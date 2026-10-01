@@ -1,24 +1,44 @@
-Binaries/
-Build/
-DerivedDataCache/
-Intermediate/
-Saved/
+# Unreal Engine generated files
+/Binaries/
+/Intermediate/
+/Saved/
+/DerivedDataCache/
+/Plugins/**/Binaries/
+/Plugins/**/Intermediate/
 
-*.sln
-*.suo
-*.xcodeproj
-*.xcworkspace
-*.VC.db
-*.VC.VC.opendb
-
-*.log
-*.tmp
-
-.DS_Store
-
-.vscode/
-.idea/
-
-# Visual Studio cache
+# Generated IDE projects and Visual Studio local state
 .vs/
-*.ipch
+*.sln
+*.slnx
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.xcodeproj/
+*.xcworkspace/
+
+# Rider personal settings and generated project models
+# Shared code styles, inspections, and run configurations remain trackable.
+*.DotSettings.user
+_ReSharper.Caches/
+/.idea/**/workspace.xml
+/.idea/**/shelf/
+/.idea/**/modules.xml
+/.idea/**/*.iml
+/.idea/**/contentModel.xml
+/.idea/**/projectSettingsUpdater.xml
+/.idea/**/dataSources/
+/.idea/**/dataSources.local.xml
+/.idea/**/httpRequests/
+/.idea/**/queries/
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Keep Source/, Config/, Content/, .keep files, .uproject, .uplugin,
+# .vsconfig, shared Rider settings, and Build/ platform resources.
+# Keep *_BuiltData.uasset so existing map build data is shared via LFS.
+# Do not globally ignore .dll/.lib files: third-party dependencies may need them.
