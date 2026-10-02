@@ -1,4 +1,5 @@
 #include "PlayerPrototypeWidget.h"
+#include "ICCharacterCreateWidget.h"
 #include "PlayerPrototypeController.h"
 #include "PlayerInventory.h"
 #include "../Core/ICTimeSubsystem.h"
@@ -55,7 +56,27 @@ void UPlayerPrototypeWidget::Build()
     auto* PC=Cast<APlayerPrototypeController>(GetOwningPlayer());if(!PC)return;auto* Inv=PC->GetInventory();if(!Inv)return;const auto Snapshot=Inv->GetSnapshot();const auto Player=PC->GetPlayerSnapshot();
     const bool bBag=PC->Menu==TEXT("Inventory")||PC->Menu==TEXT("Storage");
     if(!bBag&&IsValid(Preview)){Preview->Destroy();Preview=nullptr;}
-    auto* Canvas=Cast<UCanvasPanel>(WidgetTree->RootWidget); if(!Canvas)return; Canvas->ClearChildren();
+    auto* Canvas=Cast<UCanvasPanel>(WidgetTree->RootWidget); if(!Canvas)return;
+    if (PC->Menu == TEXT("Create") && PC->CharacterCreateWidgetClass)
+    {
+        // Keep the same form attached while editing: do not lose keyboard focus.
+        if (!CharacterCreateScreen)
+            CharacterCreateScreen = CreateWidget<UICCharacterCreateWidget>(PC, PC->CharacterCreateWidgetClass);
+        if (CharacterCreateScreen)
+        {
+            if (CharacterCreateScreen->GetParent() != Canvas)
+            {
+                Canvas->ClearChildren();
+
+                auto* CanvasSlot = Canvas->AddChildToCanvas(CharacterCreateScreen);
+                CanvasSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+                CanvasSlot->SetOffsets(FMargin(0.f));
+            }
+            CharacterCreateScreen->RefreshState();
+            return;
+        }
+    }
+    Canvas->ClearChildren();
     auto AddText=[this](UPanelWidget* Parent,const FString& Text,int32 Size=16)
     {auto* W=WidgetTree->ConstructWidget<UTextBlock>();W->SetText(FText::FromString(Text));auto Font=W->GetFont();Font.Size=Size;W->SetFont(Font);W->SetColorAndOpacity(FSlateColor(FLinearColor(0.94f,0.95f,0.97f)));W->SetAutoWrapText(true);Parent->AddChild(W);return W;};
     auto Button=[this,PC](UPanelWidget* Parent,const FString& Text,const FString& Cmd,int32 Index=0)

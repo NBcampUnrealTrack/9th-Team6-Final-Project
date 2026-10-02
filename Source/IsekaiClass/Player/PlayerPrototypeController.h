@@ -7,6 +7,7 @@
 class APlayerPrototypeObject;
 class UPlayerInventory;
 class UPlayerPrototypeWidget;
+class UICCharacterCreateWidget;
 class UICWorldStateSubsystem;
 class UICTimeSubsystem;
 class UICSaveSubsystem;
@@ -20,6 +21,8 @@ class ISEKAICLASS_API APlayerPrototypeController : public APlayerController, pub
     GENERATED_BODY()
 public:
     APlayerPrototypeController();
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
+    TSubclassOf<UICCharacterCreateWidget> CharacterCreateWidgetClass;
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void SetupInputComponent() override;
