@@ -11,5 +11,6 @@ public class IsekaiClassTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
 		ExtraModuleNames.Add("IsekaiClass");
+		DisableUnityBuildForModules = new string[] { "VRM4ULoader" };
 	}
 }
