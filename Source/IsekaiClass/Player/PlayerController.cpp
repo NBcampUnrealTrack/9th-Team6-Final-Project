@@ -3,6 +3,8 @@
 #include "PlayerGameState.h"
 #include "PlayerInventory.h"
 #include "PlayerPrototypeWidget.h"
+#include "ICCharacterCreateWidget.h"
+#include "UObject/ConstructorHelpers.h"
 #include "../Core/ICWorldStateSubsystem.h"
 #include "../Core/ICTimeSubsystem.h"
 #include "../Core/ICSaveSubsystem.h"
@@ -13,8 +15,18 @@
 
 APlayerPrototypeController::APlayerPrototypeController()
 {
-    PrimaryActorTick.bTickEvenWhenPaused=true;
-    CheatClass=UICDebugCheatManager::StaticClass();
+    PrimaryActorTick.bTickEvenWhenPaused = true;
+    CheatClass = UICDebugCheatManager::StaticClass();
+
+    static ConstructorHelpers::FClassFinder<UICCharacterCreateWidget>
+        CharacterCreateWidgetBP(
+            TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_CharacterCreate")
+        );
+
+    if (CharacterCreateWidgetBP.Succeeded())
+    {
+        CharacterCreateWidgetClass = CharacterCreateWidgetBP.Class;
+    }
 }
 UPlayerInventory* APlayerPrototypeController::GetInventory() const
 { const auto* PlayerPawn=Cast<APlayerPrototypeCharacter>(GetPawn());return PlayerPawn?PlayerPawn->Inventory:nullptr; }
