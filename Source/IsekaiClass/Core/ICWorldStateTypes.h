@@ -149,4 +149,5 @@ struct FICSaveSlotInfo
     UPROPERTY(BlueprintReadOnly) bool bUsesBackup = false;
     UPROPERTY(BlueprintReadOnly) FString PlayerName;
     UPROPERTY(BlueprintReadOnly) FDateTime SavedAt;
+    UPROPERTY(BlueprintReadOnly) FICClockState Clock;
 };

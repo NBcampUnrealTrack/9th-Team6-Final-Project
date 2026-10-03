@@ -2,6 +2,7 @@
 #include "PlayerCharacter.h"
 #include "PlayerInteractionObject.h"
 #include "PlayerInventory.h"
+#include "PlayerPrototypeWidget.h"
 #include "../Core/ICWorldStateSubsystem.h"
 #include "../Core/ICTimeSubsystem.h"
 #include "../Core/ICSaveSubsystem.h"
@@ -9,6 +10,8 @@
 #include "Containers/Ticker.h"
 #include "EngineUtils.h"
 #include "Components/TextRenderComponent.h"
+#include "Components/TextBlock.h"
+#include "Blueprint/WidgetTree.h"
 #include "Framework/Application/SlateApplication.h"
 #include "InputKeyEventArgs.h"
 #include "HAL/FileManager.h"
@@ -100,8 +103,34 @@ void APlayerPrototypeController::StartSmokeTest()
             if(Step==5)Passed=Approach(TEXT("HOME A"));
             if(Step==6){Passed=C->Menu==TEXT("Storage")&&Inv->Transfer(TEXT("PlayerHome"),0,true);Passed=Approach(TEXT("HOME B (SHARED)"))&&Passed;}
             if(Step==7){Passed=C->Menu==TEXT("Storage")&&Inv->GetSnapshot().Storage[TEXT("PlayerHome")].Slots[0].Count==5;Capture(TEXT("04_Storage.png"));}
-            if(Step==8){C->SetMenu(TEXT("Inventory"));C->ExecuteUI(TEXT("Save"),0);UIKey(EKeys::Four);Passed=C->Menu==TEXT("Save")&&C->SelectedSaveSlot==4;Capture(TEXT("06_Save.png"));}
-            if(Step==9){UIKey(EKeys::One);UIKey(EKeys::Enter);Passed=C->SelectedSaveSlot==1&&Saves->bSaving;}
+            if(Step==8)
+            {
+                const auto Before=Time->GetClock();
+                for(const auto& Entry:TArray<TPair<int32,double>>{{3,3980.0},{4,3260.0}})
+                {
+                    auto SavedClock=Before;SavedClock.GameMinute=Entry.Value;
+                    Passed=Time->RestoreClock(SavedClock)&&Saves->SaveSlotSynchronously(Entry.Key)&&Passed;
+                }
+                Passed=Time->RestoreClock(Before)&&Passed;
+                C->SetMenu(TEXT("Inventory"));C->ExecuteUI(TEXT("Save"),0);UIKey(EKeys::Four);
+                Passed=Passed&&C->Menu==TEXT("Save")&&C->SelectedSaveSlot==4;
+                Capture(TEXT("06_Save.png"));
+            }
+            if(Step==9)
+            {
+                bool bMorning=false,bAfternoon=false;
+                if(C->Screen&&C->Screen->WidgetTree)C->Screen->WidgetTree->ForEachWidget([&](UWidget* Widget)
+                {
+                    if(const auto* Text=Cast<UTextBlock>(Widget))
+                    {
+                        const auto Label=Text->GetText().ToString();
+                        bMorning|=Label.Contains(TEXT("이세계3일차 오전6시20분"));
+                        bAfternoon|=Label.Contains(TEXT("이세계3일차 오후6시20분"));
+                    }
+                });
+                Passed=bMorning&&bAfternoon;
+                UIKey(EKeys::One);UIKey(EKeys::Enter);Passed=Passed&&C->SelectedSaveSlot==1&&Saves->bSaving;
+            }
             if(Step==10)
             {
                 C->PlayerDied();C->SelectedLoadSlot=1;Passed=C->Menu==TEXT("Load")&&C->LoadPlayer();

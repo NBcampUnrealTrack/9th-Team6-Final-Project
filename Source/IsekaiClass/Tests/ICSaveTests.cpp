@@ -67,9 +67,16 @@ bool FICSaveSlotsTest::RunTest(const FString& Parameters)
     {
         F.State->SetMainStat(UICWorldStateSubsystem::PlayerId(), EICMainStat::STR, Slot + 1);
         TestTrue(TEXT("Save distinct manual slot"), F.Saves->SaveSlotSynchronously(Slot));
+        F.Time->JumpGameMinutes(60);
     }
     TestEqual(TEXT("Exactly five visible slots"), F.Saves->GetSlotList().Num(), 5);
     F.Time->JumpGameMinutes(600);
+    const auto SavedSlots = F.Saves->GetSlotList();
+    for (int32 Slot = 1; Slot <= 4; ++Slot)
+    {
+        TestEqual(TEXT("Slot metadata keeps its own saved game time"), SavedSlots[Slot].Clock.GameMinute, 420.0 + (Slot - 1) * 60);
+        TestEqual(TEXT("Slot metadata keeps its saved play time"), SavedSlots[Slot].Clock.PlaySecond, 120.0);
+    }
     TestTrue(TEXT("Load manual 1"), F.Saves->LoadSlot(1));
     TestEqual(TEXT("Slot 1 stat"), F.State->GetSnapshot(UICWorldStateSubsystem::PlayerId()).MainStats.STR, 2);
     TestEqual(TEXT("Clock restores without sleep pollution"), F.Time->GetClock().GameMinute, 420.0);
@@ -89,6 +96,7 @@ bool FICSaveRecoveryTest::RunTest(const FString& Parameters)
     FICSaveFixture F;
     TestTrue(TEXT("First auto save"), F.Saves->SaveSlotSynchronously(0));
     F.State->SetMainStat(UICWorldStateSubsystem::PlayerId(), EICMainStat::STR, 7);
+    F.Time->JumpGameMinutes(480);
     TestTrue(TEXT("Second auto save"), F.Saves->SaveSlotSynchronously(0));
     TestTrue(TEXT("Previous auto backup exists"), IFileManager::Get().FileExists(*(F.Saves->GetSlotPath(0) + TEXT(".bak"))));
     TArray<uint8> Corrupt; FFileHelper::LoadFileToArray(Corrupt, *F.Saves->GetSlotPath(0));
@@ -96,6 +104,7 @@ bool FICSaveRecoveryTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("CRC detects corruption and loads backup"), F.Saves->LoadSlot(0));
     TestEqual(TEXT("Backup is previous save"), F.State->GetSnapshot(UICWorldStateSubsystem::PlayerId()).MainStats.STR, 1);
     TestTrue(TEXT("UI marks recovered backup"), F.Saves->GetSlotList()[0].bUsesBackup);
+    TestEqual(TEXT("Slot metadata uses the recovered backup game time"), F.Saves->GetSlotList()[0].Clock.GameMinute, 360.0);
     auto* Model = NewObject<UICSaveGame>(); Model->WorldState = F.State->ExportState(); Model->Clock = F.Time->GetClock(); Model->Slot = 1; Model->SaveVersion = 999;
     TestTrue(TEXT("Write future fixture"), WriteModel(Model, F.Saves->GetSlotPath(1)));
     TestFalse(TEXT("Future version load refused"), F.Saves->LoadSlot(1));

@@ -277,7 +277,10 @@ TArray<FICSaveSlotInfo> UICSaveSubsystem::GetSlotList() const
             Info.bExists |= IFileManager::Get().FileExists(*(GetSlotPath(Slot) + Suffix));
         bool bBackup = false;
         if (const auto* Save = ReadSlot(Slot, true, bBackup))
-        { Info.bExists = true; Info.bValid = true; Info.bUsesBackup = bBackup; Info.PlayerName = Save->WorldState.PlayerName; Info.SavedAt = Save->SavedAt; }
+        {
+            Info.bExists = true; Info.bValid = true; Info.bUsesBackup = bBackup;
+            Info.PlayerName = Save->WorldState.PlayerName; Info.SavedAt = Save->SavedAt; Info.Clock = Save->Clock;
+        }
         Result.Add(Info);
     }
     return Result;
