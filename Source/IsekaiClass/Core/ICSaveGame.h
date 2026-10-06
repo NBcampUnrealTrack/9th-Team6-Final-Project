@@ -19,4 +19,5 @@ public:
     UPROPERTY(SaveGame) FDateTime SavedAt;
     UPROPERTY(SaveGame) FICWorldState WorldState;
     UPROPERTY(SaveGame) FICClockState Clock;
+    UPROPERTY(SaveGame) FICSavePreview Preview;
 };

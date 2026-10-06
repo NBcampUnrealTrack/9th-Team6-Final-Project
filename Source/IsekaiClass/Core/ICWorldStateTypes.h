@@ -138,6 +138,16 @@ struct FICSaveSafety
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEffectPending = false;
 };
 
+// Preview metadata is independent of gameplay state and optional for older saves.
+USTRUCT(BlueprintType)
+struct FICSavePreview
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) FString Location;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) TArray<FName> PartyIds;
+    UPROPERTY(BlueprintReadOnly, SaveGame) TArray<uint8> ThumbnailPNG;
+};
+
 USTRUCT(BlueprintType)
 struct FICSaveSlotInfo
 {
@@ -149,5 +159,7 @@ struct FICSaveSlotInfo
     UPROPERTY(BlueprintReadOnly) bool bUsesBackup = false;
     UPROPERTY(BlueprintReadOnly) FString PlayerName;
     UPROPERTY(BlueprintReadOnly) FDateTime SavedAt;
+    UPROPERTY(BlueprintReadOnly) int32 Preset = 0;
+    UPROPERTY(BlueprintReadOnly) FICSavePreview Preview;
     UPROPERTY(BlueprintReadOnly) FICClockState Clock;
 };
