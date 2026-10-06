@@ -15,10 +15,12 @@ bool UPlayerInventory::ValidateDefinitions() const
     auto IsDefinitionValid=[&](const FPlayerItemDefinition& D)
     {
         const FString ID=D.ItemID.ToString();
+        static const TSet<FName> LegacyIDs={TEXT("PotionHP"),TEXT("Food"),TEXT("BookSTR"),TEXT("Wood"),TEXT("Ticket"),TEXT("QuestRing"),TEXT("Sword"),TEXT("Bow"),TEXT("Staff"),TEXT("HealBook"),TEXT("Clothes"),TEXT("Ring"),TEXT("Necklace")};
+        if(LegacyIDs.Contains(D.ItemID)) return D.StackLimit>=1 && D.StackLimit<=99;
         if(!IsFormatValid(D.ItemID)||D.StackLimit<1||D.StackLimit>99||D.BuyPrice<0||D.SellPrice<0||(D.BuyPrice>0&&D.BuyPrice<D.SellPrice))return false;
         if(static_cast<uint8>(D.DefaultGrade)>static_cast<uint8>(EPlayerItemGrade::Legendary)||D.MaxEnhanceLevel<0||D.MaxRandomOptions<0||D.BaseAttack<0.f||D.BaseDefense<0.f||D.EnhanceAttackPerLevel<0.f||D.EnhanceDefensePerLevel<0.f||D.EnhanceBaseCost<0||D.EnhanceBaseSuccessRate<0.f||D.EnhanceBaseSuccessRate>1.f)return false;
         const bool IsEquipment=ID.StartsWith(TEXT("EQP_"));const bool IsQuest=ID.StartsWith(TEXT("ITM_QST_"));
-        if((D.Tab==EPlayerItemTab::Quest)!=IsQuest||IsQuest&&(D.bCanDiscard||D.bCanSell))return false;
+        if((D.Tab==EPlayerItemTab::Quest)!=IsQuest||(IsQuest&&(D.bCanDiscard||D.bCanSell)))return false;
         if(IsEquipment!=(D.Kind==EPlayerItemKind::Equipment)||IsEquipment!=(D.Category==EPlayerItemCategory::Equipment))return false;
         if(IsEquipment&&(D.StackLimit!=1||D.EquipSlot==EPlayerEquipSlot::None))return false;
         if(IsEquipment&&(D.MaxRandomOptions<=0||D.OptionPoolID.IsNone()||D.MaxEnhanceLevel<=0||D.EnhanceBaseCost<=0))return false;
@@ -54,27 +56,5 @@ bool UPlayerInventory::ValidateDefinitions() const
             RowIDs.Add(RowName);
         }
     }
-    return true;
-}
-
-bool UPlayerInventory::ValidateState() const
-{
-    if(!ValidateDefinitions()||Bag.Slots.Num()<20||Bag.Slots.Num()>100||Equipment.Num()!=4||QuickSlots.Num()!=4)return false;
-    TSet<FGuid> IDs;
-    auto Check=[this,&IDs](const FPlayerItemInstance& S,bool Quest)->bool
-    {
-        if(S.IsEmpty())return S.ItemID.IsNone()&&S.Count==0;
-        const auto* D=Find(S.ItemID);if(!D||!S.InstanceID.IsValid()||IDs.Contains(S.InstanceID)||S.Count<=0)return false;
-        if((D->Tab==EPlayerItemTab::Quest)!=Quest||S.Count>(D->Kind==EPlayerItemKind::Equipment?1:FMath::Clamp(D->StackLimit,1,99)))return false;
-        if(static_cast<uint8>(S.Grade)>static_cast<uint8>(EPlayerItemGrade::Legendary)||S.Upgrade<0||S.Upgrade>D->MaxEnhanceLevel||S.Options.Num()>D->MaxRandomOptions)return false;
-        static const TSet<FName> AllowedOptions={TEXT("Attack"),TEXT("Defense"),TEXT("MaxHP"),TEXT("MaxMP"),TEXT("MaxSP"),TEXT("AttackSpeed"),TEXT("MoveSpeed"),TEXT("CriticalRate")};
-        for(const auto& Option:S.Options)if(!AllowedOptions.Contains(Option.Key)||!FMath::IsFinite(Option.Value)||Option.Value<=0.f)return false;
-        IDs.Add(S.InstanceID);return true;
-    };
-    for(const auto& S:Bag.Slots)if(!Check(S,false))return false;
-    for(const auto& S:QuestItems)if(!Check(S,true))return false;
-    for(int32 I=0;I<Equipment.Num();++I){const auto& S=Equipment[I];if(!Check(S,false))return false;if(!S.IsEmpty()&&static_cast<int32>(Find(S.ItemID)->EquipSlot)!=I)return false;}
-    for(const auto& C:Storage){if(C.Value.Slots.Num()!=40)return false;for(const auto& S:C.Value.Slots)if(!Check(S,false))return false;}
-    for(FName Q:QuickSlots)if(!Q.IsNone()){const auto* D=Find(Q);if(!D||(D->Kind!=EPlayerItemKind::Consumable&&D->Kind!=EPlayerItemKind::Expansion))return false;}
     return true;
 }

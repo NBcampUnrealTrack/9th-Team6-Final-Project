@@ -33,20 +33,6 @@ void APlayerPrototypeController::StartSmokeTest()
     TWeakObjectPtr<APlayerPrototypeController> WeakThis(this);
     FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([WeakThis,bReload,Manifest,Step=0,Waits=0](float) mutable
     {
-        auto* Controller=WeakThis.Get();if(!Controller)return false;
-        auto Capture=[](const TCHAR* Name){FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/TEXT("PlayerSmoke")/Name,true,false);};bool Passed=true;
-        if(Step==0)Capture(TEXT("01_Creation.png"));
-        if(Step==1){Controller->PlayerName=TEXT("테스트플레이어");Controller->ExecuteUI(TEXT("Create"),0);Passed=Controller->bCreated&&Controller->GetInventory()->Equipment[0].ItemID==TEXT("EQP_WPN_SWORD_001");}
-        if(Step==2)Capture(TEXT("02_Play.png"));if(Step==3)Controller->SetMenu(TEXT("Inventory"));if(Step==4)Capture(TEXT("03_Inventory.png"));
-        if(Step==5){Controller->OpenContainer(TEXT("HomeA"),true,true);Passed=Controller->GetInventory()->Transfer(TEXT("PlayerHome"),0,true);}
-        if(Step==6){Controller->OpenContainer(TEXT("HomeB"),true,true);Passed=Controller->GetInventory()->Storage[TEXT("PlayerHome")].Slots[0].Count==5;Capture(TEXT("04_Storage.png"));}
-        if(Step==7){Passed=Controller->SavePlayer();Controller->PlayerDied();Passed=Passed&&Controller->Menu==TEXT("Load")&&Controller->LoadPlayer();}
-        if(Step==8){Controller->Preset=1;Cast<APlayerPrototypeCharacter>(Controller->GetPawn())->ApplyPreset(1);for(int32 Count=0;Count<8;++Count)Controller->GetInventory()->ExpandUsingTicket();Controller->SetMenu(TEXT("Inventory"));Passed=Controller->GetInventory()->Bag.Slots.Num()==100;}
-        if(Step==9)Capture(TEXT("05_FemaleExpanded.png"));
-        if(!Passed){UE_LOG(LogTemp,Error,TEXT("PLAYER_SMOKE_FAILED step=%d"),Step);FPlatformMisc::RequestExitWithStatus(false,1);return false;}
-        if(++Step>10){UGameplayStatics::DeleteGameInSlot(GetPlayerSaveSlot(),0);UE_LOG(LogTemp,Display,TEXT("PLAYER_SMOKE_PASSED creation, shared storage, save, death, load, inventory layouts"));FPlatformMisc::RequestExit(false);return false;}
-        return true;
-    }),3.f);
         auto* C=WeakThis.Get();if(!C)return false;
         auto* Saves=C->GetSaves();auto* State=C->GetWorldState();auto* Time=C->GetTime();auto* Inv=C->GetInventory();
         auto Capture=[](const TCHAR* Name){FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/TEXT("PlayerSmoke")/Name,true,false);};
@@ -111,7 +97,7 @@ void APlayerPrototypeController::StartSmokeTest()
         {
             if(Step==0)Capture(TEXT("01_Creation.png"));
             if(Step==1){C->PlayerName=TEXT("테스트플레이어");C->ExecuteUI(TEXT("Create"),0);}
-            if(Step==2){Passed=C->bCreated&&Inv->GetSnapshot().Equipment[0].ItemID==TEXT("Sword");Capture(TEXT("02_Play.png"));}
+            if(Step==2){Passed=C->bCreated&&Inv->GetSnapshot().Equipment[0].ItemID==TEXT("EQP_WPN_SWORD_001");Capture(TEXT("02_Play.png"));}
             if(Step==3){C->SelectedLoadSlot=0;Passed=C->LoadPlayer()&&C->SelectedSaveSlot==1;C->SetMenu(TEXT("Inventory"));}
             if(Step==4)Capture(TEXT("03_Inventory.png"));
             if(Step==5)Passed=Approach(TEXT("HOME A"));
@@ -167,15 +153,15 @@ void APlayerPrototypeController::StartSmokeTest()
             if(Step==14)
             {
                 Passed=C->Menu==TEXT("Pause")&&!C->bBlocking;
-                UIKey(C->MenuCancelKey());C->BeginItem(TEXT("Food"));C->HandleKey(C->MenuCancelKey());Passed=Passed&&C->PendingItem.IsNone();
+                UIKey(C->MenuCancelKey());C->BeginItem(TEXT("ITM_FOOD_001"));C->HandleKey(C->MenuCancelKey());Passed=Passed&&C->PendingItem.IsNone();
             }
             if(Step==15)
             {
                 const auto Before=Time->GetClock();C->ConsoleCommand(TEXT("ICAddGameMinutes 60"),true);
                 Passed=Time->GetClock().GameMinute==Before.GameMinute+60&&Time->GetClock().PlaySecond==Before.PlaySecond;
-                const int32 FoodBefore=Inv->CountItem(TEXT("Food"));C->ConsoleCommand(TEXT("ICGiveItem Food 1"),true);
+                const int32 FoodBefore=Inv->CountItem(TEXT("ITM_FOOD_001"));C->ConsoleCommand(TEXT("ICGiveItem ITM_FOOD_001 1"),true);
                 C->ConsoleCommand(TEXT("ICSetAffinity NPC_R01_001 100"),true);C->ConsoleCommand(TEXT("ICTeleport 10 20 130"),true);
-                Passed=Passed&&Inv->CountItem(TEXT("Food"))==FoodBefore+1&&State->GetSnapshot(TEXT("NPC_R01_001")).Affinity==100&&C->GetPawn()->GetActorLocation().Equals(FVector(10,20,130));
+                Passed=Passed&&Inv->CountItem(TEXT("ITM_FOOD_001"))==FoodBefore+1&&State->GetSnapshot(TEXT("NPC_R01_001")).Affinity==100&&C->GetPawn()->GetActorLocation().Equals(FVector(10,20,130));
                 Time->RestoreClock(Before);
             }
             if(Step==16){C->RequestQuit();Capture(TEXT("07_Quit.png"));}

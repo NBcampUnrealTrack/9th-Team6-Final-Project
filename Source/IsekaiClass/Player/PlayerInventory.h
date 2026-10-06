@@ -9,7 +9,6 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPlayerInventoryChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerInventoryMessage, const FText&, Message);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPlayerLootResult, FName, ItemID, int32, Accepted, int32, Discarded);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerDropRequested, const FPlayerItemInstance&, Item);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPlayerLootResult, FName, ItemID, int32, Accepted, int32, Remainder);
 
@@ -23,7 +22,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Items") TArray<FPlayerItemDefinition> Definitions;
     void BindWorldState(class UICWorldStateSubsystem* InWorldState);
     UFUNCTION(BlueprintPure) FICInventoryState GetSnapshot() const;
-    UFUNCTION(BlueprintCallable) int32 TryAddItem(FName ID, int32 Count);
+    bool ApplySnapshot(const FICInventoryState& Snapshot) { return Commit(Snapshot); }
     bool ValidateSnapshot(const FICInventoryState& Snapshot) const;
     bool BuildConsumption(FName ID, int32 Count, FICInventoryState& OutSnapshot) const;
     UPROPERTY(BlueprintAssignable) FPlayerInventoryChanged OnChanged;
@@ -33,7 +32,6 @@ public:
     UPROPERTY(BlueprintReadOnly) int32 CurrentClass = 0;
     const FPlayerItemDefinition* Find(FName ID) const;
     UFUNCTION(BlueprintCallable) void ResetInventory();
-    UFUNCTION(BlueprintCallable) bool AddItem(FName ID, int32 Count, bool bDiscardOverflow = true);
     UFUNCTION(BlueprintCallable) int32 TryAddItem(FName ID, int32 Count);
     int32 TryAddItemInstance(const FPlayerItemInstance& Item);
     UFUNCTION(BlueprintCallable) bool AddItem(FName ID, int32 Count, bool bAllowPartial = true);

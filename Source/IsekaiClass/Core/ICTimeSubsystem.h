@@ -7,6 +7,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FICTimeJumped, double, FromGameMinute, double, ToGameMinute);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FICClockChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FICNaturalMinutesAdvanced,int32,Minutes);
 
 UCLASS()
 class ISEKAICLASS_API UICTimeSubsystem : public UGameInstanceSubsystem, public FTickableGameObject
@@ -15,6 +16,7 @@ class ISEKAICLASS_API UICTimeSubsystem : public UGameInstanceSubsystem, public F
 public:
     UPROPERTY(BlueprintAssignable) FICTimeJumped OnTimeJumped;
     UPROPERTY(BlueprintAssignable) FICClockChanged OnClockChanged;
+    UPROPERTY(BlueprintAssignable) FICNaturalMinutesAdvanced OnGameMinutesAdvanced;
     virtual void Tick(float DeltaTime) override;
     virtual bool IsTickable() const override;
     virtual UWorld* GetTickableGameObjectWorld() const override { return GetWorld(); }

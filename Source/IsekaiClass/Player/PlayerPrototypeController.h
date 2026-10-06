@@ -3,21 +3,11 @@
 #include "GameFramework/PlayerController.h"
 #include "PlayerItemTypes.h"
 #include "PlayerSurvival.h"
-#include "PlayerPrototypeController.generated.h"
-class UPlayerPrototypeWidget;
-class UPlayerCrafting;
-class UPlayerInventory;
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayerCombatRequest,FName,Action,int32,Slot);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPlayerEffectRequest,FGuid,RequestID,FName,ItemID,FName,TargetID);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayerInitialized,FName,JobID,FName,FirstSkillID);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPlayerStatBookApplied,FName,TargetID,EPlayerMainStat,Stat,int32,Amount);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerExhaustionChanged,bool,bExhausted);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerSleepRequested,int32,GameMinutes);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerEquipmentStatsChanged,FPlayerEquipmentStats,Stats);
 #include "../Core/ICStateParticipant.h"
 #include "PlayerPrototypeController.generated.h"
 
 class APlayerPrototypeObject;
+class UPlayerCrafting;
 class UPlayerInventory;
 class UPlayerPrototypeWidget;
 class UICCharacterCreateWidget;
@@ -27,6 +17,11 @@ class UICSaveSubsystem;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayerCombatRequest,FName,Action,int32,Slot);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPlayerEffectRequest,FGuid,RequestID,FName,ItemID,FName,TargetID);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayerInitialized,FName,JobID,FName,FirstSkillID);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPlayerStatBookApplied,FName,TargetID,EPlayerMainStat,Stat,int32,Amount);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerExhaustionChanged,bool,bExhausted);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerSleepRequested,int32,GameMinutes);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerEquipmentStatsChanged,FPlayerEquipmentStats,Stats);
 
 UCLASS()
 class ISEKAICLASS_API APlayerPrototypeController : public APlayerController, public IICStateParticipant
@@ -97,12 +92,14 @@ public:
     UPROPERTY() TObjectPtr<UPlayerPrototypeWidget> Screen;
     UPlayerInventory* GetInventory() const;
     UPlayerCrafting* GetCrafting() const;
-    UFUNCTION(BlueprintCallable) void SetCombatState(bool Active) { bInCombat=Active; }
     UICWorldStateSubsystem* GetWorldState() const;
     UICTimeSubsystem* GetTime() const;
     UICSaveSubsystem* GetSaves() const;
     UFUNCTION(BlueprintPure) FICCharacterState GetPlayerSnapshot() const;
     bool CanEditCreation() const { return !bCreated && !bInitialSavePending; }
+    bool CanSubmitCreation() const;
+    bool ValidateCreationRequest(FString& OutReason) const;
+    void ReportCreationFailure(const FString& Reason);
     UFUNCTION(BlueprintCallable) void SetCombatState(bool Active);
     UFUNCTION(BlueprintCallable) void SetFinalMoveSpeed(float Speed);
     UFUNCTION(BlueprintCallable) void ResolveEffect(FGuid RequestID,bool Success);
@@ -156,7 +153,6 @@ private:
     void CreatePlayer();
     bool UseStatBook(FName ItemID,FName TargetID,const FPlayerItemDefinition& Definition);
     void FlushWorldState();
-    bool SavePlayerToSlot(const TCHAR* SlotName,const TCHAR* SuccessMessage);
     void CancelTarget();
     void Interact();
     void SpawnDroppedItem(const FPlayerItemInstance& Item);

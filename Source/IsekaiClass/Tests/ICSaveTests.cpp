@@ -127,7 +127,7 @@ bool FICSaveRecoveryTest::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICLegacySaveTest, "Isekai.Core.LegacySaveConversion", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FICLegacySaveTest::RunTest(const FString& Parameters)
 {
-    FICSaveFixture F; auto* Legacy = NewObject<UPlayerPrototypeSave>();
+    FICSaveFixture F; auto* Legacy = NewObject<UPlayerPrototypeSave>(); Legacy->Version=1;
     Legacy->PlayerName = TEXT("Legacy"); Legacy->FirstSkill = TEXT("SKL_HEAL_001"); Legacy->Job = 3;
     Legacy->Position = FVector(10, 20, 130); Legacy->HP = 50; Legacy->SP = 40; Legacy->Strength = 12;
     const FICInventoryState Inventory; Legacy->Bag = Inventory.Bag; Legacy->Equipment = Inventory.Equipment;

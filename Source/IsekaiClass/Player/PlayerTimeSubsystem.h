@@ -3,7 +3,7 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "PlayerTimeSubsystem.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FICTimeJumped,int32,FromMinute,int32,ToMinute);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayerLegacyTimeJumped,int32,FromMinute,int32,ToMinute);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FICGameMinutesAdvanced,int32,Minutes);
 
 UCLASS()
@@ -16,7 +16,7 @@ public:
     virtual bool DoesSupportWorldType(EWorldType::Type WorldType) const override { return WorldType==EWorldType::Game||WorldType==EWorldType::PIE; }
     UPROPERTY(BlueprintReadOnly) int32 GameMinute=480;
     UPROPERTY(BlueprintReadOnly) float PlaySeconds=0.f;
-    UPROPERTY(BlueprintAssignable) FICTimeJumped OnTimeJumped;
+    UPROPERTY(BlueprintAssignable) FPlayerLegacyTimeJumped OnTimeJumped;
     UPROPERTY(BlueprintAssignable) FICGameMinutesAdvanced OnGameMinutesAdvanced;
     UFUNCTION(BlueprintCallable) void AdvanceGameMinutes(int32 Minutes);
     UFUNCTION(BlueprintCallable) void Restore(int32 InGameMinute,float InPlaySeconds);

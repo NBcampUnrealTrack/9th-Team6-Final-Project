@@ -21,7 +21,8 @@ void UICTimeSubsystem::AdvanceClock(double DeltaSeconds, bool bWorldPaused)
     const double PlayNext = Clock.PlaySecond + DeltaSeconds;
     if (!FMath::IsFinite(GameNext) || !FMath::IsFinite(PlayNext)) return;
     Clock.GameMinute = GameNext; Clock.PlaySecond = PlayNext;
-    if (FMath::FloorToInt64(GameNext) != PreviousMinute) OnClockChanged.Broadcast();
+    const int64 Elapsed=FMath::FloorToInt64(GameNext)-PreviousMinute;
+    if(Elapsed>0){OnGameMinutesAdvanced.Broadcast(static_cast<int32>(FMath::Min<int64>(Elapsed,MAX_int32)));OnClockChanged.Broadcast();}
 }
 
 bool UICTimeSubsystem::JumpGameMinutes(double Minutes)

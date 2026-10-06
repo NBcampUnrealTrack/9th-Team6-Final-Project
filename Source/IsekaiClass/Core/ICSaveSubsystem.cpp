@@ -9,9 +9,9 @@
 #include "ICWorldStateSubsystem.h"
 #include "ICTimeSubsystem.h"
 #include "../Player/PlayerSaveGame.h"
+#include "../Player/PlayerStateConversions.h"
 #include "Async/Async.h"
 #include "Engine/GameInstance.h"
-#include "Engine/World.h"
 #include "HAL/FileManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
@@ -153,8 +153,8 @@ bool UICSaveSubsystem::DeleteLegacySave()
     if (bSaving) { LastMessage = TEXT("저장 처리 중에는 삭제할 수 없습니다."); return false; }
     const FString Path = GetLegacySavePath();
     IFileManager::Get().Delete(*Path, false, false, true);
-    if (IFileManager::Get().FileExists(*Path)) { LastMessage = TEXT("기존 Version 1 원본 삭제에 실패했습니다."); return false; }
-    LastMessage = TEXT("기존 Version 1 원본을 삭제했습니다. 가져온 수동 저장은 유지됩니다."); return true;
+    if (IFileManager::Get().FileExists(*Path)) { LastMessage = TEXT("기존 Version 1/8 원본 삭제에 실패했습니다."); return false; }
+    LastMessage = TEXT("기존 Version 1/8 원본을 삭제했습니다. 가져온 수동 저장은 유지됩니다."); return true;
 }
 
 bool UICSaveSubsystem::ValidateSave(const UICSaveGame* Save, int32 Slot) const
@@ -334,7 +334,7 @@ void UICSaveSubsystem::ResetSession()
 
 bool UICSaveSubsystem::ConvertLegacySave(const UPlayerPrototypeSave* Legacy, FICWorldState& OutState) const
 {
-    if (!Legacy || Legacy->Version != 1) return false;
+    if (!Legacy || (Legacy->Version != 1 && Legacy->Version != 8)) return false;
     FICWorldState Candidate;
     Candidate.bPlayerCreated = true; Candidate.PlayerName = Legacy->PlayerName;
     Candidate.Preset = Legacy->Preset; Candidate.Job = Legacy->Job; Candidate.FirstSkill = Legacy->FirstSkill;
@@ -342,7 +342,12 @@ bool UICSaveSubsystem::ConvertLegacySave(const UPlayerPrototypeSave* Legacy, FIC
     Candidate.Inventory.Bag = Legacy->Bag; Candidate.Inventory.QuestItems = Legacy->QuestItems;
     Candidate.Inventory.Equipment = Legacy->Equipment; Candidate.Inventory.QuickSlots = Legacy->QuickSlots; Candidate.Inventory.Storage = Legacy->Storage;
     FICCharacterState Player; Player.CharacterId = UICWorldStateSubsystem::PlayerId(); Player.Kind = EICCharacterKind::Player;
-    Player.HP = Legacy->HP; Player.SP = Legacy->SP; Player.MainStats.STR = Legacy->Strength;
+    if(Legacy->Version==8)
+    {
+        if(!Legacy->Survival.IsValid()||!Legacy->MainStats.IsValid()||Legacy->Gold<0||Legacy->GameMinute<0||Legacy->GameMinute>=1440||!FMath::IsFinite(Legacy->PlaySeconds)||Legacy->PlaySeconds<0.f)return false;
+        PlayerStateConversions::Apply(Legacy->MainStats,Legacy->Survival,Player);Candidate.Gold=Legacy->Gold;
+    }
+    else {Player.HP = Legacy->HP; Player.SP = Legacy->SP; Player.MainStats.STR = Legacy->Strength;}
     Candidate.Characters.Add(Player.CharacterId, Player);
     if (!WorldState || !WorldState->CanRestoreState(Candidate)) return false;
     OutState = MoveTemp(Candidate); return true;
@@ -355,8 +360,9 @@ bool UICSaveSubsystem::ImportLegacySave()
     const FString LegacyName = Prefix.StartsWith(TEXT("IC_Test_")) ? Prefix + TEXT("_LegacyV1") : TEXT("PlayerPrototype_Auto");
     const auto* Legacy = Cast<UPlayerPrototypeSave>(UGameplayStatics::LoadGameFromSlot(LegacyName, 0));
     FICWorldState Candidate;
-    if (!ConvertLegacySave(Legacy, Candidate)) { LastMessage = TEXT("기존 Version 1 저장을 검증할 수 없습니다."); return false; }
+    if (!ConvertLegacySave(Legacy, Candidate)) { LastMessage = TEXT("기존 Version 1/8 저장을 검증할 수 없습니다."); return false; }
     auto* Save = NewObject<UICSaveGame>(); Save->WorldState = Candidate; Save->Clock = FICClockState(); Save->Slot = 1; Save->SavedAt = FDateTime::UtcNow();
+    if(Legacy->Version==8){Save->Clock.GameMinute=Legacy->GameMinute;Save->Clock.PlaySecond=Legacy->PlaySeconds;}
     TArray<uint8> Bytes;
     if (!UICSaveGame::EncodeForFile(Save, Bytes)) return false;
     const FWriteResult Result = WriteSlotFile(GetSlotPath(1), Bytes, false, false);

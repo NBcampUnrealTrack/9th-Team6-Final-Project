@@ -13,6 +13,10 @@ class ISEKAICLASS_API UPlayerPrototypeSave : public USaveGame
     GENERATED_BODY()
 public:
     UPROPERTY(SaveGame) int32 Version=8;
+    // V1 importer compatibility. Runtime saves use UICSaveSubsystem.
+    UPROPERTY(SaveGame) float HP=60.f;
+    UPROPERTY(SaveGame) float SP=70.f;
+    UPROPERTY(SaveGame) int32 Strength=1;
     UPROPERTY(SaveGame) FString PlayerName;
     UPROPERTY(SaveGame) int32 Preset=0;
     UPROPERTY(SaveGame) int32 Job=0;

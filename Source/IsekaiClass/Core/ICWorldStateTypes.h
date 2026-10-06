@@ -113,6 +113,7 @@ struct FICWorldState
     UPROPERTY(BlueprintReadOnly, SaveGame) int32 Preset = 0;
     UPROPERTY(BlueprintReadOnly, SaveGame) int32 Job = 0;
     UPROPERTY(BlueprintReadOnly, SaveGame) FName FirstSkill;
+    UPROPERTY(BlueprintReadOnly, SaveGame) int32 Gold=1000;
     UPROPERTY(BlueprintReadOnly, SaveGame) FVector PlayerPosition = FVector(0, 0, 120);
     UPROPERTY(BlueprintReadOnly, SaveGame) FRotator PlayerRotation = FRotator::ZeroRotator;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, FICCharacterState> Characters;

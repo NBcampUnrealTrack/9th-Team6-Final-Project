@@ -22,20 +22,24 @@ void UPlayerInventory::RollRandomOptions(FPlayerItemInstance& Item,const FPlayer
 
 bool UPlayerInventory::EnhanceEquipment(int32 BagIndex,int32& Gold)
 {
-    if(!Bag.Slots.IsValidIndex(BagIndex))return false;
-    auto& Item=Bag.Slots[BagIndex];const auto* Definition=Find(Item.ItemID);
+    auto Next=GetSnapshot();
+    if(!Next.Bag.Slots.IsValidIndex(BagIndex))return false;
+    auto& Item=Next.Bag.Slots[BagIndex];const auto* Definition=Find(Item.ItemID);
     if(!Definition||Definition->Kind!=EPlayerItemKind::Equipment||Item.bLocked)return Fail(TEXT("강화할 수 없는 아이템입니다."));
     if(Item.Upgrade>=Definition->MaxEnhanceLevel)return Fail(TEXT("이미 최대 강화 단계입니다."));
     const int32 Cost=Definition->EnhanceBaseCost*(Item.Upgrade+1);
     if(Cost<=0||Gold<Cost)return Fail(TEXT("강화 비용이 부족합니다."));
-    Gold-=Cost;
+
     const float SuccessRate=FMath::Clamp(Definition->EnhanceBaseSuccessRate-Item.Upgrade*0.05f,0.5f,1.f);
     if(FMath::FRand()>SuccessRate)
     {
+        Gold-=Cost;
         OnMessage.Broadcast(FText::FromString(FString::Printf(TEXT("강화 실패: %d 골드 소모, 단계는 유지됩니다."),Cost)));
         return false;
     }
-    ++Item.Upgrade;OnChanged.Broadcast();
+    ++Item.Upgrade;
+    if(!Commit(Next))return false;
+    Gold-=Cost;
     OnMessage.Broadcast(FText::FromString(FString::Printf(TEXT("강화 성공: +%d, %d 골드 소모"),Item.Upgrade,Cost)));
     return true;
 }
@@ -43,7 +47,7 @@ bool UPlayerInventory::EnhanceEquipment(int32 BagIndex,int32& Gold)
 FPlayerEquipmentStats UPlayerInventory::GetEquipmentStats() const
 {
     FPlayerEquipmentStats Result;
-    for(const auto& Item:Equipment)
+    for(const auto& Item:GetSnapshot().Equipment)
     {
         if(Item.IsEmpty())continue;const auto* Definition=Find(Item.ItemID);if(!Definition)continue;
         Result.Attack+=Definition->BaseAttack+Definition->EnhanceAttackPerLevel*Item.Upgrade;

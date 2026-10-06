@@ -1,76 +1,113 @@
 #include "PlayerPrototypeController.h"
+#include "Engine/Engine.h"
 #include "PlayerCharacter.h"
 #include "PlayerInventory.h"
-#include "PlayerGameState.h"
-#include "PlayerSaveGame.h"
-#include "PlayerTimeSubsystem.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "../Core/ICWorldStateSubsystem.h"
 #include "../Core/ICTimeSubsystem.h"
 #include "../Core/ICSaveSubsystem.h"
 
+bool APlayerPrototypeController::CanSubmitCreation() const
+{
+    const UICSaveSubsystem* Saves = GetSaves();
+    return Menu == TEXT("Create") && !bCreated && !bEffectWaiting && Saves && !Saves->bSaving;
+}
+
+bool APlayerPrototypeController::ValidateCreationRequest(FString& OutReason) const
+{
+    OutReason.Empty();
+    if (!GetWorldState() || !GetSaves() || !GetTime() || !GetInventory() || !GetPawn())
+        OutReason = TEXT("플레이어 또는 저장 시스템이 준비되지 않았습니다.");
+    else if (bCreated)
+        OutReason = TEXT("이미 생성된 캐릭터입니다.");
+    else if (GetSaves()->bSaving)
+        OutReason = TEXT("저장 중입니다. 완료될 때까지 기다려 주세요.");
+    else if (bEffectWaiting)
+        OutReason = TEXT("아이템 효과 처리 완료 후 다시 시도하세요.");
+    else if (Job < 0 || Job > 3 || Preset < 0 || Preset > 1)
+        OutReason = TEXT("성별과 직업을 다시 선택하세요.");
+    else
+    {
+        const FString Clean = PlayerName.TrimStartAndEnd();
+        bool bInvalid = Clean.IsEmpty() || Clean.Len() > 12;
+        for (TCHAR Ch : PlayerName)
+            if (Ch < TEXT(' ') || Ch == 0x2028 || Ch == 0x2029) bInvalid = true;
+        if (bInvalid) OutReason = TEXT("이름은 공백을 제외한 1~12자이며 줄바꿈을 사용할 수 없습니다.");
+    }
+    return OutReason.IsEmpty();
+}
+
+void APlayerPrototypeController::ReportCreationFailure(const FString& Reason)
+{
+    Show(Reason);
+    UE_LOG(LogTemp, Warning, TEXT("Character creation: %s"), *Reason);
+    if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, Reason);
+}
+
 void APlayerPrototypeController::CreatePlayer()
 {
-    auto* State=GetWorldState();auto* Saves=GetSaves();auto* Time=GetTime();auto* Inventory=GetInventory();
-    if(!State||!Saves||!Time||!Inventory||bCreated||Saves->bSaving||Job<0||Job>3||Preset<0||Preset>1)return;
-    const FString Clean=PlayerName.TrimStartAndEnd();bool Invalid=Clean.IsEmpty()||Clean.Len()>12;
-    for(TCHAR Ch:PlayerName)if(Ch<TEXT(' ')||Ch==0x2028||Ch==0x2029)Invalid=true;
-    if(Invalid){Show(TEXT("이름은 공백을 제외한 1~12자이며 줄바꿈을 사용할 수 없습니다."));return;}
-    if(!bInitialSavePending)
+    FString Reason;
+    if (!ValidateCreationRequest(Reason)) { ReportCreationFailure(Reason); return; }
+    UICWorldStateSubsystem* State = GetWorldState();
+    UICSaveSubsystem* Saves = GetSaves();
+    UICTimeSubsystem* Time = GetTime();
+    UPlayerInventory* Inventory = GetInventory();
+    if (!bInitialSavePending)
     {
-        PlayerName=Clean;Survival=FPlayerSurvivalState();MainStats=FPlayerMainStats();Gold=1000;auto* Inventory=GetInventory();Inventory->ResetInventory();Inventory->CurrentClass=Job;
-        const FName Weapons[]={TEXT("EQP_WPN_SWORD_001"),TEXT("EQP_WPN_BOW_001"),TEXT("EQP_WPN_STAFF_001"),TEXT("EQP_WPN_WAND_001")};
-        const FName Jobs[]={TEXT("Warrior"),TEXT("Archer"),TEXT("Mage"),TEXT("Healer")};
-        const FName Skills[]={TEXT("SKL_WAR_001"),TEXT("SKL_ARC_001"),TEXT("SKL_MAG_001"),TEXT("SKL_HEAL_001")};
-        Inventory->AddItem(Weapons[Job],1,false);Inventory->Equip(0);FirstSkill=Skills[Job];
-        Inventory->AddItem(TEXT("ITM_CONS_001"),5,false);Inventory->AddItem(TEXT("ITM_FOOD_001"),3,false);Inventory->AddItem(TEXT("ITM_BOOK_001"),2,false);Inventory->AddItem(TEXT("ITM_TKT_001"),10,false);
-        Inventory->AddItem(TEXT("ITM_MAT_001"),98,false);Inventory->AddItem(TEXT("EQP_ARM_001"),1,false);Inventory->AddItem(TEXT("EQP_RNG_001"),1,false);Inventory->AddItem(TEXT("EQP_NCK_001"),1,false);
-        Inventory->QuickSlots={TEXT("ITM_CONS_001"),TEXT("ITM_FOOD_001"),TEXT("ITM_BOOK_001"),TEXT("ITM_TKT_001")};
-        Cast<APlayerPrototypeCharacter>(GetPawn())->ApplyPreset(Preset);OnPlayerInitialized.Broadcast(Jobs[Job],FirstSkill);bInitialSavePending=true;bCreated=true;
-    }
-    if(!AutoSavePlayer()){bCreated=false;Show(TEXT("초기 저장 실패. 생성 버튼으로 저장을 재시도하세요."));UpdateGamePhase();return;}
-    bCreated=true;bInitialSavePending=false;SetMenu(TEXT(""));Show(TEXT("생성 완료. I: 인벤토리 / F: 상호작용 / F5: 저장 / F9: 불러오기"));
-        const FName Weapons[]={TEXT("Sword"),TEXT("Bow"),TEXT("Staff"),TEXT("HealBook")};
-        const FName Skills[]={TEXT("SKL_WAR_001"),TEXT("SKL_ARC_001"),TEXT("SKL_MAG_001"),TEXT("SKL_HEAL_001")};
-        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=Clean;Initial.Preset=Preset;
-        Initial.Job=Job;Initial.FirstSkill=Skills[Job];Initial.PlayerPosition=GetPawn()->GetActorLocation();Initial.PlayerRotation=GetControlRotation();
-        FICCharacterState InitialCharacterState;InitialCharacterState.CharacterId=UICWorldStateSubsystem::PlayerId();InitialCharacterState.Kind=EICCharacterKind::Player;
-        Initial.Characters.Add(InitialCharacterState.CharacterId,InitialCharacterState);bInitialSavePending=true;
-        if(!State->RestoreState(Initial)){bInitialSavePending=false;Show(TEXT("초기 상태 검증 실패"));return;}
-        Time->ResetClock();Saves->ResetSession();
-        Inventory->AddItem(Weapons[Job],1,false);Inventory->Equip(0);
-        const TPair<FName,int32> Items[]={
-            {TEXT("PotionHP"),5},{TEXT("Food"),3},{TEXT("BookSTR"),2},{TEXT("Ticket"),10},
-            {TEXT("Wood"),98},{TEXT("Clothes"),1},{TEXT("Ring"),1},{TEXT("Necklace"),1}
+        const FName Weapons[] = { TEXT("EQP_WPN_SWORD_001"), TEXT("EQP_WPN_BOW_001"), TEXT("EQP_WPN_STAFF_001"), TEXT("EQP_WPN_WAND_001") };
+        const FName Skills[] = { TEXT("SKL_WAR_001"), TEXT("SKL_ARC_001"), TEXT("SKL_MAG_001"), TEXT("SKL_HEAL_001") };
+        // Prepare and validate the whole starting inventory before changing live state.
+        UPlayerInventory* Staging = NewObject<UPlayerInventory>(this);
+        Staging->Definitions = Inventory->Definitions;
+        Staging->ItemTable = Inventory->ItemTable;
+        Staging->CurrentClass=Job;
+        if (!Staging->AddItem(Weapons[Job], 1, false) || !Staging->Equip(0))
+        { ReportCreationFailure(TEXT("초기 무기 지급/장착에 실패했습니다. 아이템 정의를 확인하세요.")); return; }
+        const TPair<FName, int32> Items[] = {
+            { TEXT("ITM_CONS_001"), 5 }, { TEXT("ITM_FOOD_001"), 3 }, { TEXT("ITM_BOOK_001"), 2 }, { TEXT("ITM_TKT_001"), 10 },
+            { TEXT("ITM_MAT_001"), 98 }, { TEXT("EQP_ARM_001"), 1 }, { TEXT("EQP_RNG_001"), 1 }, { TEXT("EQP_NCK_001"), 1 }
         };
-        for(const auto& Item:Items)Inventory->AddItem(Item.Key,Item.Value,false);
-        auto Data=Inventory->GetSnapshot();Data.QuickSlots={TEXT("PotionHP"),TEXT("Food"),TEXT("BookSTR"),TEXT("Ticket")};
-        if(!Inventory->ValidateSnapshot(Data)||!State->CommitInventoryState(Data)){Show(TEXT("초기 인벤토리 검증 실패"));return;}
+        for (const auto& Item : Items)
+            if (!Staging->AddItem(Item.Key, Item.Value, false))
+            { ReportCreationFailure(FString::Printf(TEXT("초기 아이템 %s 지급에 실패했습니다."), *Item.Key.ToString())); return; }
+        FICInventoryState Data = Staging->GetSnapshot();
+        Data.QuickSlots = { TEXT("ITM_CONS_001"), TEXT("ITM_FOOD_001"), TEXT("ITM_BOOK_001"), TEXT("ITM_TKT_001") };
+        if (!Inventory->ValidateSnapshot(Data))
+        { ReportCreationFailure(TEXT("초기 인벤토리 검증에 실패했습니다.")); return; }
+
+        FICWorldState Initial;
+        Initial.bPlayerCreated = true;
+        Initial.PlayerName = PlayerName.TrimStartAndEnd();
+        Initial.Preset = Preset;
+        Initial.Job = Job;
+        Initial.FirstSkill = Skills[Job];
+        Initial.PlayerPosition = GetPawn()->GetActorLocation();
+        Initial.PlayerRotation = GetControlRotation();
+        Initial.Inventory = MoveTemp(Data);
+        FICCharacterState InitialCharacterState;
+        InitialCharacterState.CharacterId = UICWorldStateSubsystem::PlayerId();
+        InitialCharacterState.Kind = EICCharacterKind::Player;
+        Initial.Characters.Add(InitialCharacterState.CharacterId, InitialCharacterState);
+        if (!State->CanRestoreState(Initial))
+        { ReportCreationFailure(TEXT("캐릭터 초기 상태 검증에 실패했습니다.")); return; }
+        bInitialSavePending = true;
+        if (!State->RestoreState(Initial))
+        { bInitialSavePending = false; ReportCreationFailure(TEXT("캐릭터 초기 상태 적용에 실패했습니다.")); return; }
+        Time->ResetClock();
+        Saves->ResetSession();
     }
+    // An explicit SaveSlot call is permitted while automatic saving is suspended.
+    Saves->SetAutoSaveSuspended(true);
     SyncSaveSafety();
-    if(!Saves->SaveSlot(0)){Show(Saves->GetLastMessage()+TEXT(" 생성 버튼으로 재시도하세요."));UpdateGamePhase();}
+    Show(TEXT("캐릭터 생성 및 최초 저장 중…"));
+    if (!Saves->SaveSlot(0))
+    {
+        ReportCreationFailure(Saves->GetLastMessage() + TEXT(" 게임 시작 버튼으로 저장을 재시도할 수 있습니다."));
+        UpdateGamePhase();
+    }
 }
 
 bool APlayerPrototypeController::SavePlayer()
 {
-    return SavePlayerToSlot(GetPlayerManualSaveSlot(0),TEXT("수동 저장 1번 완료"));
-}
-
-bool APlayerPrototypeController::AutoSavePlayer()
-{
-    return SavePlayerToSlot(GetPlayerSaveSlot(),TEXT("오토세이브 완료"));
-}
-
-bool APlayerPrototypeController::SavePlayerToSlot(const TCHAR* SlotName,const TCHAR* SuccessMessage)
-{
-    if((!bCreated&&!bInitialSavePending)||bInCombat||bInDialogue||bInEvent||bDead||bEffectWaiting){Show(TEXT("현재 상태에서는 저장할 수 없습니다."));return false;}
-    auto* Inventory=GetInventory();if(!Inventory||!Inventory->ValidateState()){Show(TEXT("인벤토리 검증 실패. 저장하지 않았습니다."));return false;}
-    auto* Save=Cast<UPlayerPrototypeSave>(UGameplayStatics::CreateSaveGameObject(UPlayerPrototypeSave::StaticClass()));
-    Save->PlayerName=PlayerName;Save->Preset=Preset;Save->Job=Job;Save->FirstSkill=FirstSkill;Save->Gold=Gold;Save->Bag=Inventory->Bag;Save->QuestItems=Inventory->QuestItems;Save->Equipment=Inventory->Equipment;Save->QuickSlots=Inventory->QuickSlots;Save->Storage=Inventory->Storage;
-    Save->Position=GetPawn()->GetActorLocation();Save->Rotation=GetControlRotation();Save->Survival=Survival;Save->MainStats=MainStats;
-    if(auto* Time=GetWorld()?GetWorld()->GetSubsystem<UPlayerTimeSubsystem>():nullptr){Save->GameMinute=Time->GameMinute;Save->PlaySeconds=Time->PlaySeconds;}
-    FlushWorldState();const bool Saved=UGameplayStatics::SaveGameToSlot(Save,SlotName,0);Show(Saved?SuccessMessage:TEXT("저장 실패. 기존 상태를 유지합니다."));return Saved;
     SyncSaveSafety();auto* Saves=GetSaves();
     if(!Saves||!bCreated||SelectedSaveSlot<1||SelectedSaveSlot>4){Show(TEXT("수동 저장 슬롯 1~4를 선택하세요."));return false;}
     const bool Accepted=Saves->SaveSlot(SelectedSaveSlot);
@@ -79,21 +116,18 @@ bool APlayerPrototypeController::SavePlayerToSlot(const TCHAR* SlotName,const TC
 }
 bool APlayerPrototypeController::LoadPlayer()
 {
-    if(bEffectWaiting)return false;
-    auto* Save=Cast<UPlayerPrototypeSave>(UGameplayStatics::LoadGameFromSlot(GetPlayerSaveSlot(),0));
-    if(!Save)Save=Cast<UPlayerPrototypeSave>(UGameplayStatics::LoadGameFromSlot(GetPlayerManualSaveSlot(0),0));
-    if(!Save||Save->Version!=8||Save->Gold<0||Save->Job<0||Save->Job>3||Save->Preset<0||Save->Preset>1||Save->PlayerName.TrimStartAndEnd().IsEmpty()||Save->PlayerName.Len()>12||Save->Position.ContainsNaN()||Save->Rotation.ContainsNaN()||!Save->MainStats.IsValid()||!Save->Survival.IsValid()){Show(TEXT("사용 가능한 저장 파일이 없습니다."));return false;}
-    auto* Inventory=GetInventory();auto* Check=NewObject<UPlayerInventory>(this);Check->Definitions=Inventory->Definitions;Check->ItemTable=Inventory->ItemTable;
-    Check->Bag=Save->Bag;Check->QuestItems=Save->QuestItems;Check->Equipment=Save->Equipment;Check->QuickSlots=Save->QuickSlots;Check->Storage=Save->Storage;
-    if(!Check->ValidateState()){Show(TEXT("저장 데이터가 올바르지 않습니다. 현재 상태를 유지합니다."));return false;}
-    Inventory->Bag=Save->Bag;Inventory->QuestItems=Save->QuestItems;Inventory->Equipment=Save->Equipment;Inventory->QuickSlots=Save->QuickSlots;Inventory->Storage=Save->Storage;
-    PlayerName=Save->PlayerName;Preset=Save->Preset;Job=Save->Job;FirstSkill=Save->FirstSkill;Gold=Save->Gold;Survival=Save->Survival;MainStats=Save->MainStats;Inventory->CurrentClass=Job;bLastExhausted=Survival.IsExhausted();if(auto* Time=GetWorld()?GetWorld()->GetSubsystem<UPlayerTimeSubsystem>():nullptr)Time->Restore(Save->GameMinute,Save->PlaySeconds);
-    bCreated=true;bDead=false;bInitialSavePending=false;bInCombat=bInDialogue=bInEvent=false;SelectedBag=SelectedStorage=MoveFrom=INDEX_NONE;
-    Cast<APlayerPrototypeCharacter>(GetPawn())->ApplyPreset(Preset);GetPawn()->SetActorLocation(Save->Position);Cast<ACharacter>(GetPawn())->GetCharacterMovement()->StopMovementImmediately();SetControlRotation(Save->Rotation);
-    FlushWorldState();Inventory->OnChanged.Broadcast();SetMenu(TEXT(""));Show(TEXT("불러오기 완료"));return true;
     SyncSaveSafety();auto* Saves=GetSaves();if(!Saves)return false;
     const bool WasPending=bInitialSavePending;bInitialSavePending=false;
     const bool Loaded=Saves->LoadSlot(SelectedLoadSlot);
     if(Loaded)RefreshSaveSlots();else bInitialSavePending=WasPending;
     Show(Saves->GetLastMessage());return Loaded;
+}
+
+bool APlayerPrototypeController::AutoSavePlayer()
+{
+    SyncSaveSafety();auto* Saves=GetSaves();
+    if(!Saves||(!bCreated&&!bInitialSavePending))return false;
+    const bool Accepted=Saves->SaveSlot(0);
+    if(!Accepted)Show(Saves->GetLastMessage());
+    return Accepted;
 }
