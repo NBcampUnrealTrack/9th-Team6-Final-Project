@@ -161,4 +161,5 @@ struct FICSaveSlotInfo
     UPROPERTY(BlueprintReadOnly) FDateTime SavedAt;
     UPROPERTY(BlueprintReadOnly) int32 Preset = 0;
     UPROPERTY(BlueprintReadOnly) FICSavePreview Preview;
+    UPROPERTY(BlueprintReadOnly) FICClockState Clock;
 };

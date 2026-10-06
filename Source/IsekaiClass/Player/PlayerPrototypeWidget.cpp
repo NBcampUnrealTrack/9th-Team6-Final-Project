@@ -117,7 +117,15 @@ void UPlayerPrototypeWidget::Build()
             if(bSave&&Slot.Slot==0)continue;
             const FString Label=Slot.Slot==0?TEXT("자동"):FString::Printf(TEXT("수동 %d"),Slot.Slot);
             FString Status=!Slot.bExists?TEXT("비어 있음"):Slot.bValid?Slot.PlayerName+(Slot.bUsesBackup?TEXT(" (백업 복구 가능)"):TEXT("")):TEXT("읽을 수 없음 / 삭제 가능");
-            if(Slot.bValid)Status+=TEXT(" · ")+(Slot.SavedAt+(FDateTime::Now()-FDateTime::UtcNow())).ToString(TEXT("%Y-%m-%d %H:%M:%S"));
+            if(Slot.bValid)
+            {
+                const FString SavedAt=(Slot.SavedAt+(FDateTime::Now()-FDateTime::UtcNow())).ToString(TEXT("%y.%m.%d %H:%M"));
+                const int64 Minute=FMath::FloorToInt64(Slot.Clock.GameMinute);
+                const int64 Hour24=(Minute%1440)/60;
+                const int64 Hour12=Hour24%12==0?12:Hour24%12;
+                Status+=FString::Printf(TEXT(" · %s · 이세계%lld일차 %s%lld시%lld분"),*SavedAt,
+                    Minute/1440+1,Hour24<12?TEXT("오전"):TEXT("오후"),Hour12,Minute%60);
+            }
             auto* B=Button(Body,FString(Selected==Slot.Slot?TEXT("[선택] "):TEXT(""))+Label+TEXT(" : ")+Status,bSave?TEXT("SaveSlot"):TEXT("LoadSlot"),Slot.Slot);
             B->SetIsEnabled(!bBusy);if(Selected==Slot.Slot)B->SetBackgroundColor(FLinearColor(0.15f,0.4f,0.6f));
         }
