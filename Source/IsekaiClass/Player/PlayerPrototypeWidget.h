@@ -6,6 +6,7 @@
 class APlayerPrototypeController;
 class UVerticalBox;
 class APlayerInventoryPreview;
+class UICCharacterCreateWidget;
 
 UCLASS()
 class ISEKAICLASS_API UPlayerPrototypeButton : public UButton
@@ -31,6 +32,7 @@ public:
     virtual FReply NativeOnKeyDown(const FGeometry& Geometry,const FKeyEvent& Event) override;
     UFUNCTION() void NameChanged(const FText& Text);
 private:
+    UPROPERTY() TObjectPtr<UICCharacterCreateWidget> CharacterCreateScreen;
     UPROPERTY() TObjectPtr<APlayerInventoryPreview> Preview;
     float PreviewRefresh=0.f;
     void Build();

@@ -1,0 +1,25 @@
+ID,Type,Owner,Status,bDeprecated,ReplacementID,Notes
+PotionHP,Item,2,Temporary,false,ITM_CONS_001,기존 데모 저장 호환
+Food,Item,2,Temporary,false,ITM_FOOD_001,기존 데모 저장 호환
+BookSTR,Item,2,Temporary,false,ITM_BOOK_001,기존 데모 저장 호환
+Wood,Item,2,Temporary,false,ITM_MAT_001,기존 데모 저장 호환
+Ticket,Item,2,Temporary,false,ITM_TKT_001,기존 데모 저장 호환
+QuestRing,Item,2,Temporary,false,ITM_QST_001,기존 데모 저장 호환
+Sword,Equipment,2,Temporary,false,EQP_WPN_SWORD_001,기존 장비 GUID 유지
+Bow,Equipment,2,Temporary,false,EQP_WPN_BOW_001,기존 장비 GUID 유지
+Staff,Equipment,2,Temporary,false,EQP_WPN_STAFF_001,기존 장비 GUID 유지
+HealBook,Equipment,2,Temporary,false,,치유서 정식 계열은 미정
+Clothes,Equipment,2,Temporary,false,EQP_ARM_001,기존 장비 GUID 유지
+Ring,Equipment,2,Temporary,false,EQP_RNG_001,기존 장비 GUID 유지
+Necklace,Equipment,2,Temporary,false,EQP_NCK_001,기존 장비 GUID 유지
+PlayerHome,Container,2,Temporary,false,CNT_HOME_R01_001,집 두 곳이 같은 컨테이너 참조
+NPC_Test,Container,2,Temporary,false,,기존 권한 창고 데모 ID
+Player,Alias,2,Temporary,false,CHR_PLAYER,UI 대상 및 아이템 OwnerID의 기존 별칭
+Companion1,Alias,2,Temporary,false,,파티 슬롯 0으로 해석; 캐릭터 ID 아님
+Companion2,Alias,2,Temporary,false,,파티 슬롯 1로 해석
+Companion3,Alias,2,Temporary,false,,파티 슬롯 2로 해석
+Companion4,Alias,2,Temporary,false,,파티 슬롯 3으로 해석
+SKL_HEAL_001,Skill,3,Temporary,false,SKL_HEL_001,기존 생성·세이브 ID 유지; 마이그레이션 별도
+RestoreHP,Effect,2,Temporary,false,,현재 시험 소비품 효과
+RestoreSP,Effect,2,Temporary,false,,현재 시험 소비품 효과
+GrowSTR,Effect,2,Temporary,false,,현재 시험 소비품 효과

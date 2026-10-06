@@ -1,0 +1,40 @@
+ID,Type,Owner,RangeStart,RangeEnd,Status,bDeprecated,Notes
+CHR_PLAYER,Character,1,0,0,Active,false,고정 플레이어 ID
+NPC_R01_001,NPC,5,1,99,Reserved,false,프로토 영입형 상태 및 통합 테스트용 예약
+NPC_R01_002,NPC,5,1,99,Reserved,false,파티 중복 검사 예약
+NPC_R01_101,NPC,4,101,199,Reserved,false,프로토 상주형 예약
+NPC_R01_201,NPC,4,201,299,Reserved,false,프로토 배경형 예약
+MON_R01_001,Monster,3,1,99,Reserved,false,프로토 몬스터 예약
+BOS_R01_001,Boss,3,1,99,Reserved,false,R01 보스 예약
+BOS_FIN_001,Boss,3,1,99,Reserved,false,최종 보스 예약
+SKL_WAR_001,Skill,3,1,99,Active,false,현재 전사 초기 스킬 요청 ID
+SKL_ARC_001,Skill,3,1,99,Active,false,현재 궁사 초기 스킬 요청 ID
+SKL_MAG_001,Skill,3,1,99,Active,false,현재 마법사 초기 스킬 요청 ID
+SKL_HEL_001,Skill,3,1,99,Reserved,false,기획 규격 치유 스킬; 기존 HEAL은 예외 유지
+SKL_NPC_001,Skill,3,1,99,Reserved,false,동료 스킬 예약
+SKL_MON_001,Skill,3,1,99,Reserved,false,몬스터 스킬 예약
+DBF_001,Debuff,3,1,99,Reserved,false,자동 저장 위험 상태 검사 ID
+ITM_CONS_001,Item,2,1,99,Reserved,false,포션 정식 ID 후보; 자동 이전 없음
+ITM_FOOD_001,Item,2,1,99,Reserved,false,음식 정식 ID 후보
+ITM_BOOK_001,Item,2,1,99,Reserved,false,경험의 서 정식 ID 후보
+ITM_MAT_001,Item,2,1,99,Reserved,false,목재 정식 ID 후보
+ITM_QST_001,Item,2,1,99,Reserved,false,퀘스트 아이템 정식 ID 후보
+ITM_TKT_001,Item,2,1,99,Reserved,false,확장권 정식 ID 후보
+EQP_WPN_SWORD_001,Equipment,2,1,99,Reserved,false,검 정식 ID 후보
+EQP_WPN_BOW_001,Equipment,2,1,99,Reserved,false,활 정식 ID 후보
+EQP_WPN_STAFF_001,Equipment,2,1,99,Reserved,false,지팡이 정식 ID 후보
+EQP_WPN_WAND_001,Equipment,2,1,99,Reserved,false,치유서의 대체 외형은 담당 확정 필요
+EQP_ARM_001,Equipment,2,1,99,Reserved,false,갑옷 정식 ID 후보
+EQP_RNG_001,Equipment,2,1,99,Reserved,false,반지 정식 ID 후보
+EQP_NCK_001,Equipment,2,1,99,Reserved,false,목걸이 정식 ID 후보
+RCP_COOK_001,Recipe,2,1,99,Reserved,false,프로토 빵 레시피 예약
+RCP_CRAFT_001,Recipe,2,1,99,Reserved,false,프로토 검 레시피 예약
+QST_R01_MAIN_001,Quest,5,1,99,Reserved,false,프로토 사냥 퀘스트 및 저장 테스트 예약
+QST_FIN_001,Quest,5,1,99,Reserved,false,엔딩 퀘스트 예약
+DLG_NPC_R01_001_001,Dialogue,5,1,99,Reserved,false,영입형 대화 예약
+SCH_NPC_R01_001_01,Schedule,4,1,99,Reserved,false,영입형 일과 예약
+ANC_R01_001,Anchor,6,1,99,Reserved,false,프로토 앵커 예약
+SO_BED_R01_001,SmartObject,6,1,99,Reserved,false,침대 예약
+SO_TREE_R01_001,SmartObject,6,1,99,Reserved,false,자원 재생 저장 테스트 예약
+WRP_R01_001,Warp,6,1,99,Reserved,false,워프 저장 테스트 예약
+CNT_HOME_R01_001,Container,2,1,99,Reserved,false,공용 집 창고 정식 ID 후보
