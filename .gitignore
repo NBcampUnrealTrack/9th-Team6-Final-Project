@@ -42,3 +42,11 @@ Desktop.ini
 # .vsconfig, shared Rider settings, and Build/ platform resources.
 # Keep *_BuiltData.uasset so existing map build data is shared via LFS.
 # Do not globally ignore .dll/.lib files: third-party dependencies may need them.
+
+# Rider project layout and Git mapping settings
+/.idea/**/indexLayout.xml
+/.idea/**/vcs.xml
+
+# Generated Python caches
+__pycache__/
+*.pyc
