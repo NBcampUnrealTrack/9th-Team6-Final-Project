@@ -1,6 +1,7 @@
 #include "PlayerCharacter.h"
 #include "PlayerAppearance.h"
 #include "PlayerInventory.h"
+#include "PlayerCrafting.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -11,6 +12,7 @@
 APlayerPrototypeCharacter::APlayerPrototypeCharacter()
 {
     Inventory=CreateDefaultSubobject<UPlayerInventory>(TEXT("Inventory"));
+    Crafting=CreateDefaultSubobject<UPlayerCrafting>(TEXT("Crafting"));
     CameraArm=CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraArm"));
     CameraArm->SetupAttachment(RootComponent);
     CameraArm->TargetArmLength=420;

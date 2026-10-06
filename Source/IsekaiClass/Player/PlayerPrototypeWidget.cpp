@@ -2,6 +2,7 @@
 #include "ICCharacterCreateWidget.h"
 #include "PlayerPrototypeController.h"
 #include "PlayerInventory.h"
+#include "PlayerCrafting.h"
 #include "../Core/ICTimeSubsystem.h"
 #include "../Core/ICSaveSubsystem.h"
 #include "PlayerInventoryPreview.h"
@@ -87,8 +88,14 @@ void UPlayerPrototypeWidget::Build()
         B->AddChild(T);Parent->AddChild(B);return B;
     };
     auto ItemText=[Inv](const FPlayerItemInstance& S)
-    {if(S.IsEmpty())return FString(TEXT("빈 칸"));const auto* D=Inv->Find(S.ItemID);return FString::Printf(TEXT("%s ×%d%s"),D?*D->Name.ToString():*S.ItemID.ToString(),S.Count,S.bLocked?TEXT(" [잠금]"):TEXT(""));};
+    {if(S.IsEmpty())return FString(TEXT("빈 칸"));const auto* D=Inv->Find(S.ItemID);return FString::Printf(TEXT("%s ×%d%s"),D?*D->DisplayName.ToString():*S.ItemID.ToString(),S.Count,S.bLocked?TEXT(" [잠금]"):TEXT(""));};
     auto* HUD=WidgetTree->ConstructWidget<UVerticalBox>();auto* HS=Canvas->AddChildToCanvas(HUD);HS->SetPosition(FVector2D(24,18));HS->SetSize(FVector2D(1100,170));
+    const FPlayerEquipmentStats EquipmentStats=Inv->GetEquipmentStats();
+    AddText(HUD,PC->bCreated?FString::Printf(TEXT("%s  |  HP %.0f/%.0f  MP %.0f/%.0f  SP %.0f/%.0f%s | 골드 %d | 공격 %.0f 방어 %.0f | STR %d DEX %d INT %d CON %d CHA %d LUK %d"),*PC->PlayerName,PC->Survival.HP,PC->Survival.MaxHP,PC->Survival.MP,PC->Survival.MaxMP,PC->Survival.SP,PC->Survival.MaxSP,PC->Survival.IsExhausted()?TEXT(" [탈진]"):TEXT(""),PC->Gold,EquipmentStats.Attack,EquipmentStats.Defense,PC->MainStats.Strength,PC->MainStats.Dexterity,PC->MainStats.Intelligence,PC->MainStats.Constitution,PC->MainStats.Charisma,PC->MainStats.Luck):TEXT("플레이어 시스템 프로토타입"),22);
+    AddText(HUD,TEXT("WASD 이동 · 마우스 시점 · Space 점프 · F 상호작용 · I 가방 · ESC 메뉴 · F5 저장 · F9 로드"),14);
+    FString Quick;
+    for(int32 Q=0;Q<4;++Q){const auto* D=Inv->Find(Inv->QuickSlots[Q]);Quick+=FString::Printf(TEXT("  [%d] %s (%d)"),Q+1,D?*D->DisplayName.ToString():TEXT("미등록"),Inv->CountItem(Inv->QuickSlots[Q]));}
+    AddText(HUD,Quick,14);AddText(HUD,PC->Notice,15);
     AddText(HUD,PC->bCreated?FString::Printf(TEXT("%s  |  HP %.0f / SP %.0f / STR %d"),*PC->PlayerName,Player.HP,Player.SP,Player.MainStats.STR):TEXT("플레이어 시스템 프로토타입"),22);
     AddText(HUD,FString::Printf(TEXT("WASD 이동 · 마우스 시점 · Space 점프 · F 상호작용 · I 가방 · %s 메뉴 · F5 저장 화면 · F9 선택 슬롯 로드"),*PC->MenuCancelLabel()),14);
     if(auto* Time=PC->GetTime())
@@ -213,6 +220,13 @@ void UPlayerPrototypeWidget::Build()
         auto* MoreActions=WidgetTree->ConstructWidget<UHorizontalBox>();Body->AddChild(MoreActions);
         Button(MoreActions,TEXT("이동/합치기"),TEXT("Move"));Button(MoreActions,TEXT("버리기"),TEXT("Discard"));Button(MoreActions,TEXT("정렬"),TEXT("Sort"));Button(MoreActions,TEXT("10칸 확장"),TEXT("Expand"));
         auto* QuickRow=WidgetTree->ConstructWidget<UHorizontalBox>();Body->AddChild(QuickRow);for(int32 N=0;N<4;++N)Button(QuickRow,FString::Printf(TEXT("퀵슬롯 %d 등록"),N+1),TEXT("Quick"),N);
+        if(Inv->Bag.Slots.IsValidIndex(PC->SelectedBag))
+        {
+            const auto& S=Inv->Bag.Slots[PC->SelectedBag];const auto* Definition=Inv->Find(S.ItemID);
+            const FName TableItemID=Definition?Definition->ItemID:S.ItemID;
+            FString OptionText;for(const auto& Option:S.Options)OptionText+=FString::Printf(TEXT(" %s +%.0f"),*Option.Key.ToString(),Option.Value);
+            AddText(Body,FString::Printf(TEXT("선택: %d / %s / 아이템 ID %s / 등급 %d / 강화 +%d / 랜덤 옵션:%s / 소유자 %s / 인스턴스 ID %s"),PC->SelectedBag+1,*ItemText(S),*TableItemID.ToString(),static_cast<int32>(S.Grade),S.Upgrade,OptionText.IsEmpty()?TEXT(" 없음"):*OptionText,*S.OwnerID.ToString(),*S.InstanceID.ToString()),13);
+        }
         if(Snapshot.Bag.Slots.IsValidIndex(PC->SelectedBag))
         {const auto& S=Snapshot.Bag.Slots[PC->SelectedBag];AddText(Body,FString::Printf(TEXT("선택: %d / %s / 등급 %d / 강화 +%d / 소유자 %s / ID %s"),PC->SelectedBag+1,*ItemText(S),S.Grade,S.Upgrade,*S.OwnerID.ToString(),*S.InstanceID.ToString()),13);}
         auto* Grid=WidgetTree->ConstructWidget<UUniformGridPanel>();Grid->SetSlotPadding(FMargin(3));Body->AddChild(Grid);
@@ -225,6 +239,29 @@ void UPlayerPrototypeWidget::Build()
             if(const auto* C=Snapshot.Storage.Find(PC->OpenStorage))for(int32 N=0;N<C->Slots.Num();++N)Button(Body,FString::Printf(TEXT("%s%02d %s"),PC->SelectedStorage==N?TEXT("> "):TEXT(""),N+1,*ItemText(C->Slots[N])),TEXT("Chest"),N);
         }
     }
+    else if(PC->Menu==TEXT("Craft"))
+    {
+        AddText(Body,PC->ActiveStation==TEXT("Kitchen")?TEXT("요리"):TEXT("제작"),24);
+        auto* Crafting=PC->GetCrafting();const FName RecipeID=PC->ActiveStation==TEXT("Kitchen")?FName(TEXT("RCP_COOK_001")):FName(TEXT("RCP_CRAFT_001"));
+        if(const auto* Recipe=Crafting?Crafting->Find(RecipeID):nullptr)
+        {
+            FString Materials=FString::Printf(TEXT("재료: %s x%d"),*Recipe->IngredientID1.ToString(),Recipe->IngredientCount1);
+            if(!Recipe->IngredientID2.IsNone())Materials+=FString::Printf(TEXT(" + %s x%d"),*Recipe->IngredientID2.ToString(),Recipe->IngredientCount2);
+            AddText(Body,FString::Printf(TEXT("%s -> %s x%d / SP %.0f"),*Materials,*Recipe->ResultItemID.ToString(),Recipe->ResultCount,Recipe->SPCost),16);
+            Button(Body,FString::Printf(TEXT("%s 만들기"),*Recipe->DisplayName.ToString()),TEXT("Craft"),PC->ActiveStation==TEXT("Kitchen")?0:1);
+        }
+        if(PC->ActiveStation==TEXT("Forge"))
+        {
+            AddText(Body,TEXT("장비 강화 - 가방에 해제된 장비만 가능"),18);
+            for(int32 Index=0;Index<Inv->Bag.Slots.Num();++Index)
+            {
+                const auto& Item=Inv->Bag.Slots[Index];const auto* Definition=Inv->Find(Item.ItemID);
+                if(!Item.IsEmpty()&&Definition&&Definition->Kind==EPlayerItemKind::Equipment)Button(Body,FString::Printf(TEXT("%s%s +%d"),PC->SelectedBag==Index?TEXT("> "):TEXT(""),*Definition->DisplayName.ToString(),Item.Upgrade),TEXT("Bag"),Index);
+            }
+            Button(Body,TEXT("선택 장비 강화"),TEXT("Enhance"));
+        }
+    }
+    else if(PC->Menu==TEXT("Quest")) {AddText(Body,TEXT("별도 퀘스트 인벤토리"),22);for(const auto& S:Inv->QuestItems)AddText(Body,ItemText(S));if(Inv->QuestItems.IsEmpty())AddText(Body,TEXT("보관 중인 퀘스트 아이템이 없습니다. QUEST ITEM 상자에서 F로 시험 획득하세요."));}
     else if(PC->Menu==TEXT("Quest")) {AddText(Body,TEXT("별도 퀘스트 인벤토리"),22);for(const auto& S:Snapshot.QuestItems)AddText(Body,ItemText(S));if(Snapshot.QuestItems.IsEmpty())AddText(Body,TEXT("보관 중인 퀘스트 아이템이 없습니다. QUEST ITEM 상자에서 F로 시험 획득하세요."));}
     else if(PC->Menu==TEXT("Map")) AddText(Body,TEXT("지도 UI 연결 지점입니다. 이 구현 범위에는 실제 지도가 포함되지 않습니다."));
     else if(PC->Menu==TEXT("Party")) AddText(Body,TEXT("동료 시스템 연결 지점입니다. 아직 편성된 동료가 없습니다."));

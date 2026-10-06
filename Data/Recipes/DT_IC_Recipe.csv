@@ -1,0 +1,3 @@
+﻿Name,RecipeID,DisplayName,Type,ResultItemID,ResultCount,IngredientID1,IngredientCount1,IngredientID2,IngredientCount2,SPCost,bUnlockedByDefault
+RCP_COOK_001,RCP_COOK_001,빵,Cook,ITM_FOOD_002,1,ITM_MAT_002,2,None,0,5,true
+RCP_CRAFT_001,RCP_CRAFT_001,초보자 검,Craft,EQP_WPN_SWORD_001,1,ITM_MAT_003,2,ITM_MAT_001,1,10,true
