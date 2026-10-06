@@ -15,7 +15,7 @@ void APlayerPrototypeController::StartSmokeTest()
         auto* Controller=WeakThis.Get();if(!Controller)return false;
         auto Capture=[](const TCHAR* Name){FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/TEXT("PlayerSmoke")/Name,true,false);};bool Passed=true;
         if(Step==0)Capture(TEXT("01_Creation.png"));
-        if(Step==1){Controller->PlayerName=TEXT("테스트플레이어");Controller->ExecuteUI(TEXT("Create"),0);Passed=Controller->bCreated&&Controller->GetInventory()->Equipment[0].ItemID==TEXT("Sword");}
+        if(Step==1){Controller->PlayerName=TEXT("테스트플레이어");Controller->ExecuteUI(TEXT("Create"),0);Passed=Controller->bCreated&&Controller->GetInventory()->Equipment[0].ItemID==TEXT("EQP_WPN_SWORD_001");}
         if(Step==2)Capture(TEXT("02_Play.png"));if(Step==3)Controller->SetMenu(TEXT("Inventory"));if(Step==4)Capture(TEXT("03_Inventory.png"));
         if(Step==5){Controller->OpenContainer(TEXT("HomeA"),true,true);Passed=Controller->GetInventory()->Transfer(TEXT("PlayerHome"),0,true);}
         if(Step==6){Controller->OpenContainer(TEXT("HomeB"),true,true);Passed=Controller->GetInventory()->Storage[TEXT("PlayerHome")].Slots[0].Count==5;Capture(TEXT("04_Storage.png"));}

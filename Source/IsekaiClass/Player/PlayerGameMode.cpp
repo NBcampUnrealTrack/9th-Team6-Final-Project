@@ -35,12 +35,12 @@ void APlayerPrototypeGameMode::StartPlay()
     Fill->SetAttenuationRadius(2200);
     Fill->SetIntensity(20000);
     Fill->SetCastShadows(false);
-    const TCHAR* Labels[]={TEXT("HOME A"),TEXT("HOME B (SHARED)"),TEXT("NPC STORAGE"),TEXT("WOOD +3"),TEXT("QUEST ITEM")};
-    for(int32 Index=0;Index<5;++Index)
+    const TCHAR* Labels[]={TEXT("HOME A"),TEXT("HOME B (SHARED)"),TEXT("NPC STORAGE"),TEXT("WOOD +3"),TEXT("QUEST ITEM"),TEXT("BED - SLEEP"),TEXT("KITCHEN - BREAD"),TEXT("FORGE - SWORD"),TEXT("SUPPLY - MATERIALS")};
+    for(int32 Index=0;Index<9;++Index)
     {
         const FVector Position(320,(Index-2)*220,30);
         auto* Object=GetWorld()->SpawnActor<APlayerPrototypeObject>(Position,FRotator::ZeroRotator);
-        Object->Action=Index<3?TEXT("Storage"):Index==3?TEXT("Loot"):TEXT("Quest");
+        Object->Action=Index<3?TEXT("Storage"):Index==3?TEXT("Loot"):Index==4?TEXT("Quest"):Index==5?TEXT("Sleep"):Index==6?TEXT("Kitchen"):Index==7?TEXT("Forge"):TEXT("Supply");
         Object->bHome=Index<2;
         Object->ContainerID=Index==2?TEXT("NPC_Test"):TEXT("PlayerHome");
         Object->Label->SetText(FText::FromString(Labels[Index]));

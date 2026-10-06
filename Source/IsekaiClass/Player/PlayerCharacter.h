@@ -4,6 +4,7 @@
 #include "PlayerCharacter.generated.h"
 class UCameraComponent;
 class UPlayerInventory;
+class UPlayerCrafting;
 class USpringArmComponent;
 class UStaticMeshComponent;
 UCLASS()
@@ -14,6 +15,7 @@ public:
     APlayerPrototypeCharacter();
     virtual void BeginPlay() override;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UPlayerInventory> Inventory;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UPlayerCrafting> Crafting;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<USpringArmComponent> CameraArm;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UCameraComponent> Camera;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> PlaceholderBody;
