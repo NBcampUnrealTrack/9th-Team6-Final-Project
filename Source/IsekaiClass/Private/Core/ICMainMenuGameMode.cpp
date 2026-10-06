@@ -1,5 +1,5 @@
 #include "Core/ICMainMenuGameMode.h"
-#include "Player/ICMainMenuPlayerController.h"
+#include "Core/Controller/ICMainMenuPlayerController.h"
 
 AICMainMenuGameMode::AICMainMenuGameMode()
 {

@@ -4,7 +4,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "ICMainMenuGameMode.generated.h"
 
-UCLASS()
+UCLASS(Blueprintable)
 class ISEKAICLASS_API AICMainMenuGameMode : public AGameModeBase
 {
     GENERATED_BODY()
