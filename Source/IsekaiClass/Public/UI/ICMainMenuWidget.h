@@ -6,6 +6,7 @@
 
 class UButton;
 class UWorld;
+class UICSaveLoadWidget;
 
 UCLASS(Abstract, Blueprintable)
 class ISEKAICLASS_API UICMainMenuWidget : public UUserWidget
@@ -18,6 +19,7 @@ public:
 
 protected:
     virtual void NativeOnInitialized() override;
+    virtual void NativeConstruct() override;
 
     // Select the actual gameplay map in WBP_MainMenu > Class Defaults.
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Main Menu")
@@ -35,6 +37,9 @@ protected:
     UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Main Menu")
     TObjectPtr<UButton> BTN_Quit;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Main Menu")
+    TSubclassOf<UICSaveLoadWidget> SaveLoadWidgetClass;
+
     // Implement these in the Widget Blueprint; no save/settings system is assumed.
     UFUNCTION(BlueprintImplementableEvent, Category = "Main Menu")
     void OnLoadRequested();
@@ -46,6 +51,8 @@ protected:
     void OnStartMapNotConfigured();
 
 private:
+    UPROPERTY() TObjectPtr<UICSaveLoadWidget> SaveLoadScreen;
+    UFUNCTION() void HandleSaveLoadClosed();
     UFUNCTION() void HandleStartClicked();
     UFUNCTION() void HandleLoadClicked();
     UFUNCTION() void HandleSettingsClicked();

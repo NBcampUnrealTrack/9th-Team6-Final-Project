@@ -51,8 +51,14 @@ public:
     bool ConfigureServices(UICWorldStateSubsystem* InState, UICTimeSubsystem* InTime, const FString& InPrefix);
     bool SaveSlotSynchronously(int32 Slot);
     FString GetSlotPath(int32 Slot) const;
+    // Region/quest code updates this whenever the player's displayed location changes.
+    UFUNCTION(BlueprintCallable, Category="IC|Save") void SetPreviewLocation(const FString& Location) { PreviewLocation = Location.Left(128); }
+    UFUNCTION(BlueprintPure, Category="IC|Save") FString GetPreviewLocation() const { return PreviewLocation; }
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Save") bool bCaptureSaveThumbnail = true;
     FString GetLastMessage() const { return LastMessage; }
 private:
+    FString PreviewLocation;
+    bool CaptureThumbnail(TArray<uint8>& OutPNG);
     UPROPERTY() TObjectPtr<UICWorldStateSubsystem> WorldState;
     UPROPERTY() TObjectPtr<UICTimeSubsystem> Time;
     FICSaveSafety Safety;

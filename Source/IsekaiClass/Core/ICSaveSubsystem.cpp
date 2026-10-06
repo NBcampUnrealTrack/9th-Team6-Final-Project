@@ -1,4 +1,10 @@
 #include "ICSaveSubsystem.h"
+#include "Components/SceneCaptureComponent2D.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
+#include "ImageUtils.h"
 #include "ICSaveGame.h"
 #include "ICWorldStateSubsystem.h"
 #include "ICTimeSubsystem.h"
@@ -200,6 +206,17 @@ bool UICSaveSubsystem::PrepareSave(int32 Slot, TArray<uint8>& Bytes, double& Cap
     auto* Save = NewObject<UICSaveGame>();
     Save->WorldState = WorldState->ExportState(); Save->Clock = Time->GetClock();
     Save->Slot = Slot; Save->SavedAt = FDateTime::UtcNow();
+    Save->Preview.Location = PreviewLocation.IsEmpty() ? UGameplayStatics::GetCurrentLevelName(this, true) : PreviewLocation;
+    Save->Preview.PartyIds.Add(UICWorldStateSubsystem::PlayerId());
+    TArray<FICCharacterState> Companions;
+    for (const auto& Entry : Save->WorldState.Characters)
+        if (Entry.Key != UICWorldStateSubsystem::PlayerId() && Entry.Value.Mode == EICCharacterMode::Companion && Entry.Value.PartySlot >= 0)
+            Companions.Add(Entry.Value);
+    Companions.Sort([](const FICCharacterState& A, const FICCharacterState& B)
+    { return A.PartySlot == B.PartySlot ? A.CharacterId.LexicalLess(B.CharacterId) : A.PartySlot < B.PartySlot; });
+    for (const FICCharacterState& Companion : Companions)
+    { if (Save->Preview.PartyIds.Num() >= 5) break; Save->Preview.PartyIds.AddUnique(Companion.CharacterId); }
+    if (bCaptureSaveThumbnail) CaptureThumbnail(Save->Preview.ThumbnailPNG);
     if (!ValidateSave(Save, Slot) || !UICSaveGame::EncodeForFile(Save, Bytes))
     { LastMessage = TEXT("저장 직렬화에 실패했습니다."); return false; }
     bool bUnused = false;
@@ -262,6 +279,7 @@ bool UICSaveSubsystem::LoadSlot(int32 Slot)
     const auto PreviousClock = Time->GetClock();
     Time->RestoreClock(Save->Clock); // Participants restore schedules against the loaded clock.
     if (!WorldState->RestoreState(Save->WorldState)) { Time->RestoreClock(PreviousClock); return false; }
+    PreviewLocation = Save->Preview.Location;
     ResetSession();
     LastMessage = bBackup ? TEXT("백업에서 불러왔습니다. 원본 파일은 보존했습니다.") : TEXT("불러오기 완료");
     return true;
@@ -277,7 +295,7 @@ TArray<FICSaveSlotInfo> UICSaveSubsystem::GetSlotList() const
             Info.bExists |= IFileManager::Get().FileExists(*(GetSlotPath(Slot) + Suffix));
         bool bBackup = false;
         if (const auto* Save = ReadSlot(Slot, true, bBackup))
-        { Info.bExists = true; Info.bValid = true; Info.bUsesBackup = bBackup; Info.PlayerName = Save->WorldState.PlayerName; Info.SavedAt = Save->SavedAt; }
+        { Info.bExists = true; Info.bValid = true; Info.bUsesBackup = bBackup; Info.PlayerName = Save->WorldState.PlayerName; Info.SavedAt = Save->SavedAt; Info.Preset = Save->WorldState.Preset; Info.Preview = Save->Preview; }
         Result.Add(Info);
     }
     return Result;
@@ -335,4 +353,38 @@ bool UICSaveSubsystem::ImportLegacySave()
     const FWriteResult Result = WriteSlotFile(GetSlotPath(1), Bytes, false, false);
     if (!Result.bSuccess) { LastMessage = Result.Message; return false; }
     return LoadSlot(1);
+}
+
+bool UICSaveSubsystem::CaptureThumbnail(TArray<uint8>& OutPNG)
+{
+    OutPNG.Reset();
+    UWorld* World = GetWorld();
+    APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+    if (!PC || !PC->PlayerCameraManager || !World->IsGameWorld()) return false;
+    FActorSpawnParameters SpawnParams; SpawnParams.ObjectFlags |= RF_Transient;
+    AActor* CaptureActor = World->SpawnActor<AActor>(AActor::StaticClass(), PC->PlayerCameraManager->GetCameraLocation(), PC->PlayerCameraManager->GetCameraRotation(), SpawnParams);
+    if (!CaptureActor) return false;
+    UTextureRenderTarget2D* Target = NewObject<UTextureRenderTarget2D>(CaptureActor);
+    Target->RenderTargetFormat = RTF_RGBA8;
+    Target->InitAutoFormat(512, 288); Target->UpdateResourceImmediate(true);
+    USceneCaptureComponent2D* Capture = NewObject<USceneCaptureComponent2D>(CaptureActor);
+    CaptureActor->AddInstanceComponent(Capture); CaptureActor->SetRootComponent(Capture);
+    Capture->bCaptureEveryFrame = false; Capture->bCaptureOnMovement = false;
+    Capture->TextureTarget = Target; Capture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+    Capture->FOVAngle = PC->PlayerCameraManager->GetFOVAngle();
+    Capture->RegisterComponent();
+    Capture->SetWorldLocationAndRotation(PC->PlayerCameraManager->GetCameraLocation(), PC->PlayerCameraManager->GetCameraRotation());
+    Capture->CaptureScene();
+    TArray<FColor> Pixels;
+    FTextureRenderTargetResource* Resource = Target->GameThread_GetRenderTargetResource();
+    const bool bRead = Resource && Resource->ReadPixels(Pixels) && Pixels.Num() == 512 * 288;
+    if (bRead)
+    {
+        for (FColor& Pixel : Pixels) Pixel.A = 255;
+        TArray64<uint8> Encoded;
+        FImageUtils::PNGCompressImageArray(512, 288, TArrayView64<const FColor>(Pixels.GetData(), Pixels.Num()), Encoded);
+        if (Encoded.Num() > 0 && Encoded.Num() <= 2 * 1024 * 1024) OutPNG.Append(Encoded.GetData(), static_cast<int32>(Encoded.Num()));
+    }
+    CaptureActor->Destroy();
+    return !OutPNG.IsEmpty();
 }
