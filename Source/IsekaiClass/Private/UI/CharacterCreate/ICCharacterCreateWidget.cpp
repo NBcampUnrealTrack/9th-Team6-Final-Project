@@ -1,4 +1,5 @@
 #include "UI/CharacterCreate/ICCharacterCreateWidget.h"
+#include "Debug/ICLog.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Components/EditableTextBox.h"
 #include "Components/TextBlock.h"
@@ -6,9 +7,12 @@
 #include "Engine/Texture2D.h"
 #include "Components/Image.h"
 #include "Kismet/GameplayStatics.h"
+#include "Time/ICTimeSubsystem.h"
+#include "Engine/GameInstance.h"
 
 void UICCharacterCreateWidget::NativeOnInitialized()
 {
+    IC_TRACE_FUNCTION();
     Super::NativeOnInitialized();
     if (IC_Create_Back)
         IC_Create_Back->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleBackClicked);
@@ -32,13 +36,17 @@ void UICCharacterCreateWidget::NativeOnInitialized()
 }
 void UICCharacterCreateWidget::NativeConstruct()
 {
+    IC_TRACE_FUNCTION();
     Super::NativeConstruct();
+    UE_LOG(LogICUI, Log, TEXT("[CreationUI.Opened] Widget=%s Controller=%s"),*GetNameSafe(this),*GetNameSafe(GetOwningPlayer()));
+    if(!IC_Create_Name||!IC_Create_Confirm)UE_LOG(LogICUI, Warning, TEXT("[CreationUI.BindingMissing] Widget=%s NameField=%s ConfirmButton=%s: BP 위젯 바인딩 확인 필요"),*GetNameSafe(this),*GetNameSafe(IC_Create_Name),*GetNameSafe(IC_Create_Confirm));
     if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer()))
         if (IC_Create_Name) IC_Create_Name->SetText(FText::FromString(PC->PlayerName));
     RefreshState();
 }
 void UICCharacterCreateWidget::RefreshState()
 {
+    IC_TRACE_FUNCTION();
     if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer()))
     {
         const bool bCanEdit = PC->CanEditCreation();
@@ -51,16 +59,19 @@ void UICCharacterCreateWidget::RefreshState()
 }
 void UICCharacterCreateWidget::HandleNameChanged(const FText& Text)
 {
+    IC_TRACE_FUNCTION();
     if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer()))
         if (PC->CanEditCreation()) PC->PlayerName = Text.ToString();
 }
 void UICCharacterCreateWidget::SelectPreset(int32 Index)
 {
+    IC_TRACE_FUNCTION();
     if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer()))
         PC->ExecuteUI(TEXT("Preset"), Index);
 }
 void UICCharacterCreateWidget::SelectJob(int32 Index)
 {
+    IC_TRACE_FUNCTION();
     if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer()))
     {
         if (!PC->CanEditCreation() || Index < 0 || Index > 3) return;
@@ -70,6 +81,7 @@ void UICCharacterCreateWidget::SelectJob(int32 Index)
 }
 void UICCharacterCreateWidget::CreateCharacter()
 {
+    IC_TRACE_FUNCTION();
     if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer()))
     {
         if(PC->CanEditCreation() && IC_Create_Name) PC->PlayerName=IC_Create_Name->GetText().ToString();
@@ -78,25 +90,30 @@ void UICCharacterCreateWidget::CreateCharacter()
 }
 void UICCharacterCreateWidget::OpenLoadScreen()
 {
+    IC_TRACE_FUNCTION();
     if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer())) PC->OpenLoadMenu();
 }
 void UICCharacterCreateWidget::OpenQuitScreen()
 {
+    IC_TRACE_FUNCTION();
     if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer())) PC->RequestQuit();
 }
 int32 UICCharacterCreateWidget::GetSelectedPreset() const
 {
+    IC_TRACE_FUNCTION();
     const auto* PC = Cast<AICPlayerController>(GetOwningPlayer());
     return PC ? PC->Preset : 0;
 }
 int32 UICCharacterCreateWidget::GetSelectedJob() const
 {
+    IC_TRACE_FUNCTION();
     const auto* PC = Cast<AICPlayerController>(GetOwningPlayer());
     return PC ? PC->Job : 0;
 }
 
 void UICCharacterCreateWidget::UpdateJobButtons(int32 Job, bool bCanEdit)
 {
+    IC_TRACE_FUNCTION();
     UButton* JobButtons[] = { IC_Create_Warrior.Get(), IC_Create_Archer.Get(), IC_Create_Mage.Get(), IC_Create_Healer.Get() };
     // Localizable defaults; String Table entries can replace these when the table is supplied.
     const FText JobNames[] = {
@@ -142,15 +159,18 @@ void UICCharacterCreateWidget::UpdateJobButtons(int32 Job, bool bCanEdit)
         Button->SetIsEnabled(bCanEdit);
     }
 }
-void UICCharacterCreateWidget::HandleWarriorClicked() { SelectJob(0); }
-void UICCharacterCreateWidget::HandleArcherClicked() { SelectJob(1); }
-void UICCharacterCreateWidget::HandleMageClicked() { SelectJob(2); }
-void UICCharacterCreateWidget::HandleHealerClicked() { SelectJob(3); }
+void UICCharacterCreateWidget::HandleWarriorClicked() { IC_TRACE_FUNCTION(); SelectJob(0); }
+void UICCharacterCreateWidget::HandleArcherClicked() { IC_TRACE_FUNCTION(); SelectJob(1); }
+void UICCharacterCreateWidget::HandleMageClicked() { IC_TRACE_FUNCTION(); SelectJob(2); }
+void UICCharacterCreateWidget::HandleHealerClicked() { IC_TRACE_FUNCTION(); SelectJob(3); }
 
 void UICCharacterCreateWidget::HandleBackClicked()
 {
+    IC_TRACE_FUNCTION();
     if (!GetWorld() || MainMenuLevelName.IsNone()) return;
+    if (auto* GI = GetGameInstance()) if (auto* Time = GI->GetSubsystem<UICTimeSubsystem>()) Time->PrepareForTravel();
     // The character creation screen pauses gameplay; resume before changing levels.
     UGameplayStatics::SetGamePaused(this, false);
+    UE_LOG(LogICUI, Log, TEXT("[CreationUI.Back] Map=%s"),*MainMenuLevelName.ToString());
     UGameplayStatics::OpenLevel(this, MainMenuLevelName);
 }

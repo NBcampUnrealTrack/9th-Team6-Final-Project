@@ -1,4 +1,5 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "Debug/ICLog.h"
 #include "Save/ICSaveSubsystem.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Engine/Engine.h"
@@ -10,6 +11,7 @@
 
 FString AICPlayerController::MenuCancelLabel() const
 {
+    IC_TRACE_FUNCTION();
     if(DefaultMappingContext)
         for(const FICInputCommandBinding& Binding:CommandActions)
             if(Binding.Command==EICInputCommand::Menu&&Binding.Action)
@@ -20,13 +22,15 @@ FString AICPlayerController::MenuCancelLabel() const
 
 void AICPlayerController::ShowModal(const FString& Action,const FString& Text,int32 Slot)
 {
+    IC_TRACE_FUNCTION();
     ModalReturnMenu=Menu;ModalAction=Action;ModalText=Text;ModalSlot=Slot;SetMenu(TEXT("Confirm"));
 }
 void AICPlayerController::OpenSaveMenu(bool bQuitAfter)
 {
+    IC_TRACE_FUNCTION();
     if(!bCreated){Show(TEXT("캐릭터 생성 후 수동 저장할 수 있습니다."));return;}
     if(Menu==TEXT("Confirm"))return;
-    if(bEffectWaiting){Show(TEXT("아이템 효과 처리 완료 후 저장하세요."));return;}
+    if(bItemTransactionInProgress){Show(TEXT("아이템 효과 처리 완료 후 저장하세요."));return;}
     bExitAfterSave=bQuitAfter;
     if(Menu!=TEXT("Save"))SaveReturnMenu=Menu;
     if(SelectedSaveSlot<1||SelectedSaveSlot>4)SelectedSaveSlot=1;
@@ -35,12 +39,14 @@ void AICPlayerController::OpenSaveMenu(bool bQuitAfter)
 }
 void AICPlayerController::OpenLoadMenu()
 {
+    IC_TRACE_FUNCTION();
     if(Menu==TEXT("Confirm"))return;
     if(Menu!=TEXT("Load"))LoadReturnMenu=Menu;
     RefreshSaveSlots();SetMenu(TEXT("Load"));
 }
 void AICPlayerController::CloseSessionMenu()
 {
+    IC_TRACE_FUNCTION();
     if(Menu==TEXT("Confirm")){ConfirmModal(false);return;}
     if(Menu==TEXT("Save")){bExitAfterSave=false;SetMenu(SaveReturnMenu);return;}
     if(Menu==TEXT("Load"))
@@ -54,6 +60,7 @@ void AICPlayerController::CloseSessionMenu()
 }
 void AICPlayerController::RequestManualSave()
 {
+    IC_TRACE_FUNCTION();
     auto* Saves=GetSaves();if(!Saves||Menu!=TEXT("Save"))return;
     SyncSaveSafety();
     const FString Reason=Saves->GetSaveBlockReason(false);
@@ -67,6 +74,7 @@ void AICPlayerController::RequestManualSave()
 }
 void AICPlayerController::RequestCreatePlayer()
 {
+    IC_TRACE_FUNCTION();
     FString Reason;
     if(!ValidateCreationRequest(Reason)){ReportCreationFailure(Reason);return;}
     auto* Saves=GetSaves();
@@ -77,6 +85,7 @@ void AICPlayerController::RequestCreatePlayer()
 }
 void AICPlayerController::RequestQuit()
 {
+    IC_TRACE_FUNCTION();
     if(Menu==TEXT("Confirm"))return;
     if(Menu!=TEXT("Quit"))QuitReturnMenu=Menu;
     bExitAfterSave=false;bQuitAfterWrite=false;SetMenu(TEXT("Quit"));
@@ -84,6 +93,7 @@ void AICPlayerController::RequestQuit()
 }
 void AICPlayerController::RequestDelete(bool bLegacy)
 {
+    IC_TRACE_FUNCTION();
     auto* Saves=GetSaves();if(!Saves)return;
     if(Saves->bSaving){Show(TEXT("저장 완료 후 삭제하세요."));return;}
     RefreshSaveSlots();
@@ -99,10 +109,12 @@ void AICPlayerController::RequestDelete(bool bLegacy)
 }
 void AICPlayerController::ConfirmModal(bool bAccept)
 {
+    IC_TRACE_FUNCTION();
     if(Menu!=TEXT("Confirm"))return;
     auto* Saves=GetSaves();if(!Saves)return;
     if(Saves->bSaving){Show(TEXT("저장 완료 후 확인하세요."));return;}
     const FString Action=ModalAction;const int32 Slot=ModalSlot;const FString Return=ModalReturnMenu;
+    UE_LOG(LogICUI, Log, TEXT("[UI.Modal.Result] Action=%s Slot=%d Accepted=%d"),*Action,Slot,bAccept);
     ModalAction.Empty();ModalText.Empty();ModalSlot=INDEX_NONE;SetMenu(Return);
     if(!bAccept){Show(TEXT("취소했습니다."));return;}
     if(Action==TEXT("Overwrite")){SelectedSaveSlot=Slot;SavePlayer();}
@@ -115,6 +127,7 @@ void AICPlayerController::ConfirmModal(bool bAccept)
 }
 void AICPlayerController::QuitWithoutSave()
 {
+    IC_TRACE_FUNCTION();
     if(Menu!=TEXT("Quit"))return;
     if(auto* Saves=GetSaves();Saves&&Saves->bSaving)
     {bQuitAfterWrite=true;Show(TEXT("진행 중인 저장이 완료되면 종료합니다. 실패하면 이 화면을 유지합니다."));return;}
@@ -122,6 +135,7 @@ void AICPlayerController::QuitWithoutSave()
 }
 void AICPlayerController::FinishSessionSave(int32 Slot,bool bSuccess)
 {
+    IC_TRACE_FUNCTION();
     if(bQuitAfterWrite||(bExitAfterSave&&Slot==SelectedSaveSlot&&Slot>=1))
     {
         if(bSuccess){CompleteQuit();return;}
@@ -131,10 +145,11 @@ void AICPlayerController::FinishSessionSave(int32 Slot,bool bSuccess)
 }
 void AICPlayerController::CompleteQuit()
 {
+    IC_TRACE_FUNCTION();
     if(bSessionClosing)return;
     bSessionClosing=true;
     if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(true);
-    UE_LOG(LogTemp,Display,TEXT("PLAYER_SESSION_QUIT_COMPLETE"));
+    UE_LOG(LogICCore,Log,TEXT("[Session.Quit] Controller=%s: 게임 세션 종료"),*GetNameSafe(this));
 #if WITH_EDITOR
     if(GetWorld()&&GetWorld()->WorldType==EWorldType::PIE)
     {

@@ -1,4 +1,5 @@
 #include "UI/Inventory/ICInventoryPreview.h"
+#include "Debug/ICLog.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
@@ -10,6 +11,7 @@
 
 AICInventoryPreview::AICInventoryPreview()
 {
+    IC_TRACE_FUNCTION();
     PrimaryActorTick.bCanEverTick=false;
     SetActorEnableCollision(false);
     RootComponent=CreateDefaultSubobject<USceneComponent>(TEXT("StudioRoot"));
@@ -39,7 +41,8 @@ AICInventoryPreview::AICInventoryPreview()
 
 void AICInventoryPreview::UpdateFromCharacter(AICPlayerCharacter* Character)
 {
-    if(!Character||!Character->GetMesh()->GetSkeletalMeshAsset())return;
+    IC_TRACE_FUNCTION();
+    if(!Character||!Character->GetMesh()->GetSkeletalMeshAsset()){UE_LOG(LogICUI, VeryVerbose, TEXT("[InventoryPreview.Skipped] Character=%s: 캐릭터 또는 메시 누락"),*GetNameSafe(Character));return;}
     if(!Target)
     {
         Target=NewObject<UTextureRenderTarget2D>(this);
@@ -47,6 +50,7 @@ void AICInventoryPreview::UpdateFromCharacter(AICPlayerCharacter* Character)
         Target->InitCustomFormat(512,640,PF_FloatRGB,true);
         Capture->TextureTarget=Target;
         Capture->ShowOnlyComponent(PortraitMesh);
+    UE_LOG(LogICUI, Verbose, TEXT("[InventoryPreview.Created] Actor=%s Target=%s Size=512x640"),*GetNameSafe(this),*GetNameSafe(Target));
     }
     USkeletalMeshComponent* Source=Character->GetMesh();
     PortraitMesh->SetSkeletalMesh(Source->GetSkeletalMeshAsset());

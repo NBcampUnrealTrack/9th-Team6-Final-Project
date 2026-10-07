@@ -1,4 +1,5 @@
 #include "UI/Save/ICSaveSlotWidget.h"
+#include "Debug/ICLog.h"
 #include "UI/Save/ICSavePreviewHelpers.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
@@ -7,6 +8,7 @@
 #include "Engine/Texture2D.h"
 TSharedRef<SWidget> UICSaveSlotWidget::RebuildWidget()
 {
+    IC_TRACE_FUNCTION();
     if (!WidgetTree->RootWidget)
     {
         IC_SaveSlot_Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("IC_SaveSlot_Button"));
@@ -19,6 +21,7 @@ TSharedRef<SWidget> UICSaveSlotWidget::RebuildWidget()
 }
 void UICSaveSlotWidget::NativeConstruct()
 {
+    IC_TRACE_FUNCTION();
     Super::NativeConstruct();
     if (IC_SaveSlot_Label) IC_SaveSlot_Label->SetText(Label);
     SetSelected(bIsSelected);
@@ -27,11 +30,13 @@ void UICSaveSlotWidget::NativeConstruct()
 }
 void UICSaveSlotWidget::Configure(int32 InSlot, const FText& InLabel)
 {
+    IC_TRACE_FUNCTION();
     SlotIndex = InSlot; Label = InLabel;
     if (IC_SaveSlot_Label) IC_SaveSlot_Label->SetText(Label);
 }
 void UICSaveSlotWidget::SetSelected(bool bSelected)
 {
+    IC_TRACE_FUNCTION();
     bIsSelected = bSelected;
     if (IC_SaveSlot_Button)
     {
@@ -47,10 +52,11 @@ void UICSaveSlotWidget::SetSelected(bool bSelected)
     }
     OnSelectionChanged(bSelected);
 }
-void UICSaveSlotWidget::HandleClicked() { OnSlotPicked.Broadcast(SlotIndex); }
+void UICSaveSlotWidget::HandleClicked() { IC_TRACE_FUNCTION(); UE_LOG(LogICUI, Verbose, TEXT("[SaveSlot.Picked] Slot=%d Exists=%d Valid=%d Backup=%d"),SlotIndex,Info.bExists,Info.bValid,Info.bUsesBackup);OnSlotPicked.Broadcast(SlotIndex); }
 
 void UICSaveSlotWidget::ConfigureData(const FICSaveSlotInfo& InInfo, UTexture2D* InThumbnail, const TMap<FName, TObjectPtr<UTexture2D>>& Portraits)
 {
+    IC_TRACE_FUNCTION();
     Info = InInfo; Thumbnail = InThumbnail; PortraitTextures = Portraits;
     FText Text = FText::Format(NSLOCTEXT("ICSaveUI", "CardEmpty", "{0}\n비어 있음"), ICSavePreviewUI::SlotName(Info.Slot));
     if (Info.bExists && !Info.bValid) Text = FText::Format(NSLOCTEXT("ICSaveUI", "CardInvalid", "{0}\n읽을 수 없는 저장"), ICSavePreviewUI::SlotName(Info.Slot));
@@ -59,6 +65,7 @@ void UICSaveSlotWidget::ConfigureData(const FICSaveSlotInfo& InInfo, UTexture2D*
 }
 void UICSaveSlotWidget::ApplyData()
 {
+    IC_TRACE_FUNCTION();
     ICSavePreviewUI::SetImage(IC_SaveSlot_Thumbnail, Info.bValid ? Thumbnail.Get() : nullptr);
     UImage* Images[] = { IC_SaveSlot_Party0.Get(), IC_SaveSlot_Party1.Get(), IC_SaveSlot_Party2.Get(), IC_SaveSlot_Party3.Get(), IC_SaveSlot_Party4.Get() };
     for (int32 Index = 0; Index < 5; ++Index) ICSavePreviewUI::SetImage(Images[Index], Info.bValid ? ICSavePreviewUI::Portrait(Info, Index, PortraitTextures) : nullptr);

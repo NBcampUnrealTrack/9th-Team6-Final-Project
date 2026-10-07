@@ -1,4 +1,6 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "Debug/ICLog.h"
+#include "World/State/ICWorldStateSubsystem.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Interaction/ICInteractionActor.h"
 #include "Inventory/Components/ICInventoryComponent.h"
@@ -13,19 +15,21 @@
 
 void AICPlayerController::SetupInputComponent()
 {
+    IC_TRACE_FUNCTION();
     Super::SetupInputComponent();
     auto* Input=Cast<UEnhancedInputComponent>(InputComponent);
-    if (!Input) { UE_LOG(LogTemp,Error,TEXT("ICPlayerController requires EnhancedInputComponent."));return; }
+    if (!Input) { UE_LOG(LogICInput,Error,TEXT("[Input.Setup.Failed] Controller=%s: EnhancedInputComponent가 필요합니다."),*GetNameSafe(this));return; }
     if (MoveAction && MoveAction->ValueType==EInputActionValueType::Axis2D) Input->BindAction(MoveAction,ETriggerEvent::Triggered,this,&ThisClass::Move);
-    else if(MoveAction)UE_LOG(LogTemp,Error,TEXT("MoveAction must use Axis2D."));
+    else if(MoveAction)UE_LOG(LogICInput,Error,TEXT("[Input.Setup.Failed] MoveAction=%s: Axis2D가 필요합니다."),*GetPathNameSafe(MoveAction));
     if (LookAction && LookAction->ValueType==EInputActionValueType::Axis2D) Input->BindAction(LookAction,ETriggerEvent::Triggered,this,&ThisClass::Look);
-    else if(LookAction)UE_LOG(LogTemp,Error,TEXT("LookAction must use Axis2D."));
+    else if(LookAction)UE_LOG(LogICInput,Error,TEXT("[Input.Setup.Failed] LookAction=%s: Axis2D가 필요합니다."),*GetPathNameSafe(LookAction));
+    if(!MoveAction||!LookAction)UE_LOG(LogICInput,Warning,TEXT("[Input.Setup.Incomplete] Move=%s Look=%s: 이동/카메라 Input Action을 확인하세요."),*GetPathNameSafe(MoveAction),*GetPathNameSafe(LookAction));
     TSet<const UInputAction*> BoundActions;
     for (const FICInputCommandBinding& Binding:CommandActions)
     {
         if (!Binding.Action) continue;
         if (Binding.Action==MoveAction || Binding.Action==LookAction || BoundActions.Contains(Binding.Action))
-        { UE_LOG(LogTemp,Error,TEXT("Input action %s is assigned more than once."),*Binding.Action->GetName());continue; }
+        { UE_LOG(LogICInput,Error,TEXT("[Input.Setup.Failed] Action=%s Command=%d: Input Action 중복 연결"),*Binding.Action->GetPathName(),static_cast<int32>(Binding.Command));continue; }
         BoundActions.Add(Binding.Action);
         Input->BindAction(Binding.Action,ETriggerEvent::Started,this,&ThisClass::HandleInputCommand,Binding.Command,Binding.Slot);
         Input->BindAction(Binding.Action,ETriggerEvent::Completed,this,&ThisClass::ReleaseInputCommand,Binding.Command,Binding.Slot);
@@ -34,16 +38,18 @@ void AICPlayerController::SetupInputComponent()
 }
 
 bool AICPlayerController::CanHandleGameplayInput() const
-{ return IsLocalController() && bCreated && !bDead && Menu.IsEmpty() && !IsPaused() && GetPawn(); }
+{ IC_TRACE_FUNCTION(); return IsLocalController() && bCreated && !bDead && Menu.IsEmpty() && !IsPaused() && GetPawn(); }
 
 void AICPlayerController::FlushPressedKeys()
 {
+    IC_TRACE_FUNCTION();
     ResetHeldInput();
     Super::FlushPressedKeys();
 }
 
 void AICPlayerController::Move(const FInputActionValue& Value)
 {
+    IC_TRACE_FUNCTION();
     if (!CanHandleGameplayInput()) return;
     if (auto* TargetCharacter=Cast<AICPlayerCharacter>(GetPawn()))
     {
@@ -56,6 +62,7 @@ void AICPlayerController::Move(const FInputActionValue& Value)
 
 void AICPlayerController::Look(const FInputActionValue& Value)
 {
+    IC_TRACE_FUNCTION();
     if (!CanHandleGameplayInput()) return;
     if (const auto* TargetCharacter=Cast<AICPlayerCharacter>(GetPawn()))
     {
@@ -69,8 +76,9 @@ void AICPlayerController::Look(const FInputActionValue& Value)
 
 void AICPlayerController::PlayerTick(float DeltaSeconds)
 {
+    IC_TRACE_FUNCTION();
     Super::PlayerTick(DeltaSeconds);
-    if (!IsLocalController()) return;
+    if (!IsLocalController() || IsMainMenuLevel()) return;
     TryInitializeGameplay();SyncSaveSafety();
     if (!CanHandleGameplayInput()) ResetHeldInput();
     else
@@ -91,6 +99,7 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
 
 void AICPlayerController::ResetHeldInput()
 {
+    IC_TRACE_FUNCTION();
     bSprintKeyHeld=false;bSprinting=false;bTargetKeyHeld=false;bTargetHoldHandled=false;
     ReleaseInputCommand(EICInputCommand::Block);
     ReleaseInputCommand(EICInputCommand::Jump);
@@ -98,6 +107,8 @@ void AICPlayerController::ResetHeldInput()
 
 void AICPlayerController::CancelInputCommand(EICInputCommand Command,int32 Slot)
 {
+    IC_TRACE_FUNCTION();
+    UE_LOG(LogICInput, Verbose, TEXT("[Input.Cancelled] Command=%d Slot=%d"),static_cast<int32>(Command),Slot);
     // Canceled input (focus loss or menu changes) must never execute tap actions.
     if(Command==EICInputCommand::SprintDodge){bSprintKeyHeld=false;bSprinting=false;return;}
     if(Command==EICInputCommand::TargetToggle){bTargetKeyHeld=false;bTargetHoldHandled=false;return;}
@@ -106,9 +117,11 @@ void AICPlayerController::CancelInputCommand(EICInputCommand Command,int32 Slot)
 
 void AICPlayerController::ReleaseInputCommand(EICInputCommand Command,int32 Slot)
 {
+    IC_TRACE_FUNCTION();
     if(Command==EICInputCommand::SprintDodge)
     {
         const bool bTap=bSprintKeyHeld && FPlatformTime::Seconds()-SprintPressedAt<SprintHoldSeconds;
+    UE_LOG(LogICInput, Verbose, TEXT("[Input.ShiftReleased] Tap=%d Sprinting=%d"),bTap,bSprinting);
         bSprintKeyHeld=false;bSprinting=false;
         if(bTap && CanHandleGameplayInput())HandleInputCommand(EICInputCommand::Dodge);
         return;
@@ -118,6 +131,7 @@ void AICPlayerController::ReleaseInputCommand(EICInputCommand Command,int32 Slot
         const bool bWasHeld=bTargetKeyHeld;
         const bool bHold=bTargetHoldHandled || FPlatformTime::Seconds()-TargetPressedAt>=TargetHoldSeconds;
         const bool bAlreadyHandled=bTargetHoldHandled;
+    UE_LOG(LogICInput, Verbose, TEXT("[Input.TabReleased] Held=%d HoldAction=%d AlreadyHandled=%d"),bWasHeld,bHold,bAlreadyHandled);
         bTargetKeyHeld=false;bTargetHoldHandled=false;
         if(bWasHeld && CanHandleGameplayInput() && !bAlreadyHandled)
             HandleInputCommand(bHold?EICInputCommand::ClearTarget:EICInputCommand::NextTarget);
@@ -131,6 +145,8 @@ void AICPlayerController::ReleaseInputCommand(EICInputCommand Command,int32 Slot
 
 void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
 {
+    IC_TRACE_FUNCTION();
+    UE_LOG(LogICInput, Verbose, TEXT("[Input.Command] Command=%d Slot=%d Menu=%s Created=%d Dead=%d"),static_cast<int32>(Command),Slot,*Menu,bCreated,bDead);
     if (!IsLocalController() || Slot<0 || Slot>3) return;
     if (Menu==TEXT("Confirm"))
     { if(Command==EICInputCommand::Confirm)ConfirmModal(true);else if(Command==EICInputCommand::Menu)ConfirmModal(false);return; }
@@ -169,9 +185,9 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     if(!PendingItem.IsNone())
     {
         if(Command==EICInputCommand::QuickSlot&&Menu.IsEmpty()&&GetInventory())
-        {if(Slot==PendingQuick)ConfirmTarget(TEXT("Player"));else BeginItem(GetInventory()->GetSnapshot().QuickSlots[Slot],Slot);}
+        {if(Slot==PendingQuick)ConfirmTarget(UICWorldStateSubsystem::PlayerId());else BeginItem(GetInventory()->GetSnapshot().QuickSlots[Slot],Slot);}
         if(Command==EICInputCommand::CompanionSkill)
-        {if(PendingPartyKey==Slot)ConfirmTarget(TEXT("Player"));else{PendingPartyKey=Slot;ConfirmTarget(FName(*FString::Printf(TEXT("Companion%d"),Slot+1)));}}
+        {if(PendingPartyKey==Slot)ConfirmTarget(UICWorldStateSubsystem::PlayerId());else{PendingPartyKey=Slot;ConfirmPartyTarget(Slot);}}
         return;
     }
     if(!CanHandleGameplayInput())return;
@@ -195,16 +211,23 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
         case EICInputCommand::CompanionSkill:Action=TEXT("CompanionSkill");break;
         default:break;
     }
-    if(!Action.IsNone())OnCombatRequest.Broadcast(Action,Slot);
+    if(!Action.IsNone())
+    {
+        if(!OnCombatRequest.IsBound()){UE_LOG(LogICInput, Warning, TEXT("[Input.Combat.Unbound] Action=%s Slot=%d: OnCombatRequest 실행 경로가 연결되지 않았습니다."),*Action.ToString(),Slot);bBlocking=false;Show(TEXT("전투 동작이 연결되지 않았습니다."));return;}
+        UE_LOG(LogICInput, Verbose, TEXT("[Input.Combat.Request] Action=%s Slot=%d"),*Action.ToString(),Slot);
+        OnCombatRequest.Broadcast(Action,Slot);
+    }
 }
 AICInteractionActor* AICPlayerController::FindInteractionTarget() const
 {
+    IC_TRACE_FUNCTION();
     const auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());if(!PlayerPawn||!GetWorld())return nullptr;
     const FVector Origin=PlayerPawn->GetActorLocation();
     const FVector Forward=FRotator(0,GetControlRotation().Yaw,0).Vector();
     FCollisionQueryParams Params(SCENE_QUERY_STAT(PlayerInteraction),false);Params.AddIgnoredActor(PlayerPawn);
     auto Eligible=[&](AICInteractionActor* Object)
     {
+        IC_TRACE_FUNCTION();
         if(!IsValid(Object))return false;
         const FVector Offset=Object->GetActorLocation()-Origin;
         if(Offset.Size()>250.f||FVector::DotProduct(Forward,Offset.GetSafeNormal2D())<0.35f)return false;
@@ -228,6 +251,7 @@ AICInteractionActor* AICPlayerController::FindInteractionTarget() const
 }
 void AICPlayerController::Interact()
 {
+    IC_TRACE_FUNCTION();
     if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn()))
     {
         FHitResult Hit;FCollisionQueryParams Params;Params.AddIgnoredActor(PlayerPawn);
@@ -248,5 +272,6 @@ void AICPlayerController::Interact()
         }
         Show(!bAny?TEXT("이 맵에 상호작용 상자가 없습니다."):!bNear?TEXT("상자에 250cm 이내로 접근하세요."):!bFront?TEXT("상자가 있는 방향을 바라보세요."):TEXT("상자가 가려져 있습니다. 벽 너머에서는 사용할 수 없습니다."));return;
     }
+    UE_LOG(LogICInteraction, Verbose, TEXT("[Interaction.Request] Object=%s"),*GetPathNameSafe(Object));
     if(!Object->TryInteract(this))Show(TEXT("현재 이 대상과 상호작용할 수 없습니다. 액터 설정을 확인하세요."));
 }

@@ -11,11 +11,15 @@ public class IsekaiClass : ModuleRules
             "Core",
             "CoreUObject",
             "Engine",
+            "DeveloperSettings",
             "InputCore",
             "EnhancedInput",
             "UMG",
             "Slate",
-            "SlateCore"
+            "SlateCore",
+            "GameplayTags",
+            "Niagara",
+            "AIModule"
         });
 
         if (Target.bBuildEditor)

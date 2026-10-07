@@ -1,49 +1,60 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "Debug/ICLog.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Core/ICGameState.h"
+#include "Core/ICGameMode.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Life/Crafting/ICCraftingComponent.h"
 #include "Inventory/Actors/ICDroppedItem.h"
 #include "Player/State/ICPlayerStateConversions.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
+#include "UI/MainMenu/ICMainMenuWidget.h"
 #include "UI/CharacterCreate/ICCharacterCreateWidget.h"
 #include "Core/ICPlayerState.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Time/ICTimeSubsystem.h"
 #include "Save/ICSaveSubsystem.h"
+#include "Life/Production/ICProductionSubsystem.h"
 #include "Debug/ICDebugCheatManager.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
 
 AICPlayerController::AICPlayerController()
 {
+    IC_TRACE_FUNCTION();
     PrimaryActorTick.bTickEvenWhenPaused = true;
     CheatClass = UICDebugCheatManager::StaticClass();
     DroppedItemClass = AICDroppedItem::StaticClass();
-    StartingWeapons={TEXT("EQP_WPN_SWORD_001"),TEXT("EQP_WPN_BOW_001"),TEXT("EQP_WPN_STAFF_001"),TEXT("EQP_WPN_WAND_001")};
-    StartingSkills={TEXT("SKL_WAR_001"),TEXT("SKL_ARC_001"),TEXT("SKL_MAG_001"),TEXT("SKL_HEAL_001")};
-    StartingItems={{TEXT("ITM_CONS_001"),5},{TEXT("ITM_FOOD_001"),3},{TEXT("ITM_BOOK_001"),2},{TEXT("ITM_TKT_001"),10},
-        {TEXT("EQP_ARM_001"),1},{TEXT("EQP_RNG_001"),1},{TEXT("EQP_NCK_001"),1}};
-    StartingQuickSlots={TEXT("ITM_CONS_001"),TEXT("ITM_FOOD_001"),TEXT("ITM_BOOK_001"),TEXT("ITM_TKT_001")};
+
 }
 UICInventoryComponent* AICPlayerController::GetInventory() const
-{ const auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());return PlayerPawn?PlayerPawn->Inventory:nullptr; }
+{ IC_TRACE_FUNCTION(); const auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());return PlayerPawn?PlayerPawn->Inventory:nullptr; }
 UICCraftingComponent* AICPlayerController::GetCrafting() const
-{ const auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());return PlayerPawn?PlayerPawn->Crafting:nullptr; }
+{ IC_TRACE_FUNCTION(); const auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());return PlayerPawn?PlayerPawn->Crafting:nullptr; }
 UICWorldStateSubsystem* AICPlayerController::GetWorldState() const
-{ return GetGameInstance()?GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr; }
+{ IC_TRACE_FUNCTION(); return GetGameInstance()?GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr; }
 UICTimeSubsystem* AICPlayerController::GetTime() const
-{ return GetGameInstance()?GetGameInstance()->GetSubsystem<UICTimeSubsystem>():nullptr; }
+{ IC_TRACE_FUNCTION(); return GetGameInstance()?GetGameInstance()->GetSubsystem<UICTimeSubsystem>():nullptr; }
 UICSaveSubsystem* AICPlayerController::GetSaves() const
-{ return GetGameInstance()?GetGameInstance()->GetSubsystem<UICSaveSubsystem>():nullptr; }
+{ IC_TRACE_FUNCTION(); return GetGameInstance()?GetGameInstance()->GetSubsystem<UICSaveSubsystem>():nullptr; }
 FICCharacterState AICPlayerController::GetPlayerSnapshot() const
-{ return GetWorldState()?GetWorldState()->GetSnapshot(UICWorldStateSubsystem::PlayerId()):FICCharacterState(); }
+{ IC_TRACE_FUNCTION(); return GetWorldState()?GetWorldState()->GetSnapshot(UICWorldStateSubsystem::PlayerId()):FICCharacterState(); }
 
 void AICPlayerController::BeginPlay()
 {
+    IC_TRACE_FUNCTION();
     Super::BeginPlay();
+    UE_LOG(LogICCore, Log, TEXT("[Player.BeginPlay] Controller=%s Pawn=%s Local=%d"),*GetNameSafe(this),*GetNameSafe(GetPawn()),IsLocalController());
+    if (IsLocalController() && IsMainMenuLevel())
+    {
+        InitializeMainMenu();
+        return;
+    }
+    if(IsLocalController()&&!DefaultMappingContext) UE_LOG(LogICInput, Warning, TEXT("[Input.MappingMissing] Controller=%s: BP 컨트롤러의 Default Mapping Context를 지정하세요."),*GetNameSafe(this));
     if (!IsLocalController()) return;
     ApplyInputMapping();
     TryInitializeGameplay();
@@ -51,14 +62,17 @@ void AICPlayerController::BeginPlay()
 
 void AICPlayerController::ReceivedPlayer()
 {
+    IC_TRACE_FUNCTION();
     Super::ReceivedPlayer();
     ApplyInputMapping();
 }
 
 void AICPlayerController::OnPossess(APawn* InPawn)
 {
+    IC_TRACE_FUNCTION();
     Super::OnPossess(InPawn);
-    if (!IsLocalController() || !HasActorBegunPlay()) return;
+    UE_LOG(LogICCore, Log, TEXT("[Player.Possess] Controller=%s Pawn=%s"),*GetNameSafe(this),*GetNameSafe(InPawn));
+    if (!IsLocalController() || !HasActorBegunPlay() || IsMainMenuLevel()) return;
     BindPawnSystems();
     if (bGameplayInitialized)
     {
@@ -69,15 +83,17 @@ void AICPlayerController::OnPossess(APawn* InPawn)
 
 void AICPlayerController::OnUnPossess()
 {
+    IC_TRACE_FUNCTION();
     ResetHeldInput();
     ReleaseInputCommand(EICInputCommand::Block);
     ReleaseInputCommand(EICInputCommand::Jump);
-    UnbindPawnSystems();
+    UnbindPawnSystems();UE_LOG(LogICCore, Log, TEXT("[Player.UnPossess] Controller=%s Pawn=%s"),*GetNameSafe(this),*GetNameSafe(GetPawn()));
     Super::OnUnPossess();
 }
 
 void AICPlayerController::BindPawnSystems()
 {
+    IC_TRACE_FUNCTION();
     UICInventoryComponent* Inventory=GetInventory();
     if (BoundInventory==Inventory) return;
     UnbindPawnSystems();
@@ -87,18 +103,17 @@ void AICPlayerController::BindPawnSystems()
     BoundInventory->OnChanged.AddUniqueDynamic(this,&ThisClass::InventoryChanged);
     BoundInventory->OnMessage.AddUniqueDynamic(this,&ThisClass::InventoryMessage);
     BoundInventory->OnLootResult.AddUniqueDynamic(this,&ThisClass::InventoryLootResult);
-    BoundInventory->OnDropRequested.AddUniqueDynamic(this,&ThisClass::InventoryDropRequested);
     BoundInventory->CurrentClass=Job;
 }
 
 void AICPlayerController::UnbindPawnSystems()
 {
+    IC_TRACE_FUNCTION();
     if (BoundInventory)
     {
         BoundInventory->OnChanged.RemoveDynamic(this,&ThisClass::InventoryChanged);
         BoundInventory->OnMessage.RemoveDynamic(this,&ThisClass::InventoryMessage);
         BoundInventory->OnLootResult.RemoveDynamic(this,&ThisClass::InventoryLootResult);
-        BoundInventory->OnDropRequested.RemoveDynamic(this,&ThisClass::InventoryDropRequested);
         BoundInventory->BindWorldState(nullptr);
         BoundInventory=nullptr;
     }
@@ -106,18 +121,22 @@ void AICPlayerController::UnbindPawnSystems()
 
 void AICPlayerController::TryInitializeGameplay()
 {
-    if (bGameplayInitialized || !IsLocalController()) return;
+    IC_TRACE_FUNCTION();
+    if (bGameplayInitialized || !IsLocalController() || IsMainMenuLevel()) return;
     auto* State=GetWorldState();auto* Time=GetTime();auto* Saves=GetSaves();
     if (!State || !Time || !Saves || !GetInventory()) return;
     BindPawnSystems();
     if (!State->RegisterStateParticipant(UICWorldStateSubsystem::PlayerId(),this))
     { Show(TEXT("플레이어 상태 참여자 중복 등록"));return; }
     bGameplayInitialized=true;
+    UE_LOG(LogICCore, Log, TEXT("[Player.Initialized] Controller=%s State=%s Time=%s Saves=%s Inventory=%s"),*GetNameSafe(this),*GetNameSafe(State),*GetNameSafe(Time),*GetNameSafe(Saves),*GetNameSafe(GetInventory()));
     State->OnCharacterChanged.AddUniqueDynamic(this,&ThisClass::CharacterChanged);
+    State->OnDropsChanged.AddUniqueDynamic(this,&ThisClass::SynchronizeDrops);
     Time->OnClockChanged.AddUniqueDynamic(this,&ThisClass::ClockChanged);
-    Time->OnGameMinutesAdvanced.AddUniqueDynamic(this,&ThisClass::HandleGameMinutesAdvanced);
+    Time->OnPlaySecondsAdvanced.AddUniqueDynamic(this,&ThisClass::HandlePlaySecondsAdvanced);
     Saves->OnSaveStarted.AddUniqueDynamic(this,&ThisClass::SaveStarted);
     Saves->OnSaveFinished.AddUniqueDynamic(this,&ThisClass::SaveFinished);
+    if(auto* Production=GetGameInstance()->GetSubsystem<UICProductionSubsystem>())Production->OnProductionChanged.AddUniqueDynamic(this,&ThisClass::ProductionChanged);
     RefreshSaveSlots();
     if (GameplayWidgetClass)
     {
@@ -133,7 +152,8 @@ void AICPlayerController::TryInitializeGameplay()
 
 void AICPlayerController::ApplyInputMapping()
 {
-    if (!IsLocalController() || AppliedMappingContext==DefaultMappingContext) return;
+    IC_TRACE_FUNCTION();
+    if (!IsLocalController() || IsMainMenuLevel() || AppliedMappingContext==DefaultMappingContext) return;
     if (ULocalPlayer* LocalPlayer=GetLocalPlayer())
         if (auto* Input=LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
         {
@@ -142,20 +162,24 @@ void AICPlayerController::ApplyInputMapping()
             {
                 Input->AddMappingContext(DefaultMappingContext,MappingPriority);
                 AppliedMappingContext=DefaultMappingContext;
+    UE_LOG(LogICInput, Log, TEXT("[Input.MappingApplied] Controller=%s IMC=%s Priority=%d"),*GetNameSafe(this),*GetPathNameSafe(DefaultMappingContext),MappingPriority);
             }
         }
 }
 
 void AICPlayerController::RemoveInputMapping()
 {
+    IC_TRACE_FUNCTION();
     if (ULocalPlayer* LocalPlayer=GetLocalPlayer())
         if (auto* Input=LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
             if (AppliedMappingContext) Input->RemoveMappingContext(AppliedMappingContext);
+    if(AppliedMappingContext) UE_LOG(LogICInput, Log, TEXT("[Input.MappingRemoved] Controller=%s IMC=%s"),*GetNameSafe(this),*GetPathNameSafe(AppliedMappingContext));
     AppliedMappingContext=nullptr;
 }
 
 void AICPlayerController::UpdateScreens()
 {
+    IC_TRACE_FUNCTION();
     if (!IsLocalController()) return;
     if (Menu==TEXT("Create") && CharacterCreateWidgetClass)
     {
@@ -172,59 +196,69 @@ void AICPlayerController::UpdateScreens()
 
 void AICPlayerController::EndPlay(const EEndPlayReason::Type Reason)
 {
+    IC_TRACE_FUNCTION();
+    UE_LOG(LogICCore, Log, TEXT("[Player.EndPlay] Controller=%s Reason=%d Created=%d"),*GetNameSafe(this),static_cast<int32>(Reason),bCreated);
     ResetHeldInput();
+    if(bGameplayInitialized && bCreated)FlushWorldState();
     if(auto* State=GetWorldState())
-    {State->UnregisterStateParticipant(UICWorldStateSubsystem::PlayerId(),this);State->OnCharacterChanged.RemoveDynamic(this,&ThisClass::CharacterChanged);}
+    {State->UnregisterStateParticipant(UICWorldStateSubsystem::PlayerId(),this);State->OnCharacterChanged.RemoveDynamic(this,&ThisClass::CharacterChanged);State->OnDropsChanged.RemoveDynamic(this,&ThisClass::SynchronizeDrops);}
     if(auto* Time=GetTime())
-    {Time->OnClockChanged.RemoveDynamic(this,&ThisClass::ClockChanged);Time->OnGameMinutesAdvanced.RemoveDynamic(this,&ThisClass::HandleGameMinutesAdvanced);}
+    {Time->OnClockChanged.RemoveDynamic(this,&ThisClass::ClockChanged);Time->OnPlaySecondsAdvanced.RemoveDynamic(this,&ThisClass::HandlePlaySecondsAdvanced);Time->ReleasePauseRequests(this);}
     if(auto* Saves=GetSaves())
     {Saves->OnSaveStarted.RemoveDynamic(this,&ThisClass::SaveStarted);Saves->OnSaveFinished.RemoveDynamic(this,&ThisClass::SaveFinished);}
     UnbindPawnSystems();
     RemoveInputMapping();
     if(CharacterCreateScreen){CharacterCreateScreen->RemoveFromParent();CharacterCreateScreen=nullptr;}
     if(Screen){Screen->RemoveFromParent();Screen=nullptr;}
+    if(MainMenuWidget){MainMenuWidget->RemoveFromParent();MainMenuWidget=nullptr;}
+    if(GetGameInstance())if(auto* Production=GetGameInstance()->GetSubsystem<UICProductionSubsystem>())Production->OnProductionChanged.RemoveDynamic(this,&ThisClass::ProductionChanged);
     Super::EndPlay(Reason);
 }
 
 void AICPlayerController::SetFinalMoveSpeed(float Speed)
-{if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn()))PlayerPawn->FinalMoveSpeed=FMath::IsFinite(Speed)?FMath::Max(0.f,Speed):0.f;}
-void AICPlayerController::SetCombatState(bool Active){bInCombat=Active;SyncSaveSafety();}
+{ IC_TRACE_FUNCTION();if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn()))PlayerPawn->FinalMoveSpeed=FMath::IsFinite(Speed)?FMath::Max(0.f,Speed):0.f;}
+void AICPlayerController::SetCombatState(bool Active){ IC_TRACE_FUNCTION();if(bInCombat!=Active)UE_LOG(LogICCore, Log, TEXT("[Player.CombatState] Active=%d"),Active);bInCombat=Active;SyncSaveSafety();}
 bool AICPlayerController::SetGold(int32 Amount)
 {
+    IC_TRACE_FUNCTION();
     if(Amount<0||!GetWorldState())return false;
-    Gold=Amount;
-    const bool Success=GetWorldState()->SetPlayerGold(Amount);bDirty=true;return Success;
+    if(!GetWorldState()->SetPlayerGold(Amount))return false;
+    Gold=Amount;bDirty=true;return true;
 }
 void AICPlayerController::InventoryChanged()
-{if(auto* Inventory=GetInventory())OnEquipmentStatsChanged.Broadcast(Inventory->GetEquipmentStats());bDirty=true;}
-void AICPlayerController::InventoryMessage(const FText& Message){Show(Message.ToString());}
+{ IC_TRACE_FUNCTION();if(auto* Inventory=GetInventory())OnEquipmentStatsChanged.Broadcast(Inventory->GetEquipmentStats());bDirty=true;}
+void AICPlayerController::InventoryMessage(const FText& Message){ IC_TRACE_FUNCTION();Show(Message.ToString());}
 void AICPlayerController::CharacterChanged(FName ID)
 {
+    IC_TRACE_FUNCTION();
     if(ID==UICWorldStateSubsystem::PlayerId())
     {
         if(const auto* Stored=GetWorldState()?GetWorldState()->GetStoredCharacter(ID):nullptr)
         {MainStats=ICPlayerStateConversions::Main(Stored->MainStats);Survival=ICPlayerStateConversions::Survival(*Stored);}
+        if(GetWorldState())Gold=GetWorldState()->ExportState().Gold;
         const bool Exhausted=Survival.IsExhausted();
         if(bLastExhausted!=Exhausted){bLastExhausted=Exhausted;OnExhaustionChanged.Broadcast(Exhausted);}
     }
     bDirty=true;
 }
-void AICPlayerController::ClockChanged(){bDirty=true;}
-void AICPlayerController::Show(const FString& Text){Notice=Text;bDirty=true;OnNoticeChanged.Broadcast(Notice);}
-void AICPlayerController::RefreshSaveSlots(){if(auto* Saves=GetSaves())SaveSlots=Saves->GetSlotList();bDirty=true;}
+void AICPlayerController::ClockChanged(){ IC_TRACE_FUNCTION();bDirty=true;}
+void AICPlayerController::Show(const FString& Text){ IC_TRACE_FUNCTION();if(Notice!=Text)UE_LOG(LogICUI, Verbose, TEXT("[UI.Notice] Controller=%s Message=%s"),*GetNameSafe(this),*Text);Notice=Text;bDirty=true;OnNoticeChanged.Broadcast(Notice);}
+void AICPlayerController::RefreshSaveSlots(){ IC_TRACE_FUNCTION();if(auto* Saves=GetSaves())SaveSlots=Saves->GetSlotList();bDirty=true;}
 
 void AICPlayerController::SyncSaveSafety()
 {
+    IC_TRACE_FUNCTION();
     if(auto* Saves=GetSaves())
     {
         FICSaveSafety Safety;Safety.bInCombat=bInCombat;Safety.bInDialogue=bInDialogue;
-        Safety.bInEvent=bInEvent;Safety.bDead=bDead;Safety.bEffectPending=bEffectWaiting;
+        Safety.bInEvent=bInEvent;Safety.bDead=bDead;Safety.bEffectPending=bItemTransactionInProgress;
         Saves->SetSafetyState(Safety);
     }
 }
-void AICPlayerController::SaveStarted(int32 Slot){Show(Slot==0?TEXT("자동 저장 중..."):FString::Printf(TEXT("수동 슬롯 %d 저장 중..."),Slot));}
+void AICPlayerController::SaveStarted(int32 Slot){ IC_TRACE_FUNCTION();Show(Slot==0?TEXT("자동 저장 중..."):FString::Printf(TEXT("수동 슬롯 %d 저장 중..."),Slot));}
 void AICPlayerController::SaveFinished(int32 Slot,bool bSuccess,const FString& Message)
 {
+    IC_TRACE_FUNCTION();
     if(bInitialSavePending&&Slot==0)
     {
         bCreated=bSuccess;
@@ -248,42 +282,53 @@ void AICPlayerController::SaveFinished(int32 Slot,bool bSuccess,const FString& M
 
 void AICPlayerController::SetMenu(const FString& NewMenu)
 {
-    if(bEffectWaiting&&NewMenu!=TEXT("Quit")&&NewMenu!=TEXT("Confirm")){Show(TEXT("효과 요청 처리 중입니다."));return;}
+    IC_TRACE_FUNCTION();
+    if(bItemTransactionInProgress&&NewMenu!=TEXT("Quit")&&NewMenu!=TEXT("Confirm")){Show(TEXT("효과 요청 처리 중입니다."));return;}
     ResetHeldInput();CancelTarget();
+    if(Menu!=NewMenu)UE_LOG(LogICUI, Log, TEXT("[UI.Menu] From=%s To=%s Created=%d Dead=%d"),*Menu,*NewMenu,bCreated,bDead);
     Menu=NewMenu;
     if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
     UpdateScreens();
-    InteractionHint.Empty();bShowMouseCursor=!NewMenu.IsEmpty();SetPause(!NewMenu.IsEmpty());
-    if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(!NewMenu.IsEmpty());}
+    InteractionHint.Empty();bShowMouseCursor=!NewMenu.IsEmpty();
+    if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);Time->SetPauseRequest(this,TEXT("Menu"),!NewMenu.IsEmpty());}
     if(NewMenu.IsEmpty()){FInputModeGameOnly Mode;SetInputMode(Mode);}
     else{FInputModeGameAndUI Mode;Mode.SetHideCursorDuringCapture(false);if(CharacterCreateScreen&&CharacterCreateScreen->IsInViewport())Mode.SetWidgetToFocus(CharacterCreateScreen->TakeWidget());else if(Screen)Mode.SetWidgetToFocus(Screen->TakeWidget());SetInputMode(Mode);}
     FlushPressedKeys();bDirty=true;UpdateGamePhase();SyncSaveSafety();OnMenuChanged.Broadcast(Menu);
 }
 void AICPlayerController::UpdateGamePhase()
 {
-    if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(!Menu.IsEmpty());}
+    IC_TRACE_FUNCTION();
+    if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);Time->SetPauseRequest(this,TEXT("Menu"),!Menu.IsEmpty());}
     auto* State=GetWorld()?GetWorld()->GetGameState<AICGameState>():nullptr;
     if(State)State->SetPhase(bDead?EICGamePhase::Dead:!bCreated?EICGamePhase::CharacterCreation:!Menu.IsEmpty()?EICGamePhase::Menu:EICGamePhase::Playing);
 }
 void AICPlayerController::CancelTarget()
 {
-    if(bEffectWaiting)return;
-    PendingItem=NAME_None;PendingQuick=INDEX_NONE;PendingPartyKey=INDEX_NONE;PendingRequest.Invalidate();bDirty=true;
+    IC_TRACE_FUNCTION();
+    if(bItemTransactionInProgress)return;
+    if(!PendingItem.IsNone())UE_LOG(LogICInventory, Verbose, TEXT("[Item.TargetCancelled] Item=%s Quick=%d"),*PendingItem.ToString(),PendingQuick);
+    PendingItem=NAME_None;PendingQuick=INDEX_NONE;PendingPartyKey=INDEX_NONE;bDirty=true;
 }
 
 bool AICPlayerController::ReadLiveState_Implementation(FName CharacterId,FICCharacterState& Snapshot) const
 {
+    IC_TRACE_FUNCTION();
     const auto* Stored=GetWorldState()?GetWorldState()->GetStoredCharacter(CharacterId):nullptr;
     if(!Stored||CharacterId!=UICWorldStateSubsystem::PlayerId())return false;
-    Snapshot=*Stored;ICPlayerStateConversions::Apply(MainStats,Survival,Snapshot);return true;
+    Snapshot=*Stored;ICPlayerStateConversions::Apply(MainStats,Survival,Snapshot);
+    if(auto* Time=GetTime()) {const auto Clock=Time->GetClock();Snapshot.LastSimGameMinute=Clock.GameMinute;Snapshot.LastSimPlaySecond=Clock.PlaySecond;}
+    if(APawn* PlayerPawn=GetPawn()) {Snapshot.Position=PlayerPawn->GetActorLocation();Snapshot.Rotation=PlayerPawn->GetActorRotation();}
+    return true;
 }
 bool AICPlayerController::FlushToWorldState_Implementation(
     UICWorldStateSubsystem* State)
 {
+    IC_TRACE_FUNCTION();
     if (!State || !GetPawn() || !GetInventory()
         || !GetInventory()->ValidateState()
         || !MainStats.IsValid() || !Survival.IsValid() || Gold < 0)
     {
+        UE_LOG(LogICWorldState, Verbose, TEXT("[Player.Flush.Rejected] Pawn=%s State=%s Inventory=%s: 인벤토리/능력치/자원/골드 검사 실패"),*GetNameSafe(GetPawn()),*GetNameSafe(State),*GetNameSafe(GetInventory()));
         return false;
     }
 
@@ -301,9 +346,11 @@ bool AICPlayerController::FlushToWorldState_Implementation(
             GetPawn()->GetActorLocation(), GetControlRotation());
 }
 bool AICPlayerController::CanRestoreWorldState_Implementation(const FICWorldState& Candidate) const
-{return GetInventory()&&GetInventory()->ValidateSnapshot(Candidate.Inventory);}
+{ IC_TRACE_FUNCTION();return GetInventory()&&GetInventory()->ValidateSnapshot(Candidate.Inventory);}
 void AICPlayerController::RestoreFromWorldState_Implementation(const FICWorldState& Candidate)
 {
+    IC_TRACE_FUNCTION();
+    UE_LOG(LogICCore, Log, TEXT("[Player.Restore] Created=%d Preset=%d Job=%d FirstSkill=%s Gold=%d"),Candidate.bPlayerCreated,Candidate.Preset,Candidate.Job,*Candidate.FirstSkill.ToString(),Candidate.Gold);
     PlayerName=Candidate.PlayerName;Preset=Candidate.Preset;Job=Candidate.Job;FirstSkill=Candidate.FirstSkill;
     bCreated=Candidate.bPlayerCreated&&!bInitialSavePending;bDead=false;bInCombat=bInDialogue=bInEvent=false;
     Gold=Candidate.Gold;
@@ -317,28 +364,41 @@ void AICPlayerController::RestoreFromWorldState_Implementation(const FICWorldSta
     SelectedBag=SelectedStorage=MoveFrom=INDEX_NONE;
     if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn()))
     {PlayerPawn->ApplyPreset(Preset);PlayerPawn->SetActorLocation(Candidate.PlayerPosition);PlayerPawn->GetCharacterMovement()->StopMovementImmediately();}
+    SynchronizeDrops();
     SetControlRotation(Candidate.PlayerRotation);SetMenu(bCreated?TEXT(""):TEXT("Create"));
     const FName Jobs[]={TEXT("Warrior"),TEXT("Archer"),TEXT("Mage"),TEXT("Healer")};
     if(Candidate.bPlayerCreated&&!bInitialSavePending)OnPlayerInitialized.Broadcast(Jobs[Job],FirstSkill);
 }
 
-void AICPlayerController::HandleGameMinutesAdvanced(int32 Minutes) { if(bCreated&&!bDead)ApplyGameMinutes(Minutes); }
-void AICPlayerController::FlushWorldState() { if(bCreated||bInitialSavePending)FlushToWorldState_Implementation(GetWorldState()); }
+void AICPlayerController::FlushWorldState() { IC_TRACE_FUNCTION(); if(bCreated||bInitialSavePending)if(!FlushToWorldState_Implementation(GetWorldState()))UE_LOG(LogICWorldState, Verbose, TEXT("[Player.Flush.Failed] Controller=%s"),*GetNameSafe(this)); }
 void AICPlayerController::InventoryLootResult(FName ItemID,int32 Accepted,int32 Overflow)
 {
-    if(Overflow<=0)return;FPlayerItemInstance Item;Item.ItemID=ItemID;Item.InstanceID=FGuid::NewGuid();Item.Count=Overflow;SpawnDroppedItem(Item);
+    IC_TRACE_FUNCTION();
+    if(Overflow>0)Show(FString::Printf(TEXT("가방 초과분 %d개를 바닥에 보관했습니다."),Overflow));
 }
-void AICPlayerController::InventoryDropRequested(const FPlayerItemInstance& Item) { SpawnDroppedItem(Item); }
-void AICPlayerController::SpawnDroppedItem(const FPlayerItemInstance& Item)
+void AICPlayerController::SynchronizeDrops()
 {
-    if(!GetWorld()||!GetPawn()||!DroppedItemClass||Item.IsEmpty())return;
-    const auto* Definition=GetInventory()?GetInventory()->Find(Item.ItemID):nullptr;
-    const int32 Limit=Definition?FMath::Clamp(Definition->StackLimit,1,99):99;
-    for(int32 Left=Item.Count;Left>0;)
+    IC_TRACE_FUNCTION();
+    if(!GetWorld()||!GetWorldState()||!DroppedItemClass)return;
+    const auto Snapshot=GetWorldState()->ExportState();TSet<FGuid> Existing;
+    for(const auto& Record:Snapshot.Drops)
     {
-        FPlayerItemInstance Part=Item;Part.Count=FMath::Min(Left,Limit);Left-=Part.Count;
-        if(Left>0||Part.Count!=Item.Count)Part.InstanceID=FGuid::NewGuid();
-        const FVector Location=GetPawn()->GetActorLocation()+GetPawn()->GetActorForwardVector()*100.f+FVector(0,0,35);
-        if(auto* Dropped=GetWorld()->SpawnActor<AICDroppedItem>(DroppedItemClass,Location,FRotator::ZeroRotator))Dropped->Initialize(Part);
+        Existing.Add(Record.ID);auto& Handle=DropActors.FindOrAdd(Record.ID);AICDroppedItem* Actor=Handle.Get();
+        if(!Actor){Actor=GetWorld()->SpawnActor<AICDroppedItem>(DroppedItemClass,Record.Position+FVector(0,0,35),FRotator::ZeroRotator);Handle=Actor;}
+        if(Actor)Actor->Initialize(Record);
     }
+    for(auto It=DropActors.CreateIterator();It;++It)if(!Existing.Contains(It.Key()))
+    {if(auto* Actor=It.Value().Get())Actor->Destroy();It.RemoveCurrent();}
 }
+
+void AICPlayerController::HandlePlaySecondsAdvanced(double Seconds)
+{
+    IC_TRACE_FUNCTION();
+    if(!bCreated || bDead) return;
+    const bool WasExhausted=Survival.IsExhausted();
+    const float Consumed=Survival.AdvanceNaturalSP(Seconds);
+    if(WasExhausted!=Survival.IsExhausted()) {bLastExhausted=Survival.IsExhausted();OnExhaustionChanged.Broadcast(bLastExhausted);}
+    if(Consumed>0) {FlushWorldState();bDirty=true;}
+}
+
+void AICPlayerController::ProductionChanged(FGuid JobID,const FString& Message){ IC_TRACE_FUNCTION();Show(Message);}
