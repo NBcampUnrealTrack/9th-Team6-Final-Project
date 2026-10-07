@@ -1,4 +1,6 @@
 #include "UI/MainMenu/ICMainMenuWidget.h"
+#include "UI/Management/ICUIManagerSubsystem.h"
+#include "Engine/LocalPlayer.h"
 #include "Debug/ICLog.h"
 #include "UI/Save/ICSaveLoadWidget.h"
 #include "Save/ICSaveSubsystem.h"
@@ -271,7 +273,7 @@ void UICMainMenuWidget::CompleteExit()
     Saves->SetAutoSaveSuspended(true);
     Time->PrepareForTravel();
     UGameplayStatics::SetGamePaused(this, false);
-    if (APlayerController* PC = GetOwningPlayer()) { PC->SetInputMode(FInputModeGameOnly()); PC->bShowMouseCursor = false; }
+    if(auto* UI=GetOwningLocalPlayer()?GetOwningLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>():nullptr)UI->CloseAllScreens();
     UE_LOG(LogICUI, Log, TEXT("[MainMenu.Travel] Action=%d Map=%s"),static_cast<int32>(Action),*StartMap.ToSoftObjectPath().ToString());
     UGameplayStatics::OpenLevelBySoftObjectPtr(this, StartMap);
 }
@@ -286,25 +288,15 @@ void UICMainMenuWidget::HandleLoadClicked()
     if (!SaveLoadScreen){UE_LOG(LogICUI, Warning, TEXT("[MainMenu.LoadWidgetFailed] Class=%s"),*GetNameSafe(SaveLoadWidgetClass.Get()));return;}
     SaveLoadScreen->Configure(false, StartMap);
     SaveLoadScreen->OnClosed.AddUniqueDynamic(this, &ThisClass::HandleSaveLoadClosed);
-    SaveLoadScreen->AddToViewport(100); SetIsEnabled(false);
-    if (APlayerController* PC = GetOwningPlayer())
-    {
-        PC->bShowMouseCursor = true;
-        FInputModeUIOnly Mode; Mode.SetWidgetToFocus(SaveLoadScreen->TakeWidget());
-        Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock); PC->SetInputMode(Mode);
-    }
+    if(auto* UI=GetOwningLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->OpenScreen(SaveLoadScreen,true,100); SetIsEnabled(false);
+    if(auto* UI=GetOwningLocalPlayer()?GetOwningLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>():nullptr)UI->SetMenuContext(GetOwningPlayer(),this,true);
 }
 
 void UICMainMenuWidget::HandleSaveLoadClosed()
 {
     IC_TRACE_FUNCTION();
     SaveLoadScreen = nullptr; SetIsEnabled(true); RefreshContinueAvailability();
-    if (APlayerController* PC = GetOwningPlayer())
-    {
-        FInputModeUIOnly Mode; Mode.SetWidgetToFocus(TakeWidget());
-        Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock); PC->SetInputMode(Mode); PC->bShowMouseCursor = true;
-        if (BTN_Load) BTN_Load->SetUserFocus(PC);
-    }
+    if(auto* UI=GetOwningLocalPlayer()?GetOwningLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>():nullptr)UI->SetMenuContext(GetOwningPlayer(),this,true);
 }
 
 void UICMainMenuWidget::HandleSettingsClicked()

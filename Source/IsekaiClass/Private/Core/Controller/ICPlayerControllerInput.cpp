@@ -1,4 +1,7 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "Combat/GAS/ICAbilitySystemComponent.h"
+#include "Combat/GAS/ICGameplayTags.h"
+#include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Debug/ICLog.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Player/Character/ICPlayerCharacter.h"
@@ -92,9 +95,25 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
     const auto* Target=CanHandleGameplayInput()?FindInteractionTarget():nullptr;
     const FString Hint=Target?Target->GetInteractionText().ToString():FString();
     if (Hint!=InteractionHint) { InteractionHint=Hint;bDirty=true; }
-    if (auto* TargetCharacter=Cast<AICPlayerCharacter>(GetPawn()))
-        TargetCharacter->GetCharacterMovement()->MaxWalkSpeed=TargetCharacter->FinalMoveSpeed*
-            (bSprinting?1.f:TargetCharacter->WalkSpeedMultiplier)*(Survival.IsExhausted()?ExhaustedMoveSpeedMultiplier:1.f);
+    if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=C->GetICAbilitySystem())
+    {
+        bInCombat=ASC->HasRecentCombat();
+        FICDefinitionResult R;FICCombatSettingsRow Defaults;const auto* Settings=ASC->Definitions()?ASC->Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;if(!Settings)Settings=&Defaults;
+        if(CombatTarget.IsValid())
+        {
+            auto* Selected=CombatTarget.Get();auto* SelectedASC=Selected->GetICAbilitySystem();const double Now=ASC->PlaySecond();
+            if(!SelectedASC||!SelectedASC->IsAlive()||FVector::DistSquared(C->GetActorLocation(),Selected->GetActorLocation())>FMath::Square(Settings->LockOnMaintainDistanceCm)){CombatTarget.Reset();TargetOccludedAt=-1;}
+            else
+            {
+                FHitResult Hit;FCollisionQueryParams Q;Q.AddIgnoredActor(C);Q.AddIgnoredActor(Selected);
+                if(GetWorld()->LineTraceSingleByChannel(Hit,C->GetActorLocation(),Selected->GetActorLocation(),ECC_Visibility,Q))
+                {if(TargetOccludedAt<0)TargetOccludedAt=Now;if(Now-TargetOccludedAt>=Settings->LockOnOcclusionPlaySeconds){CombatTarget.Reset();TargetOccludedAt=-1;}}
+                else TargetOccludedAt=-1;
+            }
+        }
+        const double Run=ASC->Stat(EICStat::MoveSpeed);const double Speed=bSprinting?Run:Run*Settings->WalkSpeedCmPerSecond/FMath::Max(1.,Settings->RunSpeedCmPerSecond);
+        C->GetCharacterMovement()->MaxWalkSpeed=Speed*(Survival.IsExhausted()?ExhaustedMoveSpeedMultiplier:1.f)*(bBlocking?Settings->GuardMoveSpeedMultiplier:1.);
+    }
 }
 
 void AICPlayerController::ResetHeldInput()
@@ -138,7 +157,7 @@ void AICPlayerController::ReleaseInputCommand(EICInputCommand Command,int32 Slot
         return;
     }
     if (Command==EICInputCommand::Block && bBlocking)
-    { bBlocking=false;OnCombatRequest.Broadcast(TEXT("BlockEnd"),0); }
+    { bBlocking=false;ExecuteCombatInput(TEXT("BlockEnd"),0);OnCombatRequest.Broadcast(TEXT("BlockEnd"),0); }
     if (Command==EICInputCommand::Jump)
         if (auto* TargetCharacter=Cast<ACharacter>(GetPawn())) TargetCharacter->StopJumping();
 }
@@ -153,12 +172,19 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     if (Menu==TEXT("Quit")) { if(Command==EICInputCommand::Menu)CloseSessionMenu();return; }
     if (Menu==TEXT("Save"))
     {
-        if(Command==EICInputCommand::QuickSlot)ExecuteUI(TEXT("SaveSlot"),Slot+1);
+        if(Command==EICInputCommand::QuickSlot)SelectSessionSlot(Slot+1);
         else if(Command==EICInputCommand::Confirm)RequestManualSave();
         else if(Command==EICInputCommand::Menu)CloseSessionMenu();
         return;
     }
-    if(Command==EICInputCommand::Load){LoadPlayer();return;}
+    if(Menu==TEXT("Load"))
+    {
+        if(Command==EICInputCommand::QuickSlot)SelectSessionSlot(Slot+1);
+        else if(Command==EICInputCommand::Confirm||Command==EICInputCommand::Load)RequestLoadPlayer();
+        else if(Command==EICInputCommand::Menu)CloseSessionMenu();
+        return;
+    }
+    if(Command==EICInputCommand::Load){OpenLoadMenu();return;}
     if(Command==EICInputCommand::Menu)
     {
         if(!PendingItem.IsNone())CancelTarget();
@@ -213,8 +239,7 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     }
     if(!Action.IsNone())
     {
-        if(!OnCombatRequest.IsBound()){UE_LOG(LogICInput, Warning, TEXT("[Input.Combat.Unbound] Action=%s Slot=%d: OnCombatRequest 실행 경로가 연결되지 않았습니다."),*Action.ToString(),Slot);bBlocking=false;Show(TEXT("전투 동작이 연결되지 않았습니다."));return;}
-        UE_LOG(LogICInput, Verbose, TEXT("[Input.Combat.Request] Action=%s Slot=%d"),*Action.ToString(),Slot);
+        ExecuteCombatInput(Action,Slot);
         OnCombatRequest.Broadcast(Action,Slot);
     }
 }
@@ -274,4 +299,35 @@ void AICPlayerController::Interact()
     }
     UE_LOG(LogICInteraction, Verbose, TEXT("[Interaction.Request] Object=%s"),*GetPathNameSafe(Object));
     if(!Object->TryInteract(this))Show(TEXT("현재 이 대상과 상호작용할 수 없습니다. 액터 설정을 확인하세요."));
+}
+
+void AICPlayerController::ExecuteCombatInput(FName Action,int32 Slot)
+{
+    IC_TRACE_FUNCTION();auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());auto* ASC=PlayerCharacter?PlayerCharacter->GetICAbilitySystem():nullptr;if(!ASC)return;
+    if(Action==TEXT("ClearTarget")){CombatTarget.Reset();TargetOccludedAt=-1;return;}
+    if(Action==TEXT("NextTarget"))
+    {
+        FICDefinitionResult R;FICCombatSettingsRow Defaults;const auto* Settings=ASC->Definitions()?ASC->Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;if(!Settings)Settings=&Defaults;
+        TArray<AICCharacterBase*> Targets;for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)if(PlayerCharacter->IsHostileTo(*It)&&It->GetICAbilitySystem()&&It->GetICAbilitySystem()->IsAlive()&&FVector::DistSquared(PlayerCharacter->GetActorLocation(),It->GetActorLocation())<=FMath::Square(Settings->LockOnDistanceCm))
+        {FHitResult Hit;FCollisionQueryParams Q;Q.AddIgnoredActor(PlayerCharacter);Q.AddIgnoredActor(*It);if(!GetWorld()->LineTraceSingleByChannel(Hit,PlayerCharacter->GetActorLocation(),It->GetActorLocation(),ECC_Visibility,Q))Targets.Add(*It);}
+        Targets.Sort([PlayerCharacter](const AICCharacterBase& A,const AICCharacterBase& B){return FVector::DistSquared(A.GetActorLocation(),PlayerCharacter->GetActorLocation())<FVector::DistSquared(B.GetActorLocation(),PlayerCharacter->GetActorLocation());});
+        const int32 Index=Targets.IndexOfByKey(CombatTarget.Get());CombatTarget=Targets.IsEmpty()?nullptr:Targets[(Index+1)%Targets.Num()];TargetOccludedAt=-1;return;
+    }
+    FName SkillID;
+    if(Action==TEXT("CompanionSkill"))
+    {
+        AICCharacterBase* Companion=nullptr;for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It){const auto S=GetWorldState()->GetSnapshot(It->GetCharacterID());if(S.PartySlot==Slot&&S.Mode==EICCharacterMode::Companion){Companion=*It;break;}}
+        ASC=Companion?Companion->GetICAbilitySystem():nullptr;if(!ASC){Show(TEXT("활성 동료가 없습니다."));return;}
+        FICDefinitionResult R;const auto* NPC=ASC->Definitions()->Find<FICNPCRow>(Companion->GetCharacterID(),R);const auto* Base=NPC?ASC->Definitions()->Find<FICRecruitCombatRow>(NPC->RecruitCombatID,R):nullptr;
+        if(!Base){Show(R.Reason);return;}SkillID=Base->UniqueSkillID;Action=TEXT("Skill");
+    }
+    else if(Action==TEXT("Skill"))
+    {
+        TArray<FName> IDs;ASC->Definitions()->GetDefinitionIDs(EICDefinitionType::Class,IDs);FICDefinitionResult R;
+        for(FName ID:IDs)if(const auto* Class=ASC->Definitions()->Find<FICClassRow>(ID,R))if(static_cast<int32>(Class->CharacterClass)-1==Job){const FName Slots[]={Class->SkillSlot1ID,Class->SkillSlot2ID,Class->SkillSlot3ID,Class->SkillSlot4ID};SkillID=Slots[Slot];break;}
+        if(SkillID.IsNone()||!ASC->Capture().UnlockedSkillIDs.Contains(SkillID)){Show(TEXT("해당 슬롯의 해금 스킬이 없습니다."));return;}
+    }
+    AICCharacterBase* Target=CombatTarget.Get();
+    if(Action==TEXT("Skill")){FICDefinitionResult R;if(const auto* S=ASC->Definitions()->Find<FICSkillRow>(SkillID,R))if(S->TargetRules.Target==EICCombatTarget::Self)Target=Cast<AICCharacterBase>(ASC->GetAvatarActor());}
+    const auto Result=ASC->RequestAction(Action,SkillID,Target);if(!Result.bSuccess){bBlocking=false;Show(Result.Reason);}
 }

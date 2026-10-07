@@ -67,6 +67,7 @@ private:
     bool RollRandomOptions(FPlayerItemInstance& Item,const FICItemRow& Definition) const;
     bool Fail(const TCHAR* Text);
     friend class UICProductionSubsystem;
+    friend class FICRewardService;
     friend class AICDroppedItem;
     bool CommitLoot(const FICInventoryState& Inventory,FName ItemID,int32 Overflow);
 };

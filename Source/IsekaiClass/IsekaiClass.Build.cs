@@ -18,6 +18,11 @@ public class IsekaiClass : ModuleRules
             "Slate",
             "SlateCore",
             "GameplayTags",
+            "GameplayAbilities",
+            "GameplayTasks",
+            "StateTreeModule",
+            "GameplayStateTreeModule",
+            "NavigationSystem",
             "Niagara",
             "AIModule"
         });
@@ -25,6 +30,7 @@ public class IsekaiClass : ModuleRules
         if (Target.bBuildEditor)
         {
             PrivateDependencyModuleNames.Add("UnrealEd");
+            PrivateDependencyModuleNames.Add("UMGEditor");
         }
     }
 }

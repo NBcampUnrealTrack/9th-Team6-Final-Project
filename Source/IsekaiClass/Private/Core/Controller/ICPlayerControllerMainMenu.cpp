@@ -1,4 +1,6 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Management/ICUIManagerSubsystem.h"
+#include "Engine/LocalPlayer.h"
 #include "Core/ICGameMode.h"
 #include "Core/ICGameState.h"
 #include "Debug/ICLog.h"
@@ -39,12 +41,7 @@ void AICPlayerController::InitializeMainMenu()
     }
     MainMenuWidget->SetIsFocusable(true);
     MainMenuWidget->AddToViewport();
-    // NativeConstruct clears travel pause requests; claim the menu pause after constructing the widget.
-    if (UICTimeSubsystem* Time = GetTime()) Time->SetPauseRequest(this, TEXT("MainMenu"), true);
-    FInputModeUIOnly InputMode;
-    InputMode.SetWidgetToFocus(MainMenuWidget->TakeWidget());
-    InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-    SetInputMode(InputMode);
+    if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->SetMenuContext(this,MainMenuWidget,true);
     MainMenuWidget->FocusStartButton();
     UE_LOG(LogICUI, Log, TEXT("[MainMenu.Opened] Controller=%s Widget=%s: 공통 컨트롤러에서 메인 메뉴 표시"), *GetNameSafe(this), *GetNameSafe(MainMenuWidget));
 }

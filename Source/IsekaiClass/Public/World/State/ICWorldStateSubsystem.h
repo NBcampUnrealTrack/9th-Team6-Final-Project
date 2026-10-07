@@ -50,6 +50,7 @@ public:
     static bool ValidateInventoryShape(const FICInventoryState& Inventory, TSet<FGuid>* ExistingIDs = nullptr);
     bool ApplyWorldProgress(const FICWorldState& Candidate);
 private:
+    bool AdvanceOfflineCharacter(FName ID);
     UPROPERTY(meta=(ToolTip="GameInstance의 유일한 지속 상태 원본입니다. 내부 거래/검증 API가 갱신하고 성공 뒤 이벤트를 발행합니다. BP에 별도 원본 복사본을 유지하지 않습니다.\n입력 자료형: 구조/객체 (FICWorldState).\n소속 정의/시스템: GameInstance에 살아 있는 지속 상태의 원본입니다.")) FICWorldState State;
     TMap<FName, TWeakObjectPtr<UObject>> Participants;
 };

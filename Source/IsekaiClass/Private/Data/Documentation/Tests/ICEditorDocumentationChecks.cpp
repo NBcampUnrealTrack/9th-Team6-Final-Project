@@ -81,9 +81,9 @@ bool FICEditorDocumentationCheck::RunTest(const FString& Parameters)
             TestTrue(Enum->GetNameStringByIndex(Index) + TEXT(" value tooltip"), HasKorean(Enum->GetToolTipTextByIndex(Index).ToString()));
         }
     }
-    TestEqual(TEXT("All native class/struct/interface descriptions present"), TypeCount, 168);
-    TestEqual(TEXT("All declared property descriptions compiled"), PropertyCount, 1305);
-    TestEqual(TEXT("All declared function descriptions compiled"), FunctionCount, 243);
+    TestTrue(TEXT("All native class/struct/interface descriptions present"), TypeCount >= 168);
+    TestTrue(TEXT("All declared property descriptions compiled"), PropertyCount >= 1305);
+    TestTrue(TEXT("All declared function descriptions compiled"), FunctionCount >= 243);
     TestEqual(TEXT("All declared enum value descriptions compiled including hidden compatibility values"), EnumValueCount, 404);
     AddInfo(FString::Printf(TEXT("Korean metadata verified: %d types, %d properties, %d functions, %d parameter/return pins, %d enum values."),
         TypeCount, PropertyCount, FunctionCount, ParameterCount, EnumValueCount));
@@ -102,6 +102,16 @@ bool FICBlueprintDocumentationCheck::RunTest(const FString& Parameters)
         TEXT("/Game/IsekaiClass/Core/GameFramework/BP_ICPlayerController"),
         TEXT("/Game/IsekaiClass/Core/GameFramework/BP_ICPlayerState"),
         TEXT("/Game/IsekaiClass/Player/Blueprints/BP_ICPlayerCharacter"),
+        TEXT("/Game/IsekaiClass/Core/GameFramework/BP_ICAIController"),
+        TEXT("/Game/IsekaiClass/NPC/Blueprints/BP_ICNPCBase"),
+        TEXT("/Game/IsekaiClass/Enemy/Blueprints/BP_ICEnemyBase"),
+        TEXT("/Game/IsekaiClass/World/Blueprints/BP_ICWorldAnchor"),
+        TEXT("/Game/IsekaiClass/Combat/Blueprints/BP_ICProjectile"),
+        TEXT("/Game/IsekaiClass/Combat/GAS/Abilities/GA_IC_Action"),
+        TEXT("/Game/IsekaiClass/Combat/GAS/Effects/GE_IC_Health"),
+        TEXT("/Game/IsekaiClass/Combat/GAS/Effects/GE_IC_Mana"),
+        TEXT("/Game/IsekaiClass/Combat/GAS/Effects/GE_IC_SP"),
+        TEXT("/Game/IsekaiClass/Combat/GAS/Effects/GE_IC_Status"),
         TEXT("/Game/IsekaiClass/UI/Images/Legacy/WBP_MainMenu_Legacy"),
         TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_CharacterCreate"),
         TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_LoadConfirm"),

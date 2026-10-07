@@ -1,4 +1,6 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "Player/Character/ICPlayerCharacter.h"
+#include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Debug/ICLog.h"
 #include "Core/ICGameState.h"
 #include "Inventory/Components/ICInventoryComponent.h"
@@ -7,6 +9,8 @@
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Inventory/Use/ICItemUseService.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "World/Spawn/ICSpawnSubsystem.h"
+#include "NPC/Character/ICNPCBase.h"
 
 void AICPlayerController::BeginItem(FName ID,int32 Quick)
 {
@@ -35,8 +39,16 @@ void AICPlayerController::ConfirmTarget(FName Target)
     if(!UICWorldStateSubsystem::IsCharacterIdValid(Target)||!State->GetStoredCharacter(Target))
     {Show(TEXT("사용 가능한 대상이 없습니다."));return;}
     if(!State->FlushParticipants()){Show(TEXT("현재 상태를 반영할 수 없습니다. 변경하지 않았습니다."));return;}
-    const FICItemUseResult Prepared=UICItemUseService::Prepare(Inventory,Inventory->GetDefinitions(),PendingItem,State->GetSnapshot(Target));
+    AICNPCBase* ReviveActor=nullptr;const auto* Item=Inventory->Find(PendingItem);
+    if(Item&&Item->UseEffect==EICItemEffect::Revival)
+    {
+        FString Reason;auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());auto* Spawn=GetWorld()->GetSubsystem<UICSpawnSubsystem>();
+        ReviveActor=Spawn?Spawn->ReserveReviveTarget(Target,PlayerCharacter?PlayerCharacter->GetICAbilitySystem():nullptr,Reason):nullptr;
+        if(!ReviveActor){Show(Reason.IsEmpty()?TEXT("부활 대상을 안전하게 배치할 수 없습니다."):Reason);return;}
+    }
+    FICItemUseResult Prepared=UICItemUseService::Prepare(Inventory,Inventory->GetDefinitions(),PendingItem,State->GetSnapshot(Target));
     if(!Prepared.bSuccess){Show(Prepared.Reason);return;}
+    if(ReviveActor){Prepared.Character.Position=ReviveActor->GetActorLocation();Prepared.Character.Rotation=ReviveActor->GetActorRotation();}
     FICWorldState Next=State->ExportState();Next.Inventory=Prepared.Inventory;Next.Characters.Add(Target,Prepared.Character);
     bool Applied=false;
     {
@@ -67,7 +79,8 @@ void AICPlayerController::OpenContainer(FName ID,bool Home,bool Access)
 float AICPlayerController::ConsumeProductionSP(float Amount)
 {
     IC_TRACE_FUNCTION();
-    const bool WasExhausted=Survival.IsExhausted();const float Consumed=Survival.ConsumeSP(Amount);
+    CombatCacheChanged();const float Consumed=FMath::IsFinite(Amount)?FMath::Clamp(Amount,0.f,Survival.SP):0.f;
+    if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=C->GetICAbilitySystem())ASC->ChangeResource(TEXT("SP"),-Consumed);const bool WasExhausted=bLastExhausted;CombatCacheChanged();
     if(WasExhausted!=Survival.IsExhausted()){bLastExhausted=Survival.IsExhausted();OnExhaustionChanged.Broadcast(bLastExhausted);}FlushWorldState();bDirty=true;return Consumed;
 }
 
@@ -75,8 +88,9 @@ bool AICPlayerController::Sleep()
 {
     IC_TRACE_FUNCTION();
     if(!bCreated||bDead||bInCombat||bInDialogue||bInEvent||bItemTransactionInProgress){Show(TEXT("현재 상태에서는 잘 수 없습니다."));return false;}
+    CombatCacheChanged();
     const int32 Minutes=Survival.CalculateSleepMinutes(SleepSPRecoveryPerGameMinute);
-    const bool WasExhausted=Survival.IsExhausted();Survival.CompleteSleep();bLastExhausted=false;
+    const bool WasExhausted=Survival.IsExhausted();if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=C->GetICAbilitySystem()){ASC->CancelAction();ASC->RemoveSleepEffects();const auto S=ASC->Capture();ASC->SetVitals(S.MaxHP,S.MaxMP,S.MaxSP);}CombatCacheChanged();bLastExhausted=false;
     if(WasExhausted)OnExhaustionChanged.Broadcast(false);
     if(auto* Time=GetTime())Time->JumpGameMinutes(Minutes);
     UE_LOG(LogICCore, Log, TEXT("[Player.Sleep] GameMinutes=%d HP=%.2f MP=%.2f SP=%.2f"),Minutes,Survival.HP,Survival.MP,Survival.SP);

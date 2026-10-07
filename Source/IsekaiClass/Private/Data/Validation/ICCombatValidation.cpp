@@ -300,6 +300,12 @@ void ValidateCombat(const TArray<FICDefinitionTable>& Tables, bool bComplete, TA
                 Issue(Issues, At, Field + TEXT(".StartOffsetPlaySeconds"), TEXT("All authored emissions must finish within CastPlaySeconds + RecoveryPlaySeconds; projectile flight may continue afterward."));
             if (Hit.RepeatCount > 1 && Hit.RepeatIntervalPlaySeconds <= 0.0)
                 Issue(Issues, At, Field + TEXT(".RepeatIntervalPlaySeconds"), TEXT("Repeated emissions require a positive interval."));
+            if(Hit.Shape==EICHitShape::WeaponTrace)
+            {
+                if(Hit.TraceStartSocket.IsNone()||Hit.TraceEndSocket.IsNone())Issue(Issues,At,Field+TEXT(".TraceStartSocket"),TEXT("Weapon trace requires both actual weapon socket names."));
+                if(!FMath::IsFinite(Hit.TraceRadiusCm)||Hit.TraceRadiusCm<=0)Issue(Issues,At,Field+TEXT(".TraceRadiusCm"),TEXT("Weapon trace radius must be finite and positive in centimeters."));
+                if(!FMath::IsFinite(Hit.TraceDurationPlaySeconds)||Hit.TraceDurationPlaySeconds<=0)Issue(Issues,At,Field+TEXT(".TraceDurationPlaySeconds"),TEXT("Weapon trace duration must be finite and positive in PlayClock seconds."));
+            }
             if (Hit.Shape == EICHitShape::Projectile && bComplete && Hit.ProjectileClass.IsNull())
                 Issue(Issues, At, Field + TEXT(".ProjectileClass"), TEXT("A complete projectile emission requires its actual actor class."));
         }

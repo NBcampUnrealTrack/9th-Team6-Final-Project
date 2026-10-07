@@ -13,6 +13,7 @@ class ISEKAICLASS_API UICSaveSlotWidget : public UUserWidget
 {
     GENERATED_BODY()
 public:
+    int32 GetSlotIndex() const { IC_TRACE_FUNCTION();return SlotIndex; }
     UPROPERTY(BlueprintAssignable, meta=(ToolTip="슬롯 선택 이벤트입니다. 선택 번호로 상세 화면을 갱신하며 클릭만으로 파일 삭제/덮어쓰기를 확정하지 않습니다.\n입력 자료형: FICSlotPicked.\nBP에서 이벤트를 구독할 수 있습니다. 위젯 닫기/EndPlay에서 구독을 정리해 중복 수신을 막으세요.")) FICSlotPicked OnSlotPicked;
     void Configure(int32 InSlot, const FText& InLabel);
     void SetSelected(bool bSelected);

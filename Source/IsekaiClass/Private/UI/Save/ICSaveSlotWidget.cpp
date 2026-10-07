@@ -60,7 +60,7 @@ void UICSaveSlotWidget::ConfigureData(const FICSaveSlotInfo& InInfo, UTexture2D*
     Info = InInfo; Thumbnail = InThumbnail; PortraitTextures = Portraits;
     FText Text = FText::Format(NSLOCTEXT("ICSaveUI", "CardEmpty", "{0}\n비어 있음"), ICSavePreviewUI::SlotName(Info.Slot));
     if (Info.bExists && !Info.bValid) Text = FText::Format(NSLOCTEXT("ICSaveUI", "CardInvalid", "{0}\n읽을 수 없는 저장"), ICSavePreviewUI::SlotName(Info.Slot));
-    else if (Info.bValid) Text = FText::Format(NSLOCTEXT("ICSaveUI", "CardData", "{0}\n{1} · {2}\n{3}"), ICSavePreviewUI::SlotName(Info.Slot), FText::FromString(Info.PlayerName), ICSavePreviewUI::Date(Info), ICSavePreviewUI::Location(Info));
+    else if (Info.bValid) Text = FText::Format(NSLOCTEXT("ICSaveUI", "SessionCardData", "{0}\n{1} · {2}\n{3}\n{4}\n{5}"), ICSavePreviewUI::SlotName(Info.Slot), FText::FromString(Info.PlayerName), ICSavePreviewUI::Date(Info), ICSavePreviewUI::GameTime(Info), ICSavePreviewUI::Location(Info), ICSavePreviewUI::Recovery(Info));
     Configure(Info.Slot, Text); ApplyData();
 }
 void UICSaveSlotWidget::ApplyData()

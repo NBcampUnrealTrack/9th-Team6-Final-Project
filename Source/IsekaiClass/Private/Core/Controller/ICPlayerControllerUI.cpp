@@ -10,7 +10,7 @@ void AICPlayerController::ExecuteUI(const FString& Command,int32 Index)
 {
     IC_TRACE_FUNCTION();
     UE_LOG(LogICUI, Verbose, TEXT("[UI.Command] Command=%s Index=%d Menu=%s"),*Command,Index,*Menu);
-    auto* Inventory=GetInventory();auto* Saves=GetSaves();if(!Inventory||!Saves)return;
+    auto* Inventory=GetInventory();auto* Saves=GetSaves();if(!Saves)return;
     if(Command==TEXT("ConfirmYes")){ConfirmModal(true);return;}
     if(Command==TEXT("ConfirmNo")){ConfirmModal(false);return;}
     if(Command==TEXT("Quit")){RequestQuit();return;}
@@ -23,10 +23,9 @@ void AICPlayerController::ExecuteUI(const FString& Command,int32 Index)
     if(Command==TEXT("SaveNow")){RequestManualSave();return;}
     if(Command==TEXT("LoadMenu")){OpenLoadMenu();return;}
     if(bItemTransactionInProgress)return;
-    if(Command==TEXT("SaveSlot")){if(!Saves->bSaving&&Index>=1&&Index<=4){SelectedSaveSlot=Index;bDirty=true;}return;}
-    if(Command==TEXT("LoadSlot")){if(!Saves->bSaving&&Index>=0&&Index<=4){SelectedLoadSlot=Index;bDirty=true;}return;}
+    if(Command==TEXT("SaveSlot")||Command==TEXT("LoadSlot")){SelectSessionSlot(Index);return;}
     if(Command==TEXT("Create")){RequestCreatePlayer();return;}
-    if(Command==TEXT("Load")){LoadPlayer();return;}
+    if(Command==TEXT("Load")){RequestLoadPlayer();return;}
     if(Command==TEXT("Craft"))
     {
         const auto Recipes=GetCrafting()?GetCrafting()->GetRecipes(ActiveStation==TEXT("Kitchen")?EPlayerRecipeType::Cook:EPlayerRecipeType::Craft):TArray<FName>();
@@ -39,6 +38,7 @@ void AICPlayerController::ExecuteUI(const FString& Command,int32 Index)
         if(Saves->ImportLegacySave()){SelectedLoadSlot=1;RefreshSaveSlots();}else bInitialSavePending=WasPending;
         Show(Saves->GetLastMessage());return;
     }
+    if(!Inventory)return;
     if(Command==TEXT("Preset")){if(bCreated||bInitialSavePending||Index<0||Index>1)return;Preset=Index;if(auto* TargetCharacter=Cast<AICPlayerCharacter>(GetPawn()))TargetCharacter->ApplyPreset(Preset);bDirty=true;return;}
     if(Command==TEXT("Job")){if(bCreated||bInitialSavePending||Index<0||Index>3)return;Job=Index;bDirty=true;return;}
 

@@ -1,4 +1,5 @@
 #include "Inventory/Use/ICItemUseService.h"
+#include "Combat/GAS/Simulation/ICCombatSimulation.h"
 #include "Debug/ICLog.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -29,12 +30,11 @@ FICItemUseResult UICItemUseService::Prepare(UICInventoryComponent* Inventory,UIC
         default:break;
     }
     if(!Allowed)return Fail(TEXT("UseTarget"),TEXT("이 아이템을 사용할 수 없는 대상입니다."));
-    // Persistent stat effects require the actual GAS executor; never acknowledge an unexecuted effect.
+    // Validate every referenced effect before preparing either resources or consumption.
     if(!D->StatusEffectIDs.IsEmpty())
     {
         for(FName ID:D->StatusEffectIDs)if(!Definitions->Find<FICStatusEffectRow>(ID,Lookup))
             return Fail(TEXT("StatusEffectIDs"),TEXT("효과 정의가 누락되었습니다. 변경하지 않았습니다."));
-        return Fail(TEXT("StatusEffectIDs"),TEXT("상태 효과 실행기가 연결되지 않았습니다. 변경하지 않았습니다."));
     }
     FICCharacterState C=Target;if(Player)C.Equipment.Reset();
     bool Changed=false;
@@ -47,7 +47,7 @@ FICItemUseResult UICItemUseService::Prepare(UICInventoryComponent* Inventory,UIC
             if(D->RestoreHPRatio>1 || D->RestoreMPRatio>1 || D->RestoreSPRatio>1)return Fail(TEXT("RecoveryRatio"),TEXT("회복 비율은 0~1이어야 합니다."));
             const float HP=FMath::Min<double>(C.MaxHP,C.HP+D->RestoreHP+C.MaxHP*D->RestoreHPRatio);
             const float MP=FMath::Min<double>(C.MaxMP,C.MP+D->RestoreMP+C.MaxMP*D->RestoreMPRatio);
-            const float SP=FMath::Min<double>(C.MaxSP,C.SP+D->RestoreSP+C.MaxSP*D->RestoreSPRatio);
+            const float SP=Player?FMath::Min<double>(C.MaxSP,C.SP+D->RestoreSP+C.MaxSP*D->RestoreSPRatio):0.f;
             Changed=HP!=C.HP||MP!=C.MP||SP!=C.SP;C.HP=HP;C.MP=MP;C.SP=SP;break;
         }
         case EICItemEffect::GrowthBook:
@@ -84,8 +84,10 @@ FICItemUseResult UICItemUseService::Prepare(UICInventoryComponent* Inventory,UIC
             }
             Changed=!Remove.IsEmpty();C.Combat.Effects.RemoveAll([&](const auto& E){ IC_TRACE_FUNCTION();return Remove.Contains(E.InstanceID);});break;
         }
+        case EICItemEffect::None:if(D->StatusEffectIDs.IsEmpty())return Fail(TEXT("UseEffect"),TEXT("사용 효과가 설정되지 않았습니다."));break;
         default:return Fail(TEXT("UseEffect"),TEXT("사용 효과가 설정되지 않았습니다."));
     }
+    for(FName ID:D->StatusEffectIDs){FString Reason;if(!ICCombatSimulation::PrepareItemStatus(C,ID,Definitions,Reason)){R.Field=TEXT("StatusEffectIDs");R.Reason=Reason;return R;}Changed=true;}
     const bool ConsumeAtCap=D->UseEffect==EICItemEffect::GrowthBook&&D->bConsumeAtGrowthCap;
     if(!Changed&&D->bRejectWhenNoEffect&&!ConsumeAtCap)return Fail(TEXT("UseEffect"),TEXT("이미 최대치이거나 적용할 효과가 없습니다. 아이템은 소모하지 않았습니다."));
     FICInventoryState Items;

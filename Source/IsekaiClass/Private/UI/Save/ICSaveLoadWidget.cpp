@@ -1,257 +1,219 @@
 #include "UI/Save/ICSaveLoadWidget.h"
-#include "Debug/ICLog.h"
+#include "UI/Management/ICUIManagerSubsystem.h"
 #include "UI/Save/ICSaveSlotWidget.h"
 #include "UI/Save/ICLoadConfirmWidget.h"
 #include "UI/Save/ICSavePreviewHelpers.h"
-#include "ImageUtils.h"
-#include "Save/ICSaveSubsystem.h"
-#include "Time/ICTimeSubsystem.h"
 #include "Core/Controller/ICPlayerController.h"
+#include "Save/ICSaveSubsystem.h"
+#include "Debug/ICLog.h"
+#include "Engine/LocalPlayer.h"
+#include "ImageUtils.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
-#include "Engine/GameInstance.h"
-#include "Engine/World.h"
-#include "Kismet/GameplayStatics.h"
+#include "Components/ScrollBox.h"
 
 UICSaveSubsystem* UICSaveLoadWidget::GetSaves() const
 {
     IC_TRACE_FUNCTION();
-    return GetGameInstance() ? GetGameInstance()->GetSubsystem<UICSaveSubsystem>() : nullptr;
+    const auto* PC=Cast<AICPlayerController>(GetOwningPlayer());return PC?PC->GetSaves():nullptr;
 }
 void UICSaveLoadWidget::NativeOnInitialized()
 {
-    IC_TRACE_FUNCTION();
-    Super::NativeOnInitialized();
-    if (IC_SaveLoad_Load) IC_SaveLoad_Load->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleLoadClicked);
-    if (IC_SaveLoad_Save) IC_SaveLoad_Save->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleSaveClicked);
-    if (IC_SaveLoad_Close) IC_SaveLoad_Close->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleCloseClicked);
+    IC_TRACE_FUNCTION();Super::NativeOnInitialized();SetIsFocusable(true);
+    if(IC_SaveLoad_Load)IC_SaveLoad_Load->OnClicked.AddUniqueDynamic(this,&ThisClass::HandleLoadClicked);
+    if(IC_SaveLoad_Save)IC_SaveLoad_Save->OnClicked.AddUniqueDynamic(this,&ThisClass::HandleSaveClicked);
+    if(IC_SaveLoad_Delete)IC_SaveLoad_Delete->OnClicked.AddUniqueDynamic(this,&ThisClass::HandleDeleteClicked);
+    if(IC_SaveLoad_Close)IC_SaveLoad_Close->OnClicked.AddUniqueDynamic(this,&ThisClass::HandleCloseClicked);
 }
-void UICSaveLoadWidget::Configure(bool bInAllowSave, TSoftObjectPtr<UWorld> InGameplayMap)
+void UICSaveLoadWidget::Configure(bool bInAllowSave,TSoftObjectPtr<UWorld> InGameplayMap)
 {
-    IC_TRACE_FUNCTION();
-    bAllowSave = bInAllowSave; GameplayMap = InGameplayMap;
-    UE_LOG(LogICUI, Verbose, TEXT("[SaveUI.Configure] SaveAllowed=%d Map=%s"),bAllowSave,*GameplayMap.ToSoftObjectPath().ToString());
+    IC_TRACE_FUNCTION();bAllowSave=bInAllowSave;GameplayMap=InGameplayMap;
 }
 void UICSaveLoadWidget::NativeConstruct()
 {
-    IC_TRACE_FUNCTION();
-    Super::NativeConstruct();
-    UE_LOG(LogICUI, Log, TEXT("[SaveUI.Opened] Widget=%s SaveAllowed=%d Map=%s"),*GetNameSafe(this),bAllowSave,*GameplayMap.ToSoftObjectPath().ToString());
-    if (UICSaveSubsystem* Saves = GetSaves())
-        Saves->OnSaveFinished.AddUniqueDynamic(this, &ThisClass::HandleSaveFinished);
-    if (IC_SaveLoad_Title)
-        IC_SaveLoad_Title->SetText(bAllowSave ? NSLOCTEXT("ICSaveUI", "SaveLoadTitle", "저장 · 불러오기") : NSLOCTEXT("ICSaveUI", "LoadTitle", "불러오기"));
-    if (IC_SaveLoad_Save) IC_SaveLoad_Save->SetVisibility(bAllowSave ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-    if (bAllowSave)
-        if (AICPlayerController* PC = Cast<AICPlayerController>(GetOwningPlayer());PC&&!PC->IsMainMenuLevel()&&PC->Menu!=TEXT("Save")) PC->OpenSaveMenu();
-    RefreshSlots();
-    if (APlayerController* PC = GetOwningPlayer())
+    IC_TRACE_FUNCTION();Super::NativeConstruct();bClosing=false;SetIsEnabled(true);
+    auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
+    if(!PC){SetNotice(NSLOCTEXT("ICSaveUI","NoController","ICPlayerController가 필요합니다."));return;}
+    PC->OnMenuChanged.AddUniqueDynamic(this,&ThisClass::HandleMenuChanged);
+    PC->OnNoticeChanged.AddUniqueDynamic(this,&ThisClass::HandleNoticeChanged);
+    PC->OnSaveSessionChanged.AddUniqueDynamic(this,&ThisClass::RefreshSlots);
+    if(auto* Saves=GetSaves())
     {
-        if(const AICPlayerController* IC = Cast<AICPlayerController>(PC);IC&&!IC->IsMainMenuLevel())
-        { FInputModeGameAndUI InputMode;InputMode.SetWidgetToFocus(TakeWidget());InputMode.SetHideCursorDuringCapture(false);PC->SetInputMode(InputMode); }
-        else
-        { FInputModeUIOnly InputMode;InputMode.SetWidgetToFocus(TakeWidget());PC->SetInputMode(InputMode); }
-        PC->bShowMouseCursor = true;
+        Saves->OnSaveStarted.AddUniqueDynamic(this,&ThisClass::HandleSaveStarted);
+        Saves->OnSaveFinished.AddUniqueDynamic(this,&ThisClass::HandleSaveFinished);
     }
-    if (IC_SaveLoad_Close && GetOwningPlayer()) IC_SaveLoad_Close->SetUserFocus(GetOwningPlayer());
+    PC->SetSessionGameplayMap(GameplayMap);
+    const FString Mode=PC->GetSessionMenu();
+    if(Mode!=TEXT("Save")&&Mode!=TEXT("Load"))
+    {if(bAllowSave)PC->OpenSaveMenu();else PC->OpenLoadMenu();}
+    else PC->RefreshSaveSlots();
+    HandleMenuChanged(PC->Menu);HandleNoticeChanged(PC->Notice);
+    UE_LOG(LogICUI,Log,TEXT("[SaveUI.Opened] Widget=%s SessionMenu=%s"),*GetName(),*PC->GetSessionMenu());
 }
 void UICSaveLoadWidget::NativeDestruct()
 {
     IC_TRACE_FUNCTION();
-    if (UICSaveSubsystem* Saves = GetSaves()) Saves->OnSaveFinished.RemoveDynamic(this, &ThisClass::HandleSaveFinished);
-    if (ConfirmScreen) { ConfirmScreen->RemoveFromParent(); ConfirmScreen = nullptr; }
-    Super::NativeDestruct();
-    UE_LOG(LogICUI, Verbose, TEXT("[SaveUI.Destruct] Widget=%s: 저장 이벤트 구독 정리"),*GetNameSafe(this));
+    if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))
+    {
+        PC->OnMenuChanged.RemoveDynamic(this,&ThisClass::HandleMenuChanged);
+        PC->OnNoticeChanged.RemoveDynamic(this,&ThisClass::HandleNoticeChanged);
+        PC->OnSaveSessionChanged.RemoveDynamic(this,&ThisClass::RefreshSlots);
+    }
+    if(auto* Saves=GetSaves())
+    {
+        Saves->OnSaveStarted.RemoveDynamic(this,&ThisClass::HandleSaveStarted);
+        Saves->OnSaveFinished.RemoveDynamic(this,&ThisClass::HandleSaveFinished);
+    }
+    CloseConfirmScreen();
+    for(const auto& Row:SlotRows)if(Row)Row->OnSlotPicked.RemoveDynamic(this,&ThisClass::HandleSlotPicked);
+    SlotRows.Reset();ThumbnailTextures.Reset();Super::NativeDestruct();
+}
+FReply UICSaveLoadWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& KeyEvent)
+{
+    IC_TRACE_FUNCTION();
+    if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))
+        if(PC->HandleSessionKey(KeyEvent.GetKey(),KeyEvent.IsRepeat()))return FReply::Handled();
+    return Super::NativeOnPreviewKeyDown(Geometry,KeyEvent);
 }
 void UICSaveLoadWidget::SetNotice(const FText& Text)
 {
-    IC_TRACE_FUNCTION();
-    if (IC_SaveLoad_Notice) IC_SaveLoad_Notice->SetText(Text);
-    if(!Text.IsEmpty())UE_LOG(LogICUI, Verbose, TEXT("[SaveUI.Notice] %s"),*Text.ToString());
+    IC_TRACE_FUNCTION();if(IC_SaveLoad_Notice)IC_SaveLoad_Notice->SetText(Text);
+}
+void UICSaveLoadWidget::HandleNoticeChanged(const FString& Notice)
+{
+    IC_TRACE_FUNCTION();SetNotice(FText::FromString(Notice));UpdateSelection();
 }
 void UICSaveLoadWidget::RefreshSlots()
 {
-    IC_TRACE_FUNCTION();
-    UICSaveSubsystem* Saves = GetSaves();
-    if (!Saves || !IC_SaveLoad_SlotList)
+    IC_TRACE_FUNCTION();auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
+    if(!PC||!IC_SaveLoad_SlotList)return;
+    DisplaySlots=PC->SaveSlots;ThumbnailTextures.Reset();
+    for(const auto& Info:DisplaySlots)
     {
-        SetNotice(NSLOCTEXT("ICSaveUI", "Unavailable", "저장 시스템을 사용할 수 없습니다."));
-        if (IC_SaveLoad_Load) IC_SaveLoad_Load->SetIsEnabled(false);
-        if (IC_SaveLoad_Save) IC_SaveLoad_Save->SetIsEnabled(false);
-        return;
-    }
-    DisplaySlots = Saves->GetSlotList(); ThumbnailTextures.Reset();
-    for (int32 Index = 0; Index < DisplaySlots.Num(); ++Index)
-    {
-        UTexture2D* Texture = nullptr;
-        if (!DisplaySlots[Index].Preview.ThumbnailPNG.IsEmpty() && DisplaySlots[Index].Preview.ThumbnailPNG.Num() <= 2 * 1024 * 1024)
-            Texture = FImageUtils::ImportBufferAsTexture2D(DisplaySlots[Index].Preview.ThumbnailPNG);
+        UTexture2D* Texture=nullptr;
+        if(!Info.Preview.ThumbnailPNG.IsEmpty()&&Info.Preview.ThumbnailPNG.Num()<=2*1024*1024)
+            Texture=FImageUtils::ImportBufferAsTexture2D(Info.Preview.ThumbnailPNG);
         ThumbnailTextures.Add(Texture);
     }
-    const TArray<FICSaveSlotInfo>& Slots = DisplaySlots;
-    IC_SaveLoad_SlotList->ClearChildren(); SlotRows.Reset();
-    bool bHasSelected = false;
-    for (const FICSaveSlotInfo& Info : Slots)
+    for(const auto& Row:SlotRows)if(Row)Row->OnSlotPicked.RemoveDynamic(this,&ThisClass::HandleSlotPicked);
+    IC_SaveLoad_SlotList->ClearChildren();SlotRows.Reset();
+    for(int32 Index=0;Index<DisplaySlots.Num();++Index)
     {
-        const FText SlotLabel = Info.Slot == 0 ? NSLOCTEXT("ICSaveUI", "AutoSlot", "자동 저장") : FText::Format(NSLOCTEXT("ICSaveUI", "ManualSlot", "수동 슬롯 {0}"), FText::AsNumber(Info.Slot));
-        const FText StateLabel = !Info.bExists ? NSLOCTEXT("ICSaveUI", "Empty", "비어 있음") : !Info.bValid ? NSLOCTEXT("ICSaveUI", "Invalid", "불러올 수 없는 저장") : FText::Format(NSLOCTEXT("ICSaveUI", "SlotNameDate", "{0} · {1}"), FText::FromString(Info.PlayerName), FText::FromString(Info.SavedAt.ToString(TEXT("%Y.%m.%d %H:%M"))));
-        UClass* RowClass = SlotWidgetClass ? SlotWidgetClass.Get() : UICSaveSlotWidget::StaticClass();
-        UICSaveSlotWidget* Row = CreateWidget<UICSaveSlotWidget>(GetOwningPlayer(), RowClass);
-        if (!Row) continue;
-        Row->Configure(Info.Slot, FText::Format(NSLOCTEXT("ICSaveUI", "SlotRowV2", "{0}\n{1}"), SlotLabel, StateLabel));
-        const int32 InfoIndex = static_cast<int32>(&Info - Slots.GetData());
-        Row->ConfigureData(Info, ThumbnailTextures.IsValidIndex(InfoIndex) ? ThumbnailTextures[InfoIndex].Get() : nullptr, PortraitTextures);
-        Row->OnSlotPicked.AddUniqueDynamic(this, &ThisClass::HandleSlotPicked);
-        if (UVerticalBoxSlot* RowLayoutSlot = IC_SaveLoad_SlotList->AddChildToVerticalBox(Row)) RowLayoutSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 12.f));
+        auto* Row=CreateWidget<UICSaveSlotWidget>(GetOwningPlayer(),SlotWidgetClass?SlotWidgetClass.Get():UICSaveSlotWidget::StaticClass());
+        if(!Row)continue;
+        Row->ConfigureData(DisplaySlots[Index],ThumbnailTextures[Index],PortraitTextures);
+        Row->OnSlotPicked.AddUniqueDynamic(this,&ThisClass::HandleSlotPicked);
+        if(auto* Layout=IC_SaveLoad_SlotList->AddChildToVerticalBox(Row))Layout->SetPadding(FMargin(0,0,0,12));
         SlotRows.Add(Row);
-        bHasSelected |= Info.Slot == SelectedSlot;
-    }
-    if (!bHasSelected)
-    {
-        SelectedSlot = INDEX_NONE;
-        for (const FICSaveSlotInfo& Info : Slots) if (Info.bValid) { SelectedSlot = Info.Slot; break; }
-        if (SelectedSlot == INDEX_NONE && bAllowSave) SelectedSlot = 1;
     }
     UpdateSelection();
 }
 void UICSaveLoadWidget::HandleSlotPicked(int32 SlotIndex)
 {
-    IC_TRACE_FUNCTION();
-    if (bWaitingForSave) return;
-    SelectedSlot = SlotIndex; PendingOverwriteSlot = INDEX_NONE;
-    UE_LOG(LogICUI, Verbose, TEXT("[SaveUI.SlotSelected] Slot=%d"),SlotIndex);
-    SetNotice(FText::GetEmpty()); UpdateSelection();
+    IC_TRACE_FUNCTION();if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->SelectSessionSlot(SlotIndex);
 }
 void UICSaveLoadWidget::UpdateSelection()
 {
-    IC_TRACE_FUNCTION();
-    const UICSaveSubsystem* Saves = GetSaves();
-    const TArray<FICSaveSlotInfo>& Slots = DisplaySlots;
-    const FICSaveSlotInfo* Selected = Slots.FindByPredicate([this](const FICSaveSlotInfo& Info) { IC_TRACE_FUNCTION(); return Info.Slot == SelectedSlot; });
-    for (int32 Index = 0; Index < SlotRows.Num(); ++Index)
+    IC_TRACE_FUNCTION();const auto* PC=Cast<AICPlayerController>(GetOwningPlayer());const auto* Saves=GetSaves();
+    if(!PC)return;
+    const bool bSaveMode=PC->GetSessionMenu()==TEXT("Save");
+    const bool bBusy=!Saves||Saves->bSaving||PC->Menu==TEXT("Confirm");
+    const int32 SelectedSlot=PC->GetSelectedSessionSlot();
+    const auto* Selected=DisplaySlots.FindByPredicate([SelectedSlot](const FICSaveSlotInfo& Info){return Info.Slot==SelectedSlot;});
+    for(const auto& Row:SlotRows)
     {
-        SlotRows[Index]->SetSelected(Slots.IsValidIndex(Index) && Slots[Index].Slot == SelectedSlot);
-        SlotRows[Index]->SetIsEnabled(!bWaitingForSave);
+        Row->SetSelected(Row->GetSlotIndex()==SelectedSlot);
+        Row->SetIsEnabled(!bBusy&&(!bSaveMode||Row->GetSlotIndex()!=0));
+        if(Row->GetSlotIndex()==SelectedSlot)if(auto* Scroll=Cast<UScrollBox>(GetWidgetFromName(TEXT("IC_SaveLoad_Scroll"))))Scroll->ScrollWidgetIntoView(Row,false);
     }
-    if (IC_SaveLoad_Load) IC_SaveLoad_Load->SetIsEnabled(Selected && Selected->bValid && Saves && !Saves->bSaving && !bWaitingForSave);
-    if (IC_SaveLoad_Save) IC_SaveLoad_Save->SetIsEnabled(bAllowSave && Selected && SelectedSlot >= 1 && SelectedSlot <= 4 && Saves && !Saves->bSaving && !bWaitingForSave);
-    if (IC_SaveLoad_Close) IC_SaveLoad_Close->SetIsEnabled(!bWaitingForSave);
-    const int32 SelectedIndex = Selected ? static_cast<int32>(Selected - Slots.GetData()) : INDEX_NONE;
-    ICSavePreviewUI::SetImage(IC_SaveLoad_Thumbnail, ThumbnailTextures.IsValidIndex(SelectedIndex) ? ThumbnailTextures[SelectedIndex].Get() : nullptr);
-    UImage* PartyImages[] = { IC_SaveLoad_Party0.Get(), IC_SaveLoad_Party1.Get(), IC_SaveLoad_Party2.Get(), IC_SaveLoad_Party3.Get(), IC_SaveLoad_Party4.Get() };
-    for (int32 Index = 0; Index < 5; ++Index) ICSavePreviewUI::SetImage(PartyImages[Index], Selected && Selected->bValid ? ICSavePreviewUI::Portrait(*Selected, Index, PortraitTextures) : nullptr);
-    if (IC_SaveLoad_Detail)
+    if(IC_SaveLoad_Title)IC_SaveLoad_Title->SetText(bSaveMode?(PC->IsQuitAfterSave()?NSLOCTEXT("ICSaveUI","SaveThenQuitTitle","저장 후 종료"):NSLOCTEXT("ICSaveUI","SaveTitle","저장")):NSLOCTEXT("ICSaveUI","LoadTitle","불러오기"));
+    if(IC_SaveLoad_Save){IC_SaveLoad_Save->SetVisibility(bSaveMode?ESlateVisibility::Visible:ESlateVisibility::Collapsed);IC_SaveLoad_Save->SetIsEnabled(!bBusy&&PC->bCreated&&SelectedSlot>=1&&SelectedSlot<=4);}
+    if(IC_SaveLoad_Load){IC_SaveLoad_Load->SetVisibility(bSaveMode?ESlateVisibility::Collapsed:ESlateVisibility::Visible);IC_SaveLoad_Load->SetIsEnabled(!bBusy&&Selected&&Selected->bValid);}
+    if(IC_SaveLoad_Delete)IC_SaveLoad_Delete->SetIsEnabled(!bBusy&&Selected&&Selected->bExists);
+    if(IC_SaveLoad_Close)IC_SaveLoad_Close->SetIsEnabled(!bBusy);
+    const int32 SelectedIndex=Selected?static_cast<int32>(Selected-DisplaySlots.GetData()):INDEX_NONE;
+    ICSavePreviewUI::SetImage(IC_SaveLoad_Thumbnail,ThumbnailTextures.IsValidIndex(SelectedIndex)?ThumbnailTextures[SelectedIndex].Get():nullptr);
+    UImage* Images[]={IC_SaveLoad_Party0.Get(),IC_SaveLoad_Party1.Get(),IC_SaveLoad_Party2.Get(),IC_SaveLoad_Party3.Get(),IC_SaveLoad_Party4.Get()};
+    for(int32 Index=0;Index<5;++Index)ICSavePreviewUI::SetImage(Images[Index],Selected&&Selected->bValid?ICSavePreviewUI::Portrait(*Selected,Index,PortraitTextures):nullptr);
+    if(IC_SaveLoad_Detail)
     {
-        FText Detail = NSLOCTEXT("ICSaveUI", "PickSlot", "슬롯을 선택하세요.");
-        if (Selected)
+        FText Detail=NSLOCTEXT("ICSaveUI","PickSlot","슬롯을 선택하세요.");
+        if(Selected)
         {
-            if (!Selected->bExists) Detail = NSLOCTEXT("ICSaveUI", "EmptyDetail", "저장 데이터가 없는 슬롯입니다.");
-            else if (!Selected->bValid) Detail = NSLOCTEXT("ICSaveUI", "InvalidDetail", "파일 손상 또는 지원하지 않는 데이터로 불러올 수 없습니다.");
-            else Detail = FText::Format(NSLOCTEXT("ICSaveUI", "DetailWithLocation", "이름: {0}\n저장 시각: {1}\n저장 위치: {2}\n{3}"), FText::FromString(Selected->PlayerName), ICSavePreviewUI::Date(*Selected), ICSavePreviewUI::Location(*Selected), Selected->bUsesBackup ? NSLOCTEXT("ICSaveUI", "Backup", "복구 가능한 백업에서 불러옵니다.") : FText::GetEmpty());
+            if(!Selected->bExists)Detail=NSLOCTEXT("ICSaveUI","EmptyDetail","저장 데이터가 없는 슬롯입니다.");
+            else if(!Selected->bValid)Detail=NSLOCTEXT("ICSaveUI","InvalidDetail","파일 손상 또는 지원하지 않는 데이터로 불러올 수 없습니다.");
+            else Detail=FText::Format(NSLOCTEXT("ICSaveUI","SessionDetail","이름: {0}\n저장 시각: {1}\n게임 시간: {2}\n저장 위치: {3}\n{4}"),FText::FromString(Selected->PlayerName),ICSavePreviewUI::Date(*Selected),ICSavePreviewUI::GameTime(*Selected),ICSavePreviewUI::Location(*Selected),ICSavePreviewUI::Recovery(*Selected));
         }
         IC_SaveLoad_Detail->SetText(Detail);
     }
 }
-void UICSaveLoadWidget::HandleLoadClicked()
+void UICSaveLoadWidget::HandleMenuChanged(const FString& Menu)
 {
-    IC_TRACE_FUNCTION();
-    if (bWaitingForSave || ConfirmScreen) return;
-    const FICSaveSlotInfo* Info = DisplaySlots.FindByPredicate([this](const FICSaveSlotInfo& Entry) { IC_TRACE_FUNCTION(); return Entry.Slot == SelectedSlot; });
-    if (!Info || !Info->bValid) return;
-    if (!ConfirmWidgetClass) { SetNotice(NSLOCTEXT("ICSaveUI", "NoConfirm", "Confirm Widget Class를 지정하세요.")); return; }
-    ConfirmScreen = CreateWidget<UICLoadConfirmWidget>(GetOwningPlayer(), ConfirmWidgetClass);
-    if (!ConfirmScreen) return;
-    PendingLoadSlot = SelectedSlot;
-    const int32 Index = static_cast<int32>(Info - DisplaySlots.GetData());
-    ConfirmScreen->Configure(*Info, ThumbnailTextures.IsValidIndex(Index) ? ThumbnailTextures[Index].Get() : nullptr);
-    ConfirmScreen->OnConfirmed.AddUniqueDynamic(this, &ThisClass::HandleLoadConfirmed);
-    ConfirmScreen->OnCancelled.AddUniqueDynamic(this, &ThisClass::HandleLoadCancelled);
-    ConfirmScreen->AddToViewport(200); SetIsEnabled(false);
+    IC_TRACE_FUNCTION();auto* PC=Cast<AICPlayerController>(GetOwningPlayer());if(!PC)return;
+    const FString Mode=PC->GetSessionMenu();
+    if(Mode!=TEXT("Save")&&Mode!=TEXT("Load")){CloseView();return;}
+    if(Menu!=TEXT("Confirm")){SetIsEnabled(true);CloseConfirmScreen();UpdateSelection();return;}
+    if(ConfirmScreen)return;
+    if(!ConfirmWidgetClass){PC->ConfirmModal(false);PC->Show(TEXT("WBP_IC_SaveLoad의 Confirm Widget Class를 지정하세요."));return;}
+    ConfirmScreen=CreateWidget<UICLoadConfirmWidget>(GetOwningPlayer(),ConfirmWidgetClass);
+    if(!ConfirmScreen){PC->ConfirmModal(false);return;}
+    const int32 PendingSlot=PC->GetPendingSessionSlot();
+    const auto* Info=DisplaySlots.FindByPredicate([PendingSlot](const FICSaveSlotInfo& Entry){return Entry.Slot==PendingSlot;});
+    const int32 Index=Info?static_cast<int32>(Info-DisplaySlots.GetData()):INDEX_NONE;
+    ConfirmScreen->Configure(Info?*Info:FICSaveSlotInfo(),ThumbnailTextures.IsValidIndex(Index)?ThumbnailTextures[Index].Get():nullptr);
+    ConfirmScreen->ConfigurePrompt(FText::FromString(PC->ModalText));
+    ConfirmScreen->OnConfirmed.AddUniqueDynamic(this,&ThisClass::HandleLoadConfirmed);
+    ConfirmScreen->OnCancelled.AddUniqueDynamic(this,&ThisClass::HandleLoadCancelled);
+    auto* LP=GetOwningLocalPlayer();auto* UI=LP?LP->GetSubsystem<UICUIManagerSubsystem>():nullptr;
+    if(!UI||!UI->OpenScreen(ConfirmScreen,true,200)){CloseConfirmScreen();PC->ConfirmModal(false);return;}
+    SetIsEnabled(false);
 }
-void UICSaveLoadWidget::HandleLoadCancelled()
+void UICSaveLoadWidget::CloseConfirmScreen()
 {
-    IC_TRACE_FUNCTION();
-    if (ConfirmScreen) ConfirmScreen->RemoveFromParent();
-    ConfirmScreen = nullptr; PendingLoadSlot = INDEX_NONE; SetIsEnabled(true);
-    if (APlayerController* PC = GetOwningPlayer())
-    {
-        if(const AICPlayerController* IC = Cast<AICPlayerController>(PC);IC&&!IC->IsMainMenuLevel())
-        {FInputModeGameAndUI Mode;Mode.SetWidgetToFocus(TakeWidget());Mode.SetHideCursorDuringCapture(false);PC->SetInputMode(Mode);}
-        else
-        {FInputModeUIOnly Mode;Mode.SetWidgetToFocus(TakeWidget());PC->SetInputMode(Mode);}
-        if(IC_SaveLoad_Load)IC_SaveLoad_Load->SetUserFocus(PC);
-    }
+    IC_TRACE_FUNCTION();if(!ConfirmScreen)return;
+    auto* Closing=ConfirmScreen.Get();ConfirmScreen=nullptr;
+    Closing->OnConfirmed.RemoveDynamic(this,&ThisClass::HandleLoadConfirmed);
+    Closing->OnCancelled.RemoveDynamic(this,&ThisClass::HandleLoadCancelled);
+    if(auto* LP=GetOwningLocalPlayer())LP->GetSubsystem<UICUIManagerSubsystem>()->CloseScreen(Closing);else Closing->RemoveFromParent();
 }
 void UICSaveLoadWidget::HandleLoadConfirmed()
 {
-    IC_TRACE_FUNCTION();
-    const int32 SlotToLoad = PendingLoadSlot;
-    UE_LOG(LogICUI, Log, TEXT("[SaveUI.LoadConfirmed] Slot=%d"),SlotToLoad);
-    HandleLoadCancelled();
-    SelectedSlot = SlotToLoad; PerformLoad();
+    IC_TRACE_FUNCTION();if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->ConfirmModal(true);
 }
-void UICSaveLoadWidget::PerformLoad()
+void UICSaveLoadWidget::HandleLoadCancelled()
 {
-    IC_TRACE_FUNCTION();
-    UE_LOG(LogICUI, Verbose, TEXT("[SaveUI.Load.Request] Slot=%d"),SelectedSlot);
-    UICSaveSubsystem* Saves = GetSaves();
-    if (!Saves || Saves->bSaving || bWaitingForSave) return;
-    const TArray<FICSaveSlotInfo> Slots = Saves->GetSlotList();
-    const FICSaveSlotInfo* Selected = Slots.FindByPredicate([this](const FICSaveSlotInfo& Info) { IC_TRACE_FUNCTION(); return Info.Slot == SelectedSlot; });
-    if (!Selected || !Selected->bValid) { SetNotice(NSLOCTEXT("ICSaveUI", "SelectValid", "불러올 수 있는 슬롯을 선택하세요.")); return; }
-    if (AICPlayerController* PC = Cast<AICPlayerController>(GetOwningPlayer());PC&&!PC->IsMainMenuLevel())
-    {
-        PC->SelectedLoadSlot = SelectedSlot;
-        if (!PC->LoadPlayer()) { SetNotice(FText::FromString(Saves->GetLastMessage())); return; }
-        RemoveFromParent(); OnClosed.Broadcast(); return;
-    }
-    if (GameplayMap.IsNull() || GameplayMap.ToSoftObjectPath().GetLongPackageName().IsEmpty())
-    { SetNotice(NSLOCTEXT("ICSaveUI", "NoMap", "메인메뉴 위젯의 Start Map을 지정하세요.")); return; }
-    if (!Saves->LoadSlot(SelectedSlot)) { SetNotice(FText::FromString(Saves->GetLastMessage())); return; }
-    // The GameInstance owns loaded state; the gameplay controller restores it in BeginPlay.
-    Saves->SetAutoSaveSuspended(true);
-    if (UICTimeSubsystem* Time = GetGameInstance()->GetSubsystem<UICTimeSubsystem>())
-    { Time->PrepareForTravel(); }
-    UGameplayStatics::SetGamePaused(this, false);
-    if (APlayerController* PC = GetOwningPlayer()) { PC->SetInputMode(FInputModeGameOnly()); PC->bShowMouseCursor = false; }
-    UE_LOG(LogICUI, Log, TEXT("[SaveUI.Travel] Slot=%d Map=%s"),SelectedSlot,*GameplayMap.ToSoftObjectPath().ToString());
-    UGameplayStatics::OpenLevelBySoftObjectPtr(this, GameplayMap);
+    IC_TRACE_FUNCTION();if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->ConfirmModal(false);
+}
+void UICSaveLoadWidget::HandleLoadClicked()
+{
+    IC_TRACE_FUNCTION();if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->RequestLoadPlayer();
 }
 void UICSaveLoadWidget::HandleSaveClicked()
 {
-    IC_TRACE_FUNCTION();
-    UE_LOG(LogICUI, Verbose, TEXT("[SaveUI.Save.Request] Slot=%d"),SelectedSlot);
-    UICSaveSubsystem* Saves = GetSaves();
-    AICPlayerController* PC = Cast<AICPlayerController>(GetOwningPlayer());
-    if (!bAllowSave || !PC || !PC->bCreated || !Saves || Saves->bSaving || bWaitingForSave || SelectedSlot < 1 || SelectedSlot > 4) return;
-    PC->SyncSaveSafety();
-    const FString Reason = Saves->GetSaveBlockReason(false);
-    if (!Reason.IsEmpty()) { SetNotice(FText::FromString(Reason)); return; }
-    const TArray<FICSaveSlotInfo> Slots = Saves->GetSlotList();
-    const FICSaveSlotInfo* Selected = Slots.FindByPredicate([this](const FICSaveSlotInfo& Info) { IC_TRACE_FUNCTION(); return Info.Slot == SelectedSlot; });
-    if (Selected && Selected->bExists && PendingOverwriteSlot != SelectedSlot)
-    {
-        PendingOverwriteSlot = SelectedSlot;
-        SetNotice(NSLOCTEXT("ICSaveUI", "ConfirmOverwrite", "기존 저장을 덮어씁니다. 계속하려면 저장 버튼을 한 번 더 누르세요. 취소하려면 다른 슬롯을 선택하거나 닫으세요.")); return;
-    }
-    PendingOverwriteSlot = INDEX_NONE; PC->SelectedSaveSlot = SelectedSlot;
-    bWaitingForSave = true; UpdateSelection();
-    SetNotice(NSLOCTEXT("ICSaveUI", "Saving", "저장 중…"));
-    if (!PC->SavePlayer()) { bWaitingForSave = false; SetNotice(FText::FromString(Saves->GetLastMessage())); UpdateSelection(); }
+    IC_TRACE_FUNCTION();if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->RequestManualSave();
 }
-void UICSaveLoadWidget::HandleSaveFinished(int32 SlotIndex, bool /*bSuccess*/, const FString& Message)
+void UICSaveLoadWidget::HandleDeleteClicked()
 {
-    IC_TRACE_FUNCTION();
-    if (bWaitingForSave && SlotIndex != SelectedSlot) return;
-    bWaitingForSave = false; RefreshSlots(); SetNotice(FText::FromString(Message));
+    IC_TRACE_FUNCTION();if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->RequestDelete();
+}
+void UICSaveLoadWidget::HandleSaveStarted(int32 /*SlotIndex*/)
+{
+    IC_TRACE_FUNCTION();UpdateSelection();
+}
+void UICSaveLoadWidget::HandleSaveFinished(int32 /*SlotIndex*/,bool /*bSuccess*/,const FString& /*Message*/)
+{
+    IC_TRACE_FUNCTION();if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->RefreshSaveSlots();
 }
 void UICSaveLoadWidget::HandleCloseClicked()
 {
-    IC_TRACE_FUNCTION();
-    if (bWaitingForSave) return;
-    if (AICPlayerController* PC = Cast<AICPlayerController>(GetOwningPlayer());PC&&!PC->IsMainMenuLevel()) PC->CloseSessionMenu();
-    UE_LOG(LogICUI, Log, TEXT("[SaveUI.Closed] Widget=%s"),*GetNameSafe(this));
-    RemoveFromParent(); OnClosed.Broadcast();
+    IC_TRACE_FUNCTION();if(auto* Saves=GetSaves();Saves&&Saves->bSaving)return;
+    if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->CloseSessionMenu();
+}
+void UICSaveLoadWidget::CloseView()
+{
+    IC_TRACE_FUNCTION();if(bClosing)return;bClosing=true;
+    if(auto* LP=GetOwningLocalPlayer())LP->GetSubsystem<UICUIManagerSubsystem>()->CloseScreen(this);else RemoveFromParent();
+    OnClosed.Broadcast();
 }

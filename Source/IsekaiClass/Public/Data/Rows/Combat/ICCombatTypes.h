@@ -126,6 +126,10 @@ USTRUCT(BlueprintType, meta=(ToolTip="스킬 타격 하나의 효과 ID·반복�
 struct ISEKAICLASS_API FICSkillHitDefinition
 {
     GENERATED_BODY()
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(ToolTip="WeaponTrace의 무기 손잡이 쪽 소켓입니다. 캐릭터 메시 또는 부착 무기 컴포넌트에서 조회합니다. 소켓이 없으면 타격을 실행하지 않고 오류를 기록합니다.")) FName TraceStartSocket=TEXT("weapon_r");
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(ToolTip="WeaponTrace의 무기 끝 소켓입니다. 매 프레임 시작·끝과 이전 프레임의 이동 경로를 구체 스윕하여 검사합니다. 실제 무기 메시의 소켓 이름에 맞추세요.")) FName TraceEndSocket=TEXT("weapon_tip");
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(ClampMin="0",ToolTip="무기 추적 구체의 반경입니다. 단위 cm이며 무기 두께에 맞춥니다. 벽 너머 대상과 같은 타격 번호의 중복 대상을 제외합니다.")) double TraceRadiusCm=8;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(ClampMin="0",ToolTip="무기 추적의 최대 PlayClock 실행 시간입니다. AN_HitEnd가 먼저 오면 즉시 끝나고 알림이 누락되면 이 시간에 종료합니다. 단위 초입니다.")) double TraceDurationPlaySeconds=.15;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hit", meta=(ToolTip="이 타격이 실행할 SkillEffect DT ID입니다. StatusEffect ID를 직접 넣지 않고 SkillEffect.AppliedStatusEffectIDs로 상태 적용을 정의합니다.\n입력 자료형: 이름/ID.\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) FName EffectID;
     // Offset from cast start; no absolute timestamps or remaining cooldowns belong here.

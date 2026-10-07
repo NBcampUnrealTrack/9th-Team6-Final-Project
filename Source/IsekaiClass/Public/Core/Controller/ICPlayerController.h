@@ -15,6 +15,7 @@ class UICInventoryComponent;
 class UICGameplayWidget;
 class UICMainMenuWidget;
 class UICCharacterCreateWidget;
+class UICSaveLoadWidget;
 class UICWorldStateSubsystem;
 class UICTimeSubsystem;
 class UICSaveSubsystem;
@@ -29,6 +30,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerEquipmentStatsChanged,FPlayer
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FICMenuChanged,const FString&,Menu);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FICNoticeChanged,const FString&,Notice);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FICSaveSessionChanged);
 
 UCLASS(Blueprintable, meta=(ToolTip="실제 플레이어 입력·메뉴·캐릭터 생성·아이템 사용·저장 요청을 조정합니다. 지속 상태 원본은 WorldState이고 이 클래스의 공개 값은 화면 표시와 입력 처리를 위한 값입니다. 전투 실행은 OnCombatRequest의 실제 수신 경로를 연결해야 합니다.", ShortToolTip="실제 플레이어 입력·메뉴·캐릭터 생성·아이템 사용·저장 요청을 조정합니다."))
 class ISEKAICLASS_API AICPlayerController : public APlayerController, public IICStateParticipant
@@ -36,6 +38,15 @@ class ISEKAICLASS_API AICPlayerController : public APlayerController, public IIC
     GENERATED_BODY()
 public:
     AICPlayerController();
+    UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|UI",meta=(ToolTip="저장·불러오기 공통 화면 클래스입니다. WBP_IC_SaveLoad를 지정하면 게임 중 OpenSaveMenu/OpenLoadMenu 호출 시 자동 표시합니다. 슬롯 선택·확인·삭제·종료 규칙은 컨트롤러의 Session 코드가 담당합니다.")) TSubclassOf<UICSaveLoadWidget> SaveLoadWidgetClass;
+    UPROPERTY(BlueprintAssignable,Category="IC|Session",meta=(ToolTip="슬롯 목록 또는 저장/불러오기 선택이 변경된 알림입니다. 위젯은 컨트롤러의 SaveSlots와 선택값을 다시 표시하며 제거 시 구독을 해제합니다.")) FICSaveSessionChanged OnSaveSessionChanged;
+    UFUNCTION(BlueprintCallable,Category="IC|Session",meta=(ToolTip="현재 저장 또는 불러오기 화면의 슬롯을 선택합니다. 저장은 1~4, 불러오기는 자동 0과 수동 1~4이며 두 선택값은 독립적으로 유지됩니다. 저장 중과 확인 중에는 선택을 변경하지 않습니다.\n@param Slot 선택할 저장 슬롯 번호입니다. 입력 핀. 자료형: 정수.")) void SelectSessionSlot(int32 Slot);
+    UFUNCTION(BlueprintCallable,Category="IC|Session",meta=(ToolTip="현재 불러오기 슬롯을 재검사하고 컨트롤러의 공통 확인 팝업을 엽니다. 확인 이후에만 로드하며 메인 메뉴에서는 지정한 플레이 맵으로 이동합니다.")) void RequestLoadPlayer();
+    UFUNCTION(BlueprintPure,Category="IC|Session",meta=(ToolTip="확인 팝업 뒤에 있는 저장/불러오기 메뉴 키를 반환합니다. 위젯 표시용 조회이며 상태 원본은 컨트롤러입니다.\n@return 현재 세션 메뉴 키입니다. 출력 핀. 자료형: 문자열.")) FString GetSessionMenu() const;
+    UFUNCTION(BlueprintPure,Category="IC|Session",meta=(ToolTip="현재 세션 메뉴에 맞는 선택 슬롯 번호를 반환합니다. 저장 선택과 불러오기 선택은 서로 덮어쓰지 않습니다.\n@return 현재 선택 슬롯 번호입니다. 출력 핀. 자료형: 정수.")) int32 GetSelectedSessionSlot() const;
+    int32 GetPendingSessionSlot() const { IC_TRACE_FUNCTION();return ModalSlot; }
+    void SetSessionGameplayMap(TSoftObjectPtr<UWorld> Map) { IC_TRACE_FUNCTION();SessionGameplayMap=Map; }
+    bool HandleSessionKey(const FKey& Key,bool bRepeat=false);
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="IC|Main Menu", meta=(ToolTip="공통 컨트롤러가 메인 메뉴 레벨에서 표시할 UICMainMenuWidget 자식 WBP 클래스입니다. BP_ICPlayerController의 클래스 기본값에 실제 WBP_MainMenu를 지정하세요. 게임모드의 MainMenuMap과 일치하는 레벨에서만 생성하며 플레이 레벨에서는 캐릭터 생성/게임 화면을 사용합니다.\n입력 자료형: 클래스 선택(UICMainMenuWidget)."))
     TSubclassOf<UICMainMenuWidget> MainMenuWidgetClass;
     UFUNCTION(BlueprintPure, Category="IC|Main Menu", meta=(ToolTip="공통 ICGameMode가 현재 월드를 메인 메뉴 레벨로 지정했는지 조회합니다. 같은 컨트롤러를 메뉴와 플레이에서 사용하므로 저장 화면의 불러오기/입력 분기에 사용합니다.\n@return 현재 게임모드가 메인 메뉴 레벨로 판정하면 true입니다. 플레이 레벨이나 게임모드가 없으면 false입니다."))
@@ -165,6 +176,14 @@ public:
     virtual bool CanRestoreWorldState_Implementation(const FICWorldState& Candidate) const override;
     virtual void RestoreFromWorldState_Implementation(const FICWorldState& Candidate) override;
 private:
+    TSoftObjectPtr<UWorld> SessionGameplayMap;
+    UPROPERTY(Transient,meta=(ToolTip="게임 중 컨트롤러가 연 저장·불러오기 WBP 인스턴스입니다. 메뉴 종료·맵 전환·액터 제거 시 화면과 구독을 정리합니다.")) TObjectPtr<UICSaveLoadWidget> SessionSaveLoadScreen;
+    void LoadSelectedSessionSlot();
+    void ExecuteCombatInput(FName Action,int32 Slot);
+    FString LastEquipmentKey;
+    TWeakObjectPtr<class AICCharacterBase> CombatTarget;
+    double TargetOccludedAt=-1;
+    UFUNCTION(meta=(ToolTip="GAS 실행 자원과 표시용 값을 동기화하는 내부 콜백입니다. 지속 상태 저장은 별도 거래에서 수행합니다.")) void CombatCacheChanged();
     void InitializeMainMenu();
     UPROPERTY(Transient, meta=(ToolTip="공통 컨트롤러가 생성한 메인 메뉴 WBP 인스턴스입니다. MainMenuWidgetClass와 별개인 실행 중 참조이며 EndPlay에서 화면을 제거하여 이벤트 구독을 정리합니다. 저장 데이터에 포함하지 않습니다.\n입력 자료형: 객체 참조(UICMainMenuWidget)."))
     TObjectPtr<UICMainMenuWidget> MainMenuWidget;

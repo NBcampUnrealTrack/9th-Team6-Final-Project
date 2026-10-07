@@ -1,4 +1,8 @@
 #include "World/State/ICWorldStateSubsystem.h"
+#include "Combat/GAS/Simulation/ICCombatSimulation.h"
+#include "Time/ICTimeSubsystem.h"
+#include "World/Spawn/ICSpawnSubsystem.h"
+#include "Engine/World.h"
 #include "Debug/ICLog.h"
 #include "World/State/ICStateParticipant.h"
 #include "Internationalization/Regex.h"
@@ -94,6 +98,7 @@ bool UICWorldStateSubsystem::IsCharacterIdValid(FName ID)
 FICCharacterState UICWorldStateSubsystem::GetSnapshot(FName ID) const
 {
     IC_TRACE_FUNCTION();
+    const_cast<UICWorldStateSubsystem*>(this)->AdvanceOfflineCharacter(ID);
     const auto* Stored = State.Characters.Find(ID);
     if (!Stored) return FICCharacterState();
     FICCharacterState Result = *Stored;
@@ -102,6 +107,7 @@ FICCharacterState UICWorldStateSubsystem::GetSnapshot(FName ID) const
         FICCharacterState Live = Result;
         if (IICStateParticipant::Execute_ReadLiveState(Entry->Get(), ID, Live) && ValidCharacter(Live) && Live.CharacterId == ID)
         {
+            Result.Position=Live.Position;Result.Rotation=Live.Rotation;Result.LastSimGameMinute=Live.LastSimGameMinute;
             Result.HP = Live.HP; Result.MP = Live.MP; Result.SP = Live.SP;
             Result.MaxHP = Live.MaxHP; Result.MaxMP = Live.MaxMP; Result.MaxSP = Live.MaxSP;
             Result.Debuffs = Live.Debuffs; Result.MainStats=Live.MainStats;
@@ -134,8 +140,8 @@ bool UICWorldStateSubsystem::EnsureCharacter(FName ID, EICCharacterKind Kind)
         if(!Base||!Class||!Rules||Base->NPCID!=ID||NPC->ClassID!=Base->ClassID||!Definitions->Find<FICSkillRow>(Base->UniqueSkillID,R))return false;
         C.MainStats.STR=Base->InitialBaseStats.STR;C.MainStats.DEX=Base->InitialBaseStats.DEX;C.MainStats.INT=Base->InitialBaseStats.INT;
         C.MainStats.CON=Base->InitialBaseStats.CON;C.MainStats.CHA=Base->InitialBaseStats.CHA;C.MainStats.LUK=Base->InitialBaseStats.LUK;
-        C.HP=C.MaxHP=Rules->BaseMaxHP+Rules->HPPerCON*C.MainStats.CON;
-        C.MP=C.MaxMP=Rules->BaseMaxMP+Rules->MPPerINT*C.MainStats.INT;C.SP=C.MaxSP=Rules->BaseMaxSP+Rules->SPPerCON*C.MainStats.CON;
+        C.HP=C.MaxHP=Rules->BaseMaxHP+Rules->HPPerCON*(C.MainStats.CON-1);
+        C.MP=C.MaxMP=Rules->BaseMaxMP+Rules->MPPerINT*(C.MainStats.INT-1);C.SP=0;C.MaxSP=1;
         C.UnlockedSkillIDs.Add(Base->UniqueSkillID);C.AttackDisposition=Base->InitialAttackDisposition;
         C.LowHPDisposition=Base->InitialLowHPDisposition;C.TargetPriority=Base->InitialTargetPriority;C.bAutoSkillsEnabled=Base->bInitiallyAutoSkillEnabled;
         const FName GearIDs[]={Base->InitialEquipment.WeaponID,Base->InitialEquipment.ClothesID,Base->InitialEquipment.RingID,Base->InitialEquipment.NecklaceID};
@@ -347,6 +353,7 @@ bool UICWorldStateSubsystem::FlushParticipants()
 {
     IC_TRACE_FUNCTION();
     const FICWorldState Before = State;
+    TArray<FName> OfflineIDs;State.Characters.GetKeys(OfflineIDs);for(FName ID:OfflineIDs)if(!AdvanceOfflineCharacter(ID)){State=Before;return false;}
     for (const auto& Entry : Participants)
     {
         if (Entry.Value.IsValid() && !IICStateParticipant::Execute_FlushToWorldState(Entry.Value.Get(), this))
@@ -357,6 +364,7 @@ bool UICWorldStateSubsystem::FlushParticipants()
             return false;
         }
     }
+    if(GetWorld())if(auto* Spawn=GetWorld()->GetSubsystem<UICSpawnSubsystem>())if(!Spawn->FlushActors()){State=Before;return false;}
     if (ValidateState(State)) return true;
     UE_LOG(LogICWorldState, Warning, TEXT("[State.Flush.Rollback] 반영 후 WorldState 검증 실패, 이전 원본 복원"));
     State = Before;
@@ -368,6 +376,7 @@ bool UICWorldStateSubsystem::CanRestoreState(const FICWorldState& Candidate) con
 {
     IC_TRACE_FUNCTION();
     if (!ValidateState(Candidate)) return false;
+    if(GetWorld())if(auto* Spawn=GetWorld()->GetSubsystem<UICSpawnSubsystem>())if(!Spawn->CanRestoreActors(Candidate))return false;
     for (const auto& Entry : Participants)
         if (Entry.Value.IsValid() && !IICStateParticipant::Execute_CanRestoreWorldState(Entry.Value.Get(), Candidate)) return false;
     return true;
@@ -414,4 +423,13 @@ bool UICWorldStateSubsystem::SetPlayerGold(int32 Value)
     if(!ValidateState(Next))return false;
     if(State.Gold!=Value){UE_LOG(LogICWorldState, Verbose, TEXT("[State.Gold] Before=%d After=%d"),State.Gold,Value);State.Gold=Value;OnPlayerGoldChanged.Broadcast();}
     return true;
+}
+
+bool UICWorldStateSubsystem::AdvanceOfflineCharacter(FName ID)
+{
+    IC_TRACE_FUNCTION();if(ID==PlayerId())return true;const auto* Participant=Participants.Find(ID);if(Participant&&Participant->IsValid())return true;
+    const auto* Stored=State.Characters.Find(ID);if(!Stored)return true;auto* T=GetGameInstance()?GetGameInstance()->GetSubsystem<UICTimeSubsystem>():nullptr;auto* D=GetGameInstance()?GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;if(!T||!D)return true;
+    const auto Clock=T->GetClock();if(Clock.PlaySecond<=Stored->LastSimPlaySecond&&Clock.GameMinute<=Stored->LastSimGameMinute)return true;
+    auto C=*Stored;if(!ICCombatSimulation::Advance(C,State,D,Clock.PlaySecond,Clock.GameMinute))return false;
+    auto Next=State;Next.Characters.Add(ID,C);if(!ValidateState(Next))return false;State=MoveTemp(Next);return true;
 }

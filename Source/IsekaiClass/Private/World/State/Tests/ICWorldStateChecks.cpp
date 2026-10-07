@@ -10,6 +10,10 @@
 #include "Time/ICTimeSubsystem.h"
 #include "Save/ICSaveGame.h"
 #include "Save/ICSaveSubsystem.h"
+#include "Save/Compatibility/ICLegacyPlayerSaveGame.h"
+#include "Misc/FileHelper.h"
+#include "HAL/FileManager.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Life/Survival/ICPlayerSurvival.h"
 #include "Player/State/ICPlayerStateConversions.h"
 
@@ -212,5 +216,62 @@ bool FICProductionSaveCheck::RunTest(const FString& Parameters)
     S.Characters.FindChecked(UICWorldStateSubsystem::PlayerId()).Combat.Effects[0].ExpiresAtPlaySecond=330;WorldState->RestoreState(S);
     TestTrue(TEXT("Expired effect no longer defers autosave"),Saves->CanSave(true));
     return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICSaveRecoveryCheck,"IC.WorldState.BackupAndVersion1",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICSaveRecoveryCheck::RunTest(const FString& Parameters)
+{
+    IC_TRACE_FUNCTION();auto* GI=NewObject<UGameInstance>();auto* State=NewObject<UICWorldStateSubsystem>(GI);auto* Time=NewObject<UICTimeSubsystem>(GI);auto* Saves=NewObject<UICSaveSubsystem>(GI);
+    const FString Prefix=TEXT("IC_Test_Recovery_")+FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    State->RestoreState(PlayerWorld());Saves->ConfigureServices(State,Time,Prefix);Saves->bCaptureSaveThumbnail=false;
+    FICClockState Clock;Clock.PlaySecond=10;Time->RestoreClock(Clock);TestTrue(TEXT("First auto save"),Saves->SaveSlotSynchronously(0));const auto First=Saves->GetSlotList()[0];
+    Clock.GameMinute=900;Clock.PlaySecond=40;Time->RestoreClock(Clock);State->SetPlayerGold(321);TestTrue(TEXT("Second auto save rotates old backup"),Saves->SaveSlotSynchronously(0));
+    TArray<uint8> Bytes;TestTrue(TEXT("Read only isolated auto file"),FFileHelper::LoadFileToArray(Bytes,*Saves->GetSlotPath(0)));
+    if(!Bytes.IsEmpty()){Bytes.Last()^=1;TestTrue(TEXT("Corrupt only isolated test file"),FFileHelper::SaveArrayToFile(Bytes,*Saves->GetSlotPath(0)));}
+    const auto Recovery=Saves->GetSlotList()[0];TestTrue(TEXT("Corruption offers validated backup"),Recovery.bValid&&Recovery.bUsesBackup);TestEqual(TEXT("Preview date comes from backup"),Recovery.SavedAt,First.SavedAt);TestEqual(TEXT("Preview game clock comes from backup"),Recovery.Clock.GameMinute,480.0);
+    TestTrue(TEXT("Backup load succeeds"),Saves->LoadSlot(0));TestEqual(TEXT("Backup restores game clock"),Time->GetClock().GameMinute,480.0);TestEqual(TEXT("Backup restores play clock"),Time->GetClock().PlaySecond,10.0);TestEqual(TEXT("Backup restores corresponding state"),State->ExportState().Gold,200);
+    auto* Legacy=NewObject<UPlayerPrototypeSave>();Legacy->Version=1;Legacy->PlayerName=TEXT("기존 저장 검증");Legacy->FirstSkill=TEXT("SKL_TEST");Legacy->Bag=PlayerWorld().Inventory.Bag;Legacy->Storage=PlayerWorld().Inventory.Storage;Legacy->QuickSlots=PlayerWorld().Inventory.QuickSlots;
+    Legacy->Equipment=PlayerWorld().Inventory.Equipment;
+    TestTrue(TEXT("Isolated v1 legacy fixture saved"),UGameplayStatics::SaveGameToSlot(Legacy,Prefix+TEXT("_LegacyV1"),0));TestTrue(TEXT("V1 imports through public service"),Saves->ImportLegacySave());
+    TestEqual(TEXT("V1 has no old clock and starts at eight AM"),Time->GetClock().GameMinute,480.0);TestEqual(TEXT("V1 play clock starts at zero"),Time->GetClock().PlaySecond,0.0);TestTrue(TEXT("Legacy original remains available"),Saves->HasLegacySave());TestTrue(TEXT("Converted v1 is a valid normal slot"),Saves->GetSlotList()[1].bValid);
+    Saves->DeleteSlot(0);Saves->DeleteSlot(1);Saves->DeleteLegacySave();return !HasAnyErrors();
+}
+namespace
+{
+class FICAwaitAsyncSlot final : public IAutomationLatentCommand
+{
+    FAutomationTestBase* Test;
+    TStrongObjectPtr<UICSaveSubsystem> Saves;
+    TStrongObjectPtr<UICWorldStateSubsystem> State;
+    TStrongObjectPtr<UICTimeSubsystem> Time;
+    double Deadline;
+public:
+    FICAwaitAsyncSlot(FAutomationTestBase* InTest,UICSaveSubsystem* InSaves,UICWorldStateSubsystem* InState,UICTimeSubsystem* InTime)
+        :Test(InTest),Saves(InSaves),State(InState),Time(InTime),Deadline(FPlatformTime::Seconds()+15){}
+    virtual bool Update() override
+    {
+        IC_TRACE_FUNCTION();
+        if(Saves->bSaving)
+        {
+            if(FPlatformTime::Seconds()<Deadline)return false;
+            Test->AddError(TEXT("Isolated asynchronous save did not finish in fifteen seconds."));return true;
+        }
+        Test->TestTrue(TEXT("Async write produced a validated slot"),Saves->GetSlotList()[1].bValid);
+        Test->TestTrue(TEXT("Async snapshot loads"),Saves->LoadSlot(1));
+        Test->TestEqual(TEXT("Async file uses captured clock rather than later clock"),Time->GetClock().PlaySecond,333.0);
+        Test->TestEqual(TEXT("Async file uses captured state rather than later mutation"),State->ExportState().Gold,200);
+        Saves->DeleteSlot(1);return true;
+    }
+};
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICAsyncSlotCheck,"IC.WorldState.AsyncSlotSave",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICAsyncSlotCheck::RunTest(const FString& Parameters)
+{
+    IC_TRACE_FUNCTION();auto* GI=NewObject<UGameInstance>();auto* State=NewObject<UICWorldStateSubsystem>(GI);auto* Time=NewObject<UICTimeSubsystem>(GI);auto* Saves=NewObject<UICSaveSubsystem>(GI);
+    State->RestoreState(PlayerWorld());FICClockState Clock;Clock.PlaySecond=333;Time->RestoreClock(Clock);
+    Saves->ConfigureServices(State,Time,TEXT("IC_Test_Async_")+FGuid::NewGuid().ToString(EGuidFormats::Digits));Saves->bCaptureSaveThumbnail=false;
+    if(!TestTrue(TEXT("Async request accepted"),Saves->SaveSlot(1)))return false;
+    TestTrue(TEXT("Write remains pending until game-thread completion"),Saves->bSaving);
+    Clock.PlaySecond=1000;Time->RestoreClock(Clock);State->SetPlayerGold(123);
+    ADD_LATENT_AUTOMATION_COMMAND(FICAwaitAsyncSlot(this,Saves,State,Time));return true;
 }
 #endif

@@ -1,4 +1,8 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Management/ICUIManagerSubsystem.h"
+#include "Combat/GAS/ICAbilitySystemComponent.h"
+#include "Combat/GAS/ICGameplayTags.h"
+#include "Combat/GAS/Attributes/ICAttributeSets.h"
 #include "Debug/ICLog.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Core/ICGameState.h"
@@ -9,6 +13,7 @@
 #include "Player/State/ICPlayerStateConversions.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
 #include "UI/MainMenu/ICMainMenuWidget.h"
+#include "UI/Save/ICSaveLoadWidget.h"
 #include "UI/CharacterCreate/ICCharacterCreateWidget.h"
 #include "Core/ICPlayerState.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -84,6 +89,7 @@ void AICPlayerController::OnPossess(APawn* InPawn)
 void AICPlayerController::OnUnPossess()
 {
     IC_TRACE_FUNCTION();
+    FlushWorldState();
     ResetHeldInput();
     ReleaseInputCommand(EICInputCommand::Block);
     ReleaseInputCommand(EICInputCommand::Jump);
@@ -104,11 +110,13 @@ void AICPlayerController::BindPawnSystems()
     BoundInventory->OnMessage.AddUniqueDynamic(this,&ThisClass::InventoryMessage);
     BoundInventory->OnLootResult.AddUniqueDynamic(this,&ThisClass::InventoryLootResult);
     BoundInventory->CurrentClass=Job;
+    if(auto* C=Cast<AICPlayerCharacter>(GetPawn())){C->InitializeState(UICWorldStateSubsystem::PlayerId());if(auto* ASC=C->GetICAbilitySystem())ASC->OnStateChanged.AddUniqueDynamic(this,&ThisClass::CombatCacheChanged);}
 }
 
 void AICPlayerController::UnbindPawnSystems()
 {
     IC_TRACE_FUNCTION();
+    if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=C->GetICAbilitySystem())ASC->OnStateChanged.RemoveDynamic(this,&ThisClass::CombatCacheChanged);
     if (BoundInventory)
     {
         BoundInventory->OnChanged.RemoveDynamic(this,&ThisClass::InventoryChanged);
@@ -181,6 +189,28 @@ void AICPlayerController::UpdateScreens()
 {
     IC_TRACE_FUNCTION();
     if (!IsLocalController()) return;
+    if(!IsMainMenuLevel())
+    {
+        const FString SessionMenu=GetSessionMenu();
+        const bool bSessionOpen=SessionMenu==TEXT("Save")||SessionMenu==TEXT("Load");
+        if(bSessionOpen&&SaveLoadWidgetClass)
+        {
+            if(!SessionSaveLoadScreen)
+            {
+                SessionSaveLoadScreen=CreateWidget<UICSaveLoadWidget>(this,SaveLoadWidgetClass);
+                if(SessionSaveLoadScreen)
+                {
+                    SessionSaveLoadScreen->Configure(SessionMenu==TEXT("Save"),TSoftObjectPtr<UWorld>());
+                    if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->OpenScreen(SessionSaveLoadScreen,true,100);
+                }
+            }
+        }
+        else if(SessionSaveLoadScreen)
+        {
+            auto* Closing=SessionSaveLoadScreen.Get();SessionSaveLoadScreen=nullptr;
+            if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->CloseScreen(Closing);
+        }
+    }
     if (Menu==TEXT("Create") && CharacterCreateWidgetClass)
     {
         if (!CharacterCreateScreen) CharacterCreateScreen=CreateWidget<UICCharacterCreateWidget>(this,CharacterCreateWidgetClass);
@@ -206,17 +236,19 @@ void AICPlayerController::EndPlay(const EEndPlayReason::Type Reason)
     {Time->OnClockChanged.RemoveDynamic(this,&ThisClass::ClockChanged);Time->OnPlaySecondsAdvanced.RemoveDynamic(this,&ThisClass::HandlePlaySecondsAdvanced);Time->ReleasePauseRequests(this);}
     if(auto* Saves=GetSaves())
     {Saves->OnSaveStarted.RemoveDynamic(this,&ThisClass::SaveStarted);Saves->OnSaveFinished.RemoveDynamic(this,&ThisClass::SaveFinished);}
+    if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->CloseAllScreens();
     UnbindPawnSystems();
     RemoveInputMapping();
     if(CharacterCreateScreen){CharacterCreateScreen->RemoveFromParent();CharacterCreateScreen=nullptr;}
     if(Screen){Screen->RemoveFromParent();Screen=nullptr;}
     if(MainMenuWidget){MainMenuWidget->RemoveFromParent();MainMenuWidget=nullptr;}
+    SessionSaveLoadScreen=nullptr;
     if(GetGameInstance())if(auto* Production=GetGameInstance()->GetSubsystem<UICProductionSubsystem>())Production->OnProductionChanged.RemoveDynamic(this,&ThisClass::ProductionChanged);
     Super::EndPlay(Reason);
 }
 
 void AICPlayerController::SetFinalMoveSpeed(float Speed)
-{ IC_TRACE_FUNCTION();if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn()))PlayerPawn->FinalMoveSpeed=FMath::IsFinite(Speed)?FMath::Max(0.f,Speed):0.f;}
+{ IC_TRACE_FUNCTION();if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=PlayerPawn->GetICAbilitySystem())ASC->SetNumericAttributeBase(UICCombatAttributeSet::GetMoveSpeedAttribute(),FMath::IsFinite(Speed)?FMath::Max(0.f,Speed):0.f);}
 void AICPlayerController::SetCombatState(bool Active){ IC_TRACE_FUNCTION();if(bInCombat!=Active)UE_LOG(LogICCore, Log, TEXT("[Player.CombatState] Active=%d"),Active);bInCombat=Active;SyncSaveSafety();}
 bool AICPlayerController::SetGold(int32 Amount)
 {
@@ -226,7 +258,11 @@ bool AICPlayerController::SetGold(int32 Amount)
     Gold=Amount;bDirty=true;return true;
 }
 void AICPlayerController::InventoryChanged()
-{ IC_TRACE_FUNCTION();if(auto* Inventory=GetInventory())OnEquipmentStatsChanged.Broadcast(Inventory->GetEquipmentStats());bDirty=true;}
+{
+    IC_TRACE_FUNCTION();auto* Inventory=GetInventory();if(!Inventory)return;TArray<FString> Keys;
+    for(const auto& Item:Inventory->GetSnapshot().Equipment){FString Key=Item.InstanceID.ToString()+Item.ItemID.ToString()+FString::FromInt(Item.Grade)+TEXT(":")+FString::FromInt(Item.Upgrade);TArray<FName> Options;Item.Options.GetKeys(Options);Options.Sort(FNameLexicalLess());for(FName ID:Options)Key+=ID.ToString()+FString::SanitizeFloat(Item.Options[ID]);Keys.Add(Key);}Keys.Sort();const FString Current=FString::Join(Keys,TEXT("|"));
+    if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=C->GetICAbilitySystem()){if(Current!=LastEquipmentKey)ASC->NotifyEquipmentChanged();ASC->RebuildDerivedStats();}LastEquipmentKey=Current;OnEquipmentStatsChanged.Broadcast(Inventory->GetEquipmentStats());bDirty=true;
+}
 void AICPlayerController::InventoryMessage(const FText& Message){ IC_TRACE_FUNCTION();Show(Message.ToString());}
 void AICPlayerController::CharacterChanged(FName ID)
 {
@@ -243,7 +279,7 @@ void AICPlayerController::CharacterChanged(FName ID)
 }
 void AICPlayerController::ClockChanged(){ IC_TRACE_FUNCTION();bDirty=true;}
 void AICPlayerController::Show(const FString& Text){ IC_TRACE_FUNCTION();if(Notice!=Text)UE_LOG(LogICUI, Verbose, TEXT("[UI.Notice] Controller=%s Message=%s"),*GetNameSafe(this),*Text);Notice=Text;bDirty=true;OnNoticeChanged.Broadcast(Notice);}
-void AICPlayerController::RefreshSaveSlots(){ IC_TRACE_FUNCTION();if(auto* Saves=GetSaves())SaveSlots=Saves->GetSlotList();bDirty=true;}
+void AICPlayerController::RefreshSaveSlots(){ IC_TRACE_FUNCTION();if(auto* Saves=GetSaves())SaveSlots=Saves->GetSlotList();bDirty=true;OnSaveSessionChanged.Broadcast();}
 
 void AICPlayerController::SyncSaveSafety()
 {
@@ -290,17 +326,17 @@ void AICPlayerController::SetMenu(const FString& NewMenu)
     if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
     UpdateScreens();
     InteractionHint.Empty();bShowMouseCursor=!NewMenu.IsEmpty();
-    if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);Time->SetPauseRequest(this,TEXT("Menu"),!NewMenu.IsEmpty());}
-    if(NewMenu.IsEmpty()){FInputModeGameOnly Mode;SetInputMode(Mode);}
-    else{FInputModeGameAndUI Mode;Mode.SetHideCursorDuringCapture(false);if(CharacterCreateScreen&&CharacterCreateScreen->IsInViewport())Mode.SetWidgetToFocus(CharacterCreateScreen->TakeWidget());else if(Screen)Mode.SetWidgetToFocus(Screen->TakeWidget());SetInputMode(Mode);}
+    if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);}
+    UUserWidget* Focus=SessionSaveLoadScreen?static_cast<UUserWidget*>(SessionSaveLoadScreen.Get()):CharacterCreateScreen&&CharacterCreateScreen->IsInViewport()?static_cast<UUserWidget*>(CharacterCreateScreen.Get()):static_cast<UUserWidget*>(Screen.Get());
+    if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->SetMenuContext(this,Focus,!NewMenu.IsEmpty());
     FlushPressedKeys();bDirty=true;UpdateGamePhase();SyncSaveSafety();OnMenuChanged.Broadcast(Menu);
 }
 void AICPlayerController::UpdateGamePhase()
 {
     IC_TRACE_FUNCTION();
-    if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);Time->SetPauseRequest(this,TEXT("Menu"),!Menu.IsEmpty());}
+    if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);}
     auto* State=GetWorld()?GetWorld()->GetGameState<AICGameState>():nullptr;
-    if(State)State->SetPhase(bDead?EICGamePhase::Dead:!bCreated?EICGamePhase::CharacterCreation:!Menu.IsEmpty()?EICGamePhase::Menu:EICGamePhase::Playing);
+    if(State)State->SetPhase(IsMainMenuLevel()?EICGamePhase::Menu:bDead?EICGamePhase::Dead:!bCreated?EICGamePhase::CharacterCreation:!Menu.IsEmpty()?EICGamePhase::Menu:EICGamePhase::Playing);
 }
 void AICPlayerController::CancelTarget()
 {
@@ -315,7 +351,8 @@ bool AICPlayerController::ReadLiveState_Implementation(FName CharacterId,FICChar
     IC_TRACE_FUNCTION();
     const auto* Stored=GetWorldState()?GetWorldState()->GetStoredCharacter(CharacterId):nullptr;
     if(!Stored||CharacterId!=UICWorldStateSubsystem::PlayerId())return false;
-    Snapshot=*Stored;ICPlayerStateConversions::Apply(MainStats,Survival,Snapshot);
+    if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(C->GetICAbilitySystem())return C->ReadLiveState_Implementation(CharacterId,Snapshot);
+    Snapshot=*Stored;
     if(auto* Time=GetTime()) {const auto Clock=Time->GetClock();Snapshot.LastSimGameMinute=Clock.GameMinute;Snapshot.LastSimPlaySecond=Clock.PlaySecond;}
     if(APawn* PlayerPawn=GetPawn()) {Snapshot.Position=PlayerPawn->GetActorLocation();Snapshot.Rotation=PlayerPawn->GetActorRotation();}
     return true;
@@ -346,7 +383,7 @@ bool AICPlayerController::FlushToWorldState_Implementation(
             GetPawn()->GetActorLocation(), GetControlRotation());
 }
 bool AICPlayerController::CanRestoreWorldState_Implementation(const FICWorldState& Candidate) const
-{ IC_TRACE_FUNCTION();return GetInventory()&&GetInventory()->ValidateSnapshot(Candidate.Inventory);}
+{ IC_TRACE_FUNCTION();auto* C=Cast<AICPlayerCharacter>(GetPawn());return GetInventory()&&GetInventory()->ValidateSnapshot(Candidate.Inventory)&&(!C||C->CanRestoreWorldState_Implementation(Candidate));}
 void AICPlayerController::RestoreFromWorldState_Implementation(const FICWorldState& Candidate)
 {
     IC_TRACE_FUNCTION();
@@ -363,7 +400,7 @@ void AICPlayerController::RestoreFromWorldState_Implementation(const FICWorldSta
     }
     SelectedBag=SelectedStorage=MoveFrom=INDEX_NONE;
     if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn()))
-    {PlayerPawn->ApplyPreset(Preset);PlayerPawn->SetActorLocation(Candidate.PlayerPosition);PlayerPawn->GetCharacterMovement()->StopMovementImmediately();}
+    {PlayerPawn->InitializeState(UICWorldStateSubsystem::PlayerId());PlayerPawn->RestoreFromWorldState_Implementation(Candidate);PlayerPawn->ApplyPreset(Preset);PlayerPawn->SetActorLocation(Candidate.PlayerPosition);PlayerPawn->GetCharacterMovement()->StopMovementImmediately();}
     SynchronizeDrops();
     SetControlRotation(Candidate.PlayerRotation);SetMenu(bCreated?TEXT(""):TEXT("Create"));
     const FName Jobs[]={TEXT("Warrior"),TEXT("Archer"),TEXT("Mage"),TEXT("Healer")};
@@ -395,10 +432,15 @@ void AICPlayerController::HandlePlaySecondsAdvanced(double Seconds)
 {
     IC_TRACE_FUNCTION();
     if(!bCreated || bDead) return;
-    const bool WasExhausted=Survival.IsExhausted();
-    const float Consumed=Survival.AdvanceNaturalSP(Seconds);
-    if(WasExhausted!=Survival.IsExhausted()) {bLastExhausted=Survival.IsExhausted();OnExhaustionChanged.Broadcast(bLastExhausted);}
-    if(Consumed>0) {FlushWorldState();bDirty=true;}
+    if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=C->GetICAbilitySystem())ASC->AdvanceNaturalSP(Seconds);
+    CombatCacheChanged();
 }
 
 void AICPlayerController::ProductionChanged(FGuid JobID,const FString& Message){ IC_TRACE_FUNCTION();Show(Message);}
+
+void AICPlayerController::CombatCacheChanged()
+{
+    IC_TRACE_FUNCTION();auto* C=Cast<AICPlayerCharacter>(GetPawn());if(!C||!C->GetICAbilitySystem())return;
+    bBlocking=C->GetICAbilitySystem()->HasMatchingGameplayTag(ICTags::Guarding);const auto S=C->GetICAbilitySystem()->Capture();MainStats=ICPlayerStateConversions::Main(S.MainStats);Survival=ICPlayerStateConversions::Survival(S);
+    const bool Exhausted=Survival.IsExhausted();if(bLastExhausted!=Exhausted){bLastExhausted=Exhausted;OnExhaustionChanged.Broadcast(Exhausted);}bDirty=true;
+}

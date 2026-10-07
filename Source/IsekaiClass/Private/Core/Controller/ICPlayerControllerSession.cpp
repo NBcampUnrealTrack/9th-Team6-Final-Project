@@ -5,6 +5,10 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "InputMappingContext.h"
+#include "Time/ICTimeSubsystem.h"
+#include "UI/Management/ICUIManagerSubsystem.h"
+#include "Engine/LocalPlayer.h"
+#include "Kismet/GameplayStatics.h"
 #if WITH_EDITOR
 #include "Editor/EditorEngine.h"
 #endif
@@ -24,6 +28,70 @@ void AICPlayerController::ShowModal(const FString& Action,const FString& Text,in
 {
     IC_TRACE_FUNCTION();
     ModalReturnMenu=Menu;ModalAction=Action;ModalText=Text;ModalSlot=Slot;SetMenu(TEXT("Confirm"));
+}
+FString AICPlayerController::GetSessionMenu() const
+{
+    IC_TRACE_FUNCTION();return Menu==TEXT("Confirm")?ModalReturnMenu:Menu;
+}
+int32 AICPlayerController::GetSelectedSessionSlot() const
+{
+    IC_TRACE_FUNCTION();return GetSessionMenu()==TEXT("Save")?SelectedSaveSlot:SelectedLoadSlot;
+}
+void AICPlayerController::SelectSessionSlot(int32 Slot)
+{
+    IC_TRACE_FUNCTION();
+    auto* Saves=GetSaves();if(!Saves||Saves->bSaving||Menu==TEXT("Confirm"))return;
+    if(Menu==TEXT("Save")&&Slot>=1&&Slot<=4)SelectedSaveSlot=Slot;
+    else if(Menu==TEXT("Load")&&Slot>=0&&Slot<=4)SelectedLoadSlot=Slot;
+    else return;
+    bDirty=true;OnSaveSessionChanged.Broadcast();
+}
+bool AICPlayerController::HandleSessionKey(const FKey& Key,bool bRepeat)
+{
+    IC_TRACE_FUNCTION();
+    const FString SessionMenu=GetSessionMenu();
+    if(SessionMenu!=TEXT("Save")&&SessionMenu!=TEXT("Load"))return false;
+    if(DefaultMappingContext)
+        for(const FICInputCommandBinding& Binding:CommandActions)
+            if(Binding.Command==EICInputCommand::QuickSlot||Binding.Command==EICInputCommand::Confirm||Binding.Command==EICInputCommand::Menu)
+                for(const FEnhancedActionKeyMapping& Mapping:DefaultMappingContext->GetMappings())
+                    if(Mapping.Action==Binding.Action&&Mapping.Key==Key)
+                    {if(!bRepeat)HandleInputCommand(Binding.Command,Binding.Slot);return true;}
+    const FKey NumberKeys[]={EKeys::One,EKeys::Two,EKeys::Three,EKeys::Four};
+    for(int32 Index=0;Index<4;++Index)if(Key==NumberKeys[Index])
+    {if(!bRepeat)HandleInputCommand(EICInputCommand::QuickSlot,Index);return true;}
+    if(Key==EKeys::Enter||Key==EKeys::Escape)
+    {if(!bRepeat)HandleInputCommand(Key==EKeys::Enter?EICInputCommand::Confirm:EICInputCommand::Menu);return true;}
+    if(Key==EKeys::Delete&&Menu!=TEXT("Confirm"))
+    {if(!bRepeat)RequestDelete();return true;}
+    return false;
+}
+void AICPlayerController::RequestLoadPlayer()
+{
+    IC_TRACE_FUNCTION();
+    auto* Saves=GetSaves();if(!Saves||Menu!=TEXT("Load"))return;
+    if(Saves->bSaving){Show(TEXT("저장 완료 후 불러오세요."));return;}
+    if(IsMainMenuLevel()&&SessionGameplayMap.IsNull()){Show(TEXT("메인 메뉴의 Start Map을 지정하세요."));return;}
+    RefreshSaveSlots();
+    if(!SaveSlots.IsValidIndex(SelectedLoadSlot)||!SaveSlots[SelectedLoadSlot].bValid){Show(TEXT("불러올 수 있는 슬롯을 선택하세요."));return;}
+    ShowModal(TEXT("Load"),FString::Printf(TEXT("%s / %s 저장을 불러올까요? 현재 저장하지 않은 진행은 교체됩니다."),SelectedLoadSlot==0?TEXT("자동 저장"):*FString::Printf(TEXT("수동 슬롯 %d"),SelectedLoadSlot),*SaveSlots[SelectedLoadSlot].PlayerName),SelectedLoadSlot);
+}
+void AICPlayerController::LoadSelectedSessionSlot()
+{
+    IC_TRACE_FUNCTION();
+    if(!IsMainMenuLevel())
+    {
+        if(LoadPlayer())SetMenu(TEXT(""));
+        return;
+    }
+    auto* Saves=GetSaves();if(!Saves||SessionGameplayMap.IsNull())return;
+    if(!Saves->LoadSlot(SelectedLoadSlot)){Show(Saves->GetLastMessage());RefreshSaveSlots();return;}
+    Saves->SetAutoSaveSuspended(true);
+    if(auto* Time=GetTime())Time->PrepareForTravel();
+    if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->CloseAllScreens();
+    UGameplayStatics::SetGamePaused(this,false);
+    UE_LOG(LogICSave,Log,TEXT("[Session.Load.Travel] Slot=%d Map=%s"),SelectedLoadSlot,*SessionGameplayMap.ToSoftObjectPath().ToString());
+    UGameplayStatics::OpenLevelBySoftObjectPtr(this,SessionGameplayMap);
 }
 void AICPlayerController::OpenSaveMenu(bool bQuitAfter)
 {
@@ -47,11 +115,13 @@ void AICPlayerController::OpenLoadMenu()
 void AICPlayerController::CloseSessionMenu()
 {
     IC_TRACE_FUNCTION();
+    if(auto* Saves=GetSaves();Saves&&Saves->bSaving&&(GetSessionMenu()==TEXT("Save")||GetSessionMenu()==TEXT("Load")))
+    {Show(TEXT("저장이 완료된 뒤 돌아갈 수 있습니다."));return;}
     if(Menu==TEXT("Confirm")){ConfirmModal(false);return;}
     if(Menu==TEXT("Save")){bExitAfterSave=false;SetMenu(SaveReturnMenu);return;}
     if(Menu==TEXT("Load"))
     {
-        SetMenu(bDead?TEXT("Pause"):!bCreated?TEXT("Create"):LoadReturnMenu);
+        SetMenu(IsMainMenuLevel()?LoadReturnMenu:bDead?TEXT("Pause"):!bCreated?TEXT("Create"):LoadReturnMenu);
         if(bDead)Show(TEXT("사망 상태입니다. 저장을 불러오거나 게임을 종료하세요."));
         return;
     }
@@ -62,6 +132,7 @@ void AICPlayerController::RequestManualSave()
 {
     IC_TRACE_FUNCTION();
     auto* Saves=GetSaves();if(!Saves||Menu!=TEXT("Save"))return;
+    if(SelectedSaveSlot<1||SelectedSaveSlot>4){Show(TEXT("수동 저장 슬롯 1~4를 선택하세요."));return;}
     SyncSaveSafety();
     const FString Reason=Saves->GetSaveBlockReason(false);
     if(!Reason.IsEmpty()){Show(Reason);return;}
@@ -118,6 +189,7 @@ void AICPlayerController::ConfirmModal(bool bAccept)
     ModalAction.Empty();ModalText.Empty();ModalSlot=INDEX_NONE;SetMenu(Return);
     if(!bAccept){Show(TEXT("취소했습니다."));return;}
     if(Action==TEXT("Overwrite")){SelectedSaveSlot=Slot;SavePlayer();}
+    else if(Action==TEXT("Load")){SelectedLoadSlot=Slot;LoadSelectedSessionSlot();}
     else if(Action==TEXT("CreateOverwrite"))CreatePlayer();
     else if(Action==TEXT("Delete")||Action==TEXT("DeleteLegacy"))
     {
