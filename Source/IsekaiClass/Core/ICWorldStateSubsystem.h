@@ -34,6 +34,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|State") bool SetPlayerTransform(FVector Position, FRotator Rotation);
     UFUNCTION(BlueprintCallable, Category="IC|State") bool RegisterStateParticipant(FName ID, UObject* Participant);
     UFUNCTION(BlueprintCallable, Category="IC|State") void UnregisterStateParticipant(FName ID, UObject* Participant);
+    bool SetPlayerGold(int32 Value);
     bool FlushParticipants();
     bool CanRestoreState(const FICWorldState& Candidate) const;
     bool RestoreState(const FICWorldState& Candidate);

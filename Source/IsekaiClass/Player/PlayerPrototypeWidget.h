@@ -30,6 +30,7 @@ public:
     virtual void NativeDestruct() override;
     virtual void NativeTick(const FGeometry& Geometry,float Delta) override;
     virtual FReply NativeOnKeyDown(const FGeometry& Geometry,const FKeyEvent& Event) override;
+    void RefreshCurrentScreen();
     UFUNCTION() void NameChanged(const FText& Text);
 private:
     UPROPERTY() TObjectPtr<UICCharacterCreateWidget> CharacterCreateScreen;

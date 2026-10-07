@@ -23,6 +23,7 @@ void APlayerPrototypeController::ExecuteUI(const FString& Command,int32 Index)
     if(Command==TEXT("LoadSlot")){if(!Saves->bSaving&&Index>=0&&Index<=4){SelectedLoadSlot=Index;bDirty=true;}return;}
     if(Command==TEXT("Create")){RequestCreatePlayer();return;}
     if(Command==TEXT("Load")){LoadPlayer();return;}
+    if(Command==TEXT("Craft")){CraftRecipe(Index==0?FName(TEXT("RCP_COOK_001")):FName(TEXT("RCP_CRAFT_001")));return;}
     if(Command==TEXT("ImportLegacy"))
     {
         SyncSaveSafety();
@@ -48,6 +49,8 @@ void APlayerPrototypeController::ExecuteUI(const FString& Command,int32 Index)
         const auto& Item=Snapshot.Bag.Slots[SelectedBag];
         if(Command==TEXT("Use"))BeginItem(Item.ItemID);
         else if(Command==TEXT("Equip"))Inventory->Equip(SelectedBag);
+        else if(Command==TEXT("Enhance"))
+        {if(Menu!=TEXT("Craft")||ActiveStation!=TEXT("Forge"))Show(TEXT("대장간 강화 메뉴에서만 강화할 수 있습니다."));else{Inventory->EnhanceEquipment(SelectedBag,Gold);FlushWorldState();}}
         else if(Command==TEXT("Lock"))Inventory->ToggleLock(SelectedBag);
         else if(Command==TEXT("Discard"))Inventory->Discard(SelectedBag);
         else if(Command==TEXT("Split"))Inventory->SplitStack(SelectedBag,Item.Count/2);

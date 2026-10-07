@@ -1,0 +1,34 @@
+﻿Name,ItemID,DisplayName,Tab,Category,Kind,EquipSlot,StackLimit,bCanDiscard,bCanSell,bCanGift,bDeprecated,BuyPrice,SellPrice,EffectID,RequiredClass,GrowthStat,GrowthAmount,RestoreHP,RestoreSP,DefaultGrade,MaxEnhanceLevel,MaxRandomOptions,OptionPoolID,BaseAttack,BaseDefense,EnhanceAttackPerLevel,EnhanceDefensePerLevel,EnhanceBaseCost,EnhanceBaseSuccessRate,EquipmentMesh,AttachSocket
+ITM_CONS_001,ITM_CONS_001,체력 포션,Normal,Consumable,Consumable,None,99,true,true,true,false,0,0,RestoreHP,-1,None,0,25,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_FOOD_001,ITM_FOOD_001,채소 수프,Normal,Food,Consumable,None,99,true,true,true,false,0,0,RestoreSP,-1,None,0,0,25,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_FOOD_002,ITM_FOOD_002,빵,Normal,Food,Consumable,None,99,true,true,true,false,0,0,RestoreSP,-1,None,0,0,15,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_001,ITM_BOOK_001,초급 근력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Strength,1,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_002,ITM_BOOK_002,중급 근력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Strength,3,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_003,ITM_BOOK_003,고급 근력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Strength,5,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_004,ITM_BOOK_004,초급 민첩의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Dexterity,1,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_005,ITM_BOOK_005,중급 민첩의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Dexterity,3,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_006,ITM_BOOK_006,고급 민첩의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Dexterity,5,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_007,ITM_BOOK_007,초급 지력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Intelligence,1,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_008,ITM_BOOK_008,중급 지력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Intelligence,3,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_009,ITM_BOOK_009,고급 지력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Intelligence,5,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_010,ITM_BOOK_010,초급 체력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Constitution,1,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_011,ITM_BOOK_011,중급 체력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Constitution,3,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_012,ITM_BOOK_012,고급 체력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Constitution,5,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_013,ITM_BOOK_013,초급 매력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Charisma,1,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_014,ITM_BOOK_014,중급 매력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Charisma,3,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_015,ITM_BOOK_015,고급 매력의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Charisma,5,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_016,ITM_BOOK_016,초급 운의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Luck,1,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_017,ITM_BOOK_017,중급 운의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Luck,3,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_BOOK_018,ITM_BOOK_018,고급 운의 서,Normal,Book,Consumable,None,99,true,true,true,false,0,0,GrowMainStat,-1,Luck,5,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_MAT_001,ITM_MAT_001,목재,Normal,Material,Material,None,99,true,true,false,false,0,0,None,-1,None,0,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_MAT_002,ITM_MAT_002,밀가루,Normal,Material,Material,None,99,true,true,false,false,0,0,None,-1,None,0,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_MAT_003,ITM_MAT_003,철 주괴,Normal,Material,Material,None,99,true,true,false,false,0,0,None,-1,None,0,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_TKT_001,ITM_TKT_001,가방 확장권,Normal,Ticket,Expansion,None,99,true,true,false,false,0,0,None,-1,None,0,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+ITM_QST_001,ITM_QST_001,퀘스트 반지,Quest,Quest,Quest,None,99,false,false,false,false,0,0,None,-1,None,0,0,0,Common,0,0,None,0,0,0,0,0,1,None,None
+EQP_WPN_SWORD_001,EQP_WPN_SWORD_001,초보자 검,Normal,Equipment,Equipment,Weapon,1,true,true,false,false,0,0,None,0,None,0,0,0,Common,10,4,OPT_WPN,10,0,2,0,100,1,None,weapon_r
+EQP_WPN_BOW_001,EQP_WPN_BOW_001,초보자 활,Normal,Equipment,Equipment,Weapon,1,true,true,false,false,0,0,None,1,None,0,0,0,Common,10,4,OPT_WPN,10,0,2,0,100,1,None,weapon_r
+EQP_WPN_STAFF_001,EQP_WPN_STAFF_001,초보자 마법스태프,Normal,Equipment,Equipment,Weapon,1,true,true,false,false,0,0,None,2,None,0,0,0,Common,10,4,OPT_WPN,10,0,2,0,100,1,None,weapon_r
+EQP_WPN_WAND_001,EQP_WPN_WAND_001,초보자 치유완드,Normal,Equipment,Equipment,Weapon,1,true,true,false,false,0,0,None,3,None,0,0,0,Common,10,4,OPT_WPN,10,0,2,0,100,1,None,weapon_r
+EQP_ARM_001,EQP_ARM_001,여행자의 옷,Normal,Equipment,Equipment,Clothes,1,true,true,false,false,0,0,None,-1,None,0,0,0,Common,10,4,OPT_ARM,0,6,0,1.5,100,1,None,None
+EQP_RNG_001,EQP_RNG_001,구리 반지,Normal,Equipment,Equipment,Ring,1,true,true,false,false,0,0,None,-1,None,0,0,0,Common,10,4,OPT_ACC,3,0,1,0,100,1,None,None
+EQP_NCK_001,EQP_NCK_001,구리 목걸이,Normal,Equipment,Equipment,Necklace,1,true,true,false,false,0,0,None,-1,None,0,0,0,Common,10,4,OPT_ACC,0,2,0,1,100,1,None,None

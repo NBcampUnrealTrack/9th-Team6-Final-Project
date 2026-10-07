@@ -97,7 +97,7 @@ void APlayerPrototypeController::StartSmokeTest()
         {
             if(Step==0)Capture(TEXT("01_Creation.png"));
             if(Step==1){C->PlayerName=TEXT("테스트플레이어");C->ExecuteUI(TEXT("Create"),0);}
-            if(Step==2){Passed=C->bCreated&&Inv->GetSnapshot().Equipment[0].ItemID==TEXT("Sword");Capture(TEXT("02_Play.png"));}
+            if(Step==2){Passed=C->bCreated&&Inv->GetSnapshot().Equipment[0].ItemID==TEXT("EQP_WPN_SWORD_001");Capture(TEXT("02_Play.png"));}
             if(Step==3){C->SelectedLoadSlot=0;Passed=C->LoadPlayer()&&C->SelectedSaveSlot==1;C->SetMenu(TEXT("Inventory"));}
             if(Step==4)Capture(TEXT("03_Inventory.png"));
             if(Step==5)Passed=Approach(TEXT("HOME A"));
@@ -153,15 +153,15 @@ void APlayerPrototypeController::StartSmokeTest()
             if(Step==14)
             {
                 Passed=C->Menu==TEXT("Pause")&&!C->bBlocking;
-                UIKey(C->MenuCancelKey());C->BeginItem(TEXT("Food"));C->HandleKey(C->MenuCancelKey());Passed=Passed&&C->PendingItem.IsNone();
+                UIKey(C->MenuCancelKey());C->BeginItem(TEXT("ITM_FOOD_001"));C->HandleKey(C->MenuCancelKey());Passed=Passed&&C->PendingItem.IsNone();
             }
             if(Step==15)
             {
                 const auto Before=Time->GetClock();C->ConsoleCommand(TEXT("ICAddGameMinutes 60"),true);
                 Passed=Time->GetClock().GameMinute==Before.GameMinute+60&&Time->GetClock().PlaySecond==Before.PlaySecond;
-                const int32 FoodBefore=Inv->CountItem(TEXT("Food"));C->ConsoleCommand(TEXT("ICGiveItem Food 1"),true);
+                const int32 FoodBefore=Inv->CountItem(TEXT("ITM_FOOD_001"));C->ConsoleCommand(TEXT("ICGiveItem ITM_FOOD_001 1"),true);
                 C->ConsoleCommand(TEXT("ICSetAffinity NPC_R01_001 100"),true);C->ConsoleCommand(TEXT("ICTeleport 10 20 130"),true);
-                Passed=Passed&&Inv->CountItem(TEXT("Food"))==FoodBefore+1&&State->GetSnapshot(TEXT("NPC_R01_001")).Affinity==100&&C->GetPawn()->GetActorLocation().Equals(FVector(10,20,130));
+                Passed=Passed&&Inv->CountItem(TEXT("ITM_FOOD_001"))==FoodBefore+1&&State->GetSnapshot(TEXT("NPC_R01_001")).Affinity==100&&C->GetPawn()->GetActorLocation().Equals(FVector(10,20,130));
                 Time->RestoreClock(Before);
             }
             if(Step==16){C->RequestQuit();Capture(TEXT("07_Quit.png"));}

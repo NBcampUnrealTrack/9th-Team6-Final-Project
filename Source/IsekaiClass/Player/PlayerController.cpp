@@ -2,6 +2,9 @@
 #include "PlayerCharacter.h"
 #include "PlayerGameState.h"
 #include "PlayerInventory.h"
+#include "PlayerCrafting.h"
+#include "PlayerDroppedItem.h"
+#include "PlayerStateConversions.h"
 #include "PlayerPrototypeWidget.h"
 #include "ICCharacterCreateWidget.h"
 #include "UObject/ConstructorHelpers.h"
@@ -30,6 +33,8 @@ APlayerPrototypeController::APlayerPrototypeController()
 }
 UPlayerInventory* APlayerPrototypeController::GetInventory() const
 { const auto* PlayerPawn=Cast<APlayerPrototypeCharacter>(GetPawn());return PlayerPawn?PlayerPawn->Inventory:nullptr; }
+UPlayerCrafting* APlayerPrototypeController::GetCrafting() const
+{ const auto* PlayerPawn=Cast<APlayerPrototypeCharacter>(GetPawn());return PlayerPawn?PlayerPawn->Crafting:nullptr; }
 UICWorldStateSubsystem* APlayerPrototypeController::GetWorldState() const
 { return GetGameInstance()?GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr; }
 UICTimeSubsystem* APlayerPrototypeController::GetTime() const
@@ -47,9 +52,12 @@ void APlayerPrototypeController::BeginPlay()
     Inventory->BindWorldState(State);
     Inventory->OnChanged.AddDynamic(this,&ThisClass::InventoryChanged);
     Inventory->OnMessage.AddDynamic(this,&ThisClass::InventoryMessage);
+    Inventory->OnLootResult.AddDynamic(this,&ThisClass::InventoryLootResult);
+    Inventory->OnDropRequested.AddDynamic(this,&ThisClass::InventoryDropRequested);
     if(!State->RegisterStateParticipant(UICWorldStateSubsystem::PlayerId(),this)){Show(TEXT("플레이어 상태 참여자 중복 등록"));return;}
     State->OnCharacterChanged.AddDynamic(this,&ThisClass::CharacterChanged);
     Time->OnClockChanged.AddDynamic(this,&ThisClass::ClockChanged);
+    Time->OnGameMinutesAdvanced.AddDynamic(this,&ThisClass::HandleGameMinutesAdvanced);
     Saves->OnSaveStarted.AddDynamic(this,&ThisClass::SaveStarted);
     Saves->OnSaveFinished.AddDynamic(this,&ThisClass::SaveFinished);
     RefreshSaveSlots();
@@ -67,19 +75,39 @@ void APlayerPrototypeController::EndPlay(const EEndPlayReason::Type Reason)
 {
     if(auto* State=GetWorldState())
     {State->UnregisterStateParticipant(UICWorldStateSubsystem::PlayerId(),this);State->OnCharacterChanged.RemoveDynamic(this,&ThisClass::CharacterChanged);}
-    if(auto* Time=GetTime())Time->OnClockChanged.RemoveDynamic(this,&ThisClass::ClockChanged);
+    if(auto* Time=GetTime())
+    {Time->OnClockChanged.RemoveDynamic(this,&ThisClass::ClockChanged);Time->OnGameMinutesAdvanced.RemoveDynamic(this,&ThisClass::HandleGameMinutesAdvanced);}
     if(auto* Saves=GetSaves())
     {Saves->OnSaveStarted.RemoveDynamic(this,&ThisClass::SaveStarted);Saves->OnSaveFinished.RemoveDynamic(this,&ThisClass::SaveFinished);}
-    if(auto* Inventory=GetInventory())Inventory->BindWorldState(nullptr);
+    if(auto* Inventory=GetInventory())
+    {
+        Inventory->OnChanged.RemoveDynamic(this,&ThisClass::InventoryChanged);
+        Inventory->OnMessage.RemoveDynamic(this,&ThisClass::InventoryMessage);
+        Inventory->OnLootResult.RemoveDynamic(this,&ThisClass::InventoryLootResult);
+        Inventory->OnDropRequested.RemoveDynamic(this,&ThisClass::InventoryDropRequested);
+        Inventory->BindWorldState(nullptr);
+    }
+    if(Screen){Screen->RemoveFromParent();Screen=nullptr;}
     Super::EndPlay(Reason);
 }
 
 void APlayerPrototypeController::SetFinalMoveSpeed(float Speed)
 {if(auto* PlayerPawn=Cast<APlayerPrototypeCharacter>(GetPawn()))PlayerPawn->FinalMoveSpeed=FMath::IsFinite(Speed)?FMath::Max(0.f,Speed):0.f;}
 void APlayerPrototypeController::SetCombatState(bool Active){bInCombat=Active;SyncSaveSafety();}
-void APlayerPrototypeController::InventoryChanged(){bDirty=true;}
+void APlayerPrototypeController::InventoryChanged()
+{if(auto* Inventory=GetInventory())OnEquipmentStatsChanged.Broadcast(Inventory->GetEquipmentStats());bDirty=true;}
 void APlayerPrototypeController::InventoryMessage(const FText& Message){Show(Message.ToString());}
-void APlayerPrototypeController::CharacterChanged(FName ID){bDirty=true;}
+void APlayerPrototypeController::CharacterChanged(FName ID)
+{
+    if(ID==UICWorldStateSubsystem::PlayerId())
+    {
+        if(const auto* Stored=GetWorldState()?GetWorldState()->GetStoredCharacter(ID):nullptr)
+        {MainStats=PlayerStateConversions::Main(Stored->MainStats);Survival=PlayerStateConversions::Survival(*Stored);}
+        const bool Exhausted=Survival.IsExhausted();
+        if(bLastExhausted!=Exhausted){bLastExhausted=Exhausted;OnExhaustionChanged.Broadcast(Exhausted);}
+    }
+    bDirty=true;
+}
 void APlayerPrototypeController::ClockChanged(){bDirty=true;}
 void APlayerPrototypeController::Show(const FString& Text){Notice=Text;bDirty=true;}
 void APlayerPrototypeController::RefreshSaveSlots(){if(auto* Saves=GetSaves())SaveSlots=Saves->GetSlotList();bDirty=true;}
@@ -105,7 +133,13 @@ void APlayerPrototypeController::SaveFinished(int32 Slot,bool bSuccess,const FSt
             const FName Jobs[]={TEXT("Warrior"),TEXT("Archer"),TEXT("Mage"),TEXT("Healer")};
             OnPlayerInitialized.Broadcast(Jobs[Job],FirstSkill);
         }
-        else UpdateGamePhase();
+        else
+        {
+            UpdateGamePhase();
+            ReportCreationFailure(Message + TEXT(" 게임 시작 버튼으로 저장을 재시도할 수 있습니다."));
+        }
+        // Close the creation screen immediately on success; refresh the retry state on failure.
+        if (Screen) Screen->RefreshCurrentScreen();
     }
     RefreshSaveSlots();Show((Slot==0?FString(TEXT("자동 저장: ")):FString::Printf(TEXT("수동 슬롯 %d: "),Slot))+Message);
     FinishSessionSave(Slot,bSuccess);
@@ -116,7 +150,7 @@ void APlayerPrototypeController::SetMenu(const FString& NewMenu)
     if(bEffectWaiting&&NewMenu!=TEXT("Quit")&&NewMenu!=TEXT("Confirm")){Show(TEXT("효과 요청 처리 중입니다."));return;}
     CancelTarget();bBlocking=false;OnCombatRequest.Broadcast(TEXT("BlockEnd"),0);
     Menu=NewMenu;
-    if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bSessionClosing);
+    if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
     InteractionHint.Empty();bShowMouseCursor=!NewMenu.IsEmpty();SetPause(!NewMenu.IsEmpty());
     if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(!NewMenu.IsEmpty());}
     if(NewMenu.IsEmpty()){FInputModeGameOnly Mode;SetInputMode(Mode);}
@@ -132,19 +166,37 @@ void APlayerPrototypeController::UpdateGamePhase()
 void APlayerPrototypeController::CancelTarget()
 {
     if(bEffectWaiting)return;
-    PendingItem=NAME_None;PendingQuick=INDEX_NONE;PendingRequest.Invalidate();bDirty=true;
+    PendingItem=NAME_None;PendingQuick=INDEX_NONE;PendingPartyKey=INDEX_NONE;PendingRequest.Invalidate();bDirty=true;
 }
 
 bool APlayerPrototypeController::ReadLiveState_Implementation(FName CharacterId,FICCharacterState& Snapshot) const
 {
     const auto* Stored=GetWorldState()?GetWorldState()->GetStoredCharacter(CharacterId):nullptr;
     if(!Stored||CharacterId!=UICWorldStateSubsystem::PlayerId())return false;
-    Snapshot=*Stored;return true;
+    Snapshot=*Stored;PlayerStateConversions::Apply(MainStats,Survival,Snapshot);return true;
 }
-bool APlayerPrototypeController::FlushToWorldState_Implementation(UICWorldStateSubsystem* State)
+bool APlayerPrototypeController::FlushToWorldState_Implementation(
+    UICWorldStateSubsystem* State)
 {
-    return State&&GetPawn()&&GetInventory()&&GetInventory()->ValidateState()
-        &&State->SetPlayerTransform(GetPawn()->GetActorLocation(),GetControlRotation());
+    if (!State || !GetPawn() || !GetInventory()
+        || !GetInventory()->ValidateState()
+        || !MainStats.IsValid() || !Survival.IsValid() || Gold < 0)
+    {
+        return false;
+    }
+
+    FICCharacterState PlayerSnapshot;
+
+    if (!ReadLiveState_Implementation(
+        UICWorldStateSubsystem::PlayerId(), PlayerSnapshot))
+    {
+        return !State->ExportState().bPlayerCreated;
+    }
+
+    return State->SetCharacterState(PlayerSnapshot)
+        && State->SetPlayerGold(Gold)
+        && State->SetPlayerTransform(
+            GetPawn()->GetActorLocation(), GetControlRotation());
 }
 bool APlayerPrototypeController::CanRestoreWorldState_Implementation(const FICWorldState& Candidate) const
 {return GetInventory()&&GetInventory()->ValidateSnapshot(Candidate.Inventory);}
@@ -152,10 +204,38 @@ void APlayerPrototypeController::RestoreFromWorldState_Implementation(const FICW
 {
     PlayerName=Candidate.PlayerName;Preset=Candidate.Preset;Job=Candidate.Job;FirstSkill=Candidate.FirstSkill;
     bCreated=Candidate.bPlayerCreated&&!bInitialSavePending;bDead=false;bInCombat=bInDialogue=bInEvent=false;
+    Gold=Candidate.Gold;
+    if (const auto* StoredPlayerSnapshot =
+    Candidate.Characters.Find(UICWorldStateSubsystem::PlayerId()))
+    {
+        MainStats = PlayerStateConversions::Main(StoredPlayerSnapshot->MainStats);
+        Survival = PlayerStateConversions::Survival(*StoredPlayerSnapshot);
+    }
     SelectedBag=SelectedStorage=MoveFrom=INDEX_NONE;
     if(auto* PlayerPawn=Cast<APlayerPrototypeCharacter>(GetPawn()))
     {PlayerPawn->ApplyPreset(Preset);PlayerPawn->SetActorLocation(Candidate.PlayerPosition);PlayerPawn->GetCharacterMovement()->StopMovementImmediately();}
     SetControlRotation(Candidate.PlayerRotation);SetMenu(bCreated?TEXT(""):TEXT("Create"));
     const FName Jobs[]={TEXT("Warrior"),TEXT("Archer"),TEXT("Mage"),TEXT("Healer")};
     if(Candidate.bPlayerCreated&&!bInitialSavePending)OnPlayerInitialized.Broadcast(Jobs[Job],FirstSkill);
+}
+
+void APlayerPrototypeController::HandleGameMinutesAdvanced(int32 Minutes) { if(bCreated&&!bDead)ApplyGameMinutes(Minutes); }
+void APlayerPrototypeController::FlushWorldState() { if(bCreated||bInitialSavePending)FlushToWorldState_Implementation(GetWorldState()); }
+void APlayerPrototypeController::InventoryLootResult(FName ItemID,int32 Accepted,int32 Overflow)
+{
+    if(Overflow<=0)return;FPlayerItemInstance Item;Item.ItemID=ItemID;Item.InstanceID=FGuid::NewGuid();Item.Count=Overflow;SpawnDroppedItem(Item);
+}
+void APlayerPrototypeController::InventoryDropRequested(const FPlayerItemInstance& Item) { SpawnDroppedItem(Item); }
+void APlayerPrototypeController::SpawnDroppedItem(const FPlayerItemInstance& Item)
+{
+    if(!GetWorld()||!GetPawn()||Item.IsEmpty())return;
+    const auto* Definition=GetInventory()?GetInventory()->Find(Item.ItemID):nullptr;
+    const int32 Limit=Definition?FMath::Clamp(Definition->StackLimit,1,99):99;
+    for(int32 Left=Item.Count;Left>0;)
+    {
+        FPlayerItemInstance Part=Item;Part.Count=FMath::Min(Left,Limit);Left-=Part.Count;
+        if(Left>0||Part.Count!=Item.Count)Part.InstanceID=FGuid::NewGuid();
+        const FVector Location=GetPawn()->GetActorLocation()+GetPawn()->GetActorForwardVector()*100.f+FVector(0,0,35);
+        if(auto* Dropped=GetWorld()->SpawnActor<APlayerDroppedItem>(Location,FRotator::ZeroRotator))Dropped->Initialize(Part);
+    }
 }

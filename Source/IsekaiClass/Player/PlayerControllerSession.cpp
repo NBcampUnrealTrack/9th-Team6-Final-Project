@@ -66,7 +66,9 @@ void APlayerPrototypeController::RequestManualSave()
 }
 void APlayerPrototypeController::RequestCreatePlayer()
 {
-    auto* Saves=GetSaves();if(!Saves||Saves->bSaving)return;
+    FString Reason;
+    if(!ValidateCreationRequest(Reason)){ReportCreationFailure(Reason);return;}
+    auto* Saves=GetSaves();
     RefreshSaveSlots();
     if(!bInitialSavePending&&SaveSlots[0].bExists)
     {ShowModal(TEXT("CreateOverwrite"),FString::Printf(TEXT("새 캐릭터를 생성하면 자동 저장 / %s를 교체합니다. 계속할까요?"),SaveSlots[0].bValid?*SaveSlots[0].PlayerName:TEXT("읽을 수 없는 저장")),0);return;}
@@ -87,8 +89,8 @@ void APlayerPrototypeController::RequestDelete(bool bLegacy)
     const int32 Slot=Menu==TEXT("Save")?SelectedSaveSlot:SelectedLoadSlot;
     if(bLegacy)
     {
-        if(!Saves->HasLegacySave()){Show(TEXT("기존 Version 1 원본이 없습니다."));return;}
-        ShowModal(TEXT("DeleteLegacy"),TEXT("기존 Version 1 원본을 삭제할까요? 이미 가져온 수동 저장은 유지됩니다."));return;
+        if(!Saves->HasLegacySave()){Show(TEXT("기존 Version 1/8 원본이 없습니다."));return;}
+        ShowModal(TEXT("DeleteLegacy"),TEXT("기존 Version 1/8 원본을 삭제할까요? 이미 가져온 수동 저장은 유지됩니다."));return;
     }
     if(!SaveSlots.IsValidIndex(Slot)||!SaveSlots[Slot].bExists){Show(TEXT("선택 슬롯이 비어 있습니다."));return;}
     const FString Label=Slot==0?TEXT("자동 저장"):FString::Printf(TEXT("수동 슬롯 %d"),Slot);

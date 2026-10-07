@@ -43,7 +43,7 @@ void UICCharacterCreateWidget::RefreshState()
     {
         const bool bCanEdit = PC->CanEditCreation();
         if (IC_Create_Name) IC_Create_Name->SetIsReadOnly(!bCanEdit);
-        if (IC_Create_Confirm) IC_Create_Confirm->SetIsEnabled(bCanEdit);
+        if (IC_Create_Confirm) IC_Create_Confirm->SetIsEnabled(PC->CanSubmitCreation());
         if (IC_Create_Notice) IC_Create_Notice->SetText(FText::FromString(PC->Notice));
         OnCreationStateChanged(PC->Preset, PC->Job, bCanEdit);
         UpdateJobButtons(PC->Job, bCanEdit);
@@ -70,7 +70,11 @@ void UICCharacterCreateWidget::SelectJob(int32 Index)
 }
 void UICCharacterCreateWidget::CreateCharacter()
 {
-    if (auto* PC = Cast<APlayerPrototypeController>(GetOwningPlayer())) PC->RequestCreatePlayer();
+    if (auto* PC = Cast<APlayerPrototypeController>(GetOwningPlayer()))
+    {
+        if(PC->CanEditCreation() && IC_Create_Name) PC->PlayerName=IC_Create_Name->GetText().ToString();
+        PC->RequestCreatePlayer();
+    }
 }
 void UICCharacterCreateWidget::OpenLoadScreen()
 {

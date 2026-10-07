@@ -93,7 +93,7 @@ FICCharacterState UICWorldStateSubsystem::GetSnapshot(FName ID) const
         {
             Result.HP = Live.HP; Result.MP = Live.MP; Result.SP = Live.SP;
             Result.MaxHP = Live.MaxHP; Result.MaxMP = Live.MaxMP; Result.MaxSP = Live.MaxSP;
-            Result.Debuffs = Live.Debuffs;
+            Result.Debuffs = Live.Debuffs; Result.MainStats=Live.MainStats;
         }
     }
     if (ID == PlayerId()) Result.Equipment = State.Inventory.Equipment;
@@ -177,6 +177,7 @@ bool UICWorldStateSubsystem::ValidateInventoryShape(const FICInventoryState& I, 
 
 bool UICWorldStateSubsystem::ValidateState(const FICWorldState& Candidate)
 {
+    if(Candidate.Gold<0)return false;
     if (Candidate.Preset < 0 || Candidate.Preset > 1 || Candidate.Job < 0 || Candidate.Job > 3
         || Candidate.PlayerPosition.ContainsNaN() || Candidate.PlayerRotation.ContainsNaN()) return false;
     if (Candidate.bPlayerCreated)
@@ -302,3 +303,6 @@ bool UICWorldStateSubsystem::ApplyWorldProgress(const FICWorldState& Candidate)
     State = MoveTemp(Next);
     return true;
 }
+
+bool UICWorldStateSubsystem::SetPlayerGold(int32 Value)
+{ if(Value<0)return false;State.Gold=Value;return true; }

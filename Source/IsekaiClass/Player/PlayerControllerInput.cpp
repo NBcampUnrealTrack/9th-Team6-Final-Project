@@ -2,6 +2,7 @@
 #include "PlayerCharacter.h"
 #include "PlayerInteractionObject.h"
 #include "PlayerInventory.h"
+#include "PlayerDroppedItem.h"
 #include "../Core/ICSaveSubsystem.h"
 #include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
@@ -35,7 +36,7 @@ void APlayerPrototypeController::PlayerTick(float DeltaSeconds)
     if(Hint!=InteractionHint){InteractionHint=Hint;bDirty=true;}
     if(!bCreated||bDead||!Menu.IsEmpty()||IsPaused())return;
     auto* PlayerPawn=Cast<APlayerPrototypeCharacter>(GetPawn());if(!PlayerPawn)return;
-    PlayerPawn->GetCharacterMovement()->MaxWalkSpeed=PlayerPawn->FinalMoveSpeed;
+    PlayerPawn->GetCharacterMovement()->MaxWalkSpeed=PlayerPawn->FinalMoveSpeed*(Survival.IsExhausted()?ExhaustedMoveSpeedMultiplier:1.f);
     const FRotator Yaw(0,GetControlRotation().Yaw,0);
     const float Forward=(IsInputKeyDown(EKeys::W)?1.f:0.f)-(IsInputKeyDown(EKeys::S)?1.f:0.f);
     const float Right=(IsInputKeyDown(EKeys::D)?1.f:0.f)-(IsInputKeyDown(EKeys::A)?1.f:0.f);
@@ -78,7 +79,8 @@ void APlayerPrototypeController::HandleKey(FKey Key)
     {
         if(QuickIndex!=INDEX_NONE&&Menu.IsEmpty())
         {if(QuickIndex==PendingQuick)ConfirmTarget(TEXT("Player"));else BeginItem(GetInventory()->GetSnapshot().QuickSlots[QuickIndex],QuickIndex);}
-        if(PartyIndex!=INDEX_NONE)ConfirmTarget(FName(*FString::Printf(TEXT("Companion%d"),PartyIndex+1)));
+        if(PartyIndex!=INDEX_NONE)
+        {if(PendingPartyKey==PartyIndex)ConfirmTarget(TEXT("Player"));else{PendingPartyKey=PartyIndex;ConfirmTarget(FName(*FString::Printf(TEXT("Companion%d"),PartyIndex+1)));}}
         return;
     }
     if(!Menu.IsEmpty())return;
@@ -126,6 +128,15 @@ APlayerPrototypeObject* APlayerPrototypeController::FindInteractionTarget() cons
 }
 void APlayerPrototypeController::Interact()
 {
+    if(auto* PlayerPawn=Cast<APlayerPrototypeCharacter>(GetPawn()))
+    {
+        FHitResult Hit;FCollisionQueryParams Params;Params.AddIgnoredActor(PlayerPawn);
+        const FVector Start=PlayerPawn->Camera->GetComponentLocation();
+        GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+PlayerPawn->Camera->GetForwardVector()*1000.f,ECC_Visibility,Params);
+        if(auto* Dropped=Cast<APlayerDroppedItem>(Hit.GetActor());Dropped&&FVector::Dist(PlayerPawn->GetActorLocation(),Dropped->GetActorLocation())<=250.f)
+        {Dropped->TryPickup(this);return;}
+    }
+
     auto* Object=FindInteractionTarget();
     if(!Object)
     {
@@ -143,8 +154,11 @@ void APlayerPrototypeController::Interact()
         if(!Object->bHome&&Object->ContainerID.IsNone()){Show(TEXT("창고 ID가 설정되지 않았습니다."));return;}
         OpenContainer(Object->ContainerID,Object->bHome,Object->bAccessGranted);
     }
-    else if(Object->Action==TEXT("Loot"))
-    {const int32 Left=GetInventory()->TryAddItem(TEXT("Wood"),3);Show(Left?FString::Printf(TEXT("목재 초과분 %d개: 드롭 담당 연결 대기"),Left):TEXT("목재 획득 완료"));}
-    else if(Object->Action==TEXT("Quest"))GetInventory()->TryAddItem(TEXT("QuestRing"),1);
+    else if(Object->Action==TEXT("Sleep"))Sleep();
+    else if(Object->Action==TEXT("Kitchen")||Object->Action==TEXT("Forge")){ActiveStation=Object->Action;SetMenu(TEXT("Craft"));}
+    else if(Object->Action==TEXT("Supply"))
+    {GetInventory()->AddItem(TEXT("ITM_MAT_001"),5,true);GetInventory()->AddItem(TEXT("ITM_MAT_002"),6,true);GetInventory()->AddItem(TEXT("ITM_MAT_003"),6,true);Show(TEXT("제작 재료를 지급했습니다."));}
+    else if(Object->Action==TEXT("Loot")){GetInventory()->AddItem(TEXT("ITM_MAT_001"),3,true);Show(TEXT("목재 획득 완료. 초과분은 바닥에 생성됩니다."));}
+    else if(Object->Action==TEXT("Quest"))GetInventory()->TryAddItem(TEXT("ITM_QST_001"),1);
     else Show(TEXT("이 상자의 상호작용 종류가 설정되지 않았습니다."));
 }

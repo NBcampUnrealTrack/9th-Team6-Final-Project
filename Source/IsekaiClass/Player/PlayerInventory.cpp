@@ -1,4 +1,5 @@
 #include "PlayerInventory.h"
+#include "UObject/ConstructorHelpers.h"
 #include "../Core/ICWorldStateSubsystem.h"
 
 UPlayerInventory::UPlayerInventory()
@@ -6,23 +7,81 @@ UPlayerInventory::UPlayerInventory()
     PrimaryComponentTick.bCanEverTick = false;
     auto Add = [this](const TCHAR* ID, const TCHAR* Label, EPlayerItemKind Kind, EPlayerEquipSlot Slot, FName Effect = NAME_None)
     {
-        FPlayerItemDefinition D; D.ItemID=ID; D.Name=FText::FromString(Label); D.Kind=Kind; D.EquipSlot=Slot;
+        FPlayerItemDefinition D; D.ItemID=ID; D.DisplayName=FText::FromString(Label); D.Name=D.DisplayName; D.Kind=Kind; D.EquipSlot=Slot;
         D.StackLimit=Kind==EPlayerItemKind::Equipment ? 1 : 99; D.EffectID=Effect;
         D.bCanDiscard=D.bCanSell=Kind!=EPlayerItemKind::Quest; Definitions.Add(D);
+        auto& Added=Definitions.Last();const FString Code(ID);
+        if(Code.StartsWith(TEXT("ITM_CONS_")))Added.Category=EPlayerItemCategory::Consumable;
+        else if(Code.StartsWith(TEXT("ITM_FOOD_")))Added.Category=EPlayerItemCategory::Food;
+        else if(Code.StartsWith(TEXT("ITM_BOOK_")))Added.Category=EPlayerItemCategory::Book;
+        else if(Code.StartsWith(TEXT("ITM_MAT_")))Added.Category=EPlayerItemCategory::Material;
+        else if(Code.StartsWith(TEXT("ITM_GATH_")))Added.Category=EPlayerItemCategory::Gathering;
+        else if(Code.StartsWith(TEXT("ITM_FISH_")))Added.Category=EPlayerItemCategory::Fish;
+        else if(Code.StartsWith(TEXT("ITM_CRAFT_")))Added.Category=EPlayerItemCategory::Crafted;
+        else if(Code.StartsWith(TEXT("ITM_QST_")))Added.Category=EPlayerItemCategory::Quest;
+        else if(Code.StartsWith(TEXT("ITM_TKT_")))Added.Category=EPlayerItemCategory::Ticket;
+        else if(Code.StartsWith(TEXT("EQP_")))Added.Category=EPlayerItemCategory::Equipment;
+        Added.Tab=Kind==EPlayerItemKind::Quest?EPlayerItemTab::Quest:EPlayerItemTab::Normal;
+        Added.bCanGift=Added.Category==EPlayerItemCategory::Food||Added.Category==EPlayerItemCategory::Book||Added.Category==EPlayerItemCategory::Consumable;
+        if(Kind==EPlayerItemKind::Equipment)
+        {
+            Added.MaxEnhanceLevel=10;Added.MaxRandomOptions=4;Added.EnhanceBaseCost=100;Added.EnhanceBaseSuccessRate=1.f;
+            Added.OptionPoolID=Slot==EPlayerEquipSlot::Weapon?TEXT("OPT_WPN"):Slot==EPlayerEquipSlot::Clothes?TEXT("OPT_ARM"):TEXT("OPT_ACC");
+        }
     };
-    Add(TEXT("PotionHP"),TEXT("체력 포션"),EPlayerItemKind::Consumable,EPlayerEquipSlot::None,TEXT("RestoreHP"));
-    Add(TEXT("Food"),TEXT("채소 수프"),EPlayerItemKind::Consumable,EPlayerEquipSlot::None,TEXT("RestoreSP"));
-    Add(TEXT("BookSTR"),TEXT("초급 근력의 서"),EPlayerItemKind::Consumable,EPlayerEquipSlot::None,TEXT("GrowSTR"));
-    Add(TEXT("Wood"),TEXT("목재"),EPlayerItemKind::Material,EPlayerEquipSlot::None);
-    Add(TEXT("Ticket"),TEXT("가방 확장권"),EPlayerItemKind::Expansion,EPlayerEquipSlot::None);
-    Add(TEXT("QuestRing"),TEXT("퀘스트 반지"),EPlayerItemKind::Quest,EPlayerEquipSlot::None);
-    Add(TEXT("Sword"),TEXT("초보자 검"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Weapon);
-    Add(TEXT("Bow"),TEXT("초보자 활"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Weapon);
-    Add(TEXT("Staff"),TEXT("초보자 공격용 지팡이"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Weapon);
-    Add(TEXT("HealBook"),TEXT("초보자 치유서"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Weapon);
-    Add(TEXT("Clothes"),TEXT("여행자의 옷"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Clothes);
-    Add(TEXT("Ring"),TEXT("구리 반지"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Ring);
-    Add(TEXT("Necklace"),TEXT("구리 목걸이"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Necklace);
+    Add(TEXT("ITM_CONS_001"),TEXT("체력 포션"),EPlayerItemKind::Consumable,EPlayerEquipSlot::None,TEXT("RestoreHP")); Definitions.Last().RestoreHP=25.f;
+    Add(TEXT("ITM_FOOD_001"),TEXT("채소 수프"),EPlayerItemKind::Consumable,EPlayerEquipSlot::None,TEXT("RestoreSP")); Definitions.Last().RestoreSP=25.f;
+    Add(TEXT("ITM_FOOD_002"),TEXT("빵"),EPlayerItemKind::Consumable,EPlayerEquipSlot::None,TEXT("RestoreSP")); Definitions.Last().RestoreSP=15.f;
+    auto AddBook=[&](const TCHAR* ID,const TCHAR* Label,EPlayerMainStat Stat,int32 Amount)
+    {
+        Add(ID,Label,EPlayerItemKind::Consumable,EPlayerEquipSlot::None,TEXT("GrowMainStat"));Definitions.Last().GrowthStat=Stat;Definitions.Last().GrowthAmount=Amount;
+    };
+    AddBook(TEXT("ITM_BOOK_001"),TEXT("초급 근력의 서"),EPlayerMainStat::Strength,1);
+    AddBook(TEXT("ITM_BOOK_002"),TEXT("중급 근력의 서"),EPlayerMainStat::Strength,3);
+    AddBook(TEXT("ITM_BOOK_003"),TEXT("고급 근력의 서"),EPlayerMainStat::Strength,5);
+    AddBook(TEXT("ITM_BOOK_004"),TEXT("초급 민첩의 서"),EPlayerMainStat::Dexterity,1);
+    AddBook(TEXT("ITM_BOOK_005"),TEXT("중급 민첩의 서"),EPlayerMainStat::Dexterity,3);
+    AddBook(TEXT("ITM_BOOK_006"),TEXT("고급 민첩의 서"),EPlayerMainStat::Dexterity,5);
+    AddBook(TEXT("ITM_BOOK_007"),TEXT("초급 지력의 서"),EPlayerMainStat::Intelligence,1);
+    AddBook(TEXT("ITM_BOOK_008"),TEXT("중급 지력의 서"),EPlayerMainStat::Intelligence,3);
+    AddBook(TEXT("ITM_BOOK_009"),TEXT("고급 지력의 서"),EPlayerMainStat::Intelligence,5);
+    AddBook(TEXT("ITM_BOOK_010"),TEXT("초급 체력의 서"),EPlayerMainStat::Constitution,1);
+    AddBook(TEXT("ITM_BOOK_011"),TEXT("중급 체력의 서"),EPlayerMainStat::Constitution,3);
+    AddBook(TEXT("ITM_BOOK_012"),TEXT("고급 체력의 서"),EPlayerMainStat::Constitution,5);
+    AddBook(TEXT("ITM_BOOK_013"),TEXT("초급 매력의 서"),EPlayerMainStat::Charisma,1);
+    AddBook(TEXT("ITM_BOOK_014"),TEXT("중급 매력의 서"),EPlayerMainStat::Charisma,3);
+    AddBook(TEXT("ITM_BOOK_015"),TEXT("고급 매력의 서"),EPlayerMainStat::Charisma,5);
+    AddBook(TEXT("ITM_BOOK_016"),TEXT("초급 운의 서"),EPlayerMainStat::Luck,1);
+    AddBook(TEXT("ITM_BOOK_017"),TEXT("중급 운의 서"),EPlayerMainStat::Luck,3);
+    AddBook(TEXT("ITM_BOOK_018"),TEXT("고급 운의 서"),EPlayerMainStat::Luck,5);
+    Add(TEXT("ITM_MAT_001"),TEXT("목재"),EPlayerItemKind::Material,EPlayerEquipSlot::None);
+    Add(TEXT("ITM_MAT_002"),TEXT("밀가루"),EPlayerItemKind::Material,EPlayerEquipSlot::None);
+    Add(TEXT("ITM_MAT_003"),TEXT("철 주괴"),EPlayerItemKind::Material,EPlayerEquipSlot::None);
+    Add(TEXT("ITM_TKT_001"),TEXT("가방 확장권"),EPlayerItemKind::Expansion,EPlayerEquipSlot::None);
+    Add(TEXT("ITM_QST_001"),TEXT("퀘스트 반지"),EPlayerItemKind::Quest,EPlayerEquipSlot::None);
+    Add(TEXT("EQP_WPN_SWORD_001"),TEXT("초보자 검"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Weapon); Definitions.Last().RequiredClass=0;Definitions.Last().AttachSocket=TEXT("weapon_r");Definitions.Last().BaseAttack=10.f;Definitions.Last().EnhanceAttackPerLevel=2.f;
+    Add(TEXT("EQP_WPN_BOW_001"),TEXT("초보자 활"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Weapon); Definitions.Last().RequiredClass=1;Definitions.Last().AttachSocket=TEXT("weapon_r");Definitions.Last().BaseAttack=10.f;Definitions.Last().EnhanceAttackPerLevel=2.f;
+    Add(TEXT("EQP_WPN_STAFF_001"),TEXT("초보자 마법스태프"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Weapon); Definitions.Last().RequiredClass=2;Definitions.Last().AttachSocket=TEXT("weapon_r");Definitions.Last().BaseAttack=10.f;Definitions.Last().EnhanceAttackPerLevel=2.f;
+    Add(TEXT("EQP_WPN_WAND_001"),TEXT("초보자 치유완드"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Weapon); Definitions.Last().RequiredClass=3;Definitions.Last().AttachSocket=TEXT("weapon_r");Definitions.Last().BaseAttack=10.f;Definitions.Last().EnhanceAttackPerLevel=2.f;
+    Add(TEXT("EQP_ARM_001"),TEXT("여행자의 옷"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Clothes);Definitions.Last().BaseDefense=6.f;Definitions.Last().EnhanceDefensePerLevel=1.5f;
+    Add(TEXT("EQP_RNG_001"),TEXT("구리 반지"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Ring);Definitions.Last().BaseAttack=3.f;Definitions.Last().EnhanceAttackPerLevel=1.f;
+    Add(TEXT("EQP_NCK_001"),TEXT("구리 목걸이"),EPlayerItemKind::Equipment,EPlayerEquipSlot::Necklace);Definitions.Last().BaseDefense=2.f;Definitions.Last().EnhanceDefensePerLevel=1.f;
+    // Retain old item IDs so existing saves remain readable. New grants use canonical IDs.
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("ITM_CONS_001");}); Legacy.ItemID=TEXT("PotionHP"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("ITM_FOOD_001");}); Legacy.ItemID=TEXT("Food"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("ITM_BOOK_001");}); Legacy.ItemID=TEXT("BookSTR"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("ITM_MAT_001");}); Legacy.ItemID=TEXT("Wood"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("ITM_TKT_001");}); Legacy.ItemID=TEXT("Ticket"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("ITM_QST_001");}); Legacy.ItemID=TEXT("QuestRing"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("EQP_WPN_SWORD_001");}); Legacy.ItemID=TEXT("Sword"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("EQP_WPN_BOW_001");}); Legacy.ItemID=TEXT("Bow"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("EQP_WPN_STAFF_001");}); Legacy.ItemID=TEXT("Staff"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("EQP_WPN_WAND_001");}); Legacy.ItemID=TEXT("HealBook"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("EQP_ARM_001");}); Legacy.ItemID=TEXT("Clothes"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("EQP_RNG_001");}); Legacy.ItemID=TEXT("Ring"); Definitions.Add(Legacy); }
+    { FPlayerItemDefinition Legacy=*Definitions.FindByPredicate([](const auto& D){return D.ItemID==TEXT("EQP_NCK_001");}); Legacy.ItemID=TEXT("Necklace"); Definitions.Add(Legacy); }
+    static ConstructorHelpers::FObjectFinder<UDataTable> ItemTableAsset(TEXT("/Game/IsekaiClass/Data/Items/DT_IC_Item.DT_IC_Item"));
+    if(ItemTableAsset.Succeeded())ItemTable=ItemTableAsset.Object;
     ResetInventory();
 }
 const FPlayerItemDefinition* UPlayerInventory::Find(FName ID) const
@@ -64,7 +123,8 @@ int32 UPlayerInventory::Insert(FPlayerContainer& C, FName ID, int32 Count, const
     for (auto& S : C.Slots) if (S.IsEmpty())
     {
         S = Original ? *Original : FPlayerItemInstance(); S.ItemID = ID;
-        if (!Original || !S.InstanceID.IsValid()) S.InstanceID = FGuid::NewGuid();
+        if (!Original) { S.Grade=static_cast<int32>(D->DefaultGrade); if(D->Kind==EPlayerItemKind::Equipment) RollRandomOptions(S,*D); }
+        if (!Original || !S.InstanceID.IsValid() || Left!=Count) S.InstanceID = FGuid::NewGuid();
         S.Count = FMath::Min(Left, Limit); Left -= S.Count; if (!Left) break;
     }
     return Count - Left;
@@ -97,7 +157,7 @@ bool UPlayerInventory::AddItem(FName ID, int32 Count, bool bAllowPartial)
     if (bAllowPartial || D->Kind == EPlayerItemKind::Quest)
     {
         const int32 Left = TryAddItem(ID, Count);
-        if (Left) OnMessage.Broadcast(FText::FromString(FString::Printf(TEXT("가방 초과분 %d개: 드롭 담당 연결이 필요합니다."), Left)));
+        if (Left) OnMessage.Broadcast(FText::FromString(FString::Printf(TEXT("가방 초과분 %d개가 바닥에 떨어졌습니다."), Left)));
         return Left == 0;
     }
     auto Next = GetSnapshot();
@@ -173,7 +233,10 @@ bool UPlayerInventory::Discard(int32 Index)
     auto Next = GetSnapshot(); if (!Next.Bag.Slots.IsValidIndex(Index)) return false;
     auto& S = Next.Bag.Slots[Index]; const auto* D = Find(S.ItemID);
     if (!D || !D->bCanDiscard || S.bLocked) return Fail(TEXT("버릴 수 없는 아이템입니다."));
-    S = FPlayerItemInstance(); return Commit(Next);
+    const FPlayerItemInstance Dropped=S;
+    S = FPlayerItemInstance();
+    if (!Commit(Next)) return false;
+    OnDropRequested.Broadcast(Dropped); return true;
 }
 
 bool UPlayerInventory::Equip(int32 Index)
@@ -181,6 +244,8 @@ bool UPlayerInventory::Equip(int32 Index)
     auto Next = GetSnapshot(); if (!Next.Bag.Slots.IsValidIndex(Index)) return false;
     auto& S = Next.Bag.Slots[Index]; const auto* D = Find(S.ItemID);
     if (!D || D->Kind != EPlayerItemKind::Equipment || D->EquipSlot == EPlayerEquipSlot::None || S.bLocked) return Fail(TEXT("장착할 수 없습니다."));
+    if(D->EquipSlot==EPlayerEquipSlot::Weapon && D->RequiredClass!=INDEX_NONE && D->RequiredClass!=CurrentClass)
+        return Fail(TEXT("현재 직업이 사용할 수 없는 무기입니다."));
     Swap(S, Next.Equipment[static_cast<int32>(D->EquipSlot)]); return Commit(Next);
 }
 
@@ -213,7 +278,7 @@ bool UPlayerInventory::BindQuickSlot(int32 Quick, int32 Index)
 bool UPlayerInventory::ExpandUsingTicket()
 {
     auto Next = GetSnapshot(); if (Next.Bag.Slots.Num() >= 100) return Fail(TEXT("최대 100칸입니다. 확장권은 소모하지 않았습니다."));
-    if (!Remove(Next.Bag, TEXT("Ticket"), 1)) return Fail(TEXT("확장권이 없습니다."));
+    if (!Remove(Next.Bag, TEXT("ITM_TKT_001"), 1) && !Remove(Next.Bag, TEXT("Ticket"), 1)) return Fail(TEXT("확장권이 없습니다."));
     Next.Bag.Slots.SetNum(Next.Bag.Slots.Num() + 10); return Commit(Next);
 }
 
@@ -246,8 +311,13 @@ bool UPlayerInventory::ValidateSnapshot(const FICInventoryState& Snapshot) const
     auto Check = [this](const FPlayerItemInstance& Item, bool bQuest)
     {
         if (Item.IsEmpty()) return true;
+        static const TSet<FName> AllowedOptions={TEXT("Attack"),TEXT("Defense"),TEXT("MaxHP"),TEXT("MaxMP"),TEXT("MaxSP"),TEXT("AttackSpeed"),TEXT("MoveSpeed"),TEXT("CriticalRate")};
+        for(const auto& Option:Item.Options)
+            if(!AllowedOptions.Contains(Option.Key)||!FMath::IsFinite(Option.Value)||Option.Value<=0.f)return false;
         const auto* D = Find(Item.ItemID);
-        return D && (D->Kind == EPlayerItemKind::Quest) == bQuest && Item.Count <= (D->Kind == EPlayerItemKind::Equipment ? 1 : FMath::Clamp(D->StackLimit, 1, 99));
+        return D && Item.Grade>=0 && Item.Grade<=static_cast<int32>(EPlayerItemGrade::Legendary)
+            && Item.Upgrade>=0 && Item.Upgrade<=D->MaxEnhanceLevel && Item.Options.Num()<=D->MaxRandomOptions
+            && (D->Kind == EPlayerItemKind::Quest) == bQuest && Item.Count <= (D->Kind == EPlayerItemKind::Equipment ? 1 : FMath::Clamp(D->StackLimit, 1, 99));
     };
     for (const auto& S : Snapshot.Bag.Slots) if (!Check(S, false)) return false;
     for (const auto& S : Snapshot.QuestItems) if (!Check(S, true)) return false;
@@ -262,4 +332,23 @@ bool UPlayerInventory::ValidateSnapshot(const FICInventoryState& Snapshot) const
     return true;
 }
 
-bool UPlayerInventory::ValidateState() const { return ValidateSnapshot(GetSnapshot()); }
+bool UPlayerInventory::ValidateState() const { return ValidateDefinitions() && ValidateSnapshot(GetSnapshot()); }
+
+int32 UPlayerInventory::TryAddItemInstance(const FPlayerItemInstance& Item)
+{
+    const auto* Definition=Find(Item.ItemID);
+    if(!Definition||Item.IsEmpty())return FMath::Max(0,Item.Count);
+    if(Definition->Kind==EPlayerItemKind::Quest)
+    {
+        // Pickups cannot create overflow drops. Quest inventory is separate.
+        auto Next=GetSnapshot(); FPlayerContainer Container; Container.Slots=Next.QuestItems;
+        if(Item.Count>100000)return Item.Count;
+        Container.Slots.SetNum(Container.Slots.Num()+FMath::DivideAndRoundUp(Item.Count,FMath::Clamp(Definition->StackLimit,1,99)));
+        const int32 Added=Insert(Container,Item.ItemID,Item.Count,&Item);
+        Container.Slots.RemoveAll([](const auto& S){return S.IsEmpty();});Next.QuestItems=MoveTemp(Container.Slots);
+        return Added>0&&Commit(Next)?Item.Count-Added:Item.Count;
+    }
+    auto Next=GetSnapshot(); const int32 Added=Insert(Next.Bag,Item.ItemID,Item.Count,&Item);
+    if(Added>0&&!Commit(Next))return Item.Count;
+    return Item.Count-Added;
+}
