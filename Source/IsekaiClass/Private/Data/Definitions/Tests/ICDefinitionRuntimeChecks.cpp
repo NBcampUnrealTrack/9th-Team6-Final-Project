@@ -149,13 +149,18 @@ bool FICRealDefinitionAssetsCheck::RunTest(const FString& Parameters)
             Schema.Folder+TEXT("/")+Schema.AssetName.ToString()+TEXT(".")+Schema.AssetName.ToString());
         TestTrue(TEXT("Registered table retains row struct"),Table->GetRowStruct()==Schema.RowStruct.Get());
     }
-    TestEqual(TEXT("Both String Tables registered"),Catalog->StringTables.Num(),2);
+    TestEqual(TEXT("Definition, quest, and dialogue String Tables registered"),Catalog->StringTables.Num(),3);
+    bool IsQuestTableRegistered = false;
     for(const auto& Reference:Catalog->StringTables)
     {
         UStringTable* Strings=Reference.LoadSynchronous();
         if(TestNotNull(TEXT("Catalog String Table reference resolves"),Strings))
+        {
             TestTrue(TEXT("String Table reference uses new folder"),Strings->GetPathName().StartsWith(TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/")));
+            IsQuestTableRegistered |= Strings->GetPathName()==TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_Quest.ST_IC_Quest");
+        }
     }
+    TestTrue(TEXT("Quest String Table is registered"),IsQuestTableRegistered);
     auto* GI=NewObject<UGameInstance>();auto* Service=NewObject<UICDefinitionSubsystem>(GI);Service->ConfigureCatalog(Catalog);
     FICItemRow Potion;
     if(TestTrue(TEXT("Item resolves after catalog relocation"),Service->GetItem(TEXT("ITM_CONS_001"),Potion).bSuccess))

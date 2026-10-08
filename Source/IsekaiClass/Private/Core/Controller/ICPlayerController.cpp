@@ -12,6 +12,7 @@
 #include "Inventory/Actors/ICDroppedItem.h"
 #include "Player/State/ICPlayerStateConversions.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
+#include "UI/Quest/ICQuestWidget.h"
 #include "UI/MainMenu/ICMainMenuWidget.h"
 #include "UI/Save/ICSaveLoadWidget.h"
 #include "UI/CharacterCreate/ICCharacterCreateWidget.h"
@@ -34,7 +35,6 @@ AICPlayerController::AICPlayerController()
     PrimaryActorTick.bTickEvenWhenPaused = true;
     CheatClass = UICDebugCheatManager::StaticClass();
     DroppedItemClass = AICDroppedItem::StaticClass();
-
 }
 UICInventoryComponent* AICPlayerController::GetInventory() const
 { IC_TRACE_FUNCTION(); const auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());return PlayerPawn?PlayerPawn->Inventory:nullptr; }
@@ -221,6 +221,32 @@ void AICPlayerController::UpdateScreens()
         }
     }
     else if (CharacterCreateScreen && CharacterCreateScreen->IsInViewport()) CharacterCreateScreen->RemoveFromParent();
+    if (Menu==TEXT("Quest") && !QuestScreen)
+    {
+        if (UClass* WidgetClass = QuestWidgetClass.LoadSynchronous())
+        {
+            QuestScreen = CreateWidget<UICQuestWidget>(this, WidgetClass);
+            if (QuestScreen && GetLocalPlayer())
+            {
+                if (auto* UI = GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())
+                {
+                    UI->OpenScreen(QuestScreen, true, 50);
+                }
+            }
+        }
+    }
+    else if (Menu!=TEXT("Quest") && QuestScreen)
+    {
+        UICQuestWidget* Closing = QuestScreen.Get();
+        QuestScreen = nullptr;
+        if (GetLocalPlayer())
+        {
+            if (auto* UI = GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())
+            {
+                UI->CloseScreen(Closing);
+            }
+        }
+    }
     if (Screen) Screen->RefreshCurrentScreen();
 }
 
@@ -241,6 +267,7 @@ void AICPlayerController::EndPlay(const EEndPlayReason::Type Reason)
     RemoveInputMapping();
     if(CharacterCreateScreen){CharacterCreateScreen->RemoveFromParent();CharacterCreateScreen=nullptr;}
     if(Screen){Screen->RemoveFromParent();Screen=nullptr;}
+    QuestScreen=nullptr;
     if(MainMenuWidget){MainMenuWidget->RemoveFromParent();MainMenuWidget=nullptr;}
     SessionSaveLoadScreen=nullptr;
     if(GetGameInstance())if(auto* Production=GetGameInstance()->GetSubsystem<UICProductionSubsystem>())Production->OnProductionChanged.RemoveDynamic(this,&ThisClass::ProductionChanged);

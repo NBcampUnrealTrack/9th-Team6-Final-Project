@@ -13,6 +13,7 @@ class AICDroppedItem;
 class UICCraftingComponent;
 class UICInventoryComponent;
 class UICGameplayWidget;
+class UICQuestWidget;
 class UICMainMenuWidget;
 class UICCharacterCreateWidget;
 class UICSaveLoadWidget;
@@ -55,6 +56,7 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI", meta=(ToolTip="캐릭터 생성에 사용할 기존 UICCharacterCreateWidget 자식 WBP 클래스입니다. 인스턴스가 아니라 클래스 에셋을 지정합니다.\n입력 자료형: 클래스 선택 (UICCharacterCreateWidget).\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요."))
     TSubclassOf<UICCharacterCreateWidget> CharacterCreateWidgetClass;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|UI", meta=(ToolTip="실제 플레이 UI UICGameplayWidget 자식 WBP 클래스입니다. 클래스 에셋을 지정하고 Controller 상태/갱신 이벤트와 연결합니다.\n입력 자료형: 클래스 선택 (UICGameplayWidget).\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) TSubclassOf<UICGameplayWidget> GameplayWidgetClass;
+    UPROPERTY(EditDefaultsOnly, Category="IC|UI") TSoftClassPtr<UICQuestWidget> QuestWidgetClass;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input", meta=(ToolTip="플레이 중 사용할 실제 IMC 에셋입니다. 로컬 플레이어 Enhanced Input에 MappingPriority로 등록합니다. 키 배정은 이 IMC에서 합니다.\n입력 자료형: 객체 참조 (UInputMappingContext).\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) TObjectPtr<UInputMappingContext> DefaultMappingContext;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input", meta=(ToolTip="IMC 등록 우선순위입니다. 로컬 Enhanced Input에서 다른 컨텍스트와 충돌할 때 사용하는 정수 우선순위입니다.\n입력 자료형: 정수.\nC++ 초기값: 0. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) int32 MappingPriority=0;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input", meta=(ToolTip="WASD 이동 IA 에셋입니다. Axis2D이며 IMC에서 W/S/A/D 축·Swizzle/Negate를 연결합니다.\n입력 자료형: 객체 참조 (UInputAction).\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) TObjectPtr<UInputAction> MoveAction;
@@ -129,6 +131,7 @@ public:
     UPROPERTY(BlueprintReadOnly,Category="IC|UI", meta=(ToolTip="현재 대상 선택 동료 키 슬롯입니다. -1은 없음, 0~3은 Z/X/C/V 대응이며 실제 WorldState 파티 ID를 조회합니다.\n입력 자료형: 정수.\nC++ 초기값: -1(미지정). 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) int32 PendingPartyKey=INDEX_NONE;
     bool bDirty=true;
     UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI", meta=(ToolTip="생성된 플레이 UI 인스턴스입니다. GameplayWidgetClass와 별개이며 제거 때 참조/이벤트를 정리합니다.\n입력 자료형: 객체 참조 (UICGameplayWidget).\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) TObjectPtr<UICGameplayWidget> Screen;
+    UPROPERTY(Transient) TObjectPtr<UICQuestWidget> QuestScreen;
     UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI", meta=(ToolTip="생성된 캐릭터 생성 WBP 인스턴스입니다. 클래스 설정과 별개인 런타임 참조이며 닫기/제거 때 정리합니다.\n입력 자료형: 객체 참조 (UICCharacterCreateWidget).\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) TObjectPtr<UICCharacterCreateWidget> CharacterCreateScreen;
     UFUNCTION(BlueprintPure,Category="IC|Systems", meta=(ToolTip="이 컨트롤러의 실제 인벤토리 컴포넌트를 조회합니다. 아이템 변경은 이 컴포넌트의 거래 API를 사용하세요.\n@return 연결된 인벤토리 컴포넌트입니다. 없으면 None입니다. 자료형: UICInventoryComponent*.")) UICInventoryComponent* GetInventory() const;
     UFUNCTION(BlueprintPure,Category="IC|Systems", meta=(ToolTip="이 컨트롤러의 레시피 조회·생산 요청 컴포넌트를 조회합니다.\n@return 연결된 제작 컴포넌트입니다. 없으면 None입니다. 자료형: UICCraftingComponent*.")) UICCraftingComponent* GetCrafting() const;
