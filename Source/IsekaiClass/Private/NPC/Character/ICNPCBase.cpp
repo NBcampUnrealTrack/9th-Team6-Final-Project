@@ -104,7 +104,11 @@ void AICNPCBase::EndInteraction()
     IC_TRACE_FUNCTION();
     if(!bInteracting)return;
     bInteracting=false;
-    if(auto* AI=Cast<AICAIController>(GetController()))AI->SetInteractionHold(false,nullptr);
+    if(auto* AI=Cast<AICAIController>(GetController()))
+    {
+        AI->SetInteractionHold(false,nullptr);
+        AI->RestoreScheduleFacing();
+    }
     UE_LOG(LogICInteraction,Log,TEXT("[NPC.InteractEnd] NPC=%s"),*CharacterID.ToString());
 }
 FText AICNPCBase::GetInteractionText() const

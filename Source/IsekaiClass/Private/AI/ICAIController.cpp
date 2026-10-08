@@ -34,6 +34,31 @@ void AICAIController::SetInteractionHold(bool bHold,AActor* FaceTarget)
     if(bHold){StopMovement();if(FaceTarget)SetFocus(FaceTarget);}
     else ClearFocus(EAIFocusPriority::Gameplay);
 }
+void AICAIController::RestoreScheduleFacing()
+{
+    IC_TRACE_FUNCTION();
+    auto* NPC=Cast<AICNPCBase>(GetPawn());
+    auto* D=GetGameInstance()?GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;
+    auto* T=GetGameInstance()?GetGameInstance()->GetSubsystem<UICTimeSubsystem>():nullptr;
+    auto* Spawns=GetWorld()?GetWorld()->GetSubsystem<UICSpawnSubsystem>():nullptr;
+    if(!NPC||!D||!T||!Spawns)return;
+
+    FICDefinitionResult R;
+    const auto* Schedule=D->Find<FICScheduleRow>(NPC->GetNPCDefinition().ScheduleID,R);
+    if(!Schedule)return;
+    const int32 Minute=int32(FMath::FloorToDouble(T->GetClock().GameMinute))%1440;
+    for(const auto& Segment:Schedule->Segments)
+    {
+        if(Minute<Segment.StartGameMinute||Minute>=Segment.EndGameMinute)continue;
+        FTransform Anchor;
+        if(!Spawns->ResolveLoadedAnchor(Segment.DestinationAnchorID,Anchor))return;
+        NPC->GetCharacterMovement()->StopMovementImmediately();
+        NPC->GetCharacterMovement()->bOrientRotationToMovement=false;
+        SetControlRotation(Anchor.Rotator());
+        NPC->SetActorRotation(Anchor.Rotator());
+        return;
+    }
+}
 void AICAIController::OnUnPossess() { IC_TRACE_FUNCTION();StopExecution();Super::OnUnPossess(); }
 void AICAIController::Tick(float DeltaSeconds)
 {

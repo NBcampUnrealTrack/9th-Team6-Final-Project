@@ -138,6 +138,8 @@ public:
     UFUNCTION(BlueprintPure, meta=(ToolTip="플레이어 CHR_PLAYER의 표시용 상태 복사본을 조회합니다. 활성 실행 캐시와 현재 장착 정보를 조회 경로에서 반영합니다. 복사본을 수정해도 원본이 바뀌지 않습니다.\n@return 현재 플레이어 상태의 스냅샷입니다. 원본이 없으면 비어 있는 상태입니다. 자료형: 구조/객체 (FICCharacterState).")) FICCharacterState GetPlayerSnapshot() const;
     UFUNCTION(BlueprintPure,Category="IC|Creation", meta=(ToolTip="현재 단계에서 이름·직업·외형 선택을 변경할 수 있는지 검사합니다.\n@return 캐릭터 생성 선택을 수정할 수 있으면 true입니다. 자료형: 체크박스(true/false).")) bool CanEditCreation() const { IC_TRACE_FUNCTION(); return !bCreated && !bInitialSavePending; }
     UFUNCTION(BlueprintPure,Category="IC|Creation", meta=(ToolTip="현재 이름·직업·외형 선택과 단계가 생성 제출 조건을 만족하는지 검사합니다. 실제 DT 참조 검사는 생성 거래에서 다시 수행합니다.\n@return 생성 제출이 가능한 상태이면 true입니다. 자료형: 체크박스(true/false).")) bool CanSubmitCreation() const;
+    /** Development-only helper used by the cheat manager to bypass the missing creation confirmation UI. */
+    bool DebugCreatePlayer();
     bool ValidateCreationRequest(FString& OutReason) const;
     void ReportCreationFailure(const FString& Reason);
     UFUNCTION(BlueprintCallable, meta=(ToolTip="현재 전투 여부를 컨트롤러에 반영합니다. 저장 안전 조건과 입력/UI 판단에 사용하며 실제 전투 실행 결과는 호출 측이 제공해야 합니다.\n@param Active 현재 실제 전투 중이면 true, 전투 종료면 false입니다. 입력 핀. 자료형: 체크박스(true/false).")) void SetCombatState(bool Active);

@@ -9,6 +9,15 @@
 #include "EngineUtils.h"
 #include "Engine/GameInstance.h"
 
+void UICDebugCheatManager::ICCreateTestPlayer()
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    if (auto* PC = Cast<AICPlayerController>(GetOuterAPlayerController()))
+        PC->Show(PC->DebugCreatePlayer() ? TEXT("테스트 플레이어 생성 및 자동 저장을 요청했습니다.") : TEXT("테스트 플레이어 생성 요청이 거부되었습니다. Output Log의 Player.Create.Rejected를 확인하세요."));
+#endif
+}
+
 void UICDebugCheatManager::ICAddGameMinutes(double Minutes)
 {
     IC_TRACE_FUNCTION();
