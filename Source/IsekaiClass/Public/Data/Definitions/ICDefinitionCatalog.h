@@ -23,7 +23,7 @@ class ISEKAICLASS_API UICDefinitionCatalog : public UDataAsset
     GENERATED_BODY()
 public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ToolTip="카탈로그 DT 등록 목록입니다. 종류/RowStruct/에셋을 지정하고 같은 종류 ID를 중복시키지 않습니다.\n입력 자료형: 구조/객체 (FICDefinitionBinding) 배열.\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) TArray<FICDefinitionBinding> Tables;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ToolTip="프로젝트 정의/대사 String Table 참조 목록입니다. 키 등록과 직접 FText 연결을 확인합니다. 등록만으로 모든 NameKey UI가 자동 해석되지는 않습니다.\n입력 자료형: Soft Object 에셋 참조 (UStringTable) 배열.\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) TArray<TSoftObjectPtr<UStringTable>> StringTables;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ToolTip="프로젝트 정의·퀘스트·대사 String Table 참조 목록입니다. 키 등록과 직접 FText 연결을 확인합니다. 등록만으로 모든 NameKey UI가 자동 해석되지는 않습니다.\n입력 자료형: Soft Object 에셋 참조 (UStringTable) 배열.\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) TArray<TSoftObjectPtr<UStringTable>> StringTables;
 };
 
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="IsekaiClass Definitions", ToolTip="프로젝트가 사용할 정의 카탈로그 설정입니다. DefaultGame.ini에 저장되며 GameInstance의 DefinitionSubsystem이 시작할 때 Catalog를 불러옵니다.", ShortToolTip="프로젝트가 사용할 정의 카탈로그 설정입니다."))

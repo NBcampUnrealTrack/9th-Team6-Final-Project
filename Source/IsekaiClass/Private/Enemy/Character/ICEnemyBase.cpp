@@ -11,6 +11,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Debug/ICLog.h"
+#include "Quest/ICQuestSubsystem.h"
 AICEnemyBase::AICEnemyBase()
 {
     IC_TRACE_FUNCTION();AbilitySystem=CreateDefaultSubobject<UICAbilitySystemComponent>(TEXT("ICAbilitySystem"));AIControllerClass=AICAIController::StaticClass();AutoPossessAI=EAutoPossessAI::Disabled;Tags.Add(TEXT("IC.Enemy"));
@@ -57,6 +58,10 @@ void AICEnemyBase::HandleZeroHP()
     S.RespawnReadyAtPlaySecond=AbilitySystem->PlaySecond()+(SlotDefinition.bOverrideRespawnTime?SlotDefinition.RespawnPlaySeconds:Definition.RespawnPlaySeconds);
     State.MonsterKilledAt.Add(SpawnKey,AbilitySystem->PlaySecond());if(Definition.Kind!=EICMonsterKind::Normal)State.DefeatedBosses.Add(Definition.ID);S.bRewardPending=true;
     if(!WorldState()->ApplyWorldProgress(State)){bDefeatCommitted=false;UE_LOG(LogICWorldState,Error,TEXT("[Enemy.DeathCommitFailed] %s"),*SpawnKey.ToString());return;}
+    if (UICQuestSubsystem* Quests = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICQuestSubsystem>() : nullptr)
+    {
+        Quests->ReportObjectiveEvent(EICQuestObjectiveType::Defeat, Definition.ID, 1, S.IncarnationID);
+    }
     auto Rewards=WorldState()->ExportState();FString Reason;if(FICRewardService::PrepareMonsterDefeat(Rewards,SpawnKey,Definition,AbilitySystem->Definitions(),AbilitySystem->PlaySecond(),Reason))WorldState()->CommitGameplayTransaction(Rewards,Rewards.SpawnSlots.FindChecked(SpawnKey).IncarnationID);
     else UE_LOG(LogICInventory,Warning,TEXT("[Enemy.RewardPending] Key=%s Reason=%s"),*SpawnKey.ToString(),*Reason);
     UE_LOG(LogICWorldState,Log,TEXT("[Enemy.Defeated] Key=%s ReadyAt=%.2f"),*SpawnKey.ToString(),S.RespawnReadyAtPlaySecond);SetActorEnableCollision(false);SetLifeSpan(1.f);

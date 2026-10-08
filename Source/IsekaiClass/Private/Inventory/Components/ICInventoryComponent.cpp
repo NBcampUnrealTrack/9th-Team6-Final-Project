@@ -160,6 +160,33 @@ bool UICInventoryComponent::BuildConsumption(FName ID, int32 Count, FICInventory
     return Remove(OutSnapshot.Bag, ID, Count) && ValidateSnapshot(OutSnapshot);
 }
 
+bool UICInventoryComponent::BuildQuestItemConsumption(FName ID, int32 Count, FICInventoryState& OutSnapshot) const
+{
+    IC_TRACE_FUNCTION();
+    OutSnapshot = GetSnapshot();
+    const FICItemRow* Item = Find(ID);
+    if (!Item)
+    {
+        return false;
+    }
+    if (Item->Kind != EPlayerItemKind::Quest)
+    {
+        return Remove(OutSnapshot.Bag, ID, Count) && ValidateSnapshot(OutSnapshot);
+    }
+    FPlayerContainer QuestContainer;
+    QuestContainer.Slots = OutSnapshot.QuestItems;
+    if (!Remove(QuestContainer, ID, Count))
+    {
+        return false;
+    }
+    QuestContainer.Slots.RemoveAll([](const FPlayerItemInstance& Entry)
+    {
+        return Entry.IsEmpty();
+    });
+    OutSnapshot.QuestItems = MoveTemp(QuestContainer.Slots);
+    return ValidateSnapshot(OutSnapshot);
+}
+
 bool UICInventoryComponent::MoveSlot(int32 From, int32 To)
 {
     IC_TRACE_FUNCTION();

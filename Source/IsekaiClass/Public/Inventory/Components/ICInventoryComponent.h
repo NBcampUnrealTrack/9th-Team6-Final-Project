@@ -27,6 +27,7 @@ public:
     bool ApplySnapshot(const FICInventoryState& Snapshot) { IC_TRACE_FUNCTION(); return Commit(Snapshot); }
     bool ValidateSnapshot(const FICInventoryState& Snapshot) const;
     bool BuildConsumption(FName ID, int32 Count, FICInventoryState& OutSnapshot) const;
+    bool BuildQuestItemConsumption(FName ID, int32 Count, FICInventoryState& OutSnapshot) const;
     UPROPERTY(BlueprintAssignable, meta=(ToolTip="인벤토리 원본 변경 뒤 발생하는 갱신 이벤트입니다. 위젯 제거/Pawn 변경 때 구독을 해제해 중복 알림을 막으세요.\n입력 자료형: FPlayerInventoryChanged.\nBP에서 이벤트를 구독할 수 있습니다. 위젯 닫기/EndPlay에서 구독을 정리해 중복 수신을 막으세요.")) FPlayerInventoryChanged OnChanged;
     UPROPERTY(BlueprintAssignable, meta=(ToolTip="인벤토리 성공/실패 안내 FText 이벤트입니다. 텍스트 표시용이며 아이템 확정 여부는 함수 결과를 확인합니다.\n입력 자료형: FPlayerInventoryMessage.\nBP에서 이벤트를 구독할 수 있습니다. 위젯 닫기/EndPlay에서 구독을 정리해 중복 수신을 막으세요.")) FPlayerInventoryMessage OnMessage;
     UPROPERTY(BlueprintAssignable, meta=(ToolTip="아이템 획득 결과 이벤트입니다. ItemID/수용량/초과량을 안내하며 초과 드롭 거래는 이미 확정된 결과입니다.\n입력 자료형: FPlayerLootResult.\nBP에서 이벤트를 구독할 수 있습니다. 위젯 닫기/EndPlay에서 구독을 정리해 중복 수신을 막으세요.")) FPlayerLootResult OnLootResult;
