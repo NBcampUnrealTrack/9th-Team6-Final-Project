@@ -28,6 +28,37 @@ bool AICAIController::StartExecution(UStateTree* Tree,UBehaviorTree* Behavior)
     NextDecisionAt=0;return true;
 }
 void AICAIController::StopExecution() { IC_TRACE_FUNCTION();bExecutionReady=false;StopMovement();Target.Reset();ScheduleRunner->StopLogic(TEXT("상태 전환"));if(BrainComponent&&BrainComponent!=ScheduleRunner)BrainComponent->StopLogic(TEXT("상태 전환")); }
+void AICAIController::SetInteractionHold(bool bHold,AActor* FaceTarget)
+{
+    IC_TRACE_FUNCTION();bInteractionHold=bHold;
+    if(bHold){StopMovement();if(FaceTarget)SetFocus(FaceTarget);}
+    else ClearFocus(EAIFocusPriority::Gameplay);
+}
+void AICAIController::RestoreScheduleFacing()
+{
+    IC_TRACE_FUNCTION();
+    auto* NPC=Cast<AICNPCBase>(GetPawn());
+    auto* D=GetGameInstance()?GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;
+    auto* T=GetGameInstance()?GetGameInstance()->GetSubsystem<UICTimeSubsystem>():nullptr;
+    auto* Spawns=GetWorld()?GetWorld()->GetSubsystem<UICSpawnSubsystem>():nullptr;
+    if(!NPC||!D||!T||!Spawns)return;
+
+    FICDefinitionResult R;
+    const auto* Schedule=D->Find<FICScheduleRow>(NPC->GetNPCDefinition().ScheduleID,R);
+    if(!Schedule)return;
+    const int32 Minute=int32(FMath::FloorToDouble(T->GetClock().GameMinute))%1440;
+    for(const auto& Segment:Schedule->Segments)
+    {
+        if(Minute<Segment.StartGameMinute||Minute>=Segment.EndGameMinute)continue;
+        FTransform Anchor;
+        if(!Spawns->ResolveLoadedAnchor(Segment.DestinationAnchorID,Anchor))return;
+        NPC->GetCharacterMovement()->StopMovementImmediately();
+        NPC->GetCharacterMovement()->bOrientRotationToMovement=false;
+        SetControlRotation(Anchor.Rotator());
+        NPC->SetActorRotation(Anchor.Rotator());
+        return;
+    }
+}
 void AICAIController::OnUnPossess() { IC_TRACE_FUNCTION();StopExecution();Super::OnUnPossess(); }
 void AICAIController::Tick(float DeltaSeconds)
 {
@@ -39,8 +70,9 @@ void AICAIController::Decide()
     IC_TRACE_FUNCTION();auto* C=Cast<AICCharacterBase>(GetPawn());if(!C)return;auto* ASC=C->GetICAbilitySystem();auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();auto* S=GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();auto* T=GetGameInstance()->GetSubsystem<UICTimeSubsystem>();FICDefinitionResult R;
     if(auto* NPC=Cast<AICNPCBase>(C))
     {
+        if(bInteractionHold){StopMovement();return;}   // 상호작용 중에는 일과 이동·동료 전투 판단을 하지 않습니다.
         const auto State=S->GetSnapshot(C->GetCharacterID());if(State.IsDowned()){StopExecution();return;}
-        FVector Goal;bool HasGoal=false;
+        FVector Goal;FRotator GoalRotation=FRotator::ZeroRotator;bool HasGoal=false;
         if(State.Mode==EICCharacterMode::Companion)
         {
             auto* Player=UGameplayStatics::GetPlayerPawn(GetWorld(),0);if(Player){Goal=Player->GetActorLocation()-Player->GetActorForwardVector()*150+Player->GetActorRightVector()*((State.PartySlot-1.5)*80);HasGoal=true;}
@@ -49,9 +81,25 @@ void AICAIController::Decide()
         {
             const auto* Schedule=D->Find<FICScheduleRow>(NPC->GetNPCDefinition().ScheduleID,R);const int32 Minute=int32(FMath::FloorToDouble(T->GetClock().GameMinute))%1440;
             if(Schedule)for(const auto& Segment:Schedule->Segments)if(Minute>=Segment.StartGameMinute&&Minute<Segment.EndGameMinute)
-            {FTransform Anchor;HasGoal=GetWorld()->GetSubsystem<UICSpawnSubsystem>()->ResolveLoadedAnchor(Segment.DestinationAnchorID,Anchor);Goal=Anchor.GetLocation();if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)<FMath::Square(120.)){auto Updated=State;if(Updated.CurrentAnchorID!=Segment.DestinationAnchorID){Updated.CurrentAnchorID=Segment.DestinationAnchorID;S->SetCharacterState(Updated);}}break;}
+            {FTransform Anchor;HasGoal=GetWorld()->GetSubsystem<UICSpawnSubsystem>()->ResolveLoadedAnchor(Segment.DestinationAnchorID,Anchor);Goal=Anchor.GetLocation();GoalRotation=Anchor.Rotator();if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)<FMath::Square(120.)){auto Updated=State;if(Updated.CurrentAnchorID!=Segment.DestinationAnchorID){Updated.CurrentAnchorID=Segment.DestinationAnchorID;S->SetCharacterState(Updated);}}break;}
         }
-        if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)>FMath::Square(150.))MoveToLocation(Goal,100);else StopMovement();
+        if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)>FMath::Square(150.))
+        {
+            // 경로 이동 중에는 진행 방향을 보되, 도착 후에는 앵커 회전이 우선합니다.
+            C->GetCharacterMovement()->bOrientRotationToMovement=true;
+            MoveToLocation(Goal,100);
+        }
+        else
+        {
+            StopMovement();
+            if(HasGoal)
+            {
+                C->GetCharacterMovement()->StopMovementImmediately();
+                C->GetCharacterMovement()->bOrientRotationToMovement=false;
+                SetControlRotation(GoalRotation);
+                C->SetActorRotation(GoalRotation);
+            }
+        }
         if(!ASC||State.Mode!=EICCharacterMode::Companion||!ASC->IsAlive())return;
         const auto* Base=D->Find<FICRecruitCombatRow>(NPC->GetNPCDefinition().RecruitCombatID,R);if(!Base)return;
         AICCharacterBase* Closest=nullptr;double Dist=DBL_MAX;

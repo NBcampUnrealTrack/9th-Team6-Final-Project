@@ -62,7 +62,7 @@ bool ICCombatSimulation::Advance(FICCharacterState& C,const FICWorldState& World
     {
         const auto* NPC=D->Find<FICNPCRow>(C.CharacterId,R);const auto* Schedule=NPC?D->Find<FICScheduleRow>(NPC->ScheduleID,R):nullptr;const double Minute=FMath::Fmod(GameMinute,1440.);
         if(Schedule)for(const auto& Segment:Schedule->Segments)if(Minute>=Segment.StartGameMinute&&Minute<Segment.EndGameMinute)
-        {const auto* End=D->Find<FICAnchorRow>(Segment.DestinationAnchorID,R);if(End){C.CurrentAnchorID=End->ID;C.Position=End->WorldTransform.GetLocation();C.Rotation=End->WorldTransform.Rotator();if(Segment.Activity==EICScheduleActivity::Move)if(const auto* Start=D->Find<FICAnchorRow>(Segment.DepartureAnchorID,R))C.Position=FMath::Lerp(Start->WorldTransform.GetLocation(),C.Position,(Minute-Segment.StartGameMinute)/FMath::Max(1,Segment.EndGameMinute-Segment.StartGameMinute));}break;}
+        {if(const auto* End=D->Find<FICAnchorRow>(Segment.DestinationAnchorID,R))C.CurrentAnchorID=End->ID;break;}
     }
     C.LastSimPlaySecond=C.Combat.LastCapturedPlaySecond=Now;C.LastSimGameMinute=GameMinute;return true;
 }

@@ -33,6 +33,7 @@ private:
     TMap<FName,TWeakObjectPtr<AICNPCBase>> NPCs;
     TMap<FName,TWeakObjectPtr<AICEnemyBase>> Enemies;
     TMap<FName,TWeakObjectPtr<class UICAbilitySystemComponent>> ReviveReservations;
+    TSet<FName> NPCsWaitingForAnchor;
     bool bReady=false,bRefreshing=false,bTearingDown=false;
     double NextRefreshAt=-1;
     UFUNCTION(meta=(ToolTip="로드 뒤 기존 실행 캐시를 제거하고 복원 원본에 맞춰 스폰을 갱신하는 내부 콜백입니다.")) void WorldRestored();
