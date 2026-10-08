@@ -61,11 +61,34 @@ void UICSpawnSubsystem::RefreshSpawns()
         const bool Party=Stored&&Stored->PartySlot>=0;
         const auto* Reservation=ReviveReservations.Find(ID);const bool Reserved=Reservation&&Reservation->IsValid()&&Reservation->Get()->GetActionID().IsValid();
         if(Party)Wanted=Reserved||(!Stored->IsDowned()&&(FindCharacter(ID)||FindSafePartyPlacement(ID,Position)));
-        else Wanted=ResolveLoadedAnchor(Stored&&!Stored->CurrentAnchorID.IsNone()?Stored->CurrentAnchorID:Row->InitialAnchorID,Position);
+        else
+        {
+            const FName RequiredAnchor=Stored&&!Stored->CurrentAnchorID.IsNone()?Stored->CurrentAnchorID:Row->InitialAnchorID;
+            Wanted=ResolveLoadedAnchor(RequiredAnchor,Position);
+            if(!Wanted)
+            {
+                if(!NPCsWaitingForAnchor.Contains(ID))UE_LOG(LogICWorldState,Warning,TEXT("[Spawn.NPCWaitingForAnchor] NPC=%s Anchor=%s"),*ID.ToString(),*RequiredAnchor.ToString());
+                NPCsWaitingForAnchor.Add(ID);
+            }
+            else NPCsWaitingForAnchor.Remove(ID);
+        }
         auto* Existing=Cast<AICNPCBase>(FindCharacter(ID));if(Existing){NPCs.Add(ID,Existing);if(!Wanted&&!Existing->IsActorBeingDestroyed())Existing->Destroy();continue;}if(!Wanted)continue;
         UClass* Type=Row->ActorClass.IsNull()?AICNPCBase::StaticClass():Row->ActorClass.LoadSynchronous();if(!Type||!Type->IsChildOf(AICNPCBase::StaticClass())){UE_LOG(LogICData,Warning,TEXT("[Spawn.NPCClassInvalid] %s"),*ID.ToString());continue;}
-        if(Stored&&!Party)Position=FTransform(Stored->Rotation,Stored->Position);
-        auto* Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Position);if(Actor){if(!Actor->InitializeNPC(ID))Actor->Destroy();else NPCs.Add(ID,Actor);}
+        auto* Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Position);
+        if(!Actor)
+        {
+            UE_LOG(LogICWorldState,Warning,TEXT("[Spawn.NPCCreateFailed] NPC=%s Class=%s"),*ID.ToString(),*GetNameSafe(Type));
+        }
+        else if(!Actor->InitializeNPC(ID))
+        {
+            UE_LOG(LogICWorldState,Warning,TEXT("[Spawn.NPCInitializeFailed] NPC=%s Class=%s"),*ID.ToString(),*GetNameSafe(Type));
+            Actor->Destroy();
+        }
+        else
+        {
+            NPCs.Add(ID,Actor);
+            UE_LOG(LogICWorldState,Log,TEXT("[Spawn.NPCCreated] NPC=%s Actor=%s AnchorLocation=%s"),*ID.ToString(),*Actor->GetName(),*Position.GetLocation().ToCompactString());
+        }
     }
     D->GetDefinitionIDs(EICDefinitionType::Spawner,IDs);TSet<FName> WantedKeys;
     for(FName ID:IDs)if(const auto* Row=D->Find<FICSpawnerRow>(ID,R))for(const auto& Slot:Row->Slots)
@@ -89,7 +112,7 @@ bool UICSpawnSubsystem::CanRestoreActors(const FICWorldState& State) const
 }
 void UICSpawnSubsystem::RestoreActors()
 {
-    IC_TRACE_FUNCTION();TGuardValue<bool> Guard(bRefreshing,true);auto N=NPCs;auto E=Enemies;NPCs.Reset();Enemies.Reset();ReviveReservations.Reset();
+    IC_TRACE_FUNCTION();TGuardValue<bool> Guard(bRefreshing,true);auto N=NPCs;auto E=Enemies;NPCs.Reset();Enemies.Reset();ReviveReservations.Reset();NPCsWaitingForAnchor.Reset();
     // EndPlay must not flush an old incarnation over the newly loaded persistent state.
     for(const auto& P:N)if(P.Value.IsValid()){P.Value->ReleaseForLoad();P.Value->Destroy();}
     for(const auto& P:E)if(P.Value.IsValid()){P.Value->ReleaseForLoad();P.Value->Destroy();}NextRefreshAt=-1;
@@ -116,5 +139,5 @@ AICNPCBase* UICSpawnSubsystem::ReserveReviveTarget(FName ID,UICAbilitySystemComp
 }
 void UICSpawnSubsystem::Deinitialize()
 {
-    IC_TRACE_FUNCTION();bTearingDown=true;if(auto* GI=GetWorld()->GetGameInstance())if(auto* S=GI->GetSubsystem<UICWorldStateSubsystem>())S->OnWorldRestored.RemoveDynamic(this,&ThisClass::WorldRestored);Anchors.Reset();NPCs.Reset();Enemies.Reset();Super::Deinitialize();
+    IC_TRACE_FUNCTION();bTearingDown=true;if(auto* GI=GetWorld()->GetGameInstance())if(auto* S=GI->GetSubsystem<UICWorldStateSubsystem>())S->OnWorldRestored.RemoveDynamic(this,&ThisClass::WorldRestored);Anchors.Reset();NPCs.Reset();Enemies.Reset();NPCsWaitingForAnchor.Reset();Super::Deinitialize();
 }
