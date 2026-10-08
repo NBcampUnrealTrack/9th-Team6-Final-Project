@@ -9,6 +9,7 @@
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
 #include "Subsystems/SubsystemCollection.h"
+#include "Quest/ICQuestSubsystem.h"
 
 void UICProductionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -129,7 +130,13 @@ bool UICProductionSubsystem::CompleteJob(FGuid JobID,UICInventoryComponent* Inve
     Job->Status=EICProductionJobStatus::Completed;Job->bResultsCommitted=Job->bCostsCommitted=true;Job->CompletionTransactionID=FGuid::NewGuid();
     const FGuid Transaction=Job->CompletionTransactionID;
     if(!Inventory->ValidateSnapshot(Next.Inventory)||!State->CommitGameplayTransaction(Next,Transaction))return Fail(TEXT("생산 완료 거래 검증에 실패했습니다."));
-    UE_LOG(LogICProduction, Log, TEXT("[Production.Completed] Job=%s Transaction=%s"),*JobID.ToString(),*Transaction.ToString());OnProductionChanged.Broadcast(JobID,TEXT("제작 완료"));return true;
+    UE_LOG(LogICProduction, Log, TEXT("[Production.Completed] Job=%s Transaction=%s"),*JobID.ToString(),*Transaction.ToString());
+    if (UICQuestSubsystem* Quests = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICQuestSubsystem>() : nullptr)
+    {
+        Quests->ReportObjectiveEvent(EICQuestObjectiveType::Craft, Job->RecipeID, 1, JobID,
+            Production->Activity, Recipe->Results[0].ItemID);
+    }
+    OnProductionChanged.Broadcast(JobID,TEXT("제작 완료"));return true;
 }
 
 bool UICProductionSubsystem::CancelJob(FGuid JobID)

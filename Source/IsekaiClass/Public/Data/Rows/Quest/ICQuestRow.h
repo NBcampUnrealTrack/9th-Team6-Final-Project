@@ -36,7 +36,7 @@ enum class EICQuestCompletionMode : uint8
     SystemEvent UMETA(ToolTip="목표를 만족한 시스템 사건에서 완료를 확정하는 방식입니다.\n퀘스트 완료 확정의 경로입니다. 보상과 완료 플래그를 한 거래로 처리해야 합니다.")
 };
 
-USTRUCT(BlueprintType, meta=(ToolTip="퀘스트 목표 하나의 종류·대상·수량/임계값·활동 필터·대사/안내 위치 정의입니다. 목표별 카운터는 QuestState, 공통 중복 이벤트 이력은 WorldState에 기록합니다. 실제 퀘스트 실행기는 아직 연결 대상입니다.", ShortToolTip="퀘스트 목표 하나의 종류·대상·수량/임계값·활동 필터·대사/안내 위치 정의입니다."))
+USTRUCT(BlueprintType, meta=(ToolTip="퀘스트 목표 하나의 종류·대상·수량/임계값·활동 필터·대사/안내 위치 정의입니다. 목표별 카운터는 QuestState, 공통 중복 이벤트 이력은 WorldState에 기록합니다.", ShortToolTip="퀘스트 목표 하나의 종류·대상·수량/임계값·활동 필터·대사/안내 위치 정의입니다."))
 struct ISEKAICLASS_API FICQuestObjectiveDefinition
 {
     GENERATED_BODY()
@@ -107,7 +107,7 @@ struct ISEKAICLASS_API FICQuestObjectiveGroup
 };
 
 /** Static quest rules. Active state/counters/reward receipts and repeat-instance IDs are never DT fields. */
-USTRUCT(BlueprintType, meta=(ToolTip="퀘스트 수락·목표·완료·보상·반복·대사 연결의 정적 정의입니다. 활성 상태·진행 수치·완료 영수증은 WorldState에만 기록합니다. 실제 퀘스트 실행기는 아직 연결 대상입니다.", ShortToolTip="퀘스트 수락·목표·완료·보상·반복·대사 연결의 정적 정의입니다."))
+USTRUCT(BlueprintType, meta=(ToolTip="퀘스트 수락·목표·완료·보상·반복·대사 연결의 정적 정의입니다. 활성 상태·진행 수치·완료 영수증은 WorldState에만 기록합니다.", ShortToolTip="퀘스트 수락·목표·완료·보상·반복·대사 연결의 정적 정의입니다."))
 struct ISEKAICLASS_API FICQuestRow : public FICDefinitionRow
 {
     GENERATED_BODY()
@@ -117,6 +117,9 @@ struct ISEKAICLASS_API FICQuestRow : public FICDefinitionRow
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Quest", meta=(ToolTip="튜토리얼 퀘스트 분류입니다. 실제 안내/진행/UI 연결과 별개인 정의 표시입니다.\n입력 자료형: 체크박스(true/false).\nC++ 초기값: 꺼짐(false). 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n소속 정의/시스템: 실제 퀘스트 실행기는 아직 연결 대상입니다."))
     bool bTutorial = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Acceptance", meta=(ToolTip="조건을 만족하면 NPC 수락 없이 자동으로 퀘스트를 수락합니다. 실제 수락 상태와 수락 시각은 WorldState에 기록합니다."))
+    bool IsAutoAccept = false;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Quest", meta=(ToolTip="Region DT의 소속 지역 ID입니다. 레벨 파일 이름과 구분합니다. 필요한 행에서 None이면 지역 누락 검사가 안내합니다.\n입력 자료형: 이름/ID.\n소속 정의/시스템: 실제 퀘스트 실행기는 아직 연결 대상입니다."))
     FName RegionID;
