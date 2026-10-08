@@ -22,6 +22,7 @@
 #include "Save/ICSaveSubsystem.h"
 #include "Life/Production/ICProductionSubsystem.h"
 #include "Debug/ICDebugCheatManager.h"
+#include "Quest/ICQuestSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -151,7 +152,14 @@ void AICPlayerController::TryInitializeGameplay()
         Screen=CreateWidget<UICGameplayWidget>(this,GameplayWidgetClass);
         if (Screen) Screen->AddToViewport();
     }
-    if (State->ExportState().bPlayerCreated) RestoreFromWorldState_Implementation(State->ExportState());
+    if (State->ExportState().bPlayerCreated)
+    {
+        RestoreFromWorldState_Implementation(State->ExportState());
+        if (auto* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>())
+        {
+            Quests->RefreshAvailableQuests();
+        }
+    }
     else { SetMenu(TEXT("Create"));Show(TEXT("캐릭터 생성 또는 저장 슬롯을 선택하세요.")); }
 #if !UE_BUILD_SHIPPING
     EnableCheats();

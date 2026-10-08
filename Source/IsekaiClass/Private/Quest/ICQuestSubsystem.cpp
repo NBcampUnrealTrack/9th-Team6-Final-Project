@@ -336,7 +336,7 @@ bool UICQuestSubsystem::ApplyReward(FICWorldState& Candidate, const FICRewardRow
     return true;
 }
 
-bool UICQuestSubsystem::CompleteQuest(FName QuestID, const FICQuestRow& Definition)
+bool UICQuestSubsystem::CompleteQuest(FName QuestID, const FICQuestRow& Definition, bool IsForced)
 {
     if (!Definitions || !State || !Time)
     {
@@ -345,10 +345,11 @@ bool UICQuestSubsystem::CompleteQuest(FName QuestID, const FICQuestRow& Definiti
     FICWorldState Candidate = State->ExportState();
     FICQuestState* Quest = Candidate.Quests.Find(QuestID);
     if (!Quest || !Quest->bAccepted || Quest->bCompleted
-        || !AreObjectivesComplete(Definition, *Quest, Candidate))
+        || (!IsForced && !AreObjectivesComplete(Definition, *Quest, Candidate)))
     {
         return false;
     }
+    bool IsRewardApplied = true;
     if (!Definition.RewardID.IsNone())
     {
         FICRewardRow Reward;
@@ -357,14 +358,19 @@ bool UICQuestSubsystem::CompleteQuest(FName QuestID, const FICQuestRow& Definiti
         {
             UE_LOG(LogICWorldState, Warning, TEXT("[Quest.RewardRejected] Quest=%s Reward=%s"),
                 *QuestID.ToString(), *Definition.RewardID.ToString());
-            return false;
+            if (!IsForced)
+            {
+                return false;
+            }
+            Candidate = State->ExportState();
+            IsRewardApplied = false;
         }
     }
     Quest = Candidate.Quests.Find(QuestID);
     const FGuid TransactionID = FGuid::NewGuid();
     Quest->bCompleted = true;
-    Quest->bRewardClaimed = true;
-    Quest->RewardTransactionID = TransactionID;
+    Quest->bRewardClaimed = IsRewardApplied;
+    Quest->RewardTransactionID = IsRewardApplied ? TransactionID : FGuid();
     Quest->CompletionCount++;
     Quest->CompletedAtGameMinute = Time->GetClock().GameMinute;
     if (!State->CommitGameplayTransaction(Candidate, TransactionID))
@@ -374,6 +380,32 @@ bool UICQuestSubsystem::CompleteQuest(FName QuestID, const FICQuestRow& Definiti
     UE_LOG(LogICWorldState, Log, TEXT("[Quest.Completed] Quest=%s Reward=%s"),
         *QuestID.ToString(), *Definition.RewardID.ToString());
     return true;
+}
+
+int32 UICQuestSubsystem::ForceCompleteActiveQuests()
+{
+    if (!Definitions || !State || !Time)
+    {
+        return 0;
+    }
+
+    const FICWorldState World = State->ExportState();
+    int32 CompletedCount = 0;
+    for (const auto& Entry : World.Quests)
+    {
+        if (!Entry.Value.bAccepted || Entry.Value.bCompleted)
+        {
+            continue;
+        }
+
+        FICQuestRow Definition;
+        if (Definitions->GetQuest(Entry.Key, Definition).bSuccess
+            && CompleteQuest(Entry.Key, Definition, true))
+        {
+            ++CompletedCount;
+        }
+    }
+    return CompletedCount;
 }
 
 bool UICQuestSubsystem::TurnInQuest(FName QuestID, FName NPCID)
@@ -631,6 +663,11 @@ void UICQuestSubsystem::HandleCharacterChanged(FName CharacterID)
     }
 }
 
+void UICQuestSubsystem::RefreshAvailableQuests()
+{
+    EvaluateQuests();
+}
+
 void UICQuestSubsystem::EvaluateQuests()
 {
     if (!Definitions || !State || !Time || IsProcessing || !State->ExportState().bPlayerCreated)
@@ -638,8 +675,11 @@ void UICQuestSubsystem::EvaluateQuests()
         return;
     }
     TArray<FName> QuestIDs;
-    if (!Definitions->GetDefinitionIDs(EICDefinitionType::Quest, QuestIDs).bSuccess)
+    const FICDefinitionResult Lookup = Definitions->GetDefinitionIDs(EICDefinitionType::Quest, QuestIDs);
+    if (!Lookup.bSuccess)
     {
+        UE_LOG(LogICWorldState, Warning, TEXT("[Quest.DefinitionListRejected] Row=%s Field=%s Reason=%s"),
+            *Lookup.Row.ToString(), *Lookup.Field, *Lookup.Reason);
         return;
     }
     IsProcessing = true;

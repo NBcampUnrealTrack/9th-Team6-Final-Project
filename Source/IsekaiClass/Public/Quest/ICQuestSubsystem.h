@@ -38,6 +38,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Quest")
     bool DeliverItem(FName QuestID, FName ObjectiveID);
 
+    int32 ForceCompleteActiveQuests();
+
+    void RefreshAvailableQuests();
+
 private:
     UPROPERTY(Transient)
     TObjectPtr<UICDefinitionSubsystem> Definitions;
@@ -67,7 +71,7 @@ private:
         const FICWorldState& World) const;
     bool AreObjectivesComplete(const FICQuestRow& Definition, const FICQuestState& Quest,
         const FICWorldState& World) const;
-    bool CompleteQuest(FName QuestID, const FICQuestRow& Definition);
+    bool CompleteQuest(FName QuestID, const FICQuestRow& Definition, bool IsForced = false);
     bool ApplyReward(FICWorldState& Candidate, const FICRewardRow& Reward);
     int32 CountOwnedItem(const FICInventoryState& Inventory, FName ItemID) const;
     static bool CompareValues(double Value, double RequiredValue, EICComparison Comparison);

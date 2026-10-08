@@ -131,4 +131,23 @@ bool FICQuestRuntimeCheck::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestForceCompleteCheck, "IC.Runtime.QuestForceComplete",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FICQuestForceCompleteCheck::RunTest(const FString& Parameters)
+{
+    FICQuestFixture Fixture;
+    TestEqual(TEXT("All active quests complete without objectives"), Fixture.Quests->ForceCompleteActiveQuests(), 3);
+
+    const FICWorldState World = Fixture.State->ExportState();
+    for (const auto& Entry : World.Quests)
+    {
+        TestTrue(TEXT("Quest completed with reward receipt"), Entry.Value.bCompleted
+            && Entry.Value.bRewardClaimed && World.CompletedTransactionIDs.Contains(Entry.Value.RewardTransactionID));
+    }
+    TestEqual(TEXT("Quest rewards granted once"), Fixture.Inventory->CountItem(TEXT("ITM_FOOD_998")), 30);
+    TestEqual(TEXT("Already completed quests are skipped"), Fixture.Quests->ForceCompleteActiveQuests(), 0);
+    return true;
+}
+
 #endif

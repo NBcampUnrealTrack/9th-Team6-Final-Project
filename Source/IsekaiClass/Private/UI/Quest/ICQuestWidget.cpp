@@ -5,6 +5,7 @@
 #include "Components/VerticalBox.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "Quest/ICQuestSubsystem.h"
 #include "Debug/ICLog.h"
 #include "InputCoreTypes.h"
 #include "Internationalization/StringTable.h"
@@ -35,6 +36,10 @@ void UICQuestWidget::RefreshQuests()
         return;
     }
 
+    if (UICQuestSubsystem* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>())
+    {
+        Quests->RefreshAvailableQuests();
+    }
     const FICWorldState Snapshot = State->ExportState();
     UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
     UStringTable* Strings = QuestStringTable.LoadSynchronous();
