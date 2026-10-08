@@ -47,7 +47,7 @@ void AICAIController::Decide()
     {
         if(bInteractionHold){StopMovement();return;}   // 상호작용 중에는 일과 이동·동료 전투 판단을 하지 않습니다.
         const auto State=S->GetSnapshot(C->GetCharacterID());if(State.IsDowned()){StopExecution();return;}
-        FVector Goal;bool HasGoal=false;
+        FVector Goal;FRotator GoalRotation=FRotator::ZeroRotator;bool HasGoal=false;
         if(State.Mode==EICCharacterMode::Companion)
         {
             auto* Player=UGameplayStatics::GetPlayerPawn(GetWorld(),0);if(Player){Goal=Player->GetActorLocation()-Player->GetActorForwardVector()*150+Player->GetActorRightVector()*((State.PartySlot-1.5)*80);HasGoal=true;}
@@ -56,9 +56,25 @@ void AICAIController::Decide()
         {
             const auto* Schedule=D->Find<FICScheduleRow>(NPC->GetNPCDefinition().ScheduleID,R);const int32 Minute=int32(FMath::FloorToDouble(T->GetClock().GameMinute))%1440;
             if(Schedule)for(const auto& Segment:Schedule->Segments)if(Minute>=Segment.StartGameMinute&&Minute<Segment.EndGameMinute)
-            {FTransform Anchor;HasGoal=GetWorld()->GetSubsystem<UICSpawnSubsystem>()->ResolveLoadedAnchor(Segment.DestinationAnchorID,Anchor);Goal=Anchor.GetLocation();if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)<FMath::Square(120.)){auto Updated=State;if(Updated.CurrentAnchorID!=Segment.DestinationAnchorID){Updated.CurrentAnchorID=Segment.DestinationAnchorID;S->SetCharacterState(Updated);}}break;}
+            {FTransform Anchor;HasGoal=GetWorld()->GetSubsystem<UICSpawnSubsystem>()->ResolveLoadedAnchor(Segment.DestinationAnchorID,Anchor);Goal=Anchor.GetLocation();GoalRotation=Anchor.Rotator();if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)<FMath::Square(120.)){auto Updated=State;if(Updated.CurrentAnchorID!=Segment.DestinationAnchorID){Updated.CurrentAnchorID=Segment.DestinationAnchorID;S->SetCharacterState(Updated);}}break;}
         }
-        if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)>FMath::Square(150.))MoveToLocation(Goal,100);else StopMovement();
+        if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)>FMath::Square(150.))
+        {
+            // 경로 이동 중에는 진행 방향을 보되, 도착 후에는 앵커 회전이 우선합니다.
+            C->GetCharacterMovement()->bOrientRotationToMovement=true;
+            MoveToLocation(Goal,100);
+        }
+        else
+        {
+            StopMovement();
+            if(HasGoal)
+            {
+                C->GetCharacterMovement()->StopMovementImmediately();
+                C->GetCharacterMovement()->bOrientRotationToMovement=false;
+                SetControlRotation(GoalRotation);
+                C->SetActorRotation(GoalRotation);
+            }
+        }
         if(!ASC||State.Mode!=EICCharacterMode::Companion||!ASC->IsAlive())return;
         const auto* Base=D->Find<FICRecruitCombatRow>(NPC->GetNPCDefinition().RecruitCombatID,R);if(!Base)return;
         AICCharacterBase* Closest=nullptr;double Dist=DBL_MAX;

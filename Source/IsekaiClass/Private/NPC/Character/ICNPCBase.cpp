@@ -3,15 +3,29 @@
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Data/Rows/NPC/ICServiceRow.h"
+#include "World/Spawn/ICSpawnSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Time/ICTimeSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "StateTree.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "Debug/ICLog.h"
 #include "Core/Controller/ICPlayerController.h"
-AICNPCBase::AICNPCBase() { IC_TRACE_FUNCTION();AIControllerClass=AICAIController::StaticClass();AutoPossessAI=EAutoPossessAI::Disabled; }
+AICNPCBase::AICNPCBase()
+{
+    IC_TRACE_FUNCTION();
+    AIControllerClass=AICAIController::StaticClass();
+    AutoPossessAI=EAutoPossessAI::Disabled;
+
+    auto* Movement=GetCharacterMovement();
+    Movement->MaxWalkSpeed=ScheduleMoveSpeed;
+    // 같은 NavMesh 위에서 걷는 NPC끼리 속도를 조절해 자연스럽게 비켜 갑니다.
+    Movement->bUseRVOAvoidance=true;
+    Movement->AvoidanceConsiderationRadius=300.f;
+    Movement->AvoidanceWeight=.5f;
+}
 void AICNPCBase::BeginPlay() { IC_TRACE_FUNCTION();Super::BeginPlay();if(!bInitialized&&!NPCDefinitionID.IsNone())InitializeNPC(NPCDefinitionID); }
 bool AICNPCBase::InitializeNPC(FName ID)
 {
@@ -19,7 +33,19 @@ bool AICNPCBase::InitializeNPC(FName ID)
     const auto* NPC=D?D->Find<FICNPCRow>(ID,R):nullptr;if(!NPC||!WorldState())return false;
     const auto Kind=static_cast<EICCharacterKind>(static_cast<int32>(NPC->Type)+1);
     if(!WorldState()->EnsureCharacter(ID,Kind))return false;
-    Definition=*NPC;NPCDefinitionID=ID;if(Kind==EICCharacterKind::Recruitable)EnableCombat(true,false);
+    // The level-placed anchor is authoritative for an NPC's position and facing.
+    // Anchor DT transforms remain only as a fallback for an unloaded level.
+    auto State=WorldState()->GetSnapshot(ID);const FName AnchorID=!State.CurrentAnchorID.IsNone()?State.CurrentAnchorID:NPC->InitialAnchorID;
+    if(!AnchorID.IsNone())if(auto* Spawns=GetWorld()->GetSubsystem<UICSpawnSubsystem>())
+    {
+        FTransform AnchorTransform;
+        if(Spawns->ResolveLoadedAnchor(AnchorID,AnchorTransform))
+        {
+            State.CurrentAnchorID=AnchorID;State.Position=AnchorTransform.GetLocation();State.Rotation=AnchorTransform.Rotator();
+            WorldState()->SetCharacterState(State);SetActorLocationAndRotation(State.Position,State.Rotation);
+        }
+    }
+    Definition=*NPC;NPCDefinitionID=ID;GetCharacterMovement()->MaxWalkSpeed=ScheduleMoveSpeed;if(Kind==EICCharacterKind::Recruitable)EnableCombat(true,false);
     if(!InitializeState(ID))return false;
     if(auto* CharacterMesh=Definition.Mesh.LoadSynchronous())GetMesh()->SetSkeletalMesh(CharacterMesh);
     if(auto* Anim=Definition.AnimationClass.LoadSynchronous())GetMesh()->SetAnimInstanceClass(Anim);

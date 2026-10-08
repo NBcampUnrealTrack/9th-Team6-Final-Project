@@ -66,6 +66,8 @@ public:
     FName NPCDefinitionID;
     
 protected:
+    UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|NPC|Movement",meta=(ClampMin="0",ToolTip="일과 상태에서 앵커 사이를 이동할 때의 최대 보행 속도(cm/s)입니다. BP_ICNPCBase에서 NPC별로 조정할 수 있습니다."))
+    float ScheduleMoveSpeed=300.f;
     virtual void StoredCharacterChanged(FName ID) override;
     
 private:
