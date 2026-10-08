@@ -46,6 +46,26 @@ void AICPlayerController::ReportCreationFailure(const FString& Reason)
     UE_LOG(LogICCore, Warning, TEXT("[Player.Create.Rejected] Preset=%d Job=%d Rule=%s Reason=%s"),Preset,Job,*NewGameDefinitionID.ToString(),*Reason);
 }
 
+bool AICPlayerController::DebugCreatePlayer()
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    if (bCreated)
+    {
+        ReportCreationFailure(TEXT("이미 생성된 캐릭터입니다."));
+        return false;
+    }
+    if (PlayerName.TrimStartAndEnd().IsEmpty())
+    {
+        PlayerName = TEXT("NPC_Test");
+    }
+    CreatePlayer();
+    return bCreated || (bInitialSavePending && GetSaves() && GetSaves()->bSaving);
+#else
+    return false;
+#endif
+}
+
 void AICPlayerController::CreatePlayer()
 {
     IC_TRACE_FUNCTION();

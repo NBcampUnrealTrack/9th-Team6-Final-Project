@@ -6,6 +6,7 @@
 #include "Time/ICTimeSubsystem.h"
 #include "NPC/Character/ICNPCBase.h"
 #include "NPC/LifeNPC/ICShopSubsystem.h"
+#include "Quest/ICQuestSubsystem.h"
 #include "EngineUtils.h"
 #include "Engine/GameInstance.h"
 
@@ -71,6 +72,20 @@ void UICDebugCheatManager::ICTeleport(float X, float Y, float Z)
     {
         if (!PC->GetPawn() || !FMath::IsFinite(X) || !FMath::IsFinite(Y) || !FMath::IsFinite(Z)) { PC->Show(TEXT("유효한 좌표를 입력하세요.")); return; }
         PC->GetPawn()->SetActorLocation(FVector(X, Y, Z)); PC->Show(TEXT("개발자 순간이동 완료"));
+    }
+#endif
+}
+
+void UICDebugCheatManager::ICCompleteActiveQuests()
+{
+#if !UE_BUILD_SHIPPING
+    if (auto* PC = Cast<AICPlayerController>(GetOuterAPlayerController()))
+    {
+        UGameInstance* GameInstance = PC->GetGameInstance();
+        UICQuestSubsystem* Quests = GameInstance ? GameInstance->GetSubsystem<UICQuestSubsystem>() : nullptr;
+        const int32 CompletedCount = Quests ? Quests->ForceCompleteActiveQuests() : 0;
+        UE_LOG(LogICWorldState, Log, TEXT("[Cheat.CompleteActiveQuests] Completed=%d"), CompletedCount);
+        PC->Show(FString::Printf(TEXT("진행 중인 퀘스트 %d개 완료"), CompletedCount));
     }
 #endif
 }
