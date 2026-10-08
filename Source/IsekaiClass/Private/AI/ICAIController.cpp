@@ -28,6 +28,12 @@ bool AICAIController::StartExecution(UStateTree* Tree,UBehaviorTree* Behavior)
     NextDecisionAt=0;return true;
 }
 void AICAIController::StopExecution() { IC_TRACE_FUNCTION();bExecutionReady=false;StopMovement();Target.Reset();ScheduleRunner->StopLogic(TEXT("상태 전환"));if(BrainComponent&&BrainComponent!=ScheduleRunner)BrainComponent->StopLogic(TEXT("상태 전환")); }
+void AICAIController::SetInteractionHold(bool bHold,AActor* FaceTarget)
+{
+    IC_TRACE_FUNCTION();bInteractionHold=bHold;
+    if(bHold){StopMovement();if(FaceTarget)SetFocus(FaceTarget);}
+    else ClearFocus(EAIFocusPriority::Gameplay);
+}
 void AICAIController::OnUnPossess() { IC_TRACE_FUNCTION();StopExecution();Super::OnUnPossess(); }
 void AICAIController::Tick(float DeltaSeconds)
 {
@@ -39,6 +45,7 @@ void AICAIController::Decide()
     IC_TRACE_FUNCTION();auto* C=Cast<AICCharacterBase>(GetPawn());if(!C)return;auto* ASC=C->GetICAbilitySystem();auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();auto* S=GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();auto* T=GetGameInstance()->GetSubsystem<UICTimeSubsystem>();FICDefinitionResult R;
     if(auto* NPC=Cast<AICNPCBase>(C))
     {
+        if(bInteractionHold){StopMovement();return;}   // 상호작용 중에는 일과 이동·동료 전투 판단을 하지 않습니다.
         const auto State=S->GetSnapshot(C->GetCharacterID());if(State.IsDowned()){StopExecution();return;}
         FVector Goal;bool HasGoal=false;
         if(State.Mode==EICCharacterMode::Companion)
