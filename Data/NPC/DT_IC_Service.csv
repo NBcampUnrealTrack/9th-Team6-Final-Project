@@ -1,0 +1,2 @@
+---,Type,NPCID,RegionID,WorkAnchorID,OpeningHours,ShopID,WarpID,HomeID,Availability,BaseCostGold,AffinityDiscounts,IconResourceID,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+SRV_MERCHANT_SHOP,"Shop","NPC_R01_101","R01","ANC_MERCHANT_SHOP","((OpenGameMinute=390,CloseGameMinute=1200))","SHOP_MERCHANT_001","None","HOME_MERCHANT_001","(Policy=All,Conditions=())","0","((MinimumAffinity=0,DiscountRatio=0.000000))","None","SRV_MERCHANT_SHOP","SRV_MERCHANT_SHOP.NAME","","(GameplayTags=)","1","False","False"

@@ -1,0 +1,3 @@
+---,NPCID,EntryNodeID,Availability,SelectionPriority,Nodes,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+DLG_MERCHANT_001,"NPC_R01_101","GREETING","(Policy=All,Conditions=())","0","((NodeID=""GREETING"",SpeakerNPCID=""NPC_R01_101"",TextKey=""DLG_MERCHANT_001.GREETING"",NextNodeID=None,Choices=(),GestureMontage=None))","DLG_MERCHANT_001","DLG_MERCHANT_001.NAME","","(GameplayTags=)","1","False","False"
+DLG_RECRUIT_001,"NPC_R01_001","GREETING","(Policy=All,Conditions=())","0","((NodeID=""GREETING"",SpeakerNPCID=""NPC_R01_001"",TextKey=""DLG_RECRUIT_001.GREETING"",NextNodeID=None,Choices=(),GestureMontage=None))","DLG_RECRUIT_001","DLG_RECRUIT_001.NAME","","(GameplayTags=)","1","False","False"

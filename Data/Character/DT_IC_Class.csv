@@ -1,0 +1,2 @@
+﻿---,CharacterClass,WeaponFamily,NormalAttackDamageType,SkillSlot1ID,SkillSlot2ID,SkillSlot3ID,SkillSlot4ID,StartingWeaponID,StartingClothesID,NormalAttackStages,WeaponRightSocket,WeaponLeftSocket,MuzzleSocket,Icon,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+CLS_WARRIOR_001,"Warrior","Sword","Physical","None","None","None","None","EQP_WPN_SWORD_001","EQP_ARM_001","()","weapon_r","weapon_l","muzzle","None","CLS_WARRIOR_001","CLS_WARRIOR_001.NAME","","(GameplayTags=)","1","False","False"
