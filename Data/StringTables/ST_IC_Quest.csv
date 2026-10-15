@@ -1,7 +1,4 @@
 Key,SourceString
-QST_RING_001.NAME,퀘스트 반지 보유
-QST_RING_001.DESCRIPTION,퀘스트 반지 1개를 보유하세요.
-QST_RING_001.OBJECTIVE,퀘스트 반지 1개 보유
-QST_RING_002.NAME, 퀘스트 반지2 보유
-QST_RING_002.DESCRIPTION,퀘스트 반지 1개를 보유하세요.
-QST_RING_002.OBJECTIVE,퀘스트 반지 1개 보유
+QST_RING_001.NAME,상인에게 반지 전달
+QST_RING_001.DESCRIPTION,퀘스트 반지를 상인에게 전달하세요.
+QST_RING_001.OBJECTIVE,상인에게 퀘스트 반지 전달

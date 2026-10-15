@@ -13,6 +13,8 @@
 #include "Player/State/ICPlayerStateConversions.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
 #include "UI/Quest/ICQuestWidget.h"
+#include "UI/Quest/ICQuestTrackerWidget.h"
+#include "UI/Dialogue/ICNPCDialogueWidget.h"
 #include "UI/MainMenu/ICMainMenuWidget.h"
 #include "UI/Save/ICSaveLoadWidget.h"
 #include "UI/CharacterCreate/ICCharacterCreateWidget.h"
@@ -36,6 +38,8 @@ AICPlayerController::AICPlayerController()
     PrimaryActorTick.bTickEvenWhenPaused = true;
     CheatClass = UICDebugCheatManager::StaticClass();
     DroppedItemClass = AICDroppedItem::StaticClass();
+    QuestTrackerWidgetClass = TSoftClassPtr<UICQuestTrackerWidget>(FSoftObjectPath(
+        TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_QuestTracker.WBP_IC_QuestTracker_C")));
 }
 UICInventoryComponent* AICPlayerController::GetInventory() const
 { IC_TRACE_FUNCTION(); const auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());return PlayerPawn?PlayerPawn->Inventory:nullptr; }
@@ -151,6 +155,11 @@ void AICPlayerController::TryInitializeGameplay()
     {
         Screen=CreateWidget<UICGameplayWidget>(this,GameplayWidgetClass);
         if (Screen) Screen->AddToViewport();
+    }
+    if (UClass* WidgetClass = QuestTrackerWidgetClass.LoadSynchronous())
+    {
+        QuestTrackerScreen = CreateWidget<UICQuestTrackerWidget>(this, WidgetClass);
+        if (QuestTrackerScreen) QuestTrackerScreen->AddToPlayerScreen(1);
     }
     if (State->ExportState().bPlayerCreated)
     {
@@ -275,6 +284,7 @@ void AICPlayerController::EndPlay(const EEndPlayReason::Type Reason)
     RemoveInputMapping();
     if(CharacterCreateScreen){CharacterCreateScreen->RemoveFromParent();CharacterCreateScreen=nullptr;}
     if(Screen){Screen->RemoveFromParent();Screen=nullptr;}
+    if(QuestTrackerScreen){QuestTrackerScreen->RemoveFromParent();QuestTrackerScreen=nullptr;}
     QuestScreen=nullptr;
     if(MainMenuWidget){MainMenuWidget->RemoveFromParent();MainMenuWidget=nullptr;}
     SessionSaveLoadScreen=nullptr;
@@ -355,6 +365,19 @@ void AICPlayerController::SetMenu(const FString& NewMenu)
 {
     IC_TRACE_FUNCTION();
     if(bItemTransactionInProgress&&NewMenu!=TEXT("Quit")&&NewMenu!=TEXT("Confirm")){Show(TEXT("효과 요청 처리 중입니다."));return;}
+    if (NewMenu != TEXT("Dialogue") && DialogueScreen)
+    {
+        UICNPCDialogueWidget* Closing = DialogueScreen;
+        DialogueScreen = nullptr;
+        if (GetLocalPlayer())
+        {
+            if (UICUIManagerSubsystem* UI = GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())
+            {
+                UI->CloseScreen(Closing);
+            }
+        }
+        bInDialogue = false;
+    }
     ResetHeldInput();CancelTarget();
     if(Menu!=NewMenu)UE_LOG(LogICUI, Log, TEXT("[UI.Menu] From=%s To=%s Created=%d Dead=%d"),*Menu,*NewMenu,bCreated,bDead);
     Menu=NewMenu;
