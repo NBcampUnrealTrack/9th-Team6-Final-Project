@@ -63,11 +63,15 @@ private:
     FName SelectedQuestID;
     FName SelectedDialogueID;
     FName SelectedNodeID;
+    bool IsShowingInteractionOptions = false;
 
+    void ShowInteractionOptions();
+    void ShowInitialDialogue();
     void ShowQuestList();
+    void AddQuestEntries(bool IsOnlyActionable);
     void ShowQuest(FName QuestID);
     void ShowNode(FName DialogueID, FName NodeID = NAME_None);
-    void AddEntry(FName EntryID, const FText& Label);
+    void AddEntry(FName EntryID, const FText& Label, bool IsEnabled = true);
     void CloseDialogue();
 
     UFUNCTION()

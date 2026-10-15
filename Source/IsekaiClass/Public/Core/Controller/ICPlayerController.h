@@ -220,6 +220,9 @@ private:
     void CancelTarget();
     void Interact();
     void OpenNPCDialogue(AICNPCBase* NPC);
+
+    UFUNCTION()
+    void HandleNPCInteractionStarted(AICNPCBase* NPC, AICPlayerController* Requester, FName ServiceID);
     TMap<FGuid,TWeakObjectPtr<AICDroppedItem>> DropActors;
     void UpdateGamePhase();
     void TryInitializeGameplay();

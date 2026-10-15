@@ -15,10 +15,11 @@ void UICDialogueEntryWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
-void UICDialogueEntryWidget::SetEntry(FName InEntryID, const FText& InLabel)
+void UICDialogueEntryWidget::SetEntry(FName InEntryID, const FText& InLabel, bool IsEnabled)
 {
     EntryID = InEntryID;
     EntryLabel->SetText(InLabel);
+    EntryButton->SetIsEnabled(IsEnabled);
 }
 
 void UICDialogueEntryWidget::HandleClicked()

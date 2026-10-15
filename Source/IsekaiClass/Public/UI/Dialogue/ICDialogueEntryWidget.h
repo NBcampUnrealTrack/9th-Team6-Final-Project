@@ -15,7 +15,7 @@ class ISEKAICLASS_API UICDialogueEntryWidget : public UUserWidget
     GENERATED_BODY()
 
 public:
-    void SetEntry(FName InEntryID, const FText& InLabel);
+    void SetEntry(FName InEntryID, const FText& InLabel, bool IsEnabled = true);
 
     UPROPERTY(BlueprintAssignable, Category="IC|Dialogue")
     FICDialogueEntryPressed OnEntryPressed;

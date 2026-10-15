@@ -325,6 +325,15 @@ void AICPlayerController::OpenNPCDialogue(AICNPCBase* NPC)
     SetMenu(TEXT("Dialogue"));
     Dialogue->OpenForNPC(NPC);
 }
+
+void AICPlayerController::HandleNPCInteractionStarted(AICNPCBase* NPC, AICPlayerController* Requester, FName)
+{
+    if (Requester == this)
+    {
+        OpenNPCDialogue(NPC);
+    }
+}
+
 void AICPlayerController::Interact()
 {
     IC_TRACE_FUNCTION();
@@ -339,7 +348,9 @@ void AICPlayerController::Interact()
 
     if (AICNPCBase* NPC = FindNPCInteractionTarget())
     {
-        if (NPC->TryInteract(this)) OpenNPCDialogue(NPC);
+        NPC->OnInteractionStarted.AddUniqueDynamic(this, &ThisClass::HandleNPCInteractionStarted);
+        NPC->TryInteract(this);
+        NPC->OnInteractionStarted.RemoveDynamic(this, &ThisClass::HandleNPCInteractionStarted);
         return;
     }
     auto* Object=FindInteractionTarget();
