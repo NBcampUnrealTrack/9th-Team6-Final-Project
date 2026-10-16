@@ -6,6 +6,9 @@
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Interaction/ICInteractionActor.h"
+#include "NPC/Character/ICNPCBase.h"
+#include "UI/Dialogue/ICNPCDialogueWidget.h"
+#include "UI/Management/ICUIManagerSubsystem.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Inventory/Actors/ICDroppedItem.h"
 #include "Save/ICSaveSubsystem.h"
@@ -93,7 +96,9 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
     }
     if (bDirty) { bDirty=false;UpdateScreens(); }
     const auto* Target=CanHandleGameplayInput()?FindInteractionTarget():nullptr;
-    const FString Hint=Target?Target->GetInteractionText().ToString():FString();
+    const auto* NPC=CanHandleGameplayInput()?FindNPCInteractionTarget():nullptr;
+    const FString Hint=NPC?NPC->GetInteractionText().ToString()
+        :Target?Target->GetInteractionText().ToString():FString();
     if (Hint!=InteractionHint) { InteractionHint=Hint;bDirty=true; }
     if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=C->GetICAbilitySystem())
     {
@@ -274,6 +279,61 @@ AICInteractionActor* AICPlayerController::FindInteractionTarget() const
     }
     return Best;
 }
+AICNPCBase* AICPlayerController::FindNPCInteractionTarget() const
+{
+    const AICPlayerCharacter* PlayerPawn = Cast<AICPlayerCharacter>(GetPawn());
+    if (!PlayerPawn || !GetWorld()) return nullptr;
+    const FVector Origin = PlayerPawn->GetActorLocation();
+    const FVector Forward = FRotator(0, GetControlRotation().Yaw, 0).Vector();
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(PlayerNPCInteraction), false);
+    Params.AddIgnoredActor(PlayerPawn);
+    AICNPCBase* Closest = nullptr;
+    float ClosestDistance = 250.f;
+    for (TActorIterator<AICNPCBase> It(GetWorld()); It; ++It)
+    {
+        AICNPCBase* Candidate = *It;
+        if (!Candidate || !Candidate->IsActorInitialized()) continue;
+        const FVector Offset = Candidate->GetActorLocation() - Origin;
+        const float Distance = Offset.Size();
+        if (Distance > ClosestDistance || FVector::DotProduct(Forward, Offset.GetSafeNormal2D()) < 0.35f) continue;
+        FHitResult Hit;
+        GetWorld()->LineTraceSingleByChannel(Hit, PlayerPawn->GetPawnViewLocation(),
+            Candidate->GetActorLocation(), ECC_Visibility, Params);
+        if (Hit.bBlockingHit && Hit.GetActor() != Candidate) continue;
+        Closest = Candidate;
+        ClosestDistance = Distance;
+    }
+    return Closest;
+}
+
+void AICPlayerController::OpenNPCDialogue(AICNPCBase* NPC)
+{
+    if (!NPC || !DialogueWidgetClass || !GetLocalPlayer())
+    {
+        if (NPC) NPC->EndInteraction();
+        return;
+    }
+    UICNPCDialogueWidget* Dialogue = CreateWidget<UICNPCDialogueWidget>(this, DialogueWidgetClass);
+    UICUIManagerSubsystem* UI = GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>();
+    if (!Dialogue || !UI || !UI->OpenScreen(Dialogue, true, 100))
+    {
+        NPC->EndInteraction();
+        return;
+    }
+    DialogueScreen = Dialogue;
+    bInDialogue = true;
+    SetMenu(TEXT("Dialogue"));
+    Dialogue->OpenForNPC(NPC);
+}
+
+void AICPlayerController::HandleNPCInteractionStarted(AICNPCBase* NPC, AICPlayerController* Requester, FName)
+{
+    if (Requester == this)
+    {
+        OpenNPCDialogue(NPC);
+    }
+}
+
 void AICPlayerController::Interact()
 {
     IC_TRACE_FUNCTION();
@@ -286,6 +346,13 @@ void AICPlayerController::Interact()
         {Dropped->TryPickup(this);return;}
     }
 
+    if (AICNPCBase* NPC = FindNPCInteractionTarget())
+    {
+        NPC->OnInteractionStarted.AddUniqueDynamic(this, &ThisClass::HandleNPCInteractionStarted);
+        NPC->TryInteract(this);
+        NPC->OnInteractionStarted.RemoveDynamic(this, &ThisClass::HandleNPCInteractionStarted);
+        return;
+    }
     auto* Object=FindInteractionTarget();
     if(!Object)
     {

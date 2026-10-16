@@ -7,6 +7,9 @@
 class UStringTable;
 class UTextBlock;
 struct FICQuestRow;
+struct FICQuestState;
+struct FICWorldState;
+class UICQuestSubsystem;
 
 UCLASS(Blueprintable)
 class ISEKAICLASS_API UICQuestListWidget : public UUserWidget
@@ -14,7 +17,8 @@ class ISEKAICLASS_API UICQuestListWidget : public UUserWidget
     GENERATED_BODY()
 
 public:
-    void SetQuestData(const FICQuestRow& Definition, UStringTable* Strings);
+    void SetQuestData(const FICQuestRow& Definition, const FICQuestState& Quest, const FICWorldState& World,
+        const UICQuestSubsystem* Quests, UStringTable* Strings);
 
 private:
     UPROPERTY(meta=(BindWidget))
