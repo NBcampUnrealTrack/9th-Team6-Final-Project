@@ -1,0 +1,2 @@
+---,ServiceID,Entries,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+SHOP_MERCHANT_001,"SRV_MERCHANT_SHOP","((ItemID=""ITM_MAT_001"",DisplayOrder=0),(ItemID=""ITM_MAT_002"",DisplayOrder=1))","SHOP_MERCHANT_001","SHOP_MERCHANT_001.NAME","","(GameplayTags=)","1","False","False"

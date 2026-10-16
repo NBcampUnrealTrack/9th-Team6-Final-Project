@@ -11,16 +11,26 @@ public class IsekaiClass : ModuleRules
             "Core",
             "CoreUObject",
             "Engine",
+            "DeveloperSettings",
             "InputCore",
             "EnhancedInput",
             "UMG",
             "Slate",
-            "SlateCore"
+            "SlateCore",
+            "GameplayTags",
+            "GameplayAbilities",
+            "GameplayTasks",
+            "StateTreeModule",
+            "GameplayStateTreeModule",
+            "NavigationSystem",
+            "Niagara",
+            "AIModule"
         });
 
         if (Target.bBuildEditor)
         {
             PrivateDependencyModuleNames.Add("UnrealEd");
+            PrivateDependencyModuleNames.Add("UMGEditor");
         }
     }
 }
