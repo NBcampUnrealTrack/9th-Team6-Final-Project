@@ -31,6 +31,10 @@
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
+#include "UI/Settings/ICSettingsWidget.h"
+#include "Misc/ConfigCacheIni.h"
+#include "Core/Flow/ICGameFlowSubsystem.h"
+#include "UI/Framework/ICLoadingWidget.h"
 
 AICPlayerController::AICPlayerController()
 {
@@ -96,7 +100,6 @@ void AICPlayerController::OnUnPossess()
     IC_TRACE_FUNCTION();
     FlushWorldState();
     ResetHeldInput();
-    ReleaseInputCommand(EICInputCommand::Block);
     ReleaseInputCommand(EICInputCommand::Jump);
     UnbindPawnSystems();UE_LOG(LogICCore, Log, TEXT("[Player.UnPossess] Controller=%s Pawn=%s"),*GetNameSafe(this),*GetNameSafe(GetPawn()));
     Super::OnUnPossess();
@@ -115,7 +118,7 @@ void AICPlayerController::BindPawnSystems()
     BoundInventory->OnMessage.AddUniqueDynamic(this,&ThisClass::InventoryMessage);
     BoundInventory->OnLootResult.AddUniqueDynamic(this,&ThisClass::InventoryLootResult);
     BoundInventory->CurrentClass=Job;
-    if(auto* C=Cast<AICPlayerCharacter>(GetPawn())){C->InitializeState(UICWorldStateSubsystem::PlayerId());if(auto* ASC=C->GetICAbilitySystem())ASC->OnStateChanged.AddUniqueDynamic(this,&ThisClass::CombatCacheChanged);}
+    if(auto* C=Cast<AICPlayerCharacter>(GetPawn())){GConfig->GetFloat(TEXT("/Script/IsekaiClass.Input"),TEXT("CameraSensitivity"),C->CameraSensitivity,GGameUserSettingsIni);C->CameraSensitivity=FMath::Clamp(C->CameraSensitivity,.1f,3.f);C->InitializeState(UICWorldStateSubsystem::PlayerId());if(auto* ASC=C->GetICAbilitySystem())ASC->OnStateChanged.AddUniqueDynamic(this,&ThisClass::CombatCacheChanged);}
 }
 
 void AICPlayerController::UnbindPawnSystems()
@@ -136,6 +139,7 @@ void AICPlayerController::TryInitializeGameplay()
 {
     IC_TRACE_FUNCTION();
     if (bGameplayInitialized || !IsLocalController() || IsMainMenuLevel()) return;
+    if(!GetPawn()||!GetPawn()->HasActorBegunPlay())return;
     auto* State=GetWorldState();auto* Time=GetTime();auto* Saves=GetSaves();
     if (!State || !Time || !Saves || !GetInventory()) return;
     BindPawnSystems();
@@ -154,14 +158,22 @@ void AICPlayerController::TryInitializeGameplay()
     if (GameplayWidgetClass)
     {
         Screen=CreateWidget<UICGameplayWidget>(this,GameplayWidgetClass);
-        if (Screen) Screen->AddToViewport();
+        if (Screen && GetLocalPlayer()) GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>()->SetHUD(Screen);
     }
     if (UClass* WidgetClass = QuestTrackerWidgetClass.LoadSynchronous())
     {
         QuestTrackerScreen = CreateWidget<UICQuestTrackerWidget>(this, WidgetClass);
         if (QuestTrackerScreen) QuestTrackerScreen->AddToPlayerScreen(1);
     }
-    if (State->ExportState().bPlayerCreated)
+    auto* Flow=GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
+    if (Flow->bPendingNewGame)
+    {
+        Flow->BeginInitialization();
+        PlayerName=Flow->Answers.Name.TrimStartAndEnd();Preset=Flow->Answers.Gender;Job=Flow->Answers.Music;
+        SetMenu(TEXT("Loading"));
+        CreatePlayer();
+    }
+    else if (State->ExportState().bPlayerCreated)
     {
         RestoreFromWorldState_Implementation(State->ExportState());
         if (auto* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>())
@@ -169,7 +181,12 @@ void AICPlayerController::TryInitializeGameplay()
             Quests->RefreshAvailableQuests();
         }
     }
-    else { SetMenu(TEXT("Create"));Show(TEXT("캐릭터 생성 또는 저장 슬롯을 선택하세요.")); }
+    else
+    {
+        Flow->BeginQuestions();
+        SetMenu(TEXT("Create"));
+        Show(TEXT("질문에 답한 뒤 새 게임을 시작하세요."));
+    }
 #if !UE_BUILD_SHIPPING
     EnableCheats();
 #endif
@@ -206,6 +223,31 @@ void AICPlayerController::UpdateScreens()
 {
     IC_TRACE_FUNCTION();
     if (!IsLocalController()) return;
+    auto* FrontendUI=GetLocalPlayer()?GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>():nullptr;
+    if(IsMainMenuLevel()&&MainMenuWidget)
+    {
+        if(Menu==TEXT("MainMenu")){if(!MainMenuWidget->IsActivated()&&FrontendUI)FrontendUI->OpenScreen(MainMenuWidget,true,10);}
+        else if(MainMenuWidget->IsActivated()&&FrontendUI)FrontendUI->CloseScreen(MainMenuWidget);
+    }
+    if(Menu==TEXT("Loading"))
+    {
+        if(!LoadingScreen)
+        {
+            auto* Class=LoadClass<UICLoadingWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_Loading.WBP_Loading_C"));
+            LoadingScreen=CreateWidget<UICLoadingWidget>(this,Class?Class:UICLoadingWidget::StaticClass());
+            if(LoadingScreen&&FrontendUI)FrontendUI->OpenScreen(LoadingScreen,true,10000);
+        }
+    }
+    else if(LoadingScreen){if(FrontendUI)FrontendUI->CloseScreen(LoadingScreen);LoadingScreen=nullptr;}
+    if(Menu==TEXT("Settings"))
+    {
+        if(!SettingsScreen)
+        {
+            SettingsScreen=CreateWidget<UICSettingsWidget>(this,UICSettingsWidget::StaticClass());
+            if(SettingsScreen)SettingsScreen->AddToPlayerScreen(1000);
+        }
+    }
+    else if(SettingsScreen){SettingsScreen->RemoveFromParent();SettingsScreen=nullptr;}
     if(!IsMainMenuLevel())
     {
         const FString SessionMenu=GetSessionMenu();
@@ -233,11 +275,11 @@ void AICPlayerController::UpdateScreens()
         if (!CharacterCreateScreen) CharacterCreateScreen=CreateWidget<UICCharacterCreateWidget>(this,CharacterCreateWidgetClass);
         if (CharacterCreateScreen)
         {
-            if (!CharacterCreateScreen->IsInViewport()) CharacterCreateScreen->AddToViewport(10);
+            if (!CharacterCreateScreen->IsActivated()&&FrontendUI) FrontendUI->OpenScreen(CharacterCreateScreen,true,10);
             CharacterCreateScreen->RefreshState();
         }
     }
-    else if (CharacterCreateScreen && CharacterCreateScreen->IsInViewport()) CharacterCreateScreen->RemoveFromParent();
+    else if (CharacterCreateScreen && CharacterCreateScreen->IsActivated()&&FrontendUI) FrontendUI->CloseScreen(CharacterCreateScreen);
     if (Menu==TEXT("Quest") && !QuestScreen)
     {
         if (UClass* WidgetClass = QuestWidgetClass.LoadSynchronous())
@@ -287,6 +329,8 @@ void AICPlayerController::EndPlay(const EEndPlayReason::Type Reason)
     if(QuestTrackerScreen){QuestTrackerScreen->RemoveFromParent();QuestTrackerScreen=nullptr;}
     QuestScreen=nullptr;
     if(MainMenuWidget){MainMenuWidget->RemoveFromParent();MainMenuWidget=nullptr;}
+    LoadingScreen=nullptr;
+    if(SettingsScreen){SettingsScreen->RemoveFromParent();SettingsScreen=nullptr;}
     SessionSaveLoadScreen=nullptr;
     if(GetGameInstance())if(auto* Production=GetGameInstance()->GetSubsystem<UICProductionSubsystem>())Production->OnProductionChanged.RemoveDynamic(this,&ThisClass::ProductionChanged);
     Super::EndPlay(Reason);
@@ -332,7 +376,7 @@ void AICPlayerController::SyncSaveSafety()
     if(auto* Saves=GetSaves())
     {
         FICSaveSafety Safety;Safety.bInCombat=bInCombat;Safety.bInDialogue=bInDialogue;
-        Safety.bInEvent=bInEvent;Safety.bDead=bDead;Safety.bEffectPending=bItemTransactionInProgress;
+        Safety.bInEvent=bInEvent;Safety.bDead=bDead;Safety.bEffectPending=bItemTransactionInProgress||HasTargetSelection();
         Saves->SetSafetyState(Safety);
     }
 }
@@ -345,7 +389,9 @@ void AICPlayerController::SaveFinished(int32 Slot,bool bSuccess,const FString& M
         bCreated=bSuccess;
         if(bSuccess)
         {
-            bInitialSavePending=false;SetMenu(TEXT(""));
+            bInitialSavePending=false;
+            GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->CompleteNewGame();
+            SetMenu(TEXT(""));
             const FName Jobs[]={TEXT("Warrior"),TEXT("Archer"),TEXT("Mage"),TEXT("Healer")};
             OnPlayerInitialized.Broadcast(Jobs[Job],FirstSkill);
         }
@@ -354,7 +400,7 @@ void AICPlayerController::SaveFinished(int32 Slot,bool bSuccess,const FString& M
             UpdateGamePhase();
             ReportCreationFailure(Message + TEXT(" 게임 시작 버튼으로 저장을 재시도할 수 있습니다."));
         }
-        // Close the creation screen immediately on success; refresh the retry state on failure.
+
         UpdateScreens();
     }
     RefreshSaveSlots();Show((Slot==0?FString(TEXT("자동 저장: ")):FString::Printf(TEXT("수동 슬롯 %d: "),Slot))+Message);
@@ -381,11 +427,11 @@ void AICPlayerController::SetMenu(const FString& NewMenu)
     ResetHeldInput();CancelTarget();
     if(Menu!=NewMenu)UE_LOG(LogICUI, Log, TEXT("[UI.Menu] From=%s To=%s Created=%d Dead=%d"),*Menu,*NewMenu,bCreated,bDead);
     Menu=NewMenu;
-    if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
+    if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(NewMenu==TEXT("MainMenu")||NewMenu==TEXT("Loading")||NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
     UpdateScreens();
     InteractionHint.Empty();bShowMouseCursor=!NewMenu.IsEmpty();
     if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);}
-    UUserWidget* Focus=SessionSaveLoadScreen?static_cast<UUserWidget*>(SessionSaveLoadScreen.Get()):CharacterCreateScreen&&CharacterCreateScreen->IsInViewport()?static_cast<UUserWidget*>(CharacterCreateScreen.Get()):static_cast<UUserWidget*>(Screen.Get());
+    UUserWidget* Focus=LoadingScreen?static_cast<UUserWidget*>(LoadingScreen.Get()):SettingsScreen?static_cast<UUserWidget*>(SettingsScreen.Get()):SessionSaveLoadScreen?static_cast<UUserWidget*>(SessionSaveLoadScreen.Get()):CharacterCreateScreen&&CharacterCreateScreen->IsActivated()?static_cast<UUserWidget*>(CharacterCreateScreen.Get()):IsMainMenuLevel()?static_cast<UUserWidget*>(MainMenuWidget.Get()):static_cast<UUserWidget*>(Screen.Get());
     if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->SetMenuContext(this,Focus,!NewMenu.IsEmpty());
     FlushPressedKeys();bDirty=true;UpdateGamePhase();SyncSaveSafety();OnMenuChanged.Broadcast(Menu);
 }
@@ -401,7 +447,7 @@ void AICPlayerController::CancelTarget()
     IC_TRACE_FUNCTION();
     if(bItemTransactionInProgress)return;
     if(!PendingItem.IsNone())UE_LOG(LogICInventory, Verbose, TEXT("[Item.TargetCancelled] Item=%s Quick=%d"),*PendingItem.ToString(),PendingQuick);
-    PendingItem=NAME_None;PendingQuick=INDEX_NONE;PendingPartyKey=INDEX_NONE;bDirty=true;
+    PendingItem=NAME_None;PendingSkill=NAME_None;PendingTargetID=NAME_None;PendingSkillCaster.Reset();PendingQuick=INDEX_NONE;PendingPartyKey=INDEX_NONE;bDirty=true;
 }
 
 bool AICPlayerController::ReadLiveState_Implementation(FName CharacterId,FICCharacterState& Snapshot) const
@@ -460,7 +506,7 @@ void AICPlayerController::RestoreFromWorldState_Implementation(const FICWorldSta
     if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn()))
     {PlayerPawn->InitializeState(UICWorldStateSubsystem::PlayerId());PlayerPawn->RestoreFromWorldState_Implementation(Candidate);PlayerPawn->ApplyPreset(Preset);PlayerPawn->SetActorLocation(Candidate.PlayerPosition);PlayerPawn->GetCharacterMovement()->StopMovementImmediately();}
     SynchronizeDrops();
-    SetControlRotation(Candidate.PlayerRotation);SetMenu(bCreated?TEXT(""):TEXT("Create"));
+    SetControlRotation(Candidate.PlayerRotation);SetMenu(bCreated?TEXT(""):GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->bPendingNewGame?TEXT("Loading"):TEXT("Create"));
     const FName Jobs[]={TEXT("Warrior"),TEXT("Archer"),TEXT("Mage"),TEXT("Healer")};
     if(Candidate.bPlayerCreated&&!bInitialSavePending)OnPlayerInitialized.Broadcast(Jobs[Job],FirstSkill);
 }
@@ -499,6 +545,6 @@ void AICPlayerController::ProductionChanged(FGuid JobID,const FString& Message){
 void AICPlayerController::CombatCacheChanged()
 {
     IC_TRACE_FUNCTION();auto* C=Cast<AICPlayerCharacter>(GetPawn());if(!C||!C->GetICAbilitySystem())return;
-    bBlocking=C->GetICAbilitySystem()->HasMatchingGameplayTag(ICTags::Guarding);const auto S=C->GetICAbilitySystem()->Capture();MainStats=ICPlayerStateConversions::Main(S.MainStats);Survival=ICPlayerStateConversions::Survival(S);
+    const auto S=C->GetICAbilitySystem()->Capture();MainStats=ICPlayerStateConversions::Main(S.MainStats);Survival=ICPlayerStateConversions::Survival(S);
     const bool Exhausted=Survival.IsExhausted();if(bLastExhausted!=Exhausted){bLastExhausted=Exhausted;OnExhaustionChanged.Broadcast(Exhausted);}bDirty=true;
 }

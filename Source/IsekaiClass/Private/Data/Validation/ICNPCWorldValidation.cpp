@@ -118,7 +118,7 @@ namespace ICDefinitionValidation
             Check.UniqueIDs(Row.DialogueIDs, TEXT("DialogueIDs"));
             Check.UniqueIDs(Row.ServiceIDs, TEXT("ServiceIDs"));
             if (Row.Type != EICNPCType::Background) Check.Require(!Row.HomeID.IsNone(), TEXT("HomeID"), TEXT("Recruitable/resident NPCs require their home definition."));
-            if (Row.InitialAffinity < 0 || Row.InitialAffinity > 100) Check.Add(TEXT("InitialAffinity"), TEXT("Affinity must be an integer from 0 to 100."));
+            if (Row.InitialAffinity < 0 || Row.InitialAffinity > 500) Check.Add(TEXT("InitialAffinity"), TEXT("Affinity must be an integer from 0 to 500."));
             if (bComplete)
             {
                 if (Row.Mesh.IsNull() && Row.AppearanceResourceID.IsNone()) Check.Add(TEXT("Mesh/AppearanceResourceID"), TEXT("A character appearance asset or resource definition is required."));

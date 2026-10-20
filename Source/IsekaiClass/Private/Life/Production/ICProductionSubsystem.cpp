@@ -60,7 +60,7 @@ bool UICProductionSubsystem::StartRecipe(FName RecipeID,FName WorkAnchorID,UICIn
         return Fail(TEXT("필수 도구가 없거나 도구 정의가 누락되었습니다."));
     for(const auto& Tool:Production->Tools)if(!Definitions->Find<FICItemRow>(Tool.ItemID,R)||Tool.Count<=0||Inventory->CountItem(Tool.ItemID)<Tool.Count)
         return Fail(TEXT("필수 생산 도구가 없습니다."));
-    // Validate every result and enough bag space before reserving costs.
+
     if(Recipe->Ingredients.IsEmpty()||Recipe->Results.IsEmpty())return Fail(TEXT("재료·결과 정의가 비어 있습니다."));
     TMap<FName,int64> Costs;
     for(const auto& Cost:Recipe->Ingredients)
@@ -79,7 +79,7 @@ bool UICProductionSubsystem::StartRecipe(FName RecipeID,FName WorkAnchorID,UICIn
     FICProductionJobState Job;Job.JobID=FGuid::NewGuid();Job.OwnerCharacterID=Player->CharacterId;
     Job.RecipeID=RecipeID;Job.ProductionID=Recipe->ProductionID;Job.WorkAnchorID=WorkAnchorID;
     Job.StartedAtPlaySecond=Clock->GetClock().PlaySecond;Job.CompletesAtPlaySecond=Job.StartedAtPlaySecond+Recipe->WorkDurationPlaySeconds;
-    // SP is the action's start cost; materials stay reserved until successful completion.
+
     Job.ReservedSP=Recipe->SPCost;Job.bCostsCommitted=true;Player->SP-=Recipe->SPCost;
     for(const auto& Cost:Costs)
     {
@@ -116,7 +116,7 @@ bool UICProductionSubsystem::CompleteJob(FGuid JobID,UICInventoryComponent* Inve
         if(!Owner||Owner->SP<Job->ReservedSP||Next.Gold<Job->ReservedGold)return Fail(TEXT("예약 비용을 확정할 수 없습니다."));
         Owner->SP-=Job->ReservedSP;Next.Gold-=Job->ReservedGold;
     }
-    // Consume the exact reserved instances, then insert all outputs into the same candidate.
+
     for(const auto& Reserved:Job->Materials)
     {
         if(Reserved.Timing==EICProductionMaterialTiming::ConsumeAtStart&&Job->bCostsCommitted)continue;

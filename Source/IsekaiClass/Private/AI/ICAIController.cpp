@@ -70,7 +70,7 @@ void AICAIController::Decide()
     IC_TRACE_FUNCTION();auto* C=Cast<AICCharacterBase>(GetPawn());if(!C)return;auto* ASC=C->GetICAbilitySystem();auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();auto* S=GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();auto* T=GetGameInstance()->GetSubsystem<UICTimeSubsystem>();FICDefinitionResult R;
     if(auto* NPC=Cast<AICNPCBase>(C))
     {
-        if(bInteractionHold){StopMovement();return;}   // 상호작용 중에는 일과 이동·동료 전투 판단을 하지 않습니다.
+        if(bInteractionHold){StopMovement();return;}
         const auto State=S->GetSnapshot(C->GetCharacterID());if(State.IsDowned()){StopExecution();return;}
         FVector Goal;FRotator GoalRotation=FRotator::ZeroRotator;bool HasGoal=false;
         if(State.Mode==EICCharacterMode::Companion)
@@ -85,7 +85,7 @@ void AICAIController::Decide()
         }
         if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)>FMath::Square(150.))
         {
-            // 경로 이동 중에는 진행 방향을 보되, 도착 후에는 앵커 회전이 우선합니다.
+
             C->GetCharacterMovement()->bOrientRotationToMovement=true;
             MoveToLocation(Goal,100);
         }

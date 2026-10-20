@@ -56,6 +56,9 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
             || C.Position.ContainsNaN() || C.Rotation.ContainsNaN() || !NamesValid(C.UnlockedSkillIDs)) return Fail(Field);
         if (!C.HasStats() && (!C.Combat.Effects.IsEmpty() || !C.Combat.SkillReadyAtPlaySecond.IsEmpty() || !C.UnlockedSkillIDs.IsEmpty())) return Fail(Field + TEXT(".Combat"));
         if (!CombatValid(C.Combat, Field, Reason)) return false;
+        for(const auto& Skill:C.EquippedWeaponSkills)
+            if(Skill.Key==EICWeaponFamily::None||Skill.Key>EICWeaponFamily::Wand||(!Skill.Value.IsNone()&&!C.UnlockedSkillIDs.Contains(Skill.Value)))
+                return Fail(Field+TEXT(".EquippedWeaponSkills"));
     }
     for (const auto& Pair : S.Quests)
     {

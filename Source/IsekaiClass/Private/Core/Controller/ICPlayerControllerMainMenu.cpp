@@ -40,8 +40,7 @@ void AICPlayerController::InitializeMainMenu()
         return;
     }
     MainMenuWidget->SetIsFocusable(true);
-    MainMenuWidget->AddToViewport();
-    if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->SetMenuContext(this,MainMenuWidget,true);
+    if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>()){UI->OpenScreen(MainMenuWidget,true,10);UI->SetMenuContext(this,MainMenuWidget,true);}
     MainMenuWidget->FocusStartButton();
     UE_LOG(LogICUI, Log, TEXT("[MainMenu.Opened] Controller=%s Widget=%s: 공통 컨트롤러에서 메인 메뉴 표시"), *GetNameSafe(this), *GetNameSafe(MainMenuWidget));
 }

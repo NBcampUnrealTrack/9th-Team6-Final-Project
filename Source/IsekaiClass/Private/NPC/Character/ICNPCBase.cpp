@@ -21,7 +21,7 @@ AICNPCBase::AICNPCBase()
 
     auto* Movement=GetCharacterMovement();
     Movement->MaxWalkSpeed=ScheduleMoveSpeed;
-    // 같은 NavMesh 위에서 걷는 NPC끼리 속도를 조절해 자연스럽게 비켜 갑니다.
+
     Movement->bUseRVOAvoidance=true;
     Movement->AvoidanceConsiderationRadius=300.f;
     Movement->AvoidanceWeight=.5f;
@@ -33,8 +33,8 @@ bool AICNPCBase::InitializeNPC(FName ID)
     const auto* NPC=D?D->Find<FICNPCRow>(ID,R):nullptr;if(!NPC||!WorldState())return false;
     const auto Kind=static_cast<EICCharacterKind>(static_cast<int32>(NPC->Type)+1);
     if(!WorldState()->EnsureCharacter(ID,Kind))return false;
-    // The level-placed anchor is authoritative for an NPC's position and facing.
-    // Anchor DT transforms remain only as a fallback for an unloaded level.
+
+
     auto State=WorldState()->GetSnapshot(ID);const FName AnchorID=!State.CurrentAnchorID.IsNone()?State.CurrentAnchorID:NPC->InitialAnchorID;
     if(!AnchorID.IsNone())if(auto* Spawns=GetWorld()->GetSubsystem<UICSpawnSubsystem>())
     {
@@ -61,7 +61,7 @@ void AICNPCBase::RefreshExecution()
 void AICNPCBase::HandleZeroHP()
 {
     IC_TRACE_FUNCTION();if(bZeroHPHandled)return;EndInteraction();if(auto* AI=Cast<AICAIController>(GetController()))AI->StopExecution();
-    // The persistent party slot, effects, MP and cooldowns have already been captured.
+
     SetActorEnableCollision(false);GetWorldTimerManager().SetTimer(DefeatTimer,this,&AActor::K2_DestroyActor,1.f,false);
     Super::HandleZeroHP();
 }
@@ -92,7 +92,7 @@ bool AICNPCBase::TryInteract(AICPlayerController* Requester)
     if(State.IsDowned()||State.Mode!=EICCharacterMode::Scheduled)
     {UE_LOG(LogICInteraction,Verbose,TEXT("[NPC.InteractRejected] NPC=%s Mode=%d Downed=%d"),*CharacterID.ToString(),static_cast<int32>(State.Mode),State.IsDowned()?1:0);return false;}
     const TArray<FName> Services=GetAvailableServices();
-    const FName ServiceID=Services.Num()>0?Services[0]:NAME_None;   // 서비스가 여러 개면 우선 첫 번째만 사용합니다.
+    const FName ServiceID=Services.Num()>0?Services[0]:NAME_None;
     bInteracting=true;
     if(auto* AI=Cast<AICAIController>(GetController()))AI->SetInteractionHold(true,Requester->GetPawn());
     UE_LOG(LogICInteraction,Log,TEXT("[NPC.Interact] NPC=%s Service=%s"),*CharacterID.ToString(),*ServiceID.ToString());
@@ -114,7 +114,7 @@ void AICNPCBase::EndInteraction()
 FText AICNPCBase::GetInteractionText() const
 {
     IC_TRACE_FUNCTION();
-    return FText::FromString(TEXT("F: 대화하기"));   // TODO: String Table 키로 교체
+    return FText::FromString(TEXT("F: 대화하기"));
 }
 TArray<FICNPCInteractionOption> AICNPCBase::GetInteractionOptions() const
 {
@@ -123,8 +123,8 @@ TArray<FICNPCInteractionOption> AICNPCBase::GetInteractionOptions() const
     auto Add=[&Options](EICNPCInteractionOption Kind,const TCHAR* Label,FName ServiceID,bool bEnabled)
     { FICNPCInteractionOption Option;Option.Option=Kind;Option.Label=FText::FromString(Label);Option.ServiceID=ServiceID;Option.bEnabled=bEnabled;Options.Add(Option); };
     Add(EICNPCInteractionOption::Talk,TEXT("대화하기"),NAME_None,true);
-    Add(EICNPCInteractionOption::Gift,TEXT("선물하기"),NAME_None,true);   // TODO: 선물 기능 구현 후 활성 조건 추가
-    // 거래하기: NPC 정의에 상점 서비스가 있으면 항상 표시하고, 지금 근무 중인 서비스일 때만 활성화합니다.
+    Add(EICNPCInteractionOption::Gift,TEXT("선물하기"),NAME_None,true);
+
     auto* D=GetGameInstance()?GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;
     if(D)
     {
@@ -132,7 +132,7 @@ TArray<FICNPCInteractionOption> AICNPCBase::GetInteractionOptions() const
         for(const FName ID:Definition.ServiceIDs)
         {
             const auto* Service=D->Find<FICServiceRow>(ID,R);
-            if(Service&&Service->Type==EICServiceType::Shop){Add(EICNPCInteractionOption::Trade,TEXT("거래하기"),ID,Working.Contains(ID));break;}   // 상점 서비스가 여러 개면 첫 번째만
+            if(Service&&Service->Type==EICServiceType::Shop){Add(EICNPCInteractionOption::Trade,TEXT("거래하기"),ID,Working.Contains(ID));break;}
         }
     }
     Add(EICNPCInteractionOption::End,TEXT("대화 끝내기"),NAME_None,true);

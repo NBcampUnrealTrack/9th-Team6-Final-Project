@@ -198,11 +198,11 @@ void UICSaveLoadWidget::HandleDeleteClicked()
 {
     IC_TRACE_FUNCTION();if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->RequestDelete();
 }
-void UICSaveLoadWidget::HandleSaveStarted(int32 /*SlotIndex*/)
+void UICSaveLoadWidget::HandleSaveStarted(int32  )
 {
     IC_TRACE_FUNCTION();UpdateSelection();
 }
-void UICSaveLoadWidget::HandleSaveFinished(int32 /*SlotIndex*/,bool /*bSuccess*/,const FString& /*Message*/)
+void UICSaveLoadWidget::HandleSaveFinished(int32  ,bool  ,const FString&  )
 {
     IC_TRACE_FUNCTION();if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->RefreshSaveSlots();
 }

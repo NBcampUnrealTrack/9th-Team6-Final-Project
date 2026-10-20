@@ -310,8 +310,8 @@ void ValidateCombat(const TArray<FICDefinitionTable>& Tables, bool bComplete, TA
                 Issue(Issues, At, Field + TEXT(".ProjectileClass"), TEXT("A complete projectile emission requires its actual actor class."));
         }
         if (bComplete && Row.Montage.IsNull()) Issue(Issues, At, TEXT("Montage"), TEXT("A complete skill requires the actual animation montage."));
-        // Compare actual effects instead of names or unique row IDs. Cost/cooldown and VFX alone
-        // cannot make two otherwise identical recruit skills count as distinct final effects.
+
+
         if (Row.OwnerType == EICSkillOwner::RecruitUnique && !Row.Hits.IsEmpty())
         {
             bool bResolved = true;

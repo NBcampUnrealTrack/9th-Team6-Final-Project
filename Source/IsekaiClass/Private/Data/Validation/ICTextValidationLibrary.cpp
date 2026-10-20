@@ -24,7 +24,7 @@ TArray<FICDefinitionIssue> UICTextValidationLibrary::ValidateDialogueText(UDataT
         AddIssue(NAME_None, TEXT("StringTable"), TEXT("Dialogue String Table is missing."));
     FICDefinitionTable Binding;
     Binding.Type = EICDefinitionType::Dialogue; Binding.Table = DialogueTable;
-    // Partial mode does not require NPCs and other definitions to be complete to check dialogue authoring.
+
     Issues.Append(UICDefinitionLibrary::GetValidationIssues({Binding}, false));
     for (const FName RowName : DialogueTable->GetRowNames())
     {

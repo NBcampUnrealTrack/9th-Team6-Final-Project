@@ -24,7 +24,7 @@ bool UICShopSubsystem::ResolveService(FName ServiceID,const FICServiceRow*& Serv
     if(!Row){Reason=TEXT("서비스 정의를 찾을 수 없습니다.");return false;}
     if(Row->Type!=EICServiceType::Shop){Reason=TEXT("상점형 서비스가 아닙니다.");return false;}
     const int32 Minute=int32(FMath::FloorToDouble(T->GetClock().GameMinute))%1440;
-    // 영업시간이 비어 있으면 하루 종일 영업으로 봅니다. (일과의 근무 구간은 아래에서 따로 검사합니다.)
+
     bool bOpen=Row->OpeningHours.IsEmpty();
     for(const auto& Hours:Row->OpeningHours)if(Minute>=Hours.OpenGameMinute&&Minute<Hours.CloseGameMinute)bOpen=true;
     if(!bOpen){Reason=TEXT("지금은 영업 시간이 아닙니다.");return false;}
@@ -37,7 +37,7 @@ bool UICShopSubsystem::ResolveService(FName ServiceID,const FICServiceRow*& Serv
     if(Schedule)for(const auto& Segment:Schedule->Segments)
         if(Minute>=Segment.StartGameMinute&&Minute<Segment.EndGameMinute&&Segment.Activity==EICScheduleActivity::Work&&Segment.ServiceIDs.Contains(ServiceID))bWorking=true;
     if(!bWorking){Reason=TEXT("상점 주인이 지금 이 서비스를 근무 중이 아닙니다.");return false;}
-    // TODO: Row->Availability(퀘스트·진행도 조건)는 아직 평가하지 않습니다.
+
     Service=Row;return true;
 }
 
@@ -46,7 +46,7 @@ double UICShopSubsystem::DiscountRatioFor(const FICServiceRow& Service) const
     IC_TRACE_FUNCTION();
     auto* S=GetGameInstance()?GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr;
     const int32 Affinity=S?S->GetSnapshot(Service.NPCID).Affinity:0;
-    // 만족한 MinimumAffinity 구간 중 가장 높은 구간의 할인율을 적용합니다.
+
     int32 BestTier=-1;double Ratio=0.;
     for(const auto& Tier:Service.AffinityDiscounts)if(Affinity>=Tier.MinimumAffinity&&Tier.MinimumAffinity>BestTier){BestTier=Tier.MinimumAffinity;Ratio=Tier.DiscountRatio;}
     return FMath::Clamp(Ratio,0.,1.);
@@ -95,7 +95,7 @@ bool UICShopSubsystem::Buy(AICPlayerController* Player,FName ServiceID,FName Ite
     const int64 Total=int64(Offer->FinalPrice)*Count;
     const int32 Before=Player->Gold;
     if(Total>Before){Reason=TEXT("골드가 부족합니다.");return false;}
-    // 골드를 먼저 차감하고 아이템을 전부 지급합니다. 지급이 실패하면 골드를 환불해 일부만 바뀌지 않게 합니다.
+
     if(!Player->SetGold(Before-int32(Total))){Reason=TEXT("골드를 차감하지 못했습니다.");return false;}
     if(!Inventory->AddItem(ItemID,Count,false))
     {
@@ -119,7 +119,7 @@ bool UICShopSubsystem::Sell(AICPlayerController* Player,FName ServiceID,FName It
     const int64 Total=int64(Item->SellPrice)*Count;
     const int32 Before=Player->Gold;
     if(int64(Before)+Total>MAX_int32){Reason=TEXT("골드 보유 한도를 넘습니다.");return false;}
-    // 아이템을 먼저 소비하고 골드를 지급합니다. 골드 지급이 실패하면 아이템을 되돌립니다.
+
     if(!Inventory->Consume(ItemID,Count)){Reason=TEXT("아이템을 소비하지 못했습니다.");return false;}
     if(!Player->SetGold(Before+int32(Total)))
     {

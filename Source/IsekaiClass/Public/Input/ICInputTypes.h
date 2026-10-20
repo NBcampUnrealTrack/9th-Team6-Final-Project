@@ -3,20 +3,44 @@
 #include "InputAction.h"
 #include "ICInputTypes.generated.h"
 
-UENUM(BlueprintType, meta=(ToolTip="입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."))
+UENUM(BlueprintType)
 enum class EICInputCommand : uint8
 {
-    Jump UMETA(ToolTip="점프 시작/해제를 요청합니다. 기본 키는 Space입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Attack UMETA(ToolTip="일반 공격을 요청합니다. 기본 키는 마우스 좌클릭입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Block UMETA(ToolTip="방어 시작/해제를 요청합니다. 기본 키는 마우스 우클릭입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Dodge UMETA(ToolTip="입력 회피를 요청합니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), NextTarget UMETA(ToolTip="다음 적 선택을 요청합니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Interact UMETA(ToolTip="가까운 상호작용 대상 실행을 요청합니다. 기본 키는 F입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Skill UMETA(ToolTip="Slot 0~3의 직업 스킬을 요청합니다. 기본 키는 Q/E/R/T입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), CompanionSkill UMETA(ToolTip="Slot 0~3의 동료 스킬을 요청합니다. 기본 키는 Z/X/C/V입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), QuickSlot UMETA(ToolTip="Slot 0~3의 퀵슬롯을 사용합니다. 기본 키는 1/2/3/4입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."),
-    Inventory UMETA(ToolTip="가방 화면을 요청합니다. 기본 키는 I입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Quest UMETA(ToolTip="퀘스트 화면을 요청합니다. 기본 키는 O입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Map UMETA(ToolTip="지도 화면을 요청합니다. 기본 키는 M입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Party UMETA(ToolTip="동료 화면을 요청합니다. 기본 키는 P입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Menu UMETA(ToolTip="취소/메뉴 동작을 요청합니다. 기본 키는 ESC입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Save UMETA(ToolTip="저장 메뉴를 요청합니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Load UMETA(ToolTip="불러오기 메뉴를 요청합니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Confirm UMETA(ToolTip="현재 선택의 확정을 요청합니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."),
-    Equipment UMETA(ToolTip="장비 화면을 요청합니다. 기본 키는 B입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Stats UMETA(ToolTip="능력치 화면을 요청합니다. 기본 키는 L입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Skills UMETA(ToolTip="스킬 화면을 요청합니다. 기본 키는 K입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), Codex UMETA(ToolTip="도감 화면을 요청합니다. 기본 키는 J입니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), SprintDodge UMETA(ToolTip="Shift 통합 입력입니다. 짧게 누르면 회피, 기준 시간 이상 유지하면 달리기를 요청합니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), TargetToggle UMETA(ToolTip="Tab 통합 입력입니다. 짧게 누르면 적 전환, 기준 시간 이상 유지하면 선택 해제를 요청합니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다."), ClearTarget UMETA(ToolTip="현재 적 선택의 해제를 요청합니다.\n입력 액션이 요청하는 게임 명령입니다. ICPlayerController가 처리하고 실제 전투는 OnCombatRequest 수신 측에 연결합니다. Slot은 필요한 명령에서 0~3입니다.")
+    Jump = 0,
+    Attack = 1,
+    Block = 2 UMETA(Hidden),
+    Dodge = 3,
+    NextTarget = 4,
+    Interact = 5,
+    Skill = 6,
+    CompanionSkill = 7,
+    QuickSlot = 8,
+    Inventory = 9,
+    Quest = 10,
+    Map = 11,
+    Party = 12,
+    Menu = 13,
+    Save = 14,
+    Load = 15,
+    Confirm = 16,
+    Equipment = 17,
+    Stats = 18,
+    Skills = 19,
+    Codex = 20,
+    SprintDodge = 21 UMETA(Hidden),
+    TargetToggle = 22 UMETA(Hidden),
+    ClearTarget = 23,
+    SwitchWeapon = 24,
+    Settings = 25,
+    Fishing = 26
 };
 
-USTRUCT(BlueprintType, meta=(ToolTip="Input Action과 게임 명령·슬롯 번호 연결입니다. 키 자체는 IMC에 지정하고 Controller.CommandActions에는 IA와 수행 명령을 연결합니다.", ShortToolTip="Input Action과 게임 명령·슬롯 번호 연결입니다."))
+USTRUCT(BlueprintType)
 struct FICInputCommandBinding
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input", meta=(ToolTip="IMC에 연결한 Input Action 에셋입니다. Move/Look는 Controller 별도 필드, 나머지 버튼 명령은 이 Action과 Command/Slot을 연결합니다. 키 배정은 IMC에서 합니다.\n입력 자료형: 객체 참조 (UInputAction).\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) TObjectPtr<UInputAction> Action;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input", meta=(ToolTip="IA가 요청할 게임 명령입니다. 실제 키는 IMC에서 지정합니다. Skill/CompanionSkill/QuickSlot에는 Slot 0~3을 함께 작성합니다.\n입력 자료형: 선택 목록 (EICInputCommand).\nC++ 초기값: Interact — 가까운 상호작용 대상 실행을 요청합니다. 기본 키는 F입니다.. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) EICInputCommand Command = EICInputCommand::Interact;
-    // Zero-based slot for Skill, CompanionSkill and QuickSlot; ignored by other commands.
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input", meta=(ClampMin="0", ClampMax="3", ToolTip="명령 슬롯 0~3입니다. Skill=Q/E/R/T, CompanionSkill=Z/X/C/V, QuickSlot=1/2/3/4 대응입니다. 다른 명령은 슬롯을 사용하지 않지만 허용 범위를 넘기지 않습니다.\n입력 자료형: 정수.\nC++ 초기값: 0. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 3.\nBP에서는 조회 전용입니다. 상태 변경은 해당 시스템 API를 사용하세요.")) int32 Slot = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input") TObjectPtr<UInputAction> Action;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input") EICInputCommand Command = EICInputCommand::Interact;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input", meta=(ClampMin="0", ClampMax="3")) int32 Slot = 0;
 };

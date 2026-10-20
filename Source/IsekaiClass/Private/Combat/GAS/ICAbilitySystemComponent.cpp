@@ -48,7 +48,7 @@ bool UICAbilitySystemComponent::Restore(const FICCharacterState& State)
 {
     IC_TRACE_FUNCTION(); FString Reason; if (!CanRestore(State, Reason)) { UE_LOG(LogICWorldState, Warning, TEXT("[GAS.RestoreRejected] %s"), *Reason); return false; }
     const bool IdentityChanged = Runtime.CharacterId != State.CharacterId;
-    // A character change notification may be a resource transaction during an action; do not cancel it as a load.
+
     if (IdentityChanged) CancelAction();
     { TGuardValue<bool> Guard(bRestoring, true); Runtime = State; bReady = true;
     SetNumericAttributeBase(UICCombatAttributeSet::GetMaxHealthAttribute(), State.MaxHP);
@@ -139,7 +139,7 @@ void UICAbilitySystemComponent::Shutdown()
 { IC_TRACE_FUNCTION(); CancelAction();SetGuarding(false); bReady = false; for (const auto& Entry : EffectHandles) RemoveActiveGameplayEffect(Entry.Value); EffectHandles.Reset(); }
 void UICAbilitySystemComponent::ResetExecutionForLoad()
 {
-    IC_TRACE_FUNCTION();CancelAction();SetGuarding(false);RecentCombatAt=-100;RetryAt=DodgeReadyAt=StaggerReadyAt=StaggerUntil=0;
+    IC_TRACE_FUNCTION();CancelAction();SetGuarding(false);RecentCombatAt=-100;DodgeReadyAt=StaggerReadyAt=StaggerUntil=0;
     ComboIndex=0;ComboReadyUntil=BufferedAttackUntil=0;SetLooseGameplayTagCount(ICTags::Staggered,0);
 }
 void UICAbilitySystemComponent::AdvanceNaturalSP(double Seconds)

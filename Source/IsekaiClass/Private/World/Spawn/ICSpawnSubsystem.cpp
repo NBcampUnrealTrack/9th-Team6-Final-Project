@@ -98,7 +98,7 @@ void UICSpawnSubsystem::RefreshSpawns()
         const FName Key=FName(*(ID.ToString()+TEXT(":")+FString::FromInt(Slot.SpawnSlotIndex)));WantedKeys.Add(Key);if(auto* A=Enemies.Find(Key);A&&A->IsValid())continue;
         const auto World=S->ExportState();const auto* Saved=World.SpawnSlots.Find(Key);if(Saved&&Saved->bDefeated&&(Saved->bRewardPending||T->GetClock().PlaySecond<Saved->RespawnReadyAtPlaySecond))continue;
         UClass* Type=Monster->PawnClass.IsNull()?AICEnemyBase::StaticClass():Monster->PawnClass.LoadSynchronous();if(!Type||!Type->IsChildOf(AICEnemyBase::StaticClass())){UE_LOG(LogICData,Warning,TEXT("[Spawn.EnemyClassInvalid] %s"),*Slot.MonsterID.ToString());continue;}
-        // Preserve the corpse's deadline until it has expired; reset the new incarnation only after successful spawn.
+
         auto* Actor=GetWorld()->SpawnActor<AICEnemyBase>(Type,Origin);if(Actor){if(!Actor->InitializeEnemy(ID,Slot,Origin))Actor->Destroy();else {Enemies.Add(Key,Actor);auto Next=S->ExportState();auto& New=Next.SpawnSlots.FindChecked(Key);New.bDefeated=false;New.RespawnReadyAtPlaySecond=0;S->ApplyWorldProgress(Next);}}
     }
     for(auto It=Enemies.CreateIterator();It;++It)if(!WantedKeys.Contains(It.Key())){if(It.Value().IsValid())It.Value()->Destroy();It.RemoveCurrent();}
@@ -113,7 +113,7 @@ bool UICSpawnSubsystem::CanRestoreActors(const FICWorldState& State) const
 void UICSpawnSubsystem::RestoreActors()
 {
     IC_TRACE_FUNCTION();TGuardValue<bool> Guard(bRefreshing,true);auto N=NPCs;auto E=Enemies;NPCs.Reset();Enemies.Reset();ReviveReservations.Reset();NPCsWaitingForAnchor.Reset();
-    // EndPlay must not flush an old incarnation over the newly loaded persistent state.
+
     for(const auto& P:N)if(P.Value.IsValid()){P.Value->ReleaseForLoad();P.Value->Destroy();}
     for(const auto& P:E)if(P.Value.IsValid()){P.Value->ReleaseForLoad();P.Value->Destroy();}NextRefreshAt=-1;
 }

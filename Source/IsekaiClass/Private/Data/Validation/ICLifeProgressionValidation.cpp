@@ -180,7 +180,7 @@ void CheckCycles(const FICDefinitionGraph& Graph, const TSet<FName>& Nodes,
     TArray<FICDefinitionIssue>& Issues, const FString& Kind)
 {
     IC_TRACE_FUNCTION();
-    // 1 = on the current recursion path, 2 = completely visited. A shared DAG descendant is valid.
+
     TMap<FName, uint8> Colors;
     TFunction<void(FName)> Visit;
     Visit = [&](FName Node)
@@ -312,7 +312,7 @@ void ValidateLifeProgression(const TArray<FICDefinitionTable>& Tables, bool bCom
     TArray<FICDefinitionIssue>& Issues)
 {
     IC_TRACE_FUNCTION();
-    // Cross-table missing references and release-content counts are handled by the common validator.
+
     ForEachActiveRow<FICProductionRow>(Tables, bComplete, [&](const FICProductionRow& Row, const FICRowSite& Site)
     {
         IC_TRACE_FUNCTION();
@@ -546,7 +546,7 @@ void ValidateLifeProgression(const TArray<FICDefinitionTable>& Tables, bool bCom
                     const FICFishRow* const* FoundFish = FishDefinitions.Find(Selection.FishID);
                     if (!FoundFish)
                     {
-                        bHasUnknownCandidate = true; // Common reference validation reports the unresolved species.
+                        bHasUnknownCandidate = true;
                         continue;
                     }
                     const FICFishRow& Fish = **FoundFish;
@@ -610,7 +610,7 @@ void ValidateLifeProgression(const TArray<FICDefinitionTable>& Tables, bool bCom
         CheckUniqueNames(Issues, Site, TEXT("SuccessorQuestIDs"), Row.SuccessorQuestIDs);
         for (int32 Index = 0; Index < Row.PrerequisiteQuestIDs.Num(); ++Index)
         {
-            // Both links use chronological direction: prerequisite -> this quest -> successor.
+
             AddGraphEdge(QuestGraph, Row.PrerequisiteQuestIDs[Index], Row.ID, Site,
                 FString::Printf(TEXT("PrerequisiteQuestIDs[%d]"), Index));
         }

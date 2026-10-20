@@ -95,7 +95,7 @@ int32 UICInventoryComponent::TryAddItem(FName ID, int32 Count)
     if (D->Kind == EPlayerItemKind::Quest)
     {
         FPlayerContainer C; C.Slots = Next.QuestItems;
-        // Avoid oversized allocation from malformed requests.
+
         if (Count > 100000) { Fail(TEXT("한 번에 추가할 수 있는 수량을 초과했습니다.")); return Count; }
         C.Slots.SetNum(C.Slots.Num() + FMath::DivideAndRoundUp(Count, FMath::Clamp(D->StackLimit, 1, 99)));
         Added = Insert(C, ID, Count);
@@ -250,9 +250,53 @@ bool UICInventoryComponent::Equip(int32 Index)
     FICDefinitionResult Lookup;
     const auto* Gear=GetDefinitions()?GetDefinitions()->Find<FICEquipmentRow>(D->EquipmentID,Lookup):nullptr;
     if(!Gear || Gear->Slot!=D->EquipSlot)return Fail(TEXT("장비 정의가 누락되었습니다."));
-    if(Gear->RequiredClass!=EICCharacterClass::None && static_cast<int32>(Gear->RequiredClass)!=CurrentClass+1)
+    if(Gear->Slot!=EPlayerEquipSlot::Weapon && Gear->RequiredClass!=EICCharacterClass::None && static_cast<int32>(Gear->RequiredClass)!=CurrentClass+1)
         return Fail(TEXT("현재 직업이 사용할 수 없는 장비입니다."));
     Swap(S, Next.Equipment[static_cast<int32>(D->EquipSlot)]); return Commit(Next);
+}
+
+EICWeaponFamily UICInventoryComponent::GetEquippedWeaponFamily() const
+{
+    const auto Snapshot = GetSnapshot();
+    const int32 Index = static_cast<int32>(EPlayerEquipSlot::Weapon);
+    if (!Snapshot.Equipment.IsValidIndex(Index) || Snapshot.Equipment[Index].IsEmpty()) return EICWeaponFamily::None;
+    const auto* Item = Find(Snapshot.Equipment[Index].ItemID);
+    FICDefinitionResult Result;
+    const auto* Gear = Item && GetDefinitions() ? GetDefinitions()->Find<FICEquipmentRow>(Item->EquipmentID, Result) : nullptr;
+    return Gear ? Gear->WeaponFamily : EICWeaponFamily::None;
+}
+
+bool UICInventoryComponent::CycleWeapon()
+{
+    const auto Snapshot = GetSnapshot();
+    const auto Current = GetEquippedWeaponFamily();
+    TArray<int32> Candidates;
+    for (int32 Index = 0; Index < Snapshot.Bag.Slots.Num(); ++Index)
+    {
+        const auto& Instance = Snapshot.Bag.Slots[Index];
+        const auto* Item = Instance.IsEmpty() || Instance.bLocked ? nullptr : Find(Instance.ItemID);
+        if (!Item || Item->Kind != EPlayerItemKind::Equipment || Item->EquipSlot != EPlayerEquipSlot::Weapon) continue;
+        FICDefinitionResult Result;
+        const auto* Gear = GetDefinitions() ? GetDefinitions()->Find<FICEquipmentRow>(Item->EquipmentID, Result) : nullptr;
+        if (Gear && Gear->WeaponFamily != EICWeaponFamily::None) Candidates.Add(Index);
+    }
+    if (Candidates.IsEmpty()) return Fail(TEXT("교체할 무기가 없습니다."));
+    auto Family = [&](int32 Index)
+    {
+        FICDefinitionResult Result;
+        const auto* Item = Find(Snapshot.Bag.Slots[Index].ItemID);
+        const auto* Gear = GetDefinitions()->Find<FICEquipmentRow>(Item->EquipmentID, Result);
+        return static_cast<int32>(Gear->WeaponFamily);
+    };
+    Candidates.Sort([&](int32 A, int32 B)
+    {
+        const int32 RankA = (Family(A) - static_cast<int32>(Current) + 4) % 4;
+        const int32 RankB = (Family(B) - static_cast<int32>(Current) + 4) % 4;
+        const int32 PriorityA = RankA == 0 ? 4 : RankA;
+        const int32 PriorityB = RankB == 0 ? 4 : RankB;
+        return PriorityA == PriorityB ? A < B : PriorityA < PriorityB;
+    });
+    return Equip(Candidates[0]);
 }
 
 bool UICInventoryComponent::Unequip(EPlayerEquipSlot Slot)
@@ -376,7 +420,7 @@ int32 UICInventoryComponent::TryAddItemInstance(const FPlayerItemInstance& Item)
     if(!Definition||Item.IsEmpty())return FMath::Max(0,Item.Count);
     if(Definition->Kind==EPlayerItemKind::Quest)
     {
-        // Pickups cannot create overflow drops. Quest inventory is separate.
+
         auto Next=GetSnapshot(); FPlayerContainer Container; Container.Slots=Next.QuestItems;
         if(Item.Count>100000)return Item.Count;
         Container.Slots.SetNum(Container.Slots.Num()+FMath::DivideAndRoundUp(Item.Count,FMath::Clamp(Definition->StackLimit,1,99)));

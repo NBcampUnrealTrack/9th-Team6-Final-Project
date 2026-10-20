@@ -5,6 +5,7 @@
 #include "Core/ICGameState.h"
 #include "Core/ICPlayerState.h"
 #include "Engine/World.h"
+#include "Core/Flow/ICGameFlowSubsystem.h"
 
 AICGameMode::AICGameMode()
 {
@@ -13,6 +14,7 @@ AICGameMode::AICGameMode()
     PlayerControllerClass=AICPlayerController::StaticClass();
     GameStateClass=AICGameState::StaticClass();
     PlayerStateClass=AICPlayerState::StaticClass();
+    MainMenuMap=GetDefault<UICGameFlowSettings>()->TitleMap;
     UE_LOG(LogICCore, VeryVerbose, TEXT("[GameMode.Defaults] Class=%s Pawn=%s Controller=%s GameState=%s PlayerState=%s"),*GetNameSafe(GetClass()),*GetNameSafe(DefaultPawnClass.Get()),*GetNameSafe(PlayerControllerClass.Get()),*GetNameSafe(GameStateClass.Get()),*GetNameSafe(PlayerStateClass.Get()));
 }
 
@@ -36,7 +38,7 @@ bool AICGameMode::IsMainMenuLevel() const
 void AICGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
 {
     IC_TRACE_FUNCTION();
-    // A menu controller needs no gameplay pawn or restart attempt.
+
     if (IsMainMenuLevel()) return;
     Super::HandleStartingNewPlayer_Implementation(NewPlayer);
 }

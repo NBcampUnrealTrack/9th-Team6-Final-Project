@@ -49,7 +49,7 @@ bool UICAbilitySystemComponent::ValidateAction(FString& Reason) const
     auto* D=Definitions();if(!D){Reason=TEXT("정의 카탈로그가 없습니다.");return false;}FICDefinitionResult R;
     if(RequestedAction==TEXT("Skill"))
     {
-        if(PlaySecond()<RetryAt||(!bCommitted&&PlaySecond()<Runtime.Combat.SkillReadyAtPlaySecond.FindRef(Skill.ID))){Reason=TEXT("스킬 재사용 대기 중입니다.");return false;}
+        if(!bCommitted&&GetSkillCooldownRemaining(Skill.ID)>0){Reason=TEXT("스킬 재사용 대기 중입니다.");return false;}
         if(Primary&&!Runtime.UnlockedSkillIDs.Contains(Skill.ID)){Reason=TEXT("해금되지 않은 스킬입니다.");return false;}
         if(!Combat||Combat->GetMana()<Skill.MPCost){Reason=TEXT("MP가 부족합니다.");return false;}
         auto* Target=TargetActor.Get();auto* ASC=Target?Target->GetICAbilitySystem():nullptr;
@@ -106,14 +106,14 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
         for(FName ID:Classes)if(const auto* C=D->Find<FICClassRow>(ID,R))
         {
             if(Runtime.Kind==EICCharacterKind::Player)
-            {auto* W=GetWorld()->GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();if(W&&static_cast<int32>(C->CharacterClass)-1==W->ExportState().Job)Class=C;}
+             {if(C->WeaponFamily==GetEquippedWeaponFamily())Class=C;}
             else if(const auto* NPC=D->Find<FICNPCRow>(Runtime.CharacterId,R))if(C->ID==NPC->ClassID)Class=C;
         }
         if(!Class||Class->NormalAttackStages.Num()!=3){UE_LOG(LogICData, Warning, TEXT("[Combat.MissingClass] ID=%s"),*Runtime.CharacterId.ToString());return false;}
         if(PlaySecond()>ComboReadyUntil)ComboIndex=0;const auto& Stage=Class->NormalAttackStages[ComboIndex];
         Skill.Hits={Stage.Hit};Skill.Montage=Stage.Montage;Skill.CastSection=Stage.MontageSection;
         Skill.RecoveryPlaySeconds=FMath::Max(.3,Stage.Hit.StartOffsetPlaySeconds+Stage.Hit.TraceDurationPlaySeconds+.2);Skill.FirstEffectOffsetPlaySeconds=Stage.Hit.StartOffsetPlaySeconds;
-        // Normal attack magnitude is constructed when emitting its hit; it never receives personal CHA.
+
     }
     if(RequestedAction==TEXT("Attack")&&!Primary){FICSkillHitDefinition Hit;Hit.Shape=EICHitShape::Direct;Hit.StartOffsetPlaySeconds=.2;Skill.Hits={Hit};Skill.CastPlaySeconds=.2;Skill.RecoveryPlaySeconds=.6;}
     RunningAbility=Ability;CurrentID=FGuid::NewGuid();StartedAt=PlaySecond();StartLocation=Character->GetActorLocation();bCommitted=false;bCancelWindow=false;ActiveMontageInstanceID=INDEX_NONE;EmittedHits.Reset();HitReceipts.Reset();OpenTraceHits.Reset();LastTraceStart.Reset();LastTraceEnd.Reset();TraceEndsAt.Reset();
@@ -143,7 +143,8 @@ void UICAbilitySystemComponent::CancelAction()
 void UICAbilitySystemComponent::EndCurrentAction(bool Cancelled)
 {
     IC_TRACE_FUNCTION();if(bEnding||!CurrentID.IsValid())return;TGuardValue<bool> Guard(bEnding,true);
-    if(Cancelled&&RequestedAction==TEXT("Skill")&&!bCommitted)RetryAt=PlaySecond()+Skill.BeforeFirstEffectRetryPlaySeconds;
+    if(Cancelled&&RequestedAction==TEXT("Skill")&&!bCommitted)
+        Runtime.Combat.SkillReadyAtPlaySecond.Add(Skill.ID,FMath::Max(Runtime.Combat.SkillReadyAtPlaySecond.FindRef(Skill.ID),PlaySecond()+Skill.BeforeFirstEffectRetryPlaySeconds));
     if(RequestedAction==TEXT("Attack")){FICDefinitionResult R;const auto* Settings=Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;ComboIndex=Cancelled?0:(ComboIndex+1)%3;ComboReadyUntil=PlaySecond()+(Settings?Settings->ComboWindowPlaySeconds:.8);}
     if(Cancelled)if(auto* C=Cast<AICCharacterBase>(GetAvatarActor()))if(auto* Anim=C->GetMesh()->GetAnimInstance())if(auto* Montage=Skill.Montage.Get())Anim->Montage_Stop(.1f,Montage);
     ClearActionTags();OpenTraceHits.Reset();ActiveMontageInstanceID=INDEX_NONE;CurrentID.Invalidate();RunningAbility=nullptr;OnStateChanged.Broadcast();
@@ -195,9 +196,9 @@ bool UICAbilitySystemComponent::EmitHit(int32 Index,bool ContinueTrace)
         for(FName ID:Classes)if(const auto* Class=Definitions()->Find<FICClassRow>(ID,R))
         {
             bool Match=false;
-            if(Runtime.Kind==EICCharacterKind::Player){auto* W=GetWorld()->GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();Match=W&&static_cast<int32>(Class->CharacterClass)-1==W->ExportState().Job;}
+            if(Runtime.Kind==EICCharacterKind::Player)Match=Class->WeaponFamily==GetEquippedWeaponFamily();
             else if(const auto* NPC=Definitions()->Find<FICNPCRow>(Runtime.CharacterId,R))Match=NPC->ClassID==ID;
-            if(Match&&Class->NormalAttackStages.IsValidIndex(ComboIndex)){const auto& S=Class->NormalAttackStages[ComboIndex];Normal.DamageType=Class->NormalAttackDamageType;Normal.Magnitude.Coefficient=S.DamageCoefficient;Normal.Magnitude.FlatAmount=S.FixedDamage;Normal.Magnitude.bApplyPersonalCHA=false;Effect=&Normal;break;}
+            if(Match&&Class->NormalAttackStages.IsValidIndex(ComboIndex)){const auto& S=Class->NormalAttackStages[ComboIndex];Normal.DamageType=Class->NormalAttackDamageType;Normal.Magnitude.SourceStat=Normal.DamageType==EICDamageType::Magical?EICStat::MagicAttack:EICStat::PhysicalAttack;Normal.Magnitude.Coefficient=S.DamageCoefficient;Normal.Magnitude.FlatAmount=S.FixedDamage;Normal.Magnitude.bApplyPersonalCHA=false;Effect=&Normal;break;}
         }
     }
     else Effect=Definitions()?Definitions()->Find<FICSkillEffectRow>(Hit->EffectID,R):nullptr;
@@ -258,7 +259,9 @@ bool UICAbilitySystemComponent::NotifyFromMontage(int32 InstanceID,FName Event,i
 FICCombatResult UICAbilitySystemComponent::RequestSkillByID(FName SkillID,FName TargetID)
 {
     IC_TRACE_FUNCTION();FICCombatResult Result;auto* Spawn=GetWorld()?GetWorld()->GetSubsystem<UICSpawnSubsystem>():nullptr;if(!Spawn){Result.Reason=TEXT("스폰 시스템이 없습니다.");return Result;}
-    auto* Target=Spawn->FindCharacter(TargetID);FICDefinitionResult R;const auto* Row=Definitions()?Definitions()->Find<FICSkillRow>(SkillID,R):nullptr;if(!Row){Result.Reason=R.Reason;return Result;}
+    auto* Target=Spawn->FindCharacter(TargetID);
+    if(!Target)for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)if(It->GetCharacterID()==TargetID){Target=*It;break;}
+    FICDefinitionResult R;const auto* Row=Definitions()?Definitions()->Find<FICSkillRow>(SkillID,R):nullptr;if(!Row){Result.Reason=R.Reason;return Result;}
     if(!Target&&Row->TargetRules.TargetState==EICCombatTargetState::Downed)Target=Spawn->ReserveReviveTarget(TargetID,this,Result.Reason);
     if(!Target){if(Result.Reason.IsEmpty())Result.Reason=TEXT("활성 대상이 없습니다.");return Result;}
     return RequestAction(TEXT("Skill"),SkillID,Target);

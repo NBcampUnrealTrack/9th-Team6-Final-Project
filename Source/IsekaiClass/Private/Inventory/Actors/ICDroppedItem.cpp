@@ -54,7 +54,7 @@ void AICDroppedItem::TryPickup(AICPlayerController* Controller)
         if(Stored.IsEmpty())continue;const auto* Definition=Inventory->Find(Stored.ItemID);if(!Definition||Definition->Kind==EPlayerItemKind::Quest)return;
         FPlayerItemInstance Copy=Stored;Copy.InstanceID=FGuid::NewGuid();
         const int32 Added=Inventory->Insert(Next.Inventory.Bag,Copy.ItemID,Copy.Count,&Copy);if(Added<=0)continue;
-        // Full transfers preserve identity; partial stacks get a new identity in the bag.
+
         if(Added==Stored.Count)for(auto& Slot:Next.Inventory.Bag.Slots)if(Slot.InstanceID==Copy.InstanceID)Slot.InstanceID=Stored.InstanceID;
         Stored.Count-=Added;Changed=true;
     }

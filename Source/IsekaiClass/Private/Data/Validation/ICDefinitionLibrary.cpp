@@ -214,7 +214,7 @@ bool UICDefinitionLibrary::ValidateTables(const TArray<FICDefinitionTable>& Tabl
         for(TFieldIterator<FProperty> It(Struct);It;++It)
         {
             FProperty* P=*It;const FString Field=P->GetName();
-            // RecipeID/ItemID retained as identity aliases in old compatible structs.
+
             if(Path.IsEmpty() && ((Field==TEXT("RecipeID")&&Struct->IsChildOf(FPlayerRecipeDefinition::StaticStruct())) || (Field==TEXT("ItemID")&&Struct->IsChildOf(FPlayerItemDefinition::StaticStruct()))))continue;
             FString RefField=Field;
             if(Struct->GetFName()==TEXT("ICSkillHitDefinition") && Field==TEXT("EffectID")) RefField=TEXT("SkillEffectID");
@@ -302,7 +302,7 @@ bool UICDefinitionLibrary::ValidateTables(const TArray<FICDefinitionTable>& Tabl
             ValidationIssue.Severity==EICDefinitionSeverity::Error?TEXT("Error"):TEXT("Warning"),
             *ValidationIssue.Table,*ValidationIssue.Row.ToString(),*ValidationIssue.Field,*ValidationIssue.Reason);
     }
-    // 데이터 작성 검사 결과는 반환값으로 판정합니다. 예상 실패 검사도 실행할 수 있게 UE Error로 승격하지 않습니다.
+
     UE_LOG(LogICData, Log, TEXT("[Validation.Complete] Tables=%d CompleteContent=%d Errors=%d Warnings=%d"),
         Tables.Num(),bRequireCompleteContent,ErrorCount,Issues.Num()-ErrorCount);
     return ErrorCount==0;

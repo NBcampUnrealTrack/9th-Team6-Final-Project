@@ -41,7 +41,7 @@ bool FICRewardService::PrepareMonsterDefeat(FICWorldState& Candidate,FName Key,c
         auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(D,Next.Job);if(!Staging->ApplySnapshot(Next.Inventory)){Reason=TEXT("보상 전 인벤토리가 올바르지 않습니다.");return false;}
         for(const auto& Item:Reward->Items)if(!Staging->AddItem(Item.ItemID,Item.Count,false))
         {if(Reward->Overflow!=EICRewardOverflow::DropExcess||!BuildGroundItem(Item.ItemID,Item.Count,nullptr)){Reason=TEXT("보상 아이템 참조 또는 가방 공간이 부족합니다.");return false;}}
-        Next.Inventory=Staging->GetSnapshot();for(const auto& Affinity:Reward->Affinity){auto* Character=Next.Characters.Find(Affinity.NPCID);if(!Character||Character->Kind==EICCharacterKind::Background){Reason=TEXT("보상 관계 대상이 없습니다.");return false;}Character->Affinity=FMath::Clamp(Character->Affinity+Affinity.Amount,0,100);}
+        Next.Inventory=Staging->GetSnapshot();for(const auto& Affinity:Reward->Affinity){auto* Character=Next.Characters.Find(Affinity.NPCID);if(!Character||Character->Kind==EICCharacterKind::Background){Reason=TEXT("보상 관계 대상이 없습니다.");return false;}Character->Affinity=FMath::Clamp(Character->Affinity+Affinity.Amount,0,500);}
         for(FName ID:Reward->UnlockRecipeIDs){if(!D->Find<FICRecipeRow>(ID,R)){Reason=R.Reason;return false;}Next.UnlockedRecipeIDs.Add(ID);}
     }
     if(Gold>MAX_int32||Gold<0){Reason=TEXT("보상 후 골드 범위를 초과합니다.");return false;}

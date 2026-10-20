@@ -80,125 +80,119 @@ void AICPlayerController::Look(const FInputActionValue& Value)
     }
 }
 
+
 void AICPlayerController::PlayerTick(float DeltaSeconds)
 {
-    IC_TRACE_FUNCTION();
     Super::PlayerTick(DeltaSeconds);
     if (!IsLocalController() || IsMainMenuLevel()) return;
-    TryInitializeGameplay();SyncSaveSafety();
+    TryInitializeGameplay();
+    SyncSaveSafety();
     if (!CanHandleGameplayInput()) ResetHeldInput();
-    else
-    {
-        const double Now=FPlatformTime::Seconds();
-        if(bSprintKeyHeld && Now-SprintPressedAt>=SprintHoldSeconds) bSprinting=true;
-        if(bTargetKeyHeld && !bTargetHoldHandled && Now-TargetPressedAt>=TargetHoldSeconds)
-        { bTargetHoldHandled=true;HandleInputCommand(EICInputCommand::ClearTarget); }
-    }
-    if (bDirty) { bDirty=false;UpdateScreens(); }
+    if (bDirty) { bDirty=false; UpdateScreens(); }
     const auto* Target=CanHandleGameplayInput()?FindInteractionTarget():nullptr;
     const auto* NPC=CanHandleGameplayInput()?FindNPCInteractionTarget():nullptr;
-    const FString Hint=NPC?NPC->GetInteractionText().ToString()
-        :Target?Target->GetInteractionText().ToString():FString();
-    if (Hint!=InteractionHint) { InteractionHint=Hint;bDirty=true; }
-    if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=C->GetICAbilitySystem())
+    const FString Hint=NPC?NPC->GetInteractionText().ToString():Target?Target->GetInteractionText().ToString():FString();
+    if (Hint!=InteractionHint) { InteractionHint=Hint; bDirty=true; }
+    auto* C=Cast<AICPlayerCharacter>(GetPawn());
+    auto* ASC=C?C->GetICAbilitySystem():nullptr;
+    if (!ASC) return;
+    bInCombat=ASC->HasRecentCombat();
+    FICDefinitionResult Result;
+    FICCombatSettingsRow Defaults;
+    const auto* Settings=ASC->Definitions()?ASC->Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),Result):nullptr;
+    if (!Settings) Settings=&Defaults;
+    if (CombatTarget.IsValid())
     {
-        bInCombat=ASC->HasRecentCombat();
-        FICDefinitionResult R;FICCombatSettingsRow Defaults;const auto* Settings=ASC->Definitions()?ASC->Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;if(!Settings)Settings=&Defaults;
-        if(CombatTarget.IsValid())
+        auto* Selected=CombatTarget.Get();
+        auto* SelectedASC=Selected->GetICAbilitySystem();
+        if (!SelectedASC || !SelectedASC->IsAlive() || FVector::DistSquared(C->GetActorLocation(),Selected->GetActorLocation())>FMath::Square(Settings->LockOnMaintainDistanceCm))
+        { CombatTarget.Reset(); TargetOccludedAt=-1; }
+        else
         {
-            auto* Selected=CombatTarget.Get();auto* SelectedASC=Selected->GetICAbilitySystem();const double Now=ASC->PlaySecond();
-            if(!SelectedASC||!SelectedASC->IsAlive()||FVector::DistSquared(C->GetActorLocation(),Selected->GetActorLocation())>FMath::Square(Settings->LockOnMaintainDistanceCm)){CombatTarget.Reset();TargetOccludedAt=-1;}
-            else
+            FHitResult Hit;
+            FCollisionQueryParams Query;
+            Query.AddIgnoredActor(C);
+            Query.AddIgnoredActor(Selected);
+            if (GetWorld()->LineTraceSingleByChannel(Hit,C->GetActorLocation(),Selected->GetActorLocation(),ECC_Visibility,Query))
             {
-                FHitResult Hit;FCollisionQueryParams Q;Q.AddIgnoredActor(C);Q.AddIgnoredActor(Selected);
-                if(GetWorld()->LineTraceSingleByChannel(Hit,C->GetActorLocation(),Selected->GetActorLocation(),ECC_Visibility,Q))
-                {if(TargetOccludedAt<0)TargetOccludedAt=Now;if(Now-TargetOccludedAt>=Settings->LockOnOcclusionPlaySeconds){CombatTarget.Reset();TargetOccludedAt=-1;}}
-                else TargetOccludedAt=-1;
+                if (TargetOccludedAt<0) TargetOccludedAt=ASC->PlaySecond();
+                if (ASC->PlaySecond()-TargetOccludedAt>=Settings->LockOnOcclusionPlaySeconds) { CombatTarget.Reset(); TargetOccludedAt=-1; }
             }
+            else TargetOccludedAt=-1;
         }
-        const double Run=ASC->Stat(EICStat::MoveSpeed);const double Speed=bSprinting?Run:Run*Settings->WalkSpeedCmPerSecond/FMath::Max(1.,Settings->RunSpeedCmPerSecond);
-        C->GetCharacterMovement()->MaxWalkSpeed=Speed*(Survival.IsExhausted()?ExhaustedMoveSpeedMultiplier:1.f)*(bBlocking?Settings->GuardMoveSpeedMultiplier:1.);
     }
+    C->GetCharacterMovement()->MaxWalkSpeed=ASC->Stat(EICStat::MoveSpeed)*(Survival.IsExhausted()?ExhaustedMoveSpeedMultiplier:1.f);
 }
 
 void AICPlayerController::ResetHeldInput()
 {
-    IC_TRACE_FUNCTION();
-    bSprintKeyHeld=false;bSprinting=false;bTargetKeyHeld=false;bTargetHoldHandled=false;
-    ReleaseInputCommand(EICInputCommand::Block);
     ReleaseInputCommand(EICInputCommand::Jump);
 }
 
 void AICPlayerController::CancelInputCommand(EICInputCommand Command,int32 Slot)
 {
-    IC_TRACE_FUNCTION();
-    UE_LOG(LogICInput, Verbose, TEXT("[Input.Cancelled] Command=%d Slot=%d"),static_cast<int32>(Command),Slot);
-    // Canceled input (focus loss or menu changes) must never execute tap actions.
-    if(Command==EICInputCommand::SprintDodge){bSprintKeyHeld=false;bSprinting=false;return;}
-    if(Command==EICInputCommand::TargetToggle){bTargetKeyHeld=false;bTargetHoldHandled=false;return;}
     ReleaseInputCommand(Command,Slot);
 }
 
 void AICPlayerController::ReleaseInputCommand(EICInputCommand Command,int32 Slot)
 {
-    IC_TRACE_FUNCTION();
-    if(Command==EICInputCommand::SprintDodge)
-    {
-        const bool bTap=bSprintKeyHeld && FPlatformTime::Seconds()-SprintPressedAt<SprintHoldSeconds;
-    UE_LOG(LogICInput, Verbose, TEXT("[Input.ShiftReleased] Tap=%d Sprinting=%d"),bTap,bSprinting);
-        bSprintKeyHeld=false;bSprinting=false;
-        if(bTap && CanHandleGameplayInput())HandleInputCommand(EICInputCommand::Dodge);
-        return;
-    }
-    if(Command==EICInputCommand::TargetToggle)
-    {
-        const bool bWasHeld=bTargetKeyHeld;
-        const bool bHold=bTargetHoldHandled || FPlatformTime::Seconds()-TargetPressedAt>=TargetHoldSeconds;
-        const bool bAlreadyHandled=bTargetHoldHandled;
-    UE_LOG(LogICInput, Verbose, TEXT("[Input.TabReleased] Held=%d HoldAction=%d AlreadyHandled=%d"),bWasHeld,bHold,bAlreadyHandled);
-        bTargetKeyHeld=false;bTargetHoldHandled=false;
-        if(bWasHeld && CanHandleGameplayInput() && !bAlreadyHandled)
-            HandleInputCommand(bHold?EICInputCommand::ClearTarget:EICInputCommand::NextTarget);
-        return;
-    }
-    if (Command==EICInputCommand::Block && bBlocking)
-    { bBlocking=false;ExecuteCombatInput(TEXT("BlockEnd"),0);OnCombatRequest.Broadcast(TEXT("BlockEnd"),0); }
     if (Command==EICInputCommand::Jump)
-        if (auto* TargetCharacter=Cast<ACharacter>(GetPawn())) TargetCharacter->StopJumping();
+        if (auto* InputCharacter=Cast<ACharacter>(GetPawn())) InputCharacter->StopJumping();
 }
 
 void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
 {
-    IC_TRACE_FUNCTION();
-    UE_LOG(LogICInput, Verbose, TEXT("[Input.Command] Command=%d Slot=%d Menu=%s Created=%d Dead=%d"),static_cast<int32>(Command),Slot,*Menu,bCreated,bDead);
     if (!IsLocalController() || Slot<0 || Slot>3) return;
+    if (Command==EICInputCommand::CompanionSkill && Slot>=3) return;
+    if (Command==EICInputCommand::Skill && Slot!=0) return;
+    if (Command==EICInputCommand::Block) return;
+    if (Command==EICInputCommand::SprintDodge) Command=EICInputCommand::Dodge;
+    if (Command==EICInputCommand::TargetToggle) Command=EICInputCommand::NextTarget;
+    if(IsMainMenuLevel()||Menu==TEXT("Create")||Menu==TEXT("Loading"))return;
     if (Menu==TEXT("Confirm"))
-    { if(Command==EICInputCommand::Confirm)ConfirmModal(true);else if(Command==EICInputCommand::Menu)ConfirmModal(false);return; }
-    if (Menu==TEXT("Quit")) { if(Command==EICInputCommand::Menu)CloseSessionMenu();return; }
-    if (Menu==TEXT("Save"))
+    { if(Command==EICInputCommand::Confirm)ConfirmModal(true); else if(Command==EICInputCommand::Menu)ConfirmModal(false); return; }
+    if (Menu==TEXT("Quit")) { if(Command==EICInputCommand::Menu)CloseSessionMenu(); return; }
+    if (Menu==TEXT("Save") || Menu==TEXT("Load"))
     {
         if(Command==EICInputCommand::QuickSlot)SelectSessionSlot(Slot+1);
-        else if(Command==EICInputCommand::Confirm)RequestManualSave();
+        else if(Command==EICInputCommand::Confirm) { if(Menu==TEXT("Save"))RequestManualSave(); else RequestLoadPlayer(); }
         else if(Command==EICInputCommand::Menu)CloseSessionMenu();
         return;
     }
-    if(Menu==TEXT("Load"))
+    if (Command==EICInputCommand::Load) { OpenLoadMenu(); return; }
+    if (Command==EICInputCommand::Menu)
     {
-        if(Command==EICInputCommand::QuickSlot)SelectSessionSlot(Slot+1);
-        else if(Command==EICInputCommand::Confirm||Command==EICInputCommand::Load)RequestLoadPlayer();
-        else if(Command==EICInputCommand::Menu)CloseSessionMenu();
+        if (HasTargetSelection()) CancelTarget();
+        else if (!Menu.IsEmpty()) CloseSessionMenu();
+        else if (bCreated&&!bDead) SetMenu(TEXT("Pause"));
         return;
     }
-    if(Command==EICInputCommand::Load){OpenLoadMenu();return;}
-    if(Command==EICInputCommand::Menu)
+    if (Command==EICInputCommand::Save) { OpenSaveMenu(); return; }
+    if (!bCreated || bDead) return;
+    if (HasTargetSelection())
     {
-        if(!PendingItem.IsNone())CancelTarget();
-        else if(!Menu.IsEmpty())CloseSessionMenu();
-        else if(bCreated&&!bDead)SetMenu(TEXT("Pause"));
+        if (Command==EICInputCommand::CompanionSkill)
+        {
+            if (PendingPartyKey==Slot) SelectTarget(UICWorldStateSubsystem::PlayerId());
+            else
+            {
+                PendingPartyKey=Slot;
+                const auto State=GetWorldState()?GetWorldState()->ExportState():FICWorldState();
+                bool Found=false;
+                for (const auto& Pair:State.Characters)
+                    if(Pair.Value.Mode==EICCharacterMode::Companion && Pair.Value.PartySlot==Slot)
+                    { Found=SelectTarget(Pair.Key); break; }
+                if(!Found)Show(TEXT("해당 동료를 대상으로 선택할 수 없습니다."));
+            }
+        }
+        else if (Command==EICInputCommand::Confirm || (Command==EICInputCommand::Skill&&!PendingSkill.IsNone())) ConfirmSelectedTarget();
+        else if (Command==EICInputCommand::QuickSlot && !PendingItem.IsNone())
+        {
+            if(Slot==PendingQuick)ConfirmSelectedTarget();
+            else if(GetInventory())BeginItem(GetInventory()->GetSnapshot().QuickSlots[Slot],Slot);
+        }
         return;
     }
-    if(Command==EICInputCommand::Save){OpenSaveMenu();return;}
-    if(!bCreated||bDead)return;
     const TCHAR* TargetMenu=nullptr;
     switch(Command)
     {
@@ -210,31 +204,21 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
         case EICInputCommand::Quest:TargetMenu=TEXT("Quest");break;
         case EICInputCommand::Map:TargetMenu=TEXT("Map");break;
         case EICInputCommand::Party:TargetMenu=TEXT("Party");break;
+        case EICInputCommand::Settings:TargetMenu=TEXT("Settings");break;
         default:break;
     }
-    if(TargetMenu){SetMenu(Menu==TargetMenu?TEXT(""):TargetMenu);return;}
-    if(!PendingItem.IsNone())
-    {
-        if(Command==EICInputCommand::QuickSlot&&Menu.IsEmpty()&&GetInventory())
-        {if(Slot==PendingQuick)ConfirmTarget(UICWorldStateSubsystem::PlayerId());else BeginItem(GetInventory()->GetSnapshot().QuickSlots[Slot],Slot);}
-        if(Command==EICInputCommand::CompanionSkill)
-        {if(PendingPartyKey==Slot)ConfirmTarget(UICWorldStateSubsystem::PlayerId());else{PendingPartyKey=Slot;ConfirmPartyTarget(Slot);}}
-        return;
-    }
+    if(TargetMenu) { SetMenu(Menu==TargetMenu?TEXT(""):TargetMenu); return; }
     if(!CanHandleGameplayInput())return;
-    if(Command==EICInputCommand::SprintDodge)
-    { if(!bSprintKeyHeld){bSprintKeyHeld=true;SprintPressedAt=FPlatformTime::Seconds();}return; }
-    if(Command==EICInputCommand::TargetToggle)
-    { if(!bTargetKeyHeld){bTargetKeyHeld=true;bTargetHoldHandled=false;TargetPressedAt=FPlatformTime::Seconds();}return; }
-    if(Command==EICInputCommand::QuickSlot)
-    {if(GetInventory())BeginItem(GetInventory()->GetSnapshot().QuickSlots[Slot],Slot);return;}
-    if(Command==EICInputCommand::Jump){if(auto* TargetCharacter=Cast<ACharacter>(GetPawn()))TargetCharacter->Jump();return;}
-    if(Command==EICInputCommand::Interact){Interact();return;}
+    if(Command==EICInputCommand::QuickSlot) { if(GetInventory())BeginItem(GetInventory()->GetSnapshot().QuickSlots[Slot],Slot); return; }
+    if(Command==EICInputCommand::Jump) { if(auto* InputCharacter=Cast<ACharacter>(GetPawn()))InputCharacter->Jump(); return; }
+    if(Command==EICInputCommand::Interact) { Interact(); return; }
+    if(Command==EICInputCommand::Fishing) { RequestFishing(); return; }
+    if(Command==EICInputCommand::SwitchWeapon)
+    { if(GetInventory()&&GetInventory()->CycleWeapon()) { FlushWorldState(); bDirty=true; OnCombatRequest.Broadcast(TEXT("SwitchWeapon"),0); } return; }
     FName Action=NAME_None;
     switch(Command)
     {
         case EICInputCommand::Attack:Action=TEXT("Attack");break;
-        case EICInputCommand::Block:Action=TEXT("BlockStart");bBlocking=true;break;
         case EICInputCommand::Dodge:Action=TEXT("Dodge");break;
         case EICInputCommand::NextTarget:Action=TEXT("NextTarget");break;
         case EICInputCommand::ClearTarget:Action=TEXT("ClearTarget");break;
@@ -242,12 +226,9 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
         case EICInputCommand::CompanionSkill:Action=TEXT("CompanionSkill");break;
         default:break;
     }
-    if(!Action.IsNone())
-    {
-        ExecuteCombatInput(Action,Slot);
-        OnCombatRequest.Broadcast(Action,Slot);
-    }
+    if(!Action.IsNone()) { ExecuteCombatInput(Action,Slot); OnCombatRequest.Broadcast(Action,Slot); }
 }
+
 AICInteractionActor* AICPlayerController::FindInteractionTarget() const
 {
     IC_TRACE_FUNCTION();
@@ -368,33 +349,123 @@ void AICPlayerController::Interact()
     if(!Object->TryInteract(this))Show(TEXT("현재 이 대상과 상호작용할 수 없습니다. 액터 설정을 확인하세요."));
 }
 
+
+void AICPlayerController::SelectCombatTarget(bool Next)
+{
+    auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());
+    auto* ASC=PlayerCharacter?PlayerCharacter->GetICAbilitySystem():nullptr;
+    if(!ASC||!GetWorld())return;
+    FVector CameraLocation;
+    FRotator CameraRotation;
+    GetPlayerViewPoint(CameraLocation,CameraRotation);
+    FICDefinitionResult Result;
+    FICCombatSettingsRow Defaults;
+    const auto* Settings=ASC->Definitions()?ASC->Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),Result):nullptr;
+    if(!Settings)Settings=&Defaults;
+    struct FCandidate { AICCharacterBase* Actor; double Angle; double Distance; };
+    TArray<FCandidate> Targets;
+    for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)
+    {
+        auto* Target=*It;
+        auto* TargetASC=Target->GetICAbilitySystem();
+        const double Distance=FVector::DistSquared(PlayerCharacter->GetActorLocation(),Target->GetActorLocation());
+        if(!PlayerCharacter->IsHostileTo(Target)||!TargetASC||!TargetASC->IsAlive()||Distance>FMath::Square(Settings->LockOnDistanceCm))continue;
+        const double Facing=FVector::DotProduct(CameraRotation.Vector(),(Target->GetActorLocation()-CameraLocation).GetSafeNormal());
+        if(Facing<=0)continue;
+        FHitResult Hit;
+        FCollisionQueryParams Query;
+        Query.AddIgnoredActor(PlayerCharacter);
+        Query.AddIgnoredActor(Target);
+        if(GetWorld()->LineTraceSingleByChannel(Hit,CameraLocation,Target->GetActorLocation(),ECC_Visibility,Query))continue;
+        Targets.Add({Target,1.-Facing,Distance});
+    }
+    Targets.Sort([](const FCandidate& A,const FCandidate& B)
+    {
+        if(!FMath::IsNearlyEqual(A.Angle,B.Angle))return A.Angle<B.Angle;
+        if(!FMath::IsNearlyEqual(A.Distance,B.Distance))return A.Distance<B.Distance;
+        return A.Actor->GetUniqueID()<B.Actor->GetUniqueID();
+    });
+    const int32 Current=Targets.IndexOfByPredicate([&](const FCandidate& C){return C.Actor==CombatTarget.Get();});
+    CombatTarget=Targets.IsEmpty()?nullptr:Targets[Next&&Current!=INDEX_NONE?(Current+1)%Targets.Num():0].Actor;
+    TargetOccludedAt=-1;
+    bDirty=true;
+}
+
 void AICPlayerController::ExecuteCombatInput(FName Action,int32 Slot)
 {
-    IC_TRACE_FUNCTION();auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());auto* ASC=PlayerCharacter?PlayerCharacter->GetICAbilitySystem():nullptr;if(!ASC)return;
-    if(Action==TEXT("ClearTarget")){CombatTarget.Reset();TargetOccludedAt=-1;return;}
-    if(Action==TEXT("NextTarget"))
-    {
-        FICDefinitionResult R;FICCombatSettingsRow Defaults;const auto* Settings=ASC->Definitions()?ASC->Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;if(!Settings)Settings=&Defaults;
-        TArray<AICCharacterBase*> Targets;for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)if(PlayerCharacter->IsHostileTo(*It)&&It->GetICAbilitySystem()&&It->GetICAbilitySystem()->IsAlive()&&FVector::DistSquared(PlayerCharacter->GetActorLocation(),It->GetActorLocation())<=FMath::Square(Settings->LockOnDistanceCm))
-        {FHitResult Hit;FCollisionQueryParams Q;Q.AddIgnoredActor(PlayerCharacter);Q.AddIgnoredActor(*It);if(!GetWorld()->LineTraceSingleByChannel(Hit,PlayerCharacter->GetActorLocation(),It->GetActorLocation(),ECC_Visibility,Q))Targets.Add(*It);}
-        Targets.Sort([PlayerCharacter](const AICCharacterBase& A,const AICCharacterBase& B){return FVector::DistSquared(A.GetActorLocation(),PlayerCharacter->GetActorLocation())<FVector::DistSquared(B.GetActorLocation(),PlayerCharacter->GetActorLocation());});
-        const int32 Index=Targets.IndexOfByKey(CombatTarget.Get());CombatTarget=Targets.IsEmpty()?nullptr:Targets[(Index+1)%Targets.Num()];TargetOccludedAt=-1;return;
-    }
+    auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());
+    auto* Caster=static_cast<AICCharacterBase*>(PlayerCharacter);
+    auto* ASC=Caster?Caster->GetICAbilitySystem():nullptr;
+    if(!ASC)return;
+    if(Action==TEXT("ClearTarget")) { CombatTarget.Reset(); TargetOccludedAt=-1; return; }
+    if(Action==TEXT("NextTarget")) { SelectCombatTarget(true); return; }
     FName SkillID;
     if(Action==TEXT("CompanionSkill"))
     {
-        AICCharacterBase* Companion=nullptr;for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It){const auto S=GetWorldState()->GetSnapshot(It->GetCharacterID());if(S.PartySlot==Slot&&S.Mode==EICCharacterMode::Companion){Companion=*It;break;}}
-        ASC=Companion?Companion->GetICAbilitySystem():nullptr;if(!ASC){Show(TEXT("활성 동료가 없습니다."));return;}
-        FICDefinitionResult R;const auto* NPC=ASC->Definitions()->Find<FICNPCRow>(Companion->GetCharacterID(),R);const auto* Base=NPC?ASC->Definitions()->Find<FICRecruitCombatRow>(NPC->RecruitCombatID,R):nullptr;
-        if(!Base){Show(R.Reason);return;}SkillID=Base->UniqueSkillID;Action=TEXT("Skill");
+        if(Slot<0||Slot>=3)return;
+        Caster=nullptr;
+        for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)
+        {
+            const auto State=GetWorldState()->GetSnapshot(It->GetCharacterID());
+            if(State.Mode==EICCharacterMode::Companion&&State.PartySlot==Slot&&!State.IsDowned()) { Caster=*It; break; }
+        }
+        ASC=Caster?Caster->GetICAbilitySystem():nullptr;
+        if(!ASC) { Show(TEXT("활성 동료가 없습니다.")); return; }
+        FICDefinitionResult Result;
+        const auto* NPC=ASC->Definitions()?ASC->Definitions()->Find<FICNPCRow>(Caster->GetCharacterID(),Result):nullptr;
+        const auto* Base=NPC?ASC->Definitions()->Find<FICRecruitCombatRow>(NPC->RecruitCombatID,Result):nullptr;
+        if(!Base) { Show(Result.Reason); return; }
+        SkillID=Base->UniqueSkillID;
+        Action=TEXT("Skill");
     }
     else if(Action==TEXT("Skill"))
     {
-        TArray<FName> IDs;ASC->Definitions()->GetDefinitionIDs(EICDefinitionType::Class,IDs);FICDefinitionResult R;
-        for(FName ID:IDs)if(const auto* Class=ASC->Definitions()->Find<FICClassRow>(ID,R))if(static_cast<int32>(Class->CharacterClass)-1==Job){const FName Slots[]={Class->SkillSlot1ID,Class->SkillSlot2ID,Class->SkillSlot3ID,Class->SkillSlot4ID};SkillID=Slots[Slot];break;}
-        if(SkillID.IsNone()||!ASC->Capture().UnlockedSkillIDs.Contains(SkillID)){Show(TEXT("해당 슬롯의 해금 스킬이 없습니다."));return;}
+        SkillID=ASC->GetCurrentWeaponSkill();
+        if(SkillID.IsNone()) { Show(TEXT("현재 무기에 장착한 해금 스킬이 없습니다.")); return; }
     }
-    AICCharacterBase* Target=CombatTarget.Get();
-    if(Action==TEXT("Skill")){FICDefinitionResult R;if(const auto* S=ASC->Definitions()->Find<FICSkillRow>(SkillID,R))if(S->TargetRules.Target==EICCombatTarget::Self)Target=Cast<AICCharacterBase>(ASC->GetAvatarActor());}
-    const auto Result=ASC->RequestAction(Action,SkillID,Target);if(!Result.bSuccess){bBlocking=false;Show(Result.Reason);}
+    if(Action==TEXT("Skill"))
+    {
+        FICDefinitionResult Result;
+        const auto* Skill=ASC->Definitions()?ASC->Definitions()->Find<FICSkillRow>(SkillID,Result):nullptr;
+        if(!Skill) { Show(Result.Reason); return; }
+        if(Skill->Purpose!=EICSkillPurpose::Attack&&Skill->Purpose!=EICSkillPurpose::Utility)
+        { BeginSkillTarget(Caster,SkillID); return; }
+        if(Skill->TargetRules.Target==EICCombatTarget::Self)
+        { const auto Cast=ASC->RequestAction(Action,SkillID,Caster); if(!Cast.bSuccess)Show(Cast.Reason); return; }
+    }
+    if(!CombatTarget.IsValid())SelectCombatTarget(false);
+    const auto Result=ASC->RequestAction(Action,SkillID,CombatTarget.Get());
+    if(!Result.bSuccess)Show(Result.Reason);
+}
+
+FName AICPlayerController::GetCurrentWeaponSkill() const
+{
+    const auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());
+    const auto* ASC=PlayerCharacter?PlayerCharacter->GetICAbilitySystem():nullptr;
+    return ASC?ASC->GetCurrentWeaponSkill():NAME_None;
+}
+
+double AICPlayerController::GetCurrentWeaponSkillCooldown() const
+{
+    const auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());
+    const auto* ASC=PlayerCharacter?PlayerCharacter->GetICAbilitySystem():nullptr;
+    return ASC?ASC->GetSkillCooldownRemaining(ASC->GetCurrentWeaponSkill()):0.;
+}
+
+bool AICPlayerController::EquipWeaponSkill(EICWeaponFamily Family,FName SkillID)
+{
+    auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());
+    auto* ASC=PlayerCharacter?PlayerCharacter->GetICAbilitySystem():nullptr;
+    if(!bCreated||bDead||!ASC||!ASC->EquipWeaponSkill(Family,SkillID))return false;
+    CancelTarget();
+    FlushWorldState();
+    bDirty=true;
+    return true;
+}
+
+void AICPlayerController::RequestFishing()
+{
+    if(!CanHandleGameplayInput()||HasTargetSelection())return;
+    if(OnFishingRequested.IsBound())OnFishingRequested.Broadcast();
+    else Show(TEXT("이 지역에 연결된 낚시 기능이 없습니다."));
 }
