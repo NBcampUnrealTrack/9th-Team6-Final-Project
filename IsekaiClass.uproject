@@ -11,10 +11,22 @@
 		}
 	],
 	"Plugins": [
-		{ "Name": "GameplayAbilities", "Enabled": true },
-		{ "Name": "StateTree", "Enabled": true },
-		{ "Name": "GameplayStateTree", "Enabled": true },
-		{ "Name": "CommonUI", "Enabled": true },
+		{
+			"Name": "GameplayAbilities",
+			"Enabled": true
+		},
+		{
+			"Name": "StateTree",
+			"Enabled": true
+		},
+		{
+			"Name": "GameplayStateTree",
+			"Enabled": true
+		},
+		{
+			"Name": "CommonUI",
+			"Enabled": true
+		},
 		{
 			"Name": "EnhancedInput",
 			"Enabled": true
@@ -46,6 +58,10 @@
 		},
 		{
 			"Name": "AllToolsets",
+			"Enabled": true
+		},
+		{
+			"Name": "VRM4U",
 			"Enabled": true
 		}
 	]
