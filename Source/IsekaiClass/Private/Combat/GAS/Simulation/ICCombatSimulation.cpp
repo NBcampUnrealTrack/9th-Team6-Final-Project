@@ -75,7 +75,7 @@ bool ICCombatSimulation::PrepareItemStatus(FICCharacterState& C,FName ID,UICDefi
     for(const auto& E:C.Combat.Effects)if(const auto* Active=D->Find<FICStatusEffectRow>(E.EffectID,R))
     {Tags.AppendTags(Active->GrantedStateTags);if(Active->GrantedStatusImmunityIDs.Contains(ID)||Active->GrantedStatusImmunityTags.HasAny(Rule->Tags)){Reason=TEXT("이 상태 효과에 면역인 대상입니다.");return false;}}
     if(Tags.HasAny(Rule->BlockedByTargetTags)||(Rule->bBlockedByInvulnerability&&Tags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("IC.State.Invulnerable"),false)))){Reason=TEXT("현재 상태에서는 이 효과를 적용할 수 없습니다.");return false;}
-    // Item preparation has no transient targeting/casting context. Refuse such conditions explicitly.
+
     if(!Rule->ApplicationConditions.Conditions.IsEmpty()){Reason=TEXT("조건부 상태 효과 아이템은 별도의 사용 조건 실행 경로가 필요합니다.");return false;}
     FICActiveEffectState E;E.InstanceID=FGuid::NewGuid();E.EffectID=ID;E.SourceEntityID=C.CharacterId;E.bInfinite=Rule->bPermanent;E.bHarmful=Rule->bHarmful;E.ExpiresAtPlaySecond=C.LastSimPlaySecond+Rule->DurationPlaySeconds;E.NextTickPlaySecond=C.LastSimPlaySecond+(Rule->bTickImmediatelyOnApplication?0:Rule->TickIntervalPlaySeconds);E.CapturedMagnitudes.Add(TEXT("Strength"),Rule->Strength);E.CapturedMagnitudes.Add(TEXT("PersonalCHA"),1);E.CapturedMagnitudes.Add(TEXT("Output"),1);
     auto Magnitude=[&](const FICCombatMagnitude& M)

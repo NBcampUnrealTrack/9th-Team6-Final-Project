@@ -155,7 +155,7 @@ void UICAbilitySystemComponent::RemoveSleepEffects()
 void UICAbilitySystemComponent::AdvanceEffects(double Now)
 {
     IC_TRACE_FUNCTION();FICDefinitionResult R;TArray<FGuid> Expired;
-    // Copy IDs because a periodic hit can cancel an action or invoke observers.
+
     TArray<FGuid> IDs;for(const auto& E:Runtime.Combat.Effects)IDs.Add(E.InstanceID);
     for(FGuid ID:IDs)
     {

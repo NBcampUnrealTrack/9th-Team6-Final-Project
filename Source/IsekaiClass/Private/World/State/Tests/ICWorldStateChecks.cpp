@@ -57,7 +57,7 @@ bool FICPauseClockCheck::RunTest(const FString& Parameters)
     Time->SetRunning(true);Time->SetMenuPaused(false);Time->AdvanceClock(10,false);
     TestEqual(TEXT("Initial game clock"),Time->GetClock().GameMinute,485.0);
     Time->SetPauseRequest(Menu,TEXT("Menu"),true);Time->SetPauseRequest(Popup,TEXT("Popup"),true);
-    Time->SetPauseRequest(Menu,TEXT("Menu"),true); // duplicate request is idempotent
+    Time->SetPauseRequest(Menu,TEXT("Menu"),true);
     Time->AdvanceClock(50,false);TestEqual(TEXT("Both clocks freeze"),Time->GetClock().PlaySecond,10.0);
     Time->ReleasePauseRequests(Menu);TestFalse(TEXT("Popup still owns pause"),Time->IsRunning());
     Time->AdvanceClock(50,false);TestEqual(TEXT("Game time still frozen"),Time->GetClock().GameMinute,485.0);

@@ -6,6 +6,8 @@
 #include "Time/ICTimeSubsystem.h"
 #include "Save/ICSaveSubsystem.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "Core/Flow/ICGameFlowSubsystem.h"
+#include "Combat/GAS/ICAbilitySystemComponent.h"
 
 bool AICPlayerController::CanSubmitCreation() const
 {
@@ -27,7 +29,7 @@ bool AICPlayerController::ValidateCreationRequest(FString& OutReason) const
     else if (bItemTransactionInProgress)
         OutReason = TEXT("아이템 효과 처리 완료 후 다시 시도하세요.");
     else if (Job < 0 || Job > 3 || Preset < 0 || Preset > 1)
-        OutReason = TEXT("성별과 직업을 다시 선택하세요.");
+        OutReason = TEXT("성별과 시작 무기를 다시 선택하세요.");
     else
     {
         const FString Clean = PlayerName.TrimStartAndEnd();
@@ -43,6 +45,7 @@ void AICPlayerController::ReportCreationFailure(const FString& Reason)
 {
     IC_TRACE_FUNCTION();
     Show(Reason);
+    if(GetGameInstance())if(auto* Flow=GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>())if(Flow->bPendingNewGame)Flow->Fail(Reason);
     UE_LOG(LogICCore, Warning, TEXT("[Player.Create.Rejected] Preset=%d Job=%d Rule=%s Reason=%s"),Preset,Job,*NewGameDefinitionID.ToString(),*Reason);
 }
 
@@ -83,10 +86,19 @@ void AICPlayerController::CreatePlayer()
         if(!Rules || !Rules->StartingWeapons.IsValidIndex(Job) || !Rules->StartingSkills.IsValidIndex(Job)
             || Rules->StartingQuickSlots.Num()!=4 || Rules->InitialGold<0 || !FMath::IsFinite(Rules->InitialGameMinute) || Rules->InitialGameMinute<0)
         {ReportCreationFailure(TEXT("새 게임 정의가 누락되었거나 초기 지급 설정이 올바르지 않습니다."));return;}
-        // Prepare and validate the whole starting inventory before changing live state.
+
+        auto* Flow=GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
+        const auto* Choice=Flow->bPendingNewGame?Flow->FindOption(3,Flow->Answers.Music):nullptr;
+        const auto* Story=Flow->bPendingNewGame?Flow->FindOption(2,Flow->Answers.Story):nullptr;
+        if(Flow->bPendingNewGame&&(!Flow->Answers.IsComplete()||!Choice||!Story))
+        {ReportCreationFailure(TEXT("질문지 답변이나 보상 데이터가 올바르지 않습니다."));return;}
+        const FName StartingWeapon=Choice?Choice->WeaponItemID:Rules->StartingWeapons[Job];
+        const FName StartingSkill=Choice?Choice->SkillID:Rules->StartingSkills[Job];
+        if(!Inventory->GetDefinitions()->Find<FICSkillRow>(StartingSkill,Lookup))
+        {ReportCreationFailure(TEXT("시작 기술 정의를 찾을 수 없습니다."));return;}
         UICInventoryComponent* Staging = NewObject<UICInventoryComponent>(this);
         Staging->BeginStaging(Inventory->GetDefinitions(),Job);
-        if (!Staging->AddItem(Rules->StartingWeapons[Job], 1, false) || !Staging->Equip(0))
+        if (!Staging->AddItem(StartingWeapon, 1, false) || !Staging->Equip(0))
         { ReportCreationFailure(TEXT("초기 무기 지급/장착에 실패했습니다. 아이템 정의를 확인하세요.")); return; }
         for (const auto& Item : Rules->StartingItems)
             if (!Staging->AddItem(Item.ItemID, Item.Count, false))
@@ -101,7 +113,32 @@ void AICPlayerController::CreatePlayer()
         Initial.PlayerName = PlayerName.TrimStartAndEnd();
         Initial.Preset = Preset;
         Initial.Job = Job;
-        Initial.FirstSkill = Rules->StartingSkills[Job];
+        Initial.FirstSkill = StartingSkill;
+        if(Choice)
+        {
+            Initial.CreationAnswers=Flow->Answers;
+            Initial.Flags.Add(FName(*FString::Printf(TEXT("Creation.Story.%d"),Flow->Answers.Story)),true);
+            if(!Choice->NPCID.IsNone())
+            {
+                FICDefinitionResult Result;
+                const auto* NPC=Inventory->GetDefinitions()->Find<FICNPCRow>(Choice->NPCID,Result);
+                const auto* Combat=NPC?Inventory->GetDefinitions()->Find<FICRecruitCombatRow>(NPC->RecruitCombatID,Result):nullptr;
+                if(!NPC||!Combat||Combat->UniqueSkillID!=StartingSkill||!State->EnsureCharacter(Choice->NPCID,EICCharacterKind::Recruitable))
+                {ReportCreationFailure(TEXT("시작 NPC와 고유 기술 연결을 확인하세요."));return;}
+                auto NPCState=State->GetSnapshot(Choice->NPCID);NPCState.Affinity=FMath::Clamp(NPCState.Affinity+300,0,500);
+                Initial.Characters.Add(Choice->NPCID,NPCState);
+            }
+            if(Story&&!Story->RecipeID.IsNone())
+            {
+                if(!Inventory->GetDefinitions()->Find<FICRecipeRow>(Story->RecipeID,Lookup)){ReportCreationFailure(TEXT("시작 레시피 정의를 찾을 수 없습니다."));return;}
+                Initial.UnlockedRecipeIDs.Add(Story->RecipeID);
+            }
+            if(Story&&!Story->CodexID.IsNone())
+            {
+                if(!Inventory->GetDefinitions()->Find<FICCodexRow>(Story->CodexID,Lookup)){ReportCreationFailure(TEXT("시작 인물 정보 정의를 찾을 수 없습니다."));return;}
+                Initial.CodexEntryIDs.Add(Story->CodexID);
+            }
+        }
         Initial.Gold = Rules->InitialGold;
         Initial.PlayerPosition = GetPawn()->GetActorLocation();
         Initial.PlayerRotation = GetControlRotation();
@@ -109,6 +146,7 @@ void AICPlayerController::CreatePlayer()
         FICCharacterState InitialCharacterState;
         InitialCharacterState.CharacterId = UICWorldStateSubsystem::PlayerId();
         InitialCharacterState.Kind = EICCharacterKind::Player;
+        InitialCharacterState.UnlockedSkillIDs.Add(StartingSkill);
         InitialCharacterState.MainStats.STR=Rules->InitialStats.STR;InitialCharacterState.MainStats.DEX=Rules->InitialStats.DEX;
         InitialCharacterState.MainStats.INT=Rules->InitialStats.INT;InitialCharacterState.MainStats.CON=Rules->InitialStats.CON;
         InitialCharacterState.MainStats.CHA=Rules->InitialStats.CHA;InitialCharacterState.MainStats.LUK=Rules->InitialStats.LUK;
@@ -120,7 +158,11 @@ void AICPlayerController::CreatePlayer()
         for(FName ID:Rules->InitiallyUnlockedRecipeIDs)Initial.UnlockedRecipeIDs.Add(ID);
         Initial.Characters.Add(InitialCharacterState.CharacterId, InitialCharacterState);
         if (!State->CanRestoreState(Initial))
-        { ReportCreationFailure(TEXT("캐릭터 초기 상태 검증에 실패했습니다.")); return; }
+        {
+            FString Failure;UICWorldStateSubsystem::ValidateStateWithReason(Initial,Failure);
+            if(auto* Avatar=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=Avatar->GetICAbilitySystem())ASC->CanRestore(InitialCharacterState,Failure);
+            ReportCreationFailure(TEXT("캐릭터 초기 상태 검증에 실패했습니다. ")+Failure);return;
+        }
         bInitialSavePending = true;
         if (!State->RestoreState(Initial))
         { bInitialSavePending = false; ReportCreationFailure(TEXT("캐릭터 초기 상태 적용에 실패했습니다.")); return; }
@@ -128,7 +170,7 @@ void AICPlayerController::CreatePlayer()
         if(!Time->RestoreClock(InitialClock)){ReportCreationFailure(TEXT("초기 시간 설정에 실패했습니다."));return;}
         Saves->ResetSession();
     }
-    // An explicit SaveSlot call is permitted while automatic saving is suspended.
+
     Saves->SetAutoSaveSuspended(true);
     SyncSaveSafety();
     Show(TEXT("캐릭터 생성 및 최초 저장 중…"));
@@ -137,6 +179,11 @@ void AICPlayerController::CreatePlayer()
         ReportCreationFailure(Saves->GetLastMessage() + TEXT(" 게임 시작 버튼으로 저장을 재시도할 수 있습니다."));
         UpdateGamePhase();
     }
+}
+
+void AICPlayerController::RetryNewGame()
+{
+    if(!IsMainMenuLevel()&&!bCreated&&GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->bPendingNewGame)CreatePlayer();
 }
 
 bool AICPlayerController::SavePlayer()

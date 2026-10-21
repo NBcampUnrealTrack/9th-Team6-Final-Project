@@ -11,7 +11,7 @@ UICSaveGame::UICSaveGame() { IC_TRACE_FUNCTION(); SaveVersion = CurrentVersion; 
 
 namespace
 {
-constexpr uint32 FileMagic = 0x56534349; // ICSV
+constexpr uint32 FileMagic = 0x56534349;
 constexpr int32 ICSaveEnvelopeBytes = 16;
 constexpr uint32 MaxPayload = 16 * 1024 * 1024 - ICSaveEnvelopeBytes;
 }
@@ -42,9 +42,8 @@ UICSaveGame* UICSaveGame::DecodeFile(const TArray<uint8>& Bytes)
     TArray<uint8> Payload; Payload.Append(Bytes.GetData() + ICSaveEnvelopeBytes, Size);
     UICSaveGame* Save = Cast<UICSaveGame>(UGameplayStatics::LoadGameFromMemory(Payload));
     if (!Save){UE_LOG(LogICSave, VeryVerbose, TEXT("[Save.Decode.Rejected] Format=%u: SaveGame 자료형 복원 실패"),Format);return nullptr;}
-    // Tagged serialization may omit a property equal to its CDO default. A v2
-    // payload can therefore inherit today's constructor version (3) on load.
-    // The envelope is the schema authority; reject any unrelated payload version.
+
+
     if (Format == 2)
     {
         if (Save->SaveVersion != 2 && Save->SaveVersion != CurrentVersion) return nullptr;
@@ -91,7 +90,7 @@ bool UICSaveGame::UpgradeFromVersion2()
         auto& Quest = Pair.Value;
         if (Quest.bCompleted && !Quest.bRewardClaimed)
         {
-            // v2 completed quests are treated as already paid; migration never grants rewards.
+
             Quest.bRewardClaimed = true; Quest.CompletionCount = 1;
             Quest.RewardTransactionID = FGuid::NewGuid();
             WorldState.CompletedTransactionIDs.Add(Quest.RewardTransactionID);

@@ -39,7 +39,7 @@ bool AICInteractionActor::TryInteract_Implementation(AICPlayerController* Contro
     else if(Action==TEXT("Loot")||Action==TEXT("Quest"))
     {
         if(ItemID.IsNone()||ItemCount<=0)return false;
-        // All-or-nothing avoids duplicating a partially collected world object.
+
         bSuccess=Controller->GetInventory()->AddItem(ItemID,ItemCount,false);
     }
     UE_LOG(LogICInteraction, Log, TEXT("[Interaction.Result] Object=%s Action=%s Success=%d DestroyAfterUse=%d"),*GetNameSafe(this),*Action.ToString(),bSuccess,bDestroyAfterUse);

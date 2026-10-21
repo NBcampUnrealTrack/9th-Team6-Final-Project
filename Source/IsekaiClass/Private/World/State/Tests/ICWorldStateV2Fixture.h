@@ -1,7 +1,6 @@
 #pragma once
 
-// Captured from the actual v2 UE 5.8 binary before the WorldState schema change.
-// Empty initial state: no user saves or personal data. Embedded for reproducible checks.
+
 inline constexpr TCHAR ICWorldStateV2Fixture[] =
     TEXT("SUNTVgIAAAAlCAAAzu2iIkdWQVMDAAAACgIAAPoDAAAFAAgAAwCVOXgDEgAAACsrVUU1K1JlbGVhc2UtNS44AAMAAABjAAAAItVU")
     TEXT("nL5PJqhGByGU0IK0YSwAAACjXJFi90uOHMcSDqP3nSHILAAAACQNQMx7Tungg6L5myfAwNwAAAAA5DLYsA1PiR+3fs+sokr9NgoA")

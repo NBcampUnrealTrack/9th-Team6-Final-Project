@@ -20,6 +20,7 @@
 #include "Time/ICTimeSubsystem.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Debug/ICLog.h"
+#include "Core/Controller/ICPlayerController.h"
 namespace
 {
 struct FGASFixture
@@ -170,6 +171,96 @@ bool FICGASNPCCheck::RunTest(const FString& Parameters)
     NPC->FlushToWorldState_Implementation(F.State);NPC->ReleaseForLoad();NPC->Destroy();auto* Spawn=F.World->GetSubsystem<UICSpawnSubsystem>();FString Reason;const auto Before=F.ASC->Capture();
     TestNull(TEXT("No player/floor prevents unsafe revive placement"),Spawn->ReserveReviveTarget(Recruit.ID,F.ASC,Reason));TestTrue(TEXT("Safe placement failure has a reason"),!Reason.IsEmpty());TestEqual(TEXT("Failed placement costs no MP"),F.ASC->Capture().MP,Before.MP);TestTrue(TEXT("Failed placement keeps persistent Downed"),F.State->GetSnapshot(Recruit.ID).IsDowned());
     Town->ReleaseForLoad();Town->Destroy();
+    return !HasAnyErrors();
+}
+namespace
+{
+void ConfigureInputWeapons(FGASFixture& F)
+{
+    UDataTable* Classes=nullptr;
+    for(const auto& Binding:F.Catalog->Tables)if(Binding.RowStruct==FICClassRow::StaticStruct())Classes=Binding.Table.LoadSynchronous();
+    FICClassRow Sword;
+    Sword.ID=TEXT("CLS_GAS_998");Sword.CharacterClass=EICCharacterClass::Warrior;Sword.WeaponFamily=EICWeaponFamily::Sword;Sword.NormalAttackStages.SetNum(3);
+    FICClassRow Bow=Sword;Bow.ID=TEXT("CLS_INPUT_998");Bow.CharacterClass=EICCharacterClass::Archer;Bow.WeaponFamily=EICWeaponFamily::Bow;
+    Classes->AddRow(Sword.ID,Sword);Classes->AddRow(Bow.ID,Bow);
+    FICItemRow SwordItem;SwordItem.ID=TEXT("ITM_INPUT_998");SwordItem.ItemID=SwordItem.ID;SwordItem.Kind=EPlayerItemKind::Equipment;SwordItem.EquipSlot=EPlayerEquipSlot::Weapon;SwordItem.StackLimit=1;SwordItem.EquipmentID=TEXT("EQP_INPUT_998");
+    FICItemRow BowItem=SwordItem;BowItem.ID=TEXT("ITM_INPUT_997");BowItem.ItemID=BowItem.ID;BowItem.EquipmentID=TEXT("EQP_INPUT_997");
+    F.Table<FICItemRow>(EICDefinitionType::Item,{SwordItem,BowItem});
+    FICEnhancementRow Enhancement;Enhancement.ID=TEXT("ENH_INPUT_998");Enhancement.MaximumLevel=0;
+    F.Table<FICEnhancementRow>(EICDefinitionType::Enhancement,{Enhancement});
+    FICEquipmentRow SwordGear;SwordGear.ID=SwordItem.EquipmentID;SwordGear.ItemID=SwordItem.ID;SwordGear.Slot=EPlayerEquipSlot::Weapon;SwordGear.WeaponFamily=EICWeaponFamily::Sword;SwordGear.RequiredClass=EICCharacterClass::Warrior;SwordGear.EnhancementID=Enhancement.ID;
+    FICEquipmentRow BowGear=SwordGear;BowGear.ID=BowItem.EquipmentID;BowGear.ItemID=BowItem.ID;BowGear.WeaponFamily=EICWeaponFamily::Bow;BowGear.RequiredClass=EICCharacterClass::Archer;
+    F.Table<FICEquipmentRow>(EICDefinitionType::Equipment,{SwordGear,BowGear});
+    auto SwordSkill=*F.Skills->FindRow<FICSkillRow>(F.SkillID,TEXT("Input"));SwordSkill.Purpose=EICSkillPurpose::Heal;SwordSkill.RequiredWeaponFamily=EICWeaponFamily::Sword;SwordSkill.bRequiresEquippedWeapon=true;SwordSkill.TargetRules.Target=EICCombatTarget::PartyMember;SwordSkill.TargetRules.bAllowCaster=true;
+    F.Skills->AddRow(SwordSkill.ID,SwordSkill);
+    auto BowSkill=SwordSkill;BowSkill.ID=TEXT("SKL_INPUT_997");BowSkill.ClassID=Bow.ID;BowSkill.RequiredWeaponFamily=EICWeaponFamily::Bow;BowSkill.CooldownPlaySeconds=7;
+    F.Skills->AddRow(BowSkill.ID,BowSkill);
+    F.Definitions->ConfigureCatalog(F.Catalog);
+    auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(F.Definitions,0);
+    check(Staging->AddItem(SwordItem.ID,1,false));check(Staging->Equip(0));check(Staging->AddItem(BowItem.ID,1,false));
+    check(F.Player->Inventory->ApplySnapshot(Staging->GetSnapshot()));
+    auto Player=F.ASC->Capture();Player.UnlockedSkillIDs.Add(BowSkill.ID);check(F.ASC->Restore(Player));
+}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICInputWeaponCheck,"IC.Input.WeaponSwitchAndIndependentCooldowns",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICInputWeaponCheck::RunTest(const FString& Parameters)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    auto* Inventory=F.Player->Inventory.Get();
+    TestEqual(TEXT("Starts with the equipped sword"),F.ASC->GetEquippedWeaponFamily(),EICWeaponFamily::Sword);
+    TestEqual(TEXT("Q resolves the sword skill"),F.ASC->GetCurrentWeaponSkill(),F.SkillID);
+    const auto Sword=F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player);
+    TestTrue(TEXT("Sword skill activates"),Sword.bSuccess);
+    TestTrue(TEXT("Sword effect commits its own cooldown"),F.ASC->NotifyCombatEvent(Sword.ActionID,TEXT("AN_HitStart"),0));
+    F.ASC->CancelAction();
+    const double SwordCooldown=F.ASC->GetSkillCooldownRemaining(F.SkillID);
+    TestTrue(TEXT("Changing weapon ignores the original class restriction"),Inventory->CycleWeapon());
+    TestEqual(TEXT("Weapon family changes to bow"),F.ASC->GetEquippedWeaponFamily(),EICWeaponFamily::Bow);
+    const FName BowID=TEXT("SKL_INPUT_997");
+    TestEqual(TEXT("Q changes with the weapon"),F.ASC->GetCurrentWeaponSkill(),BowID);
+    TestEqual(TEXT("Sword cooldown survives switching"),F.ASC->GetSkillCooldownRemaining(F.SkillID),SwordCooldown);
+    const auto Bow=F.ASC->RequestAction(TEXT("Skill"),BowID,F.Player);
+    TestTrue(TEXT("Sword cooldown does not block bow skill"),Bow.bSuccess);
+    TestTrue(TEXT("Bow starts an independent cooldown"),F.ASC->NotifyCombatEvent(Bow.ActionID,TEXT("AN_HitStart"),0));
+    F.ASC->CancelAction();
+    TestTrue(TEXT("Skill can be unequipped during its cooldown"),F.ASC->EquipWeaponSkill(EICWeaponFamily::Bow,NAME_None));
+    TestTrue(TEXT("Empty skill slot stays empty"),F.ASC->GetCurrentWeaponSkill().IsNone());
+    TestTrue(TEXT("The same skill can be re-equipped"),F.ASC->EquipWeaponSkill(EICWeaponFamily::Bow,BowID));
+    TestTrue(TEXT("Re-equipping never resets cooldown"),F.ASC->GetSkillCooldownRemaining(BowID)>0);
+    const auto Saved=F.ASC->Capture();
+    TestTrue(TEXT("Load restores skill loadout and cooldowns"),F.ASC->Restore(Saved));
+    TestEqual(TEXT("Saved weapon skill remains equipped"),F.ASC->GetCurrentWeaponSkill(),BowID);
+    TestEqual(TEXT("Saved bow cooldown is unchanged"),F.ASC->GetSkillCooldownRemaining(BowID),7.);
+    TestEqual(TEXT("Both weapons remain owned"),Inventory->GetSnapshot().Bag.Slots[0].Count+Inventory->GetSnapshot().Equipment[0].Count,2);
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICInputTargetCheck,"IC.Input.SupportTargetSelection",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICInputTargetCheck::RunTest(const FString& Parameters)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    auto* PC=F.World->SpawnActor<AICPlayerController>();PC->Possess(F.Player);PC->SetAsLocalPlayerController();PC->bCreated=true;PC->Menu.Empty();
+    FICCharacterState Companion;Companion.CharacterId=TEXT("NPC_R08_001");Companion.Mode=EICCharacterMode::Companion;Companion.PartySlot=0;Companion.Affinity=100;Companion.MaxSP=1;Companion.SP=0;
+    TestTrue(TEXT("Companion target exists in persistent state"),F.State->SetCharacterState(Companion));
+    PC->HandleInputCommand(EICInputCommand::Skill);
+    TestEqual(TEXT("Q opens support targeting"),PC->PendingSkill,F.SkillID);
+    const float MP=F.ASC->Capture().MP;
+    PC->HandleInputCommand(EICInputCommand::CompanionSkill,0);
+    TestEqual(TEXT("E selects the first companion"),PC->PendingTargetID,Companion.CharacterId);
+    TestEqual(TEXT("Selection does not spend MP"),F.ASC->Capture().MP,MP);
+    PC->HandleInputCommand(EICInputCommand::CompanionSkill,0);
+    TestEqual(TEXT("Repeated E selects the player"),PC->PendingTargetID,UICWorldStateSubsystem::PlayerId());
+    PC->HandleInputCommand(EICInputCommand::CompanionSkill,3);
+    TestEqual(TEXT("There is no fourth companion input"),PC->PendingTargetID,UICWorldStateSubsystem::PlayerId());
+    PC->HandleInputCommand(EICInputCommand::Menu);
+    TestFalse(TEXT("Escape cancels without casting"),PC->HasTargetSelection());
+    TestEqual(TEXT("Cancel preserves MP"),F.ASC->Capture().MP,MP);
+    PC->HandleInputCommand(EICInputCommand::Skill);
+    PC->HandleInputCommand(EICInputCommand::Confirm);
+    TestFalse(TEXT("Confirm leaves target selection"),PC->HasTargetSelection());
+    TestTrue(TEXT("Confirmed support skill starts a real GAS action"),F.ASC->GetActionID().IsValid());
+    F.ASC->CancelAction();PC->Destroy();
     return !HasAnyErrors();
 }
 #endif

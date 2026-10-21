@@ -315,10 +315,10 @@ bool UICSaveSubsystem::LoadSlot(int32 Slot)
     bool bBackup = false;
     auto* Save = ReadSlot(Slot, true, bBackup);
     if (!Save) { LastMessage = TEXT("저장 파일이 없거나 손상/버전/데이터 검증에 실패했습니다.");UE_LOG(LogICSave, Log, TEXT("[Save.Load.Rejected] Slot=%d File=%s Reason=%s"),Slot,*GetSlotPath(Slot),*LastMessage); return false; }
-    // Both parts are validated before either is applied.
+
     if (!Save->Clock.IsValid() || !WorldState->CanRestoreState(Save->WorldState)) return false;
     const auto PreviousClock = Time->GetClock();
-    Time->RestoreClock(Save->Clock); // Participants restore schedules against the loaded clock.
+    Time->RestoreClock(Save->Clock);
     if (!WorldState->RestoreState(Save->WorldState)) { UE_LOG(LogICSave, Warning, TEXT("[Save.Load.Rollback] Slot=%d: 상태 복원 실패, 이전 시간 복원"),Slot);Time->RestoreClock(PreviousClock); return false; }
     PreviewLocation = Save->Preview.Location;
     ResetSession();

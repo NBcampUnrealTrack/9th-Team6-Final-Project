@@ -6,7 +6,7 @@ UProjectileMovementComponent::EHandleBlockingHitResult UICProjectileMovementComp
     IC_TRACE_FUNCTION();
     auto* Actor=UpdatedComponent?UpdatedComponent->GetOwner():nullptr;
     if(!IsValid(Actor)||Actor->IsActorBeingDestroyed()||!CheckStillInWorld())return EHandleBlockingHitResult::Abort;
-    // SafeMoveUpdatedComponent already delivered OnComponentHit to ICProjectile.
+
     SubTickTimeRemaining=TimeTick*(1.f-Hit.Time);
     return EHandleBlockingHitResult::AdvanceNextSubstep;
 }

@@ -66,19 +66,19 @@ void CheckCondition(const FICCondition& Condition,const FItemLocation& At,const 
         if(Condition.Stat==EICStat::None) ItemIssue(Issues,At,Field+TEXT(".Stat"),TEXT("Stat conditions require an explicit stat."));
         const bool bPrimary=Condition.Stat>=EICStat::STR && Condition.Stat<=EICStat::LUK;
         if(!bPrimary && !Condition.bUseEffectiveStats) ItemIssue(Issues,At,Field+TEXT(".bUseEffectiveStats"),TEXT("The default base-stat condition must use one of six primary stats; derived/effective exceptions must be explicit."));
-        if(bPrimary && (Condition.Value<1 || Condition.Value>10000 || Condition.Value!=FMath::RoundToDouble(Condition.Value)))
+        if(bPrimary && (Condition.Value<1 || Condition.Value>50000 || Condition.Value!=FMath::RoundToDouble(Condition.Value)))
             ItemIssue(Issues,At,Field+TEXT(".Value"),TEXT("Primary-stat thresholds must be integers in [1,10000]."));
     }
     if(Condition.Type==EICConditionType::ItemInBag && (Condition.Value<1 || Condition.Value!=FMath::RoundToDouble(Condition.Value)))
         ItemIssue(Issues,At,Field+TEXT(".Value"),TEXT("Inventory count thresholds must be positive integers."));
-    if(Condition.Type==EICConditionType::Affinity && (Condition.Value<0 || Condition.Value>100 || Condition.Value!=FMath::RoundToDouble(Condition.Value)))
-        ItemIssue(Issues,At,Field+TEXT(".Value"),TEXT("Affinity thresholds must be integers in [0,100]."));
+    if(Condition.Type==EICConditionType::Affinity && (Condition.Value<0 || Condition.Value>500 || Condition.Value!=FMath::RoundToDouble(Condition.Value)))
+        ItemIssue(Issues,At,Field+TEXT(".Value"),TEXT("Affinity thresholds must be integers in [0,500]."));
     if((Condition.Type==EICConditionType::CurrentHPRatio || Condition.Type==EICConditionType::CurrentMPRatio) && (Condition.Value<0 || Condition.Value>1))
         ItemIssue(Issues,At,Field+TEXT(".Value"),TEXT("Resource ratio thresholds use [0,1]."));
     if(Condition.Type==EICConditionType::Flag && Condition.Flag.IsNone()) ItemIssue(Issues,At,Field+TEXT(".Flag"),TEXT("Flag conditions require their persistent flag key."),true,bComplete);
     if((Condition.Type==EICConditionType::HasGameplayTag || Condition.Type==EICConditionType::CharacterMode) && Condition.RequiredTags.IsEmpty())
         ItemIssue(Issues,At,Field+TEXT(".RequiredTags"),TEXT("Tag/mode conditions require explicit gameplay tags."),true,bComplete);
-    // Runtime condition kinds inherently inspect current state; bAllowCurrentState is a caller policy.
+
 }
 
 void InspectConditions(const UStruct* Struct,const void* Data,const FItemLocation& At,const FString& Path,

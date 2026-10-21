@@ -30,7 +30,7 @@ FICItemUseResult UICItemUseService::Prepare(UICInventoryComponent* Inventory,UIC
         default:break;
     }
     if(!Allowed)return Fail(TEXT("UseTarget"),TEXT("이 아이템을 사용할 수 없는 대상입니다."));
-    // Validate every referenced effect before preparing either resources or consumption.
+
     if(!D->StatusEffectIDs.IsEmpty())
     {
         for(FName ID:D->StatusEffectIDs)if(!Definitions->Find<FICStatusEffectRow>(ID,Lookup))

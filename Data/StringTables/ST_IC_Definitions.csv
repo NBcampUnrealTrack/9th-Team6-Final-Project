@@ -1,4 +1,4 @@
-Key,SourceString
+﻿Key,SourceString
 ANC_FORGE_001.NAME,대장간
 ANC_KITCHEN_001.NAME,조리대
 ANC_MERCHANT_BED.NAME,상인 침대
@@ -12,7 +12,6 @@ ANC_RECRUIT_BED.NAME,테스트 동료 침대
 ANC_RECRUIT_HOME.NAME,테스트 동료 집
 ANC_RECRUIT_WORK.NAME,테스트 동료 작업대
 SCH_RECRUIT_001.NAME,테스트 동료 일과
-CLS_WARRIOR_001.NAME,테스트 전사
 RCB_RECRUIT_001.NAME,테스트 동료 전투 설정
 SKL_RECRUIT_001.NAME,테스트 동료 고유 스킬
 R01.NAME,NPC 테스트 지역
@@ -81,3 +80,25 @@ PRD_COOK_001.NAME,빵
 PRD_CRAFT_001.NAME,초보자 검
 RCP_COOK_001.NAME,빵
 RCP_CRAFT_001.NAME,초보자 검
+SFE_START_PHYSICAL_001.NAME,시작 테스트 효과
+SFE_START_PHYSICAL_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
+SFE_START_MAGIC_001.NAME,시작 테스트 효과
+SFE_START_MAGIC_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
+SFE_START_HEAL_001.NAME,시작 테스트 효과
+SFE_START_HEAL_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
+SKL_START_SWORD_001.NAME,검 시작 기술 (테스트)
+SKL_START_SWORD_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
+CLS_WARRIOR_001.NAME,검 무기 프로필
+CLS_WARRIOR_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
+SKL_START_BOW_001.NAME,활 시작 기술 (테스트)
+SKL_START_BOW_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
+CLS_ARCHER_001.NAME,활 무기 프로필
+CLS_ARCHER_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
+SKL_START_STAFF_001.NAME,스태프 시작 기술 (테스트)
+SKL_START_STAFF_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
+CLS_MAGE_001.NAME,스태프 무기 프로필
+CLS_MAGE_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
+SKL_START_WAND_001.NAME,완드 시작 기술 (테스트)
+SKL_START_WAND_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
+CLS_HEALER_001.NAME,완드 무기 프로필
+CLS_HEALER_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
