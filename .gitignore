@@ -50,3 +50,5 @@ Desktop.ini
 # Generated Python caches
 __pycache__/
 *.pyc
+
+/.idea

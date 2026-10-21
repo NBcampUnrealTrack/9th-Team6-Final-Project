@@ -2,149 +2,149 @@
 #include "Data/Rows/Common/ICDefinitionTypes.h"
 #include "ICSettingsRows.generated.h"
 
-USTRUCT(BlueprintType, meta=(ToolTip="새 캐릭터의 시작 골드·시간·능력치·자원·지급품·직업별 무기/스킬·퀵슬롯 설정입니다. Controller.NewGameDefinitionID로 조회합니다. 기존 프로젝트 기준 골드 200, 시작 480분, HP 60/MP 100/SP 70을 사용합니다.", ShortToolTip="새 캐릭터의 시작 골드·시간·능력치·자원·지급품·직업별 무기/스킬·퀵슬롯 설정입니다."))
+USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICNewGameRow : public FICDefinitionRow
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="새 게임 시작 위치의 Anchor ID입니다. 플레이어 집 시작 앵커를 지정하도록 정의되었지만 현재 CreatePlayer는 스폰된 Pawn 위치를 사용하므로 이 값만으로 자동 이동하지 않습니다.\n입력 자료형: 이름/ID.")) FName StartAnchorID;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="Region DT의 소속 지역 ID입니다. 레벨 파일 이름과 구분합니다. 필요한 행에서 None이면 지역 누락 검사가 안내합니다.\n입력 자료형: 이름/ID.")) FName RegionID;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="시작 GameClock 분입니다. 0시 기준 480=08:00이며 생성 시 시계/마지막 처리 기준에 적용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 480. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.")) double InitialGameMinute = 480;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="새 플레이어 기본 능력치입니다. CreatePlayer가 WorldState에 복사하며 이후 성장은 지속 원본을 사용합니다.\n입력 자료형: 구조/객체 (FICBaseStats).")) FICBaseStats InitialStats;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="시작 골드 총액입니다. 실제 DT 기준 200이며 생성 때 적용합니다. 기존 저장 골드는 로드 원본을 유지합니다.\n입력 자료형: 정수.\nC++ 초기값: 200. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.")) int32 InitialGold = 200;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="시작 Item ID/수량 목록입니다. 모든 지급을 후보 인벤토리에서 검사하고 누락/용량 부족이면 원본 적용을 중단합니다.\n입력 자료형: 구조/객체 (FICItemAmount) 배열.")) TArray<FICItemAmount> StartingItems;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="직업별 시작 무기 Item ID 배열입니다. 0~3은 전사·궁수·마법사·힐러입니다. 실제 생성 때 선택 인덱스로 지급/장착하므로 네 항목을 작성합니다.\n입력 자료형: 이름/ID 배열.")) TArray<FName> StartingWeapons;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="직업별 첫 Skill ID 배열입니다. 0~3은 전사·궁수·마법사·힐러입니다. 현재 FirstSkill에 기록하며 실제 콘텐츠/GAS 실행은 연결 대상입니다.\n입력 자료형: 이름/ID 배열.")) TArray<FName> StartingSkills;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="시작 퀵슬롯 네 Item ID입니다. 인덱스 0~3은 키 1~4이며 초기 지급/사용 가능 품목과 맞춥니다.\n입력 자료형: 이름/ID 배열.")) TArray<FName> StartingQuickSlots;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="시작 현재 HP입니다. 실제 DT 60이며 bStartWithFullResources가 체크되면 InitialMaxHP를 대신 사용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 60. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.")) double InitialHP = 60;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="시작 현재 MP입니다. 실제 DT 100이며 전부 채우기 체크 시 InitialMaxMP를 사용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 100. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.")) double InitialMP = 100;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="시작 현재 SP입니다. 실제 DT 70이며 전부 채우기 체크 시 InitialMaxSP를 사용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 70. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.")) double InitialSP = 70;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="시작 HP 상한입니다. InitialHP 이상이어야 하며 현재 생성 시 직접 복사합니다. 전체 파생 계산 연결과 구분합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 100. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.")) double InitialMaxHP = 100;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="시작 MP 상한입니다. InitialMP 이상이며 현재 생성 시 사용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 100. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.")) double InitialMaxMP = 100;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="시작 SP 상한입니다. InitialSP 이상이며 현재 생성 시 사용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 100. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.")) double InitialMaxSP = 100;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="새 게임에서 해금 기록을 만들 Recipe ID 목록입니다. bUnlockedByDefault와 별개입니다.\n입력 자료형: 이름/ID 배열.")) TArray<FName> InitiallyUnlockedRecipeIDs;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="이름 최소 길이 규격입니다. 현재 Controller는 공백 제외 1자 이상의 별도 코드 검사이므로 DT 자동 적용은 미연결입니다.\n입력 자료형: 정수.\nC++ 초기값: 1. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.")) int32 MinimumNameLength = 1;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="이름 최대 길이 규격입니다. 현재 Controller/저장 검사는 12자 이하의 별도 코드 규칙이며 DT만 바꿔 변경되지 않습니다.\n입력 자료형: 정수.\nC++ 초기값: 12. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.")) int32 MaximumNameLength = 12;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="체크=초기 HP/MP/SP를 상한으로 채움, 해제=InitialHP/MP/SP 사용입니다. 실제 DT는 기존 60/100/70 유지 목적으로 해제되어 있습니다.\n입력 자료형: 체크박스(true/false).\nC++ 초기값: 켜짐(true). 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.")) bool bStartWithFullResources = true;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FName StartAnchorID;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FName RegionID;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double InitialGameMinute = 480;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FICBaseStats InitialStats;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 InitialGold = 200;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FICItemAmount> StartingItems;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> StartingWeapons;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> StartingSkills;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> StartingQuickSlots;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double InitialHP = 60;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double InitialMP = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double InitialSP = 70;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double InitialMaxHP = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double InitialMaxMP = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double InitialMaxSP = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> InitiallyUnlockedRecipeIDs;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 MinimumNameLength = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 MaximumNameLength = 12;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bStartWithFullResources = true;
 };
 
-USTRUCT(BlueprintType, meta=(ToolTip="게임 시간 속도·SP 감소 간격·수면 회복의 정적 규격입니다. 현재 TimeSubsystem/Controller/Survival은 별도 코드 기본값을 사용하므로 DT 편집만으로 모든 값이 자동 바뀌지는 않습니다.", ShortToolTip="게임 시간 속도·SP 감소 간격·수면 회복의 정적 규격입니다."))
+USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICTimeSettingsRow : public FICDefinitionRow
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001", ToolTip="게임 1분당 실제 플레이 초 규격입니다. 2초=실제 2초당 게임 1분입니다. 현재 TimeSubsystem은 코드의 0.5분/초를 사용하므로 DT 자동 적용은 미연결입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 2. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.001.\n소속 정의/시스템: 현재 TimeSubsystem/Controller/Survival은 별도 코드 기본값을 사용하므로 DT 편집만으로 모든 값이 자동 바뀌지는 않습니다.")) double RealSecondsPerGameMinute = 2;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="10", ClampMax="10", Units="s", ToolTip="SP 1 감소 간격 규격입니다. 10초이며 메뉴 중 정지합니다. 현재 Survival은 코드 10초를 사용하므로 DT 자동 적용은 미연결입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 10. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 10.\n최댓값: 10.\n소속 정의/시스템: 현재 TimeSubsystem/Controller/Survival은 별도 코드 기본값을 사용하므로 DT 편집만으로 모든 값이 자동 바뀌지는 않습니다.")) double SPDrainIntervalPlaySeconds = 10;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001", ToolTip="수면 게임 1분당 SP 회복 규격입니다. 현재 실제 값은 Controller.SleepSPRecoveryPerGameMinute이므로 DT 자동 적용은 미연결입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.001.\n소속 정의/시스템: 현재 TimeSubsystem/Controller/Survival은 별도 코드 기본값을 사용하므로 DT 편집만으로 모든 값이 자동 바뀌지는 않습니다.")) double SleepRecoveryPerGameMinute = 1;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="수면 최소 게임 분 규격입니다. 실제 Controller 시간 계산과 별도이며 DT 자동 적용은 미연결입니다.\n입력 자료형: 정수.\nC++ 초기값: 60. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n소속 정의/시스템: 현재 TimeSubsystem/Controller/Survival은 별도 코드 기본값을 사용하므로 DT 편집만으로 모든 값이 자동 바뀌지는 않습니다.")) int32 MinimumSleepGameMinutes = 60;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double RealSecondsPerGameMinute = 2;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="10", ClampMax="10", Units="s")) double SPDrainIntervalPlaySeconds = 10;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double SleepRecoveryPerGameMinute = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 MinimumSleepGameMinutes = 60;
 };
 
-USTRUCT(BlueprintType, meta=(ToolTip="기본/파생 능력치의 공식 계수와 상한입니다. 성장책 상한과 영입 NPC 초기 자원 계산에 사용합니다. UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.", ShortToolTip="기본/파생 능력치의 공식 계수와 상한입니다."))
+USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICStatSettingsRow : public FICDefinitionRow
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="기본 능력치 정수 상한입니다. 현재 성장책/NPC 초기 규격에서 사용하며 1~10000을 요구합니다.\n입력 자료형: 정수.\nC++ 초기값: 10000. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) int32 MainStatCap = 10000;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="CON 보정 전 HP 기본량입니다. NPC 초기 공식 BaseMaxHP+HPPerCON×CON에 사용하며 플레이어 최초 자원은 NewGame을 사용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 300. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double BaseMaxHP = 300;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="CON 1당 최대 HP 증가입니다. NPC 초기화에서 사용하며 장비/효과 최종 계산과 다릅니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 8. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double HPPerCON = 8;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="INT 보정 전 MP 기본량입니다. NPC 초기 공식 BaseMaxMP+MPPerINT×INT에 사용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 80. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double BaseMaxMP = 80;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="INT 1당 최대 MP 증가입니다. NPC 최초 계산에서 사용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 3. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double MPPerINT = 3;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="CON 보정 전 SP 기본량입니다. NPC 초기 공식 BaseMaxSP+SPPerCON×CON에 사용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 100. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double BaseMaxSP = 100;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="CON 1당 최대 SP 증가입니다. NPC 최초 계산에서 사용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.5. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double SPPerCON = 0.5;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="StatSettings에서는 기본 공격 공식 항, Item에서는 옛 장비 표시/호환 값입니다. 실제 장비 기여는 Equipment.BaseModifiers입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 10. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double BaseAttack = 10;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="주 능력치 1당 공격 증가 계수입니다. 전체 파생/GAS 공격 계산 연결은 남아 있습니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 2. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double AttackPerMainStat = 2;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="StatSettings에서는 기본 방어 공식 항, Item에서는 옛 장비 표시/호환 값입니다. 실제 장비 기여는 Equipment.BaseModifiers입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 5. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double BaseDefense = 5;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="CON 1당 방어 증가 계수입니다. 전체 파생/GAS 계산 연결은 남아 있습니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1.2. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double DefensePerCON = 1.2;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001", ToolTip="DEX/(DEX+K) 속도 포화 곡선 상수 규격입니다. 실제 계산 연결은 별도입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 100. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.001.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double DEXSpeedCurveK = 100;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001", ToolTip="민첩 자동 회피 포화 곡선 상수입니다. 실제 계산/전투 적용 연결이 필요합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 300. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.001.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double DEXDodgeCurveK = 300;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001", ToolTip="민첩 치명타 포화 곡선 상수입니다. 최종 상한/실제 계산과 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 200. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.001.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double DEXCriticalCurveK = 200;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001", ToolTip="행운 포화 곡선 상수입니다. 보상/치명타 실제 계산 연결이 필요합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 200. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.001.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double LUKCurveK = 200;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001", ToolTip="매력 포화 곡선 상수입니다. 개인/동료 실제 보정에 한 번 적용하도록 정의합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 100. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.001.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double CHACurveK = 100;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="민첩 곡선 최대 공격 속도 추가 비율입니다. 0.20=20% 규격이며 실제 계산 적용은 별도입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.20. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double DEXAttackSpeedBonus = 0.20;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="민첩 곡선 최대 이동 속도 추가 비율입니다. 0.10=10% 규격입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.10. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double DEXMoveSpeedBonus = 0.10;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="민첩 곡선 최대 자동 회피 추가 확률입니다. 0.10=10%p이며 실제 판정 연결이 필요합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.10. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double DEXDodgeBonus = 0.10;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="기본 치명타 확률입니다. 0.05=5%이며 장비/민첩 보정 후 상한을 적용하도록 정의합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.05. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double BaseCriticalChance = 0.05;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="민첩 최대 치명타 추가 확률 규격입니다. 0.20=20%p입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.20. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double DEXCriticalBonus = 0.20;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="기본 치명타 피해 배율입니다. 1.5=150%입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1.50. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double BaseCriticalMultiplier = 1.50;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="행운 치명타 배율 추가 규격입니다. 실제 곡선/최종 상한 계산을 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.50. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double LUKCriticalBonus = 0.50;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="매력 최대 효과/동료 보정 비율입니다. 0.15=15%이며 대상 능력치/중복 보정을 확인합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.15. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double CHABonus = 0.15;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="동료 CHA 보정 대상 능력치입니다. 실제 파생 연결이 필요하며 목록 밖은 보정하지 않도록 정의합니다.\n입력 자료형: 선택 목록 (EICStat) 배열.\nC++ 초기값: { EICStat::MaxHP, EICStat::MaxMP, EICStat::PhysicalAttack, EICStat::MagicAttack, EICStat::Defense }. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) TArray<EICStat> CompanionCHAAffectedStats = { EICStat::MaxHP, EICStat::MaxMP, EICStat::PhysicalAttack, EICStat::MagicAttack, EICStat::Defense };
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="행운 최대 보상 추가 비율입니다. 0.30=30% 규격이며 실제 추첨 실행은 별도입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.30. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double LUKRewardBonus = 0.30;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="최종 치명타 확률 상한입니다. 0.50=50%이며 실제 보정 후 계산에 적용해야 합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.50. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double CriticalChanceCap = 0.50;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="최종 치명타 피해 배율 상한입니다. 2.5=250%입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 2.50. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double CriticalMultiplierCap = 2.50;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="자동 회피 확률 상한입니다. 0.15=15%이며 실제 전투 적용은 별도입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.15. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double AutoDodgeChanceCap = 0.15;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="공격 속도 배율 상한입니다. 1.5=150%이며 일반 공격 몽타주 재생 속도와 알림 누락 시 타격 시간에 적용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1.50. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double AttackSpeedMultiplierCap = 1.50;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="이동 속도 배율 상한입니다. 1.3=130%이며 Pawn 속도 적용과 연결해야 합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1.30. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double MoveSpeedMultiplierCap = 1.30;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="SP 고갈 피해 배율 규격입니다. 0.8=정상의 80%이며 GAS 공격 수치 캡처 시 탈진 출력 배율로 적용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.80. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double ExhaustedDamageMultiplier = 0.80;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="SP 고갈 공격 속도 배율 규격입니다. 0.8=80%이며 SP 0 상태에서 GAS 공격 속도 조회값에 적용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.80. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double ExhaustedAttackSpeedMultiplier = 0.80;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="SP 고갈 이동 속도 배율입니다. Controller 초기화에서 이 값을 읽어 SP 0의 최종 이동 속도에 곱합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.90. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent가 CFG_STAT_001을 조회하여 파생 능력치·상한·탈진 배율을 실행에 적용합니다. 플레이어 생성 최대 자원은 NewGame 초기값을 기준으로 성장량을 더합니다.")) double ExhaustedMoveSpeedMultiplier = 0.90;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 MainStatCap = 10000;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double BaseMaxHP = 300;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double HPPerCON = 8;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double BaseMaxMP = 80;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double MPPerINT = 3;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double BaseMaxSP = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double SPPerCON = 0.5;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double BaseAttack = 10;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double AttackPerMainStat = 2;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double BaseDefense = 5;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DefensePerCON = 1.2;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double DEXSpeedCurveK = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double DEXDodgeCurveK = 300;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double DEXCriticalCurveK = 200;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double LUKCurveK = 200;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double CHACurveK = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double DEXAttackSpeedBonus = 0.20;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double DEXMoveSpeedBonus = 0.10;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double DEXDodgeBonus = 0.10;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double BaseCriticalChance = 0.05;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double DEXCriticalBonus = 0.20;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double BaseCriticalMultiplier = 1.50;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double LUKCriticalBonus = 0.50;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double CHABonus = 0.15;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<EICStat> CompanionCHAAffectedStats = { EICStat::MaxHP, EICStat::MaxMP, EICStat::PhysicalAttack, EICStat::MagicAttack, EICStat::Defense };
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double LUKRewardBonus = 0.30;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double CriticalChanceCap = 0.50;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double CriticalMultiplierCap = 2.50;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double AutoDodgeChanceCap = 0.15;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) double AttackSpeedMultiplierCap = 1.50;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) double MoveSpeedMultiplierCap = 1.30;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double ExhaustedDamageMultiplier = 0.80;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double ExhaustedAttackSpeedMultiplier = 0.80;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double ExhaustedMoveSpeedMultiplier = 0.90;
 };
 
-USTRUCT(BlueprintType, meta=(ToolTip="이동·입력 버퍼·방어·회피·판정·상호작용의 정적 전투 규격입니다. UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.", ShortToolTip="이동·입력 버퍼·방어·회피·판정·상호작용의 정적 전투 규격입니다."))
+USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICCombatSettingsRow : public FICDefinitionRow
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="걷기 속도 cm/s 규격입니다. 250=2.5m/s입니다. GAS의 최종 달리기 속도에 WalkSpeedCmPerSecond/RunSpeedCmPerSecond 비율을 곱하여 기본 걷기에 적용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 250. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double WalkSpeedCmPerSecond = 250;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="달리기 cm/s 규격입니다. 450=4.5m/s이며 GAS의 이동 파생값 기준 속도이며 Shift 유지 시 최종 이동 속도로 적용합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 450. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double RunSpeedCmPerSecond = 450;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="전투 입력 보관 PlayClock 초 규격입니다. 공격 중 다음 일반 공격 요청을 이 시간 동안 보관합니다. 다음 동작 시작 전까지 유효한 요청만 실행합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.2. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double InputBufferPlaySeconds = 0.2;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="콤보 입력 허용 PlayClock 초 규격입니다. 타격 단계/몽타주 실행에 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.8. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double ComboWindowPlaySeconds = 0.8;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="360", ToolTip="전방 방어 총 각도 규격입니다. 120=120도이며 실제 방향 판정 연결이 필요합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 120. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 360.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double GuardArcDegrees = 120;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="방어 피해 배율입니다. 0.30=원래 피해의 30%를 받음이며 실제 전투 적용은 별도입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.30. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double GuardDamageMultiplier = 0.30;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="방어 이동 배율 규격입니다. 0.5=절반입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.50. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double GuardMoveSpeedMultiplier = 0.50;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="회피 무적 PlayClock 초 규격입니다. 시작/중단/종료 중복 방지 실행이 필요합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.25. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double DodgeInvulnerabilityPlaySeconds = 0.25;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="회피 이동 cm 규격입니다. 300=3m이며 실제 이동/충돌 실행은 별도입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 300. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double DodgeDistanceCm = 300;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="회피 쿨타임 PlayClock 초 규격입니다. 실제 캐시/실행 연결이 필요합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double DodgeCooldownPlaySeconds = 1;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="피격 경직 PlayClock 초 규격입니다. 실제 경직/면역 실행과 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.2. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double HitStaggerPlaySeconds = 0.2;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="경직 재허용 PlayClock 초 규격입니다. 타격 중복 검증과 실제 판정을 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double HitStaggerIntervalPlaySeconds = 1;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="최초 효과 전 취소 시전의 재시도 PlayClock 초입니다. 일반 쿨타임과 구분합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double CanceledCastRetryPlaySeconds = 1;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="최근 전투 판단 PlayClock 초 규격입니다. 실제 마지막 사건 시각과 비교하는 실행 연결이 필요합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 8. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double RecentCombatPlaySeconds = 8;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001", ToolTip="방어 피해 감소의 양수 상수 규격입니다. 실제 피해 공식 실행기에 연결해야 합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 100. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.001.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double DefenseFormulaK = 100;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="상호작용 cm 규격입니다. 현재 Controller는 별도 250cm 검사를 사용하므로 DT 자동 적용은 미연결입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 250. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double InteractionDistanceCm = 250;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="적 잠금 시작 cm 규격입니다. 실제 잠금 실행 연결이 필요합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 2500. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double LockOnDistanceCm = 2500;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="적 잠금 유지 cm 규격입니다. 실제 이탈 해제 실행을 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 3000. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double LockOnMaintainDistanceCm = 3000;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="가려진 적 잠금 유지 PlayClock 초 규격입니다. 실제 시야/해제 실행은 별도입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: UICAbilitySystemComponent와 PlayerController가 CFG_COMBAT_001을 조회합니다. 공격·방어·회피·입력 버퍼·적 잠금에 적용하며 InteractionDistanceCm은 기존 상호작용 거리와 별개입니다.")) double LockOnOcclusionPlaySeconds = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double WalkSpeedCmPerSecond = 250;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double RunSpeedCmPerSecond = 450;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double InputBufferPlaySeconds = 0.2;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double ComboWindowPlaySeconds = 0.8;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="360")) double GuardArcDegrees = 120;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double GuardDamageMultiplier = 0.30;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double GuardMoveSpeedMultiplier = 0.50;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeInvulnerabilityPlaySeconds = 0.25;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeDistanceCm = 300;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeCooldownPlaySeconds = 3;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double HitStaggerPlaySeconds = 0.2;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double HitStaggerIntervalPlaySeconds = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double CanceledCastRetryPlaySeconds = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double RecentCombatPlaySeconds = 8;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double DefenseFormulaK = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double InteractionDistanceCm = 250;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double LockOnDistanceCm = 2500;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double LockOnMaintainDistanceCm = 3000;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double LockOnOcclusionPlaySeconds = 1;
 };
 
-USTRUCT(BlueprintType, meta=(ToolTip="최대 동료·영입 관계·저체력·추격/복귀·대형의 정적 규격입니다. 전체 파티 AI/영입 판정 실행에서 이 DT를 적용하는 연결은 아직 남아 있습니다.", ShortToolTip="최대 동료·영입 관계·저체력·추격/복귀·대형의 정적 규격입니다."))
+USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICPartySettingsRow : public FICDefinitionRow
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="4", ToolTip="최대 동료 1~4 규격입니다. 현재 저장/슬롯 검사는 코드 최대 4도 사용하며 DT 자동 적용은 미연결입니다.\n입력 자료형: 정수.\nC++ 초기값: 4. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n최댓값: 4.\n소속 정의/시스템: 전체 파티 AI/영입 판정 실행에서 이 DT를 적용하는 연결은 아직 남아 있습니다.")) int32 MaximumCompanions = 4;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="100", ToolTip="영입 관계 0~100 규격입니다. 실제 영입/모드 전환 거래 연결이 필요합니다.\n입력 자료형: 정수.\nC++ 초기값: 100. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 100.\n소속 정의/시스템: 전체 파티 AI/영입 판정 실행에서 이 DT를 적용하는 연결은 아직 남아 있습니다.")) int32 RequiredRecruitAffinity = 100;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="저체력 HP/MaxHP 비율 규격입니다. 0.2=20%이며 실제 AI 판단에 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.20. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: 전체 파티 AI/영입 판정 실행에서 이 DT를 적용하는 연결은 아직 남아 있습니다.")) double LowHPRatio = 0.20;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="자동 회복 HP 비율 규격입니다. 0.5=50%이며 실제 AI/GAS 연결이 필요합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.50. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: 전체 파티 AI/영입 판정 실행에서 이 DT를 적용하는 연결은 아직 남아 있습니다.")) double AutoHealHPRatio = 0.50;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="동료 적 탐색 cm 규격입니다. 실제 AI 검색 실행과 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1200. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: 전체 파티 AI/영입 판정 실행에서 이 DT를 적용하는 연결은 아직 남아 있습니다.")) double SearchDistanceCm = 1200;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="동료 추격 cm 규격입니다. 소유자/적 기준점과 실제 AI 실행을 확인합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 2000. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: 전체 파티 AI/영입 판정 실행에서 이 DT를 적용하는 연결은 아직 남아 있습니다.")) double ChaseDistanceCm = 2000;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="동료 대형 복귀 cm 규격입니다. 이동/경로 복구 실행에 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 3000. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: 전체 파티 AI/영입 판정 실행에서 이 DT를 적용하는 연결은 아직 남아 있습니다.")) double RecoveryDistanceCm = 3000;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="경로 실패 판단 PlayClock 초입니다. 실제 AI 경로 상태 실행을 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 5. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: 전체 파티 AI/영입 판정 실행에서 이 DT를 적용하는 연결은 아직 남아 있습니다.")) double PathFailurePlaySeconds = 5;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ToolTip="슬롯별 대형 상대 위치 cm 배열입니다. 동료 슬롯/이동/충돌 실행과 연결합니다.\n입력 자료형: 3차원 좌표/크기 배열.\n소속 정의/시스템: 전체 파티 AI/영입 판정 실행에서 이 DT를 적용하는 연결은 아직 남아 있습니다.")) TArray<FVector> FormationOffsetsCm;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="4")) int32 MaximumCompanions = 4;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="100")) int32 RequiredRecruitAffinity = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double LowHPRatio = 0.20;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double AutoHealHPRatio = 0.50;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double SearchDistanceCm = 1200;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double ChaseDistanceCm = 2000;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double RecoveryDistanceCm = 3000;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double PathFailurePlaySeconds = 5;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FVector> FormationOffsetsCm;
 };
 
-USTRUCT(BlueprintType, meta=(ToolTip="가방·확장·스택·퀵슬롯·보관함·드롭 수명의 규격입니다. 현재 드롭 수명은 이 DT에서 조회합니다. 가방/보관함 일부 상한과 초기값은 런타임 구조 기본값도 사용하므로 DT만 편집해 전체 규칙을 바꾸면 안 됩니다.", ShortToolTip="가방·확장·스택·퀵슬롯·보관함·드롭 수명의 규격입니다."))
+USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICInventorySettingsRow : public FICDefinitionRow
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="초기 가방 슬롯 규격입니다. 현재 InventoryState 기본값도 별도로 사용하므로 DT 자동 변경되지 않습니다.\n입력 자료형: 정수.\nC++ 초기값: 20. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n소속 정의/시스템: 현재 드롭 수명은 이 DT에서 조회합니다.")) int32 InitialSlots = 20;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="티켓 확장 슬롯 규격입니다. 현재 실제 티켓 경로는 별도 +10 코드입니다.\n입력 자료형: 정수.\nC++ 초기값: 10. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n소속 정의/시스템: 현재 드롭 수명은 이 DT에서 조회합니다.")) int32 ExpansionSlots = 10;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="가방 최대 슬롯 규격입니다. 현재 실제 상태/티켓 경로는 별도 최대 100 코드입니다.\n입력 자료형: 정수.\nC++ 초기값: 100. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n소속 정의/시스템: 현재 드롭 수명은 이 DT에서 조회합니다.")) int32 MaximumSlots = 100;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="한 슬롯 최대 수량입니다. 1~99이며 장비는 1입니다. 강화/옵션이 다른 장비 인스턴스를 합치지 않습니다.\n입력 자료형: 정수.\nC++ 초기값: 99. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n소속 정의/시스템: 현재 드롭 수명은 이 DT에서 조회합니다.")) int32 StackLimit = 99;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="4", ToolTip="퀵슬롯 ID 배열 또는 개수 규격입니다. 플레이 배열 정확히 4칸/인덱스 0~3=키 1~4이며 저장 길이를 검사합니다.\n입력 자료형: 정수.\nC++ 초기값: 4. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n최댓값: 4.\n소속 정의/시스템: 현재 드롭 수명은 이 DT에서 조회합니다.")) int32 QuickSlots = 4;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="4", ToolTip="최대 설치 보관함 규격입니다. 현재 검사도 상한 4를 사용하며 실제 설치 실행은 별도입니다.\n입력 자료형: 정수.\nC++ 초기값: 4. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n최댓값: 4.\n소속 정의/시스템: 현재 드롭 수명은 이 DT에서 조회합니다.")) int32 MaximumStorageInstallations = 4;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ToolTip="보관함 용량 규격입니다. 현재 40칸이며 실제 구조/검사 기본값도 사용합니다. DT 자동 적용 여부를 확인하세요.\n입력 자료형: 정수.\nC++ 초기값: 40. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 1.\n소속 정의/시스템: 현재 드롭 수명은 이 DT에서 조회합니다.")) int32 SlotsPerStorage = 40;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="드롭 생성 후 PlayClock 초 수명입니다. 현재 DropActor가 CFG_INVENTORY_001에서 조회합니다. 1800=플레이 30분이며 메뉴 중 진행하지 않습니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 1800. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: 현재 드롭 수명은 이 DT에서 조회합니다.")) double DropLifetimePlaySeconds = 1800;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 InitialSlots = 20;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 ExpansionSlots = 10;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 MaximumSlots = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 StackLimit = 99;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="4")) int32 QuickSlots = 4;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="4")) int32 MaximumStorageInstallations = 4;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 SlotsPerStorage = 40;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DropLifetimePlaySeconds = 1800;
 };
 
-USTRUCT(BlueprintType, meta=(ToolTip="수동/클리어 슬롯과 자동 저장 간격·HP 조건의 정적 규격입니다. 현재 SaveSubsystem의 별도 AutoSaveInterval/AutoSaveHealthThreshold와 코드 슬롯 규칙을 사용하므로 DT 전체 자동 적용 연결은 남아 있습니다.", ShortToolTip="수동/클리어 슬롯과 자동 저장 간격·HP 조건의 정적 규격입니다."))
+USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICSaveSettingsRow : public FICDefinitionRow
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="4", ClampMax="4", ToolTip="수동 저장 개수 규격입니다. 4로 고정하며 실제 서비스는 슬롯 1~4의 코드 규칙입니다.\n입력 자료형: 정수.\nC++ 초기값: 4. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 4.\n최댓값: 4.\n소속 정의/시스템: 현재 SaveSubsystem의 별도 AutoSaveInterval/AutoSaveHealthThreshold와 코드 슬롯 규칙을 사용하므로 DT 전체 자동 적용 연결은 남아 있습니다.")) int32 ManualSlotCount = 4;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="5", ClampMax="5", ToolTip="클리어 기록 슬롯 규격입니다. 정의 5이며 실제 엔딩 기록 실행은 연결 대상입니다.\n입력 자료형: 정수.\nC++ 초기값: 5. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 5.\n최댓값: 5.\n소속 정의/시스템: 현재 SaveSubsystem의 별도 AutoSaveInterval/AutoSaveHealthThreshold와 코드 슬롯 규칙을 사용하므로 DT 전체 자동 적용 연결은 남아 있습니다.")) int32 ClearRecordSlot = 5;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ToolTip="자동 저장 PlayClock 초 규격입니다. 현재 실제 값은 SaveSubsystem.AutoSaveInterval이며 DT 자동 적용은 미연결입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 300. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n소속 정의/시스템: 현재 SaveSubsystem의 별도 AutoSaveInterval/AutoSaveHealthThreshold와 코드 슬롯 규칙을 사용하므로 DT 전체 자동 적용 연결은 남아 있습니다.")) double AutoSaveIntervalPlaySeconds = 300;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1", ToolTip="자동 저장 HP 비율 하한 규격입니다. 실제 값은 SaveSubsystem.AutoSaveHealthThreshold입니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.25. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.\n최댓값: 1.\n소속 정의/시스템: 현재 SaveSubsystem의 별도 AutoSaveInterval/AutoSaveHealthThreshold와 코드 슬롯 규칙을 사용하므로 DT 전체 자동 적용 연결은 남아 있습니다.")) double AutoSaveMinimumHPRatio = 0.25;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="4", ClampMax="4")) int32 ManualSlotCount = 4;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="5", ClampMax="5")) int32 ClearRecordSlot = 5;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double AutoSaveIntervalPlaySeconds = 300;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double AutoSaveMinimumHPRatio = 0.25;
 };
 
-/** Shared horizontal discovery tuning; the discovered record itself belongs to WorldState. */
-USTRUCT(BlueprintType, meta=(ToolTip="가로 평면의 지도 발견 거리 규격입니다. 발견 기록은 WorldState가 소유합니다. 지도 발견 실행 경로는 아직 별도로 연결해야 합니다.", ShortToolTip="가로 평면의 지도 발견 거리 규격입니다."))
+
+USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICMapSettingsRow : public FICDefinitionRow
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001", Units="cm", ToolTip="가로 지도 발견 cm 규격입니다. 5000=50m이며 실제 발견/층 판정 실행을 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 5000. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.001.\n소속 정의/시스템: 지도 발견 실행 경로는 아직 별도로 연결해야 합니다.")) double DiscoveryRadiusCm = 5000;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001", Units="cm")) double DiscoveryRadiusCm = 5000;
 };

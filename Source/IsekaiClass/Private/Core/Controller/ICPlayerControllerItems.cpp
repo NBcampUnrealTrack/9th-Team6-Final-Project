@@ -11,6 +11,7 @@
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "World/Spawn/ICSpawnSubsystem.h"
 #include "NPC/Character/ICNPCBase.h"
+#include "Combat/GAS/ICAbilitySystemComponent.h"
 
 void AICPlayerController::BeginItem(FName ID,int32 Quick)
 {
@@ -21,12 +22,66 @@ void AICPlayerController::BeginItem(FName ID,int32 Quick)
     if(Definition->Kind==EPlayerItemKind::Expansion){Inventory->ExpandUsingTicket();return;}
     if(Definition->Kind!=EPlayerItemKind::Consumable){Show(TEXT("사용 가능한 소비품이 아닙니다."));return;}
     UE_LOG(LogICInventory, Verbose, TEXT("[Item.TargetSelection] Item=%s Quick=%d"),*ID.ToString(),Quick);
-    PendingItem=ID;PendingQuick=Quick;PendingPartyKey=INDEX_NONE;Show(FString::Printf(TEXT("대상 선택: 같은 숫자 키 = 자신 / Z X C V = 동료 / %s = 취소"),*MenuCancelLabel()));
+    if(!Menu.IsEmpty())SetMenu(TEXT(""));
+    CancelTarget();
+    PendingItem=ID;PendingQuick=Quick;
+    Show(FString::Printf(TEXT("E/R/T: 동료 선택, 같은 키 다시 누르기: 자신, 숫자 키 또는 Enter: 사용, %s: 취소"),*MenuCancelLabel()));
 }
+
+void AICPlayerController::BeginSkillTarget(AICCharacterBase* Caster,FName SkillID)
+{
+    if(!Caster||!Caster->GetICAbilitySystem())return;
+    CancelTarget();
+    PendingSkill=SkillID;
+    PendingSkillCaster=Caster;
+    Show(FString::Printf(TEXT("E/R/T: 동료 선택, 같은 키 다시 누르기: 자신, Q 또는 Enter: 사용, %s: 취소"),*MenuCancelLabel()));
+}
+
+bool AICPlayerController::SelectTarget(FName CharacterID)
+{
+    const auto* State=GetWorldState();
+    const auto* Target=State?State->GetStoredCharacter(CharacterID):nullptr;
+    if(!HasTargetSelection()||!Target)return false;
+    const bool bPlayerTarget=CharacterID==UICWorldStateSubsystem::PlayerId();
+    if(!bPlayerTarget&&(Target->Mode!=EICCharacterMode::Companion||Target->PartySlot<0||Target->PartySlot>=3))return false;
+    bool Revive=false;
+    if(!PendingSkill.IsNone())
+    {
+        auto* Caster=PendingSkillCaster.Get();
+        auto* ASC=Caster?Caster->GetICAbilitySystem():nullptr;
+        FICDefinitionResult Result;
+        const auto* Skill=ASC&&ASC->Definitions()?ASC->Definitions()->Find<FICSkillRow>(PendingSkill,Result):nullptr;
+        if(!Skill)return false;
+        Revive=Skill->Purpose==EICSkillPurpose::Revive||Skill->TargetRules.Target==EICCombatTarget::DownedCompanion;
+        if(Skill->TargetRules.Target==EICCombatTarget::Self&&CharacterID!=Caster->GetCharacterID())return false;
+        if(CharacterID==Caster->GetCharacterID()&&!Skill->TargetRules.bAllowCaster&&Skill->TargetRules.Target!=EICCombatTarget::Self)return false;
+    }
+    else
+    {
+        const auto* Item=GetInventory()?GetInventory()->Find(PendingItem):nullptr;
+        if(!Item)return false;
+        Revive=Item->UseEffect==EICItemEffect::Revival;
+        if(Item->UseTarget==EICItemTarget::PlayerOnly&&!bPlayerTarget)return false;
+    }
+    if(Target->IsDowned()!=Revive)return false;
+    PendingTargetID=CharacterID;
+    bDirty=true;
+    Show(FString::Printf(TEXT("선택 대상: %s / Q·아이템 숫자키 또는 Enter로 확정 / %s로 취소"),bPlayerTarget?TEXT("자신"):*CharacterID.ToString(),*MenuCancelLabel()));
+    return true;
+}
+
+void AICPlayerController::ConfirmSelectedTarget()
+{
+    if(!HasTargetSelection())return;
+    if(PendingTargetID.IsNone()&&!SelectTarget(UICWorldStateSubsystem::PlayerId()))
+    {Show(TEXT("E/R/T로 사용 가능한 동료를 선택하세요."));return;}
+    ConfirmTarget(PendingTargetID);
+}
+
 void AICPlayerController::ConfirmPartyTarget(int32 Slot)
 {
     IC_TRACE_FUNCTION();
-    if(Slot<0||Slot>3||!GetWorldState())return;
+    if(Slot<0||Slot>=3||!GetWorldState())return;
     for(const auto& Pair:GetWorldState()->ExportState().Characters)
         if(Pair.Value.PartySlot==Slot){ConfirmTarget(Pair.Key);return;}
     Show(TEXT("해당 슬롯에 동료가 없습니다."));
@@ -34,6 +89,17 @@ void AICPlayerController::ConfirmPartyTarget(int32 Slot)
 void AICPlayerController::ConfirmTarget(FName Target)
 {
     IC_TRACE_FUNCTION();
+    if(!PendingSkill.IsNone())
+    {
+        if(!SelectTarget(Target)){Show(TEXT("이 스킬을 사용할 수 없는 대상입니다."));return;}
+        auto* Caster=PendingSkillCaster.Get();
+        auto* ASC=Caster?Caster->GetICAbilitySystem():nullptr;
+        if(!ASC){CancelTarget();return;}
+        const auto Result=ASC->RequestSkillByID(PendingSkill,Target);
+        if(Result.bSuccess){CancelTarget();Show(TEXT("스킬 사용"));}
+        else Show(Result.Reason);
+        return;
+    }
     auto* Inventory=GetInventory();auto* State=GetWorldState();
     if(PendingItem.IsNone()||bItemTransactionInProgress||!Inventory||!State)return;
     if(!UICWorldStateSubsystem::IsCharacterIdValid(Target)||!State->GetStoredCharacter(Target))

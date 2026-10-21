@@ -30,7 +30,7 @@ bool AICCharacterBase::InitializeState(FName ID)
         ? *State->GetStoredCharacter(ID) : State->GetSnapshot(ID);
     FString Reason;
     if (AbilitySystem && !AbilitySystem->CanRestore(Snapshot, Reason)) return false;
-    // The existing player controller delegates its persistence interface to this pawn.
+
     if (Snapshot.Kind != EICCharacterKind::Player && !State->RegisterStateParticipant(ID, this)) return false;
     CharacterID = ID; bRegisteredState = Snapshot.Kind != EICCharacterKind::Player;
     State->OnCharacterChanged.AddUniqueDynamic(this, &ThisClass::StoredCharacterChanged);

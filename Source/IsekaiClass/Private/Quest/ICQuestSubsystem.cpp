@@ -398,7 +398,7 @@ bool UICQuestSubsystem::ApplyReward(FICWorldState& Candidate, const FICRewardRow
             return false;
         }
         Character->Affinity = static_cast<int32>(FMath::Clamp<int64>(
-            static_cast<int64>(Character->Affinity) + Affinity.Amount, 0, 100));
+            static_cast<int64>(Character->Affinity) + Affinity.Amount, 0, 500));
     }
     for (FName RecipeID : Reward.UnlockRecipeIDs)
     {

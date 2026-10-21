@@ -34,7 +34,7 @@ bool ValidItems(const TArray<FPlayerItemInstance>& Items, TSet<FGuid>& IDs)
 bool ValidCharacter(const FICCharacterState& C)
 {
     IC_TRACE_FUNCTION();
-    if (!UICWorldStateSubsystem::IsCharacterIdValid(C.CharacterId) || C.Affinity < 0 || C.Affinity > 100
+    if (!UICWorldStateSubsystem::IsCharacterIdValid(C.CharacterId) || C.Affinity < 0 || C.Affinity > 500
         || static_cast<uint8>(C.Kind) > static_cast<uint8>(EICCharacterKind::Background)
         || static_cast<uint8>(C.Mode) > static_cast<uint8>(EICCharacterMode::Companion)
         || C.PartySlot < INDEX_NONE || C.PartySlot > 3 || !C.MainStats.IsValid()
@@ -219,7 +219,7 @@ bool UICWorldStateSubsystem::SetPartySlot(FName ID, int32 Slot)
     UE_LOG(LogICWorldState, Verbose, TEXT("[State.PartySlot.Request] ID=%s Slot=%d"),*ID.ToString(),Slot);
     const auto* C = State.Characters.Find(ID);
     if (!C || C->Kind != EICCharacterKind::Recruitable || (C->IsDowned() && Slot == INDEX_NONE)
-        || (Slot >= 0 && C->PartySlot == INDEX_NONE && C->Affinity != 100)) return false;
+        || (Slot >= 0 && C->PartySlot == INDEX_NONE && C->Affinity < 300)) return false;
     FICCharacterState Next = *C; Next.PartySlot = Slot;
     Next.Mode = Slot == INDEX_NONE ? EICCharacterMode::Scheduled : EICCharacterMode::Companion;
     return SetCharacterState(Next);
@@ -250,6 +250,8 @@ bool UICWorldStateSubsystem::ValidateState(const FICWorldState& Candidate)
     {
         if (Candidate.PlayerName.TrimStartAndEnd().IsEmpty() || Candidate.PlayerName.Len() > 12 || !Candidate.Characters.Contains(PlayerId()) || Candidate.FirstSkill.IsNone()) return false;
         for (TCHAR Ch : Candidate.PlayerName) if (Ch < TEXT(' ') || Ch == 0x2028 || Ch == 0x2029) return false;
+        if(!Candidate.CreationAnswers.Name.IsEmpty()&&(!Candidate.CreationAnswers.IsComplete()
+            ||Candidate.CreationAnswers.Name.TrimStartAndEnd()!=Candidate.PlayerName||Candidate.CreationAnswers.Gender!=Candidate.Preset))return false;
     }
     TSet<int32> Party;
     TSet<FGuid> IDs;
@@ -258,7 +260,7 @@ bool UICWorldStateSubsystem::ValidateState(const FICWorldState& Candidate)
     {
         const auto& C = Entry.Value;
         if (Entry.Key != C.CharacterId || !ValidCharacter(C)) return false;
-        if (C.CharacterId == PlayerId() && !C.Equipment.IsEmpty()) return false; // Player equipment lives in Inventory.
+        if (C.CharacterId == PlayerId() && !C.Equipment.IsEmpty()) return false;
         if (!C.HasStats() && (!C.Equipment.IsEmpty() || !C.Debuffs.IsEmpty())) return false;
         if (!ValidItems(C.Equipment, IDs)) return false;
         if (C.PartySlot >= 0)
@@ -326,7 +328,7 @@ bool UICWorldStateSubsystem::CommitGameplayTransaction(const FICWorldState& Cand
     if(!ValidateState(Next)){UE_LOG(LogICWorldState, Verbose, TEXT("[State.Transaction.Rejected] Transaction=%s: 후보 상태 검증 실패, 원본 유지"),*TransactionID.ToString());return false;}
     State=MoveTemp(Next);
     UE_LOG(LogICWorldState, Verbose, TEXT("[State.Transaction.Committed] Transaction=%s Gold=%d Characters=%d Jobs=%d Drops=%d"),*TransactionID.ToString(),State.Gold,State.Characters.Num(),State.ProductionJobs.Num(),State.Drops.Num());
-    // Publish only after every field and the idempotency receipt have committed.
+
     TArray<FName> CharacterIDs;State.Characters.GetKeys(CharacterIDs);
     for(FName ID:CharacterIDs)OnCharacterChanged.Broadcast(ID);
     OnInventoryChanged.Broadcast();OnPlayerGoldChanged.Broadcast();OnDropsChanged.Broadcast();

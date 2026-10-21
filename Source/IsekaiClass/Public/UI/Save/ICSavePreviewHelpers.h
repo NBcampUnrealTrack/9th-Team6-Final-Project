@@ -7,11 +7,11 @@
 namespace ICSavePreviewUI
 {
 inline FText SlotName(int32 Slot) { IC_TRACE_FUNCTION(); return Slot == 0 ? NSLOCTEXT("ICSaveUI", "AutoSlot", "자동 저장") : FText::Format(NSLOCTEXT("ICSaveUI", "ManualSlot", "수동 슬롯 {0}"), FText::AsNumber(Slot)); }
-// Save timestamps remain UTC on disk; display them in the player's local timezone.
+
 inline FText Date(const FICSaveSlotInfo& Info)
 {
     IC_TRACE_FUNCTION();
-    // Locale-aware ICU skeletons change separators; format this fixed game UI explicitly.
+
     const double OffsetMinutes=FMath::RoundToDouble((FDateTime::Now()-FDateTime::UtcNow()).GetTotalMinutes());
     return FText::FromString((Info.SavedAt+FTimespan::FromMinutes(OffsetMinutes)).ToString(TEXT("%y.%m.%d %H:%M")));
 }

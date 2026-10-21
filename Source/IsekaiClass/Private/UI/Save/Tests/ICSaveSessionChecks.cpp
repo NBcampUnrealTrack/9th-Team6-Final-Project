@@ -78,7 +78,7 @@ bool FICSaveSessionAssetsCheck::RunTest(const FString& Parameters)
     if(!TestNotNull(TEXT("Existing confirmation WBP"),ModalBP)||!TestNotNull(TEXT("Existing slot WBP"),SlotBP))return false;
     if(FParse::Param(FCommandLine::Get(),TEXT("ICApplySaveSessionAssets")))
     {
-        // Only this explicit authoring flag edits assets; ordinary tests are read-only.
+
         auto* Tree=WidgetBP->WidgetTree.Get();auto* Close=Cast<UButton>(Tree->FindWidget(TEXT("IC_SaveLoad_Close")));
         if(!TestNotNull(TEXT("Existing close button"),Close))return false;
         const TCHAR* Names[]={TEXT("IC_SaveLoad_Save"),TEXT("IC_SaveLoad_Delete")};
@@ -99,8 +99,8 @@ bool FICSaveSessionAssetsCheck::RunTest(const FString& Parameters)
             else {AddError(TEXT("Unexpected save WBP action layout; author buttons in its existing action panel."));return false;}
             Button->bIsVariable=true;
         }
-        // Preserve the existing 1920x1080 design: save replaces load in its action
-        // panel, delete sits beside Back, and long slot lists scroll inside the frame.
+
+
         auto* Load=Cast<UButton>(Tree->FindWidget(TEXT("IC_SaveLoad_Load")));
         auto* Save=Cast<UButton>(Tree->FindWidget(TEXT("IC_SaveLoad_Save")));
         auto* Delete=Cast<UButton>(Tree->FindWidget(TEXT("IC_SaveLoad_Delete")));

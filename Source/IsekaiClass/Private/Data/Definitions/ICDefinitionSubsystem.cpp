@@ -51,7 +51,7 @@ const FICDefinitionRow* UICDefinitionSubsystem::FindRow(FName ID,const UScriptSt
     if(!UICDefinitionLibrary::IsDefinitionIDValid(ID)) {Failure(Result,EICDefinitionFailure::InvalidID,TEXT("ID"),TEXT("ID must contain uppercase letters, digits or underscores (maximum 40)."));return nullptr;}
     if(!Catalog) {Failure(Result,EICDefinitionFailure::CatalogUnavailable,TEXT("Catalog"),TEXT("Definition catalog is not configured or could not be loaded."));return nullptr;}
     const FICDefinitionRow* Found=nullptr; FString FoundTable; bool bRegistered=false;
-    // Check the whole type for duplicates, including distinct Settings schemas.
+
     for(const auto& Binding:Catalog->Tables)
     {
         if(Binding.Type!=Schema->Type)continue;

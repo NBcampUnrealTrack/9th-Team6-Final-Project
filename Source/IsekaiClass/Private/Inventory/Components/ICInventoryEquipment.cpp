@@ -17,7 +17,7 @@ bool UICInventoryComponent::RollRandomOptions(FPlayerItemInstance& Item,const FI
     const auto* Grade=Pool->Grades.FindByPredicate([&](const auto& G){ IC_TRACE_FUNCTION();return G.Grade==Gear->DefaultGrade;});
     if(!Grade || Grade->OptionCount<0 || Grade->OptionCount>4)return false;
     TArray<FICWeightedOption> Options=Grade->Options;TSet<FName> Seen;
-    // Resolve every referenced option before rolling anything.
+
     for(const auto& Entry:Options)
     {
         const auto* Rule=Service->Find<FICOptionRow>(Entry.OptionID,R);

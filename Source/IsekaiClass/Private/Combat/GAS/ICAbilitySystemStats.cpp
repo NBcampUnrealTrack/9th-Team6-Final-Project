@@ -69,7 +69,7 @@ void UICAbilitySystemComponent::RebuildDerivedStats()
     }
     for(const auto& E:Runtime.Combat.Effects)if(const auto* R=Definitions()?Definitions()->Find<FICStatusEffectRow>(E.EffectID,Result):nullptr)
         for(auto M:R->StatModifiers){const double Scale=E.CapturedMagnitudes.Contains(TEXT("PersonalCHA"))?E.CapturedMagnitudes.FindRef(TEXT("PersonalCHA")):1.;M.Flat*=Scale*E.Stacks;M.Percent*=Scale*E.Stacks;Mods.Add(M);}
-    // Strongest active combination per stat; membership includes Downed companions.
+
     auto* W=GetWorld()&&GetWorld()->GetGameInstance()?GetWorld()->GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr;
     FICWorldState World=W?W->ExportState():FICWorldState();TArray<FName> Synergies;TMap<EICStat,TArray<FICStatModifier>> SynergyMods;
     if(Definitions()&&Runtime.HasStats()&&!Runtime.IsDowned()&& (Runtime.Kind==EICCharacterKind::Player||Runtime.PartySlot>=0))
@@ -93,7 +93,7 @@ void UICAbilitySystemComponent::RebuildDerivedStats()
         CHA=SetPrimary(EICStat::CHA,UICPrimaryAttributeSet::GetCHAAttribute());LUK=SetPrimary(EICStat::LUK,UICPrimaryAttributeSet::GetLUKAttribute());
     }
     double BaseHP=Rules->BaseMaxHP+Rules->HPPerCON*(CON-1),BaseMP=Rules->BaseMaxMP+Rules->MPPerINT*(INT-1),BaseSP=Rules->BaseMaxSP+Rules->SPPerCON*(CON-1);
-    // Player creation values are an explicit project contract. Growth uses configured increments from this baseline.
+
     if(Runtime.Kind==EICCharacterKind::Player)if(const auto* New=Definitions()?Definitions()->Find<FICNewGameRow>(TEXT("CFG_NEWGAME_001"),Result):nullptr)
     {BaseHP=New->InitialMaxHP+Rules->HPPerCON*(CON-New->InitialStats.CON);BaseMP=New->InitialMaxMP+Rules->MPPerINT*(INT-New->InitialStats.INT);BaseSP=New->InitialMaxSP+Rules->SPPerCON*(CON-New->InitialStats.CON);}
     double CompanionCHA=1;
@@ -123,6 +123,13 @@ void UICAbilitySystemComponent::RebuildDerivedStats()
 void UICAbilitySystemComponent::UnlockSkills()
 {
     IC_TRACE_FUNCTION(); if(!Primary||!Definitions())return;TArray<FName> IDs;FICDefinitionResult R;Definitions()->GetDefinitionIDs(EICDefinitionType::Skill,IDs);
+    if (Runtime.Kind == EICCharacterKind::Player)
+    {
+        const auto* State = GetWorld()->GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();
+        const FName InitialSkill = State ? State->ExportState().FirstSkill : NAME_None;
+        if (!InitialSkill.IsNone() && Definitions()->Find<FICSkillRow>(InitialSkill, R)) Runtime.UnlockedSkillIDs.Add(InitialSkill);
+        return;
+    }
     for(int32 Pass=0;Pass<4;++Pass)for(FName ID:IDs)if(const auto* S=Definitions()->Find<FICSkillRow>(ID,R))
     {
         bool Owner= S->OwnerType==EICSkillOwner::RecruitUnique ? S->NPCID==Runtime.CharacterId : false;

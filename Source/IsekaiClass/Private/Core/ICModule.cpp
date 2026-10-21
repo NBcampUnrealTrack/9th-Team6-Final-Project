@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+
 
 #include "Core/ICModule.h"
 #include "Debug/ICLog.h"
