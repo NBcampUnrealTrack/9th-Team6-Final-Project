@@ -36,6 +36,7 @@ private:
     UPROPERTY(meta=(BindWidget))
     TObjectPtr<UButton> IC_Quest_Close;
 
+    UFUNCTION()
     void RefreshQuests();
 
     UFUNCTION()

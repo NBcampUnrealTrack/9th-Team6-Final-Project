@@ -175,20 +175,8 @@ struct ISEKAICLASS_API FICQuestRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Repeat", meta=(ToolTip="퀘스트 포기 허용입니다. 체크는 허용, 해제는 금지 규격이며 실제 포기/수락품/진행 정리 실행은 별도입니다.\n입력 자료형: 체크박스(true/false).\nC++ 초기값: 켜짐(true). 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n소속 정의/시스템: 실제 퀘스트 실행기는 아직 연결 대상입니다."))
     bool bAllowAbandon = true;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Repeat", meta=(ToolTip="퀘스트 반복 허용입니다. 해제는 일회성, 체크는 지연/조건/회차 GUID를 사용하도록 정의합니다.\n입력 자료형: 체크박스(true/false).\nC++ 초기값: 꺼짐(false). 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n소속 정의/시스템: 실제 퀘스트 실행기는 아직 연결 대상입니다."))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Repeat", meta=(ToolTip="완료 후 즉시 다시 수락할 수 있습니다. 진행 중에는 재수락할 수 없습니다."))
     bool bRepeatable = false;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Repeat", meta=(EditCondition="bRepeatable", ToolTip="반복 퀘스트 지연 기준 시계입니다. PlayClock 초와 GameClock 분 중 해당 지연 필드를 사용합니다.\n입력 자료형: 선택 목록 (EICClock).\nC++ 초기값: PlayClock — 누적 실제 플레이 초입니다. 생산·쿨타임·드롭 수명처럼 활동한 시간을 사용하며 수면 점프로 늘리지 않습니다.. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n편집 활성 조건: bRepeatable.\n소속 정의/시스템: 실제 퀘스트 실행기는 아직 연결 대상입니다."))
-    EICClock RepeatClock = EICClock::PlayClock;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Repeat", meta=(ClampMin="0.0", Units="s", EditCondition="bRepeatable && RepeatClock == EICClock::PlayClock", ToolTip="PlayClock 기준 반복 퀘스트 지연 초입니다. 메뉴 정지 중 경과하지 않으며 마지막 완료 시각과 비교합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.0. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.0.\n편집 활성 조건: bRepeatable && RepeatClock == EICClock::PlayClock.\n소속 정의/시스템: 실제 퀘스트 실행기는 아직 연결 대상입니다."))
-    double RepeatDelayPlaySeconds = 0.0;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Repeat", meta=(ClampMin="0.0", EditCondition="bRepeatable && RepeatClock == EICClock::GameClock", ToolTip="GameClock 기준 반복 퀘스트 지연 분입니다. 수면 점프 영향과 마지막 완료 시각을 실제 판정기에 연결합니다.\n입력 자료형: 배정밀도 소수.\nC++ 초기값: 0.0. 기존 DT 행/BP의 저장된 값은 해당 에셋 값이 우선합니다.\n최솟값: 0.0.\n편집 활성 조건: bRepeatable && RepeatClock == EICClock::GameClock.\n소속 정의/시스템: 실제 퀘스트 실행기는 아직 연결 대상입니다."))
-    double RepeatDelayGameMinutes = 0.0;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Repeat", meta=(EditCondition="bRepeatable", ToolTip="반복 퀘스트 재제공 조건입니다. 기준 시계·지연 시간과 함께 재수락 전에 검사합니다.\n입력 자료형: 구조/객체 (FICConditionGroup) 배열.\n편집 활성 조건: bRepeatable.\n소속 정의/시스템: 실제 퀘스트 실행기는 아직 연결 대상입니다."))
-    TArray<FICConditionGroup> RepeatConditions;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Dialogue", meta=(ToolTip="제안 상태 Dialogue ID입니다. 실제 상태별 대사 선택 연결이 필요합니다.\n입력 자료형: 이름/ID.\n소속 정의/시스템: 실제 퀘스트 실행기는 아직 연결 대상입니다."))
     FName OfferDialogueID;

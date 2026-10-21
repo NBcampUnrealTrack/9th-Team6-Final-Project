@@ -31,6 +31,15 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Quest")
     bool TurnInQuest(FName QuestID, FName NPCID);
 
+    UFUNCTION(BlueprintPure, Category="IC|Quest")
+    bool CanOfferQuest(FName QuestID) const;
+
+    UFUNCTION(BlueprintPure, Category="IC|Quest")
+    bool AreQuestObjectivesReady(FName QuestID) const;
+
+    bool GetObjectiveProgress(const FICQuestObjectiveDefinition& Objective, const FICQuestState& Quest,
+        const FICWorldState& World, int32& CurrentCount) const;
+
     UFUNCTION(BlueprintCallable, Category="IC|Quest")
     bool ReportObjectiveEvent(EICQuestObjectiveType Type, FName TargetID, int32 Count, FGuid EventID,
         EICLifeActivity Activity = EICLifeActivity::Gathering, FName OutputItemID = NAME_None, FName DialogueID = NAME_None);
@@ -71,7 +80,9 @@ private:
         const FICWorldState& World) const;
     bool AreObjectivesComplete(const FICQuestRow& Definition, const FICQuestState& Quest,
         const FICWorldState& World) const;
-    bool CompleteQuest(FName QuestID, const FICQuestRow& Definition, bool IsForced = false);
+    bool PrepareDeliveryObjectives(const FICQuestRow& Definition, FICWorldState& World) const;
+    bool CompleteQuest(FName QuestID, const FICQuestRow& Definition, bool IsForced = false,
+        const FICWorldState* PreparedWorld = nullptr);
     bool ApplyReward(FICWorldState& Candidate, const FICRewardRow& Reward);
     int32 CountOwnedItem(const FICInventoryState& Inventory, FName ItemID) const;
     static bool CompareValues(double Value, double RequiredValue, EICComparison Comparison);

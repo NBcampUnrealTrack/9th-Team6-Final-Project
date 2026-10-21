@@ -4,8 +4,12 @@
 #include "Data/Text/ICTextLibrary.h"
 #include "Debug/ICLog.h"
 #include "Internationalization/StringTable.h"
+#include "Quest/ICQuestSubsystem.h"
+#include "UI/Quest/ICQuestDisplay.h"
+#include "World/State/ICWorldStateSubsystem.h"
 
-void UICQuestListWidget::SetQuestData(const FICQuestRow& Definition, UStringTable* Strings)
+void UICQuestListWidget::SetQuestData(const FICQuestRow& Definition, const FICQuestState& Quest,
+    const FICWorldState& World, const UICQuestSubsystem* Quests, UStringTable* Strings)
 {
     const FICTextLookupResult NameResult = UICTextLibrary::ResolveText(Strings, Definition.NameKey);
     if (!NameResult.bSuccess)
@@ -35,7 +39,7 @@ void UICQuestListWidget::SetQuestData(const FICQuestRow& Definition, UStringTabl
                     *Definition.ID.ToString(), *Objective.ObjectiveID.ToString(), *Objective.DescriptionKey, *Result.FailureReason);
                 continue;
             }
-            ObjectiveLines.Add(Result.Text);
+            ObjectiveLines.Add(FICQuestDisplay::FormatObjective(Result.Text, Objective, Quest, World, Quests));
         }
     }
     QuestObjectivesText->SetText(FText::Join(FText::FromString(TEXT("\n")), ObjectiveLines));
