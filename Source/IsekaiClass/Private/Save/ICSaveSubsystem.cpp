@@ -1,12 +1,9 @@
 #include "Save/ICSaveSubsystem.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Save/Compatibility/ICSaveDataMigration.h"
-#include "Components/SceneCaptureComponent2D.h"
-#include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
-#include "Camera/PlayerCameraManager.h"
-#include "ImageUtils.h"
 #include "Save/ICSaveGame.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Time/ICTimeSubsystem.h"
@@ -42,7 +39,8 @@ bool WriteVerified(const FString& Path, const TArray<uint8>& Bytes)
     return bVerified;
 }
 
-struct FWriteResult { bool bSuccess = false; FString Message; };
+// File work runs on a worker thread. Resolve these keys to FText only on the game thread.
+struct FWriteResult { bool bSuccess = false; FString MessageKey; };
 
 FWriteResult WriteSlotFile(const FString& Path, const TArray<uint8>& Bytes, bool bAuto, bool bRotateBackup)
 {
@@ -53,34 +51,34 @@ FWriteResult WriteSlotFile(const FString& Path, const TArray<uint8>& Bytes, bool
     const FString Backup = Path + TEXT(".bak");
     const FString BackupTemporary = Backup + TEXT(".tmp");
     if (!Files.MakeDirectory(*FPaths::GetPath(Path), true) || !WriteVerified(Temporary, Bytes))
-        return { false, TEXT("임시 저장 파일 쓰기/검증에 실패했습니다. 기존 저장을 유지합니다.") };
+        return { false, TEXT("Save_WriteTemporaryFailed") };
 
     const bool bExisting = Files.FileExists(*Path);
     TArray<uint8> Original;
     if (bExisting)
     {
-        if (!ReadBytes(Path, Original)) return { false, TEXT("기존 저장을 보존할 수 없어 교체하지 않았습니다.") };
+        if (!ReadBytes(Path, Original)) return { false, TEXT("Save_PreserveExistingFailed") };
         if ((bRotateBackup || !Files.FileExists(*Rollback)) && !WriteVerified(Rollback, Original))
-            return { false, TEXT("복구용 파일 생성에 실패했습니다. 기존 저장을 유지합니다.") };
+            return { false, TEXT("Save_WriteRollbackFailed") };
         if (bAuto && bRotateBackup)
         {
             if (!WriteVerified(BackupTemporary, Original) || !Files.Move(*Backup, *BackupTemporary, true, false, false, true))
-                return { false, TEXT("오토세이브 백업 갱신에 실패했습니다. 기존 저장을 유지합니다.") };
+                return { false, TEXT("Save_WriteBackupFailed") };
         }
     }
     if (!Files.Move(*Path, *Temporary, true, false, false, true))
     {
         if (bExisting) WriteVerified(Path, Original);
-        return { false, TEXT("저장 파일 교체에 실패했습니다. 백업/복구 파일을 보존했습니다.") };
+        return { false, TEXT("Save_ReplaceFailed") };
     }
     TArray<uint8> Committed;
     if (!ReadBytes(Path, Committed) || Committed != Bytes)
     {
         if (bExisting) WriteVerified(Path, Original);
-        return { false, TEXT("교체한 저장 검증에 실패했습니다. 이전 상태로 복구했습니다.") };
+        return { false, TEXT("Save_VerifyReplacedFailed") };
     }
     if (bRotateBackup || !bExisting) Files.Delete(*Rollback, false, false, true);
-    return { true, TEXT("저장 완료") };
+    return { true, TEXT("Save_Complete") };
 }
 }
 
@@ -115,27 +113,31 @@ FString UICSaveSubsystem::GetSlotPath(int32 Slot) const
 
 FString UICSaveSubsystem::GetSaveBlockReason(bool bAutoSave) const
 {
+    IC_TRACE_FUNCTION();return GetSaveBlockReasonText(bAutoSave).ToString();
+}
+FText UICSaveSubsystem::GetSaveBlockReasonText(bool bAutoSave) const
+{
     IC_TRACE_FUNCTION();
-    if (!WorldState || !Time) return TEXT("저장 시스템이 준비되지 않았습니다.");
-    if (bSaving) return TEXT("다른 저장을 처리 중입니다.");
-    if (!WorldState->ExportState().bPlayerCreated) return TEXT("캐릭터를 먼저 생성하세요.");
-    if (Safety.bDead) return TEXT("사망 상태에서는 저장할 수 없습니다.");
-    if (Safety.bInCombat) return TEXT("전투 중에는 저장할 수 없습니다.");
-    if (Safety.bInDialogue) return TEXT("대화 중에는 저장할 수 없습니다.");
-    if (Safety.bInEvent) return TEXT("이벤트 중에는 저장할 수 없습니다.");
-    if (Safety.bEffectPending) return TEXT("아이템 효과 처리 완료 후 저장하세요.");
+    if (!WorldState || !Time) return ICText::Get(TEXT("Save_NotReady"));
+    if (bSaving) return ICText::Get(TEXT("Save_Busy"));
+    if (!WorldState->ExportState().bPlayerCreated) return ICText::Get(TEXT("Save_CreatePlayerFirst"));
+    if (Safety.bDead) return ICText::Get(TEXT("Save_BlockedDead"));
+    if (Safety.bInCombat) return ICText::Get(TEXT("Save_BlockedCombat"));
+    if (Safety.bInDialogue) return ICText::Get(TEXT("Save_BlockedDialogue"));
+    if (Safety.bInEvent) return ICText::Get(TEXT("Save_BlockedEvent"));
+    if (Safety.bEffectPending) return ICText::Get(TEXT("Save_BlockedEffect"));
     const auto Player = WorldState->GetSnapshot(UICWorldStateSubsystem::PlayerId());
-    if (Player.CharacterId.IsNone() || Player.HP <= 0 || Player.MaxHP <= 0) return TEXT("플레이어 생존 상태를 확인할 수 없습니다.");
+    if (Player.CharacterId.IsNone() || Player.HP <= 0 || Player.MaxHP <= 0) return ICText::Get(TEXT("Save_InvalidPlayer"));
     if (bAutoSave)
     {
-        if (Player.HP / Player.MaxHP <= FMath::Clamp(AutoSaveHealthThreshold, 0.f, 1.f)) return TEXT("체력이 낮아 자동 저장을 연기합니다.");
-        for (const auto& D : Player.Debuffs) if (D.RemainingSeconds > 0) return TEXT("디버프가 있어 자동 저장을 연기합니다.");
+        if (Player.HP / Player.MaxHP <= FMath::Clamp(AutoSaveHealthThreshold, 0.f, 1.f)) return ICText::Get(TEXT("Save_AutoLowHealth"));
+        for (const auto& D : Player.Debuffs) if (D.RemainingSeconds > 0) return ICText::Get(TEXT("Save_AutoDebuff"));
         for (const auto& Effect : Player.Combat.Effects)
-            if (Effect.bHarmful && (Effect.bInfinite || Effect.ExpiresAtPlaySecond > Time->GetClock().PlaySecond)) return TEXT("디버프가 있어 자동 저장을 연기합니다.");
+            if (Effect.bHarmful && (Effect.bInfinite || Effect.ExpiresAtPlaySecond > Time->GetClock().PlaySecond)) return ICText::Get(TEXT("Save_AutoDebuff"));
     }
-    return FString();
+    return FText::GetEmpty();
 }
-bool UICSaveSubsystem::CanSave(bool bAutoSave) const { IC_TRACE_FUNCTION(); return GetSaveBlockReason(bAutoSave).IsEmpty(); }
+bool UICSaveSubsystem::CanSave(bool bAutoSave) const { IC_TRACE_FUNCTION(); return GetSaveBlockReasonText(bAutoSave).IsEmpty(); }
 
 FString UICSaveSubsystem::GetLegacySavePath() const
 {
@@ -147,9 +149,9 @@ bool UICSaveSubsystem::HasLegacySave() const { IC_TRACE_FUNCTION(); return IFile
 bool UICSaveSubsystem::DeleteSlot(int32 Slot)
 {
     IC_TRACE_FUNCTION();
-    if (bSaving) { LastMessage = TEXT("저장 처리 중에는 삭제할 수 없습니다."); return false; }
+    if (bSaving) { SetLastMessage(ICText::Get(TEXT("Save_DeleteBusy"))); return false; }
     const FString Path = GetSlotPath(Slot);
-    if (Path.IsEmpty()) { LastMessage = TEXT("잘못된 저장 슬롯입니다."); return false; }
+    if (Path.IsEmpty()) { SetLastMessage(ICText::Get(TEXT("Save_InvalidSlot"))); return false; }
     TArray<FString> Failed;
     for (const FString& Suffix : {FString(), FString(TEXT(".bak")), FString(TEXT(".tmp")), FString(TEXT(".rollback")), FString(TEXT(".bak.tmp"))})
     {
@@ -160,20 +162,20 @@ bool UICSaveSubsystem::DeleteSlot(int32 Slot)
             if (IFileManager::Get().FileExists(*File)) Failed.Add(FPaths::GetCleanFilename(File));
         }
     }
-    if (!Failed.IsEmpty()) { LastMessage = TEXT("삭제하지 못한 파일: ") + FString::Join(Failed, TEXT(", "));UE_LOG(LogICSave, Warning, TEXT("[Save.Delete.Failed] Slot=%d Reason=%s"),Slot,*LastMessage); return false; }
+    if (!Failed.IsEmpty()) { SetLastMessage(ICText::FormatText(TEXT("Save_DeleteFilesFailed"),FString::Join(Failed,TEXT(", "))));UE_LOG(LogICSave, Warning, TEXT("[Save.Delete.Failed] Slot=%d Reason=%s"),Slot,*LastMessage); return false; }
     UE_LOG(LogICSave, Log, TEXT("[Save.Deleted] Slot=%d File=%s: 원본/백업/임시/복구 파일 정리"),Slot,*Path);
     if (Slot == 0) ResetSession();
-    LastMessage = Slot == 0 ? TEXT("자동 저장과 복구 파일을 삭제했습니다. 이후 자동 저장 조건을 만족하면 새로 생성됩니다.") : FString::Printf(TEXT("수동 슬롯 %d와 복구 파일을 삭제했습니다."), Slot);
+    SetLastMessage(Slot == 0 ? ICText::Get(TEXT("Save_AutoDeleted")) : ICText::FormatText(TEXT("Native_ea5f792f4df6"), Slot));
     return true;
 }
 bool UICSaveSubsystem::DeleteLegacySave()
 {
     IC_TRACE_FUNCTION();
-    if (bSaving) { LastMessage = TEXT("저장 처리 중에는 삭제할 수 없습니다."); return false; }
+    if (bSaving) { SetLastMessage(ICText::Get(TEXT("Save_DeleteBusy"))); return false; }
     const FString Path = GetLegacySavePath();
     IFileManager::Get().Delete(*Path, false, false, true);
-    if (IFileManager::Get().FileExists(*Path)) { LastMessage = TEXT("기존 Version 1/8 원본 삭제에 실패했습니다."); return false; }
-    LastMessage = TEXT("기존 Version 1/8 원본을 삭제했습니다. 가져온 수동 저장은 유지됩니다.");UE_LOG(LogICSave, Log, TEXT("[Save.Legacy.Deleted] File=%s"),*Path); return true;
+    if (IFileManager::Get().FileExists(*Path)) { SetLastMessage(ICText::Get(TEXT("Save_DeleteLegacyFailed"))); return false; }
+    SetLastMessage(ICText::Get(TEXT("Save_LegacyDeleted")));UE_LOG(LogICSave, Log, TEXT("[Save.Legacy.Deleted] File=%s"),*Path); return true;
 }
 
 bool UICSaveSubsystem::ValidateSave(const UICSaveGame* Save, int32 Slot) const
@@ -215,21 +217,21 @@ UICSaveGame* UICSaveSubsystem::ReadSlot(int32 Slot, bool bAllowBackup, bool& bUs
 bool UICSaveSubsystem::PrepareSave(int32 Slot, TArray<uint8>& Bytes, double& CapturedPlaySecond, bool& bRotateBackup)
 {
     IC_TRACE_FUNCTION();
-    if (GetSlotPath(Slot).IsEmpty()) { LastMessage = TEXT("잘못된 저장 슬롯입니다."); return false; }
-    LastMessage = GetSaveBlockReason(Slot == 0); if (!LastMessage.IsEmpty()) return false;
+    if (GetSlotPath(Slot).IsEmpty()) { SetLastMessage(ICText::Get(TEXT("Save_InvalidSlot"))); return false; }
+    SetLastMessage(GetSaveBlockReasonText(Slot == 0)); if (!LastMessage.IsEmpty()) return false;
     TArray<uint8> ExistingBytes;
     if (ReadBytes(GetSlotPath(Slot), ExistingBytes))
     {
         const auto* Existing = UICSaveGame::DecodeFile(ExistingBytes);
         if (UICSaveGame::IsFutureFile(ExistingBytes) || (Existing && Existing->SaveVersion > UICSaveGame::CurrentVersion))
-        { LastMessage = TEXT("더 높은 버전의 저장 파일을 덮어쓰지 않습니다."); return false; }
+        { SetLastMessage(ICText::Get(TEXT("Save_FutureVersion"))); return false; }
     }
     if (!WorldState->FlushParticipants() || !WorldState->CanRestoreState(WorldState->ExportState()))
-    { LastMessage = TEXT("저장 전 상태 검증/반영에 실패했습니다."); return false; }
+    { SetLastMessage(ICText::Get(TEXT("Save_StateInvalid"))); return false; }
     auto* Save = NewObject<UICSaveGame>();
     Save->WorldState = WorldState->ExportState(); Save->Clock = Time->GetClock();
     Save->Slot = Slot; Save->SavedAt = FDateTime::UtcNow();
-    Save->Preview.Location = PreviewLocation.IsEmpty() ? UGameplayStatics::GetCurrentLevelName(this, true) : PreviewLocation;
+    Save->Preview.Location = TEXT("R01");
     Save->Preview.PartyIds.Add(UICWorldStateSubsystem::PlayerId());
     TArray<FICCharacterState> Companions;
     for (const auto& Entry : Save->WorldState.Characters)
@@ -239,9 +241,8 @@ bool UICSaveSubsystem::PrepareSave(int32 Slot, TArray<uint8>& Bytes, double& Cap
     { IC_TRACE_FUNCTION(); return A.PartySlot == B.PartySlot ? A.CharacterId.LexicalLess(B.CharacterId) : A.PartySlot < B.PartySlot; });
     for (const FICCharacterState& Companion : Companions)
     { if (Save->Preview.PartyIds.Num() >= 5) break; Save->Preview.PartyIds.AddUnique(Companion.CharacterId); }
-    if (bCaptureSaveThumbnail && !CaptureThumbnail(Save->Preview.ThumbnailPNG)) UE_LOG(LogICSave, Verbose, TEXT("[Save.Thumbnail.Skipped] Slot=%d: 카메라/월드/렌더 결과를 사용할 수 없어 미리보기 없이 저장"),Slot);
     if (!ValidateSave(Save, Slot) || !UICSaveGame::EncodeForFile(Save, Bytes))
-    { LastMessage = TEXT("저장 직렬화에 실패했습니다."); return false; }
+    { SetLastMessage(ICText::Get(TEXT("Save_EncodeFailed"))); return false; }
     bool bUnused = false;
     bRotateBackup = ReadSlot(Slot, false, bUnused) != nullptr;
     CapturedPlaySecond = Save->Clock.PlaySecond;
@@ -255,7 +256,7 @@ bool UICSaveSubsystem::SaveSlot(int32 Slot)
     if (!PrepareSave(Slot, Bytes, Captured, bRotate)){UE_LOG(LogICSave, Log, TEXT("[Save.Request.Rejected] Slot=%d Reason=%s"),Slot,*LastMessage);return false;}
     const uint64 Generation = AutoRequestGeneration;
     UE_LOG(LogICSave, Log, TEXT("[Save.Started] Slot=%d Mode=Async File=%s Bytes=%d PlaySecond=%.2f Generation=%llu"),Slot,*GetSlotPath(Slot),Bytes.Num(),Captured,Generation);
-    bSaving = true; LastMessage = TEXT("저장 중..."); OnSaveStarted.Broadcast(Slot);
+    bSaving = true; SetLastMessage(ICText::Get(TEXT("Save_InProgress"))); OnSaveStarted.Broadcast(Slot);
     const FString Path = GetSlotPath(Slot);
     const TWeakObjectPtr<UICSaveSubsystem> WeakThis(this);
     Async(EAsyncExecution::ThreadPool, [WeakThis, Path, Bytes = MoveTemp(Bytes), Slot, Captured, Generation, bRotate]()
@@ -265,7 +266,7 @@ bool UICSaveSubsystem::SaveSlot(int32 Slot)
         AsyncTask(ENamedThreads::GameThread, [WeakThis, Slot, Captured, Generation, Result]()
         {
             IC_TRACE_FUNCTION();
-            if (WeakThis.IsValid()) WeakThis->FinishSave(Slot, Result.bSuccess, Captured, Generation, Result.Message);
+            if (WeakThis.IsValid()) WeakThis->FinishSave(Slot, Result.bSuccess, Captured, Generation, Result.MessageKey);
             else UE_LOG(LogICSave, Verbose, TEXT("[Save.CallbackIgnored] Slot=%d Success=%d: 서비스 제거 후 콜백"),Slot,Result.bSuccess);
         });
     });
@@ -279,16 +280,16 @@ bool UICSaveSubsystem::SaveSlotSynchronously(int32 Slot)
     if (!PrepareSave(Slot, Bytes, Captured, bRotate)){UE_LOG(LogICSave, Log, TEXT("[Save.Request.Rejected] Slot=%d Reason=%s"),Slot,*LastMessage);return false;}
     const uint64 Generation = AutoRequestGeneration;
     UE_LOG(LogICSave, Log, TEXT("[Save.Started] Slot=%d Mode=Sync File=%s Bytes=%d PlaySecond=%.2f Generation=%llu"),Slot,*GetSlotPath(Slot),Bytes.Num(),Captured,Generation);
-    bSaving = true; OnSaveStarted.Broadcast(Slot);
+    bSaving = true; SetLastMessage(ICText::Get(TEXT("Save_InProgress"))); OnSaveStarted.Broadcast(Slot);
     const FWriteResult Result = WriteSlotFile(GetSlotPath(Slot), Bytes, Slot == 0, bRotate);
-    FinishSave(Slot, Result.bSuccess, Captured, Generation, Result.Message);
+    FinishSave(Slot, Result.bSuccess, Captured, Generation, Result.MessageKey);
     return Result.bSuccess;
 }
 
 void UICSaveSubsystem::FinishSave(int32 Slot, bool bSuccess, double CapturedPlaySecond, uint64 CapturedGeneration, const FString& Message)
 {
     IC_TRACE_FUNCTION();
-    bSaving = false; LastMessage = Message;
+    bSaving = false; SetLastMessage(ICText::Get(*Message));
     if(bSuccess)
     {
         UE_LOG(LogICSave, Log, TEXT("[Save.Completed] Slot=%d PlaySecond=%.2f Generation=%llu"),Slot,CapturedPlaySecond,CapturedGeneration);
@@ -304,25 +305,25 @@ void UICSaveSubsystem::FinishSave(int32 Slot, bool bSuccess, double CapturedPlay
         if (Slot == 0 && CapturedGeneration == AutoRequestGeneration) { bAutoSavePending = false; PendingReason = NAME_None; }
     }
     else if (Time) RetryAfterPlaySecond = Time->GetClock().PlaySecond + 30;
-    OnSaveFinished.Broadcast(Slot, bSuccess, Message);
+    OnSaveFinished.Broadcast(Slot, bSuccess, LastMessage);
 }
 
 bool UICSaveSubsystem::LoadSlot(int32 Slot)
 {
     IC_TRACE_FUNCTION();
     UE_LOG(LogICSave, Verbose, TEXT("[Save.Load.Request] Slot=%d File=%s"),Slot,*GetSlotPath(Slot));
-    if (bSaving || !WorldState || !Time || Safety.bEffectPending) { LastMessage = TEXT("저장/효과 처리 중에는 불러올 수 없습니다.");UE_LOG(LogICSave, Log, TEXT("[Save.Load.Rejected] Slot=%d Saving=%d EffectPending=%d Reason=%s"),Slot,bSaving,Safety.bEffectPending,*LastMessage); return false; }
+    if (bSaving || !WorldState || !Time || Safety.bEffectPending) { SetLastMessage(ICText::Get(TEXT("Save_LoadBusy")));UE_LOG(LogICSave, Log, TEXT("[Save.Load.Rejected] Slot=%d Saving=%d EffectPending=%d Reason=%s"),Slot,bSaving,Safety.bEffectPending,*LastMessage); return false; }
     bool bBackup = false;
     auto* Save = ReadSlot(Slot, true, bBackup);
-    if (!Save) { LastMessage = TEXT("저장 파일이 없거나 손상/버전/데이터 검증에 실패했습니다.");UE_LOG(LogICSave, Log, TEXT("[Save.Load.Rejected] Slot=%d File=%s Reason=%s"),Slot,*GetSlotPath(Slot),*LastMessage); return false; }
+    if (!Save) { SetLastMessage(ICText::Get(TEXT("Save_LoadInvalid")));UE_LOG(LogICSave, Log, TEXT("[Save.Load.Rejected] Slot=%d File=%s Reason=%s"),Slot,*GetSlotPath(Slot),*LastMessage); return false; }
 
     if (!Save->Clock.IsValid() || !WorldState->CanRestoreState(Save->WorldState)) return false;
     const auto PreviousClock = Time->GetClock();
     Time->RestoreClock(Save->Clock);
     if (!WorldState->RestoreState(Save->WorldState)) { UE_LOG(LogICSave, Warning, TEXT("[Save.Load.Rollback] Slot=%d: 상태 복원 실패, 이전 시간 복원"),Slot);Time->RestoreClock(PreviousClock); return false; }
-    PreviewLocation = Save->Preview.Location;
+    PreviewLocation = Save->Preview.Location == TEXT("지역 1") ? TEXT("R01") : Save->Preview.Location;
     ResetSession();
-    LastMessage = bBackup ? TEXT("백업에서 불러왔습니다. 원본 파일은 보존했습니다.") : TEXT("불러오기 완료");
+    SetLastMessage(ICText::Get(bBackup ? TEXT("Save_LoadedBackup") : TEXT("Save_Loaded")));
     UE_LOG(LogICSave, Log, TEXT("[Save.Loaded] Slot=%d Backup=%d Version=%d GameMinute=%.2f PlaySecond=%.2f"),Slot,bBackup,Save->SaveVersion,Save->Clock.GameMinute,Save->Clock.PlaySecond);
     return true;
 }
@@ -346,6 +347,7 @@ TArray<FICSaveSlotInfo> UICSaveSubsystem::GetSlotList() const
             Info.SavedAt = Save->SavedAt;
             Info.Preset = Save->WorldState.Preset;
             Info.Preview = Save->Preview;
+            if (Info.Preview.Location == TEXT("지역 1")) Info.Preview.Location = TEXT("R01");
             Info.Clock = Save->Clock;
         }
         Result.Add(Info);
@@ -406,11 +408,11 @@ bool UICSaveSubsystem::ImportLegacySave()
 {
     IC_TRACE_FUNCTION();
     if (!WorldState || !Time || bSaving || Safety.bEffectPending || GetSlotList()[1].bExists)
-    { LastMessage = TEXT("수동 슬롯 1이 비어 있고 처리 중이 아닐 때만 기존 저장을 가져옵니다."); return false; }
+    { SetLastMessage(ICText::Get(TEXT("Save_LegacySlotBusy"))); return false; }
     const FString LegacyName = Prefix.StartsWith(TEXT("IC_Test_")) ? Prefix + TEXT("_LegacyV1") : TEXT("PlayerPrototype_Auto");
     const auto* Legacy = Cast<UICLegacyPlayerSaveGame>(UGameplayStatics::LoadGameFromSlot(LegacyName, 0));
     FICWorldState Candidate;
-    if (!ConvertLegacySave(Legacy, Candidate)) { LastMessage = TEXT("기존 Version 1/8 저장을 검증할 수 없습니다.");UE_LOG(LogICSave, Log, TEXT("[Save.Legacy.ImportRejected] File=%s Reason=%s"),*GetLegacySavePath(),*LastMessage); return false; }
+    if (!ConvertLegacySave(Legacy, Candidate)) { SetLastMessage(ICText::Get(TEXT("Save_LegacyInvalid")));UE_LOG(LogICSave, Log, TEXT("[Save.Legacy.ImportRejected] File=%s Reason=%s"),*GetLegacySavePath(),*LastMessage); return false; }
     auto* Save = NewObject<UICSaveGame>(); Save->WorldState = Candidate; Save->Clock = FICClockState(); Save->Slot = 1; Save->SavedAt = FDateTime::UtcNow();
     if(Legacy->Version==8){Save->Clock.GameMinute=Legacy->GameMinute;Save->Clock.PlaySecond=Legacy->PlaySeconds;}
     if (auto* Player = Save->WorldState.Characters.Find(UICWorldStateSubsystem::PlayerId()))
@@ -422,45 +424,9 @@ bool UICSaveSubsystem::ImportLegacySave()
     TArray<uint8> Bytes;
     if (!UICSaveGame::EncodeForFile(Save, Bytes)) return false;
     const FWriteResult Result = WriteSlotFile(GetSlotPath(1), Bytes, false, false);
-    if (!Result.bSuccess) { LastMessage = Result.Message;UE_LOG(LogICSave, Warning, TEXT("[Save.Legacy.WriteFailed] %s"),*LastMessage); return false; }
+    if (!Result.bSuccess) { SetLastMessage(ICText::Get(*Result.MessageKey));UE_LOG(LogICSave, Warning, TEXT("[Save.Legacy.WriteFailed] %s"),*LastMessage); return false; }
     UE_LOG(LogICSave, Log, TEXT("[Save.Legacy.Imported] SourceVersion=%d TargetSlot=1 TargetVersion=%d"),Legacy->Version,UICSaveGame::CurrentVersion);
     return LoadSlot(1);
-}
-
-bool UICSaveSubsystem::CaptureThumbnail(TArray<uint8>& OutPNG)
-{
-    IC_TRACE_FUNCTION();
-    OutPNG.Reset();
-    UWorld* World = GetWorld();
-    APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
-    if (!PC || !PC->PlayerCameraManager || !World->IsGameWorld()) return false;
-    FActorSpawnParameters SpawnParams; SpawnParams.ObjectFlags |= RF_Transient;
-    AActor* CaptureActor = World->SpawnActor<AActor>(AActor::StaticClass(), PC->PlayerCameraManager->GetCameraLocation(), PC->PlayerCameraManager->GetCameraRotation(), SpawnParams);
-    if (!CaptureActor) return false;
-    UTextureRenderTarget2D* Target = NewObject<UTextureRenderTarget2D>(CaptureActor);
-    Target->RenderTargetFormat = RTF_RGBA8;
-    Target->InitAutoFormat(512, 288); Target->UpdateResourceImmediate(true);
-    USceneCaptureComponent2D* Capture = NewObject<USceneCaptureComponent2D>(CaptureActor);
-    CaptureActor->AddInstanceComponent(Capture); CaptureActor->SetRootComponent(Capture);
-    Capture->bCaptureEveryFrame = false; Capture->bCaptureOnMovement = false;
-    Capture->TextureTarget = Target; Capture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
-    Capture->FOVAngle = PC->PlayerCameraManager->GetFOVAngle();
-    Capture->RegisterComponent();
-    Capture->SetWorldLocationAndRotation(PC->PlayerCameraManager->GetCameraLocation(), PC->PlayerCameraManager->GetCameraRotation());
-    Capture->CaptureScene();
-    TArray<FColor> Pixels;
-    FTextureRenderTargetResource* Resource = Target->GameThread_GetRenderTargetResource();
-    const bool bRead = Resource && Resource->ReadPixels(Pixels) && Pixels.Num() == 512 * 288;
-    if (bRead)
-    {
-        for (FColor& Pixel : Pixels) Pixel.A = 255;
-        TArray64<uint8> Encoded;
-        FImageUtils::PNGCompressImageArray(512, 288, TArrayView64<const FColor>(Pixels.GetData(), Pixels.Num()), Encoded);
-        if (Encoded.Num() > 0 && Encoded.Num() <= 2 * 1024 * 1024) OutPNG.Append(Encoded.GetData(), static_cast<int32>(Encoded.Num()));
-    }
-    CaptureActor->Destroy();
-    UE_LOG(LogICSave, Verbose, TEXT("[Save.Thumbnail] Size=512x288 Read=%d PNGBytes=%d"),bRead,OutPNG.Num());
-    return !OutPNG.IsEmpty();
 }
 
 void UICSaveSubsystem::SetAutoSaveSuspended(bool bSuspended)

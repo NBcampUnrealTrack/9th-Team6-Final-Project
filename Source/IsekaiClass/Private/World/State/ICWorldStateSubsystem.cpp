@@ -79,7 +79,7 @@ bool FICMainStats::Set(EICMainStat Stat, int32 Value)
         case EICMainStat::DEX: DEX = Value; break;
         case EICMainStat::INT: INT = Value; break;
         case EICMainStat::CON: CON = Value; break;
-        case EICMainStat::CHA: CHA = Value; break;
+        case EICMainStat::CHA: return false; // Keep the saved field, disallow new growth.
         case EICMainStat::LUK: LUK = Value; break;
         default: return false;
     }
@@ -235,7 +235,9 @@ bool UICWorldStateSubsystem::ValidateInventoryShape(const FICInventoryState& I, 
     if (!ValidItems(I.Bag.Slots, IDs) || !ValidItems(I.QuestItems, IDs) || !ValidItems(I.Equipment, IDs)) return false;
     for (const auto& Container : I.Storage)
     {
-        if (Container.Key.IsNone() || Container.Value.Slots.Num() != 40 || !ValidItems(Container.Value.Slots, IDs)) return false;
+        const int32 Slots=Container.Value.Slots.Num();
+        const bool Shape=Container.Key==TEXT("PlayerHome")?(Slots>=40&&Slots<=160&&Slots%40==0):Slots==40;
+        if (Container.Key.IsNone() || !Shape || !ValidItems(Container.Value.Slots, IDs)) return false;
     }
     return true;
 }

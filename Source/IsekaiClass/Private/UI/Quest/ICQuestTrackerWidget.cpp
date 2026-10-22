@@ -1,4 +1,5 @@
 #include "UI/Quest/ICQuestTrackerWidget.h"
+#include "UI/Framework/ICText.h"
 
 #include "Components/TextBlock.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -66,7 +67,7 @@ void UICQuestTrackerWidget::RefreshQuests()
                 const FICTextLookupResult Description = UICTextLibrary::ResolveText(Strings, Objective.DescriptionKey);
                 if (Description.bSuccess)
                 {
-                    Lines.Add(FText::Format(NSLOCTEXT("ICQuestTracker", "Objective", "  • {0}"),
+                    Lines.Add(FText::Format(ICText::Get(TEXT("Native_4dfde083f2db")),
                         FICQuestDisplay::FormatObjective(Description.Text, Objective, Quest, Snapshot, Quests)));
                 }
             }

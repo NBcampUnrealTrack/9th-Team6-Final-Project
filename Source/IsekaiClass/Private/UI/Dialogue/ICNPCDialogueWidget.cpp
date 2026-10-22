@@ -12,7 +12,10 @@
 #include "Engine/GameInstance.h"
 #include "InputCoreTypes.h"
 
+static const FName DialogueQuestsEntry(TEXT("IC.Dialogue.Quests"));
 static const FName DialogueTalkEntry(TEXT("IC.Dialogue.Talk"));
+static const FName DialogueGiftEntry(TEXT("IC.Dialogue.Gift"));
+static const FName DialogueTradeEntry(TEXT("IC.Dialogue.Trade"));
 static const FName DialogueOptionsEntry(TEXT("IC.Dialogue.Options"));
 static const FName DialogueAcceptEntry(TEXT("IC.Dialogue.Accept"));
 static const FName DialogueTurnInEntry(TEXT("IC.Dialogue.TurnIn"));
@@ -47,43 +50,22 @@ void UICNPCDialogueWidget::ShowInteractionOptions()
     DialogueText->SetText(FText::GetEmpty());
     if (!NPC) return;
 
-    if (UGameInstance* GameInstance = GetGameInstance())
-    {
-        UICDefinitionSubsystem* Definitions = GameInstance->GetSubsystem<UICDefinitionSubsystem>();
-        const FICNPCRow& Definition = NPC->GetNPCDefinition();
-        for (const FName DialogueID : Definition.DialogueIDs)
-        {
-            FICDialogueRow Dialogue;
-            if (!Definitions || !Definitions->GetDialogue(DialogueID, Dialogue).bSuccess
-                || Dialogue.NPCID != Definition.ID) continue;
-
-            const FICDialogueNode* Node = Dialogue.Nodes.FindByPredicate(
-                [&Dialogue](const FICDialogueNode& Candidate)
-                {
-                    return Candidate.NodeID == Dialogue.EntryNodeID;
-                });
-            if (!Node) continue;
-
-            const FICTextLookupResult Greeting = UICTextLibrary::ResolveText(DialogueStringTable, Node->TextKey);
-            if (Greeting.bSuccess)
-            {
-                DialogueText->SetText(Greeting.Text);
-                break;
-            }
-        }
-    }
-
-    AddQuestEntries();
+    AddEntry(DialogueQuestsEntry, QuestsText);
     for (const FICNPCInteractionOption& Option : NPC->GetInteractionOptions())
     {
         FName EntryID;
         switch (Option.Option)
         {
         case EICNPCInteractionOption::Talk: EntryID = DialogueTalkEntry; break;
+        case EICNPCInteractionOption::Gift: EntryID = DialogueGiftEntry; break;
+        case EICNPCInteractionOption::Trade: EntryID = DialogueTradeEntry; break;
         case EICNPCInteractionOption::End: EntryID = DialogueCloseEntry; break;
         default: continue;
         }
-        AddEntry(EntryID, Option.Label, Option.bEnabled);
+        const bool IsSupported = Option.Option == EICNPCInteractionOption::Talk
+            || Option.Option == EICNPCInteractionOption::Gift
+            || Option.Option == EICNPCInteractionOption::End;
+        AddEntry(EntryID, Option.Label, Option.bEnabled && IsSupported);
     }
 }
 
@@ -126,6 +108,19 @@ void UICNPCDialogueWidget::AddEntry(FName EntryID, const FText& Label, bool IsEn
     Entries->AddChildToVerticalBox(Entry);
 }
 
+void UICNPCDialogueWidget::ShowQuestList()
+{
+    SelectedQuestID = NAME_None;
+    SelectedDialogueID = NAME_None;
+    Entries->ClearChildren();
+    DialogueText->SetText(QuestPromptText);
+    if (!NPC || !GetGameInstance()) return;
+
+    AddQuestEntries();
+    AddEntry(DialogueOptionsEntry, BackText);
+    AddEntry(DialogueCloseEntry, CloseText);
+}
+
 void UICNPCDialogueWidget::AddQuestEntries()
 {
     if (!NPC || !GetGameInstance()) return;
@@ -154,11 +149,11 @@ void UICNPCDialogueWidget::AddQuestEntries()
             const bool IsReady = IsActive && Quest.TurnInNPCID == NPC->GetNPCDefinition().ID
                 && Quests->AreQuestObjectivesReady(QuestID);
             if (!IsOfferable && !IsReady) continue;
+            const FText& Status = IsReady ? ReadyStatusText : IsActive ? ActiveStatusText
+                : OfferStatusText;
             const FICTextLookupResult Name = UICTextLibrary::ResolveText(QuestStringTable, Quest.NameKey);
-            const FText QuestName = Name.bSuccess ? Name.Text : FText::FromName(QuestID);
-            AddEntry(QuestID, IsReady
-                ? FText::Format(QuestEntryFormatText, ReadyStatusText, QuestName)
-                : QuestName);
+            AddEntry(QuestID, FText::Format(QuestEntryFormatText, Status,
+                Name.bSuccess ? Name.Text : FText::FromName(QuestID)));
         }
     }
 }
@@ -172,7 +167,7 @@ void UICNPCDialogueWidget::ShowQuest(FName QuestID)
     FICQuestRow Quest;
     if (!Definitions || !Quests || !State || !Definitions->GetQuest(QuestID, Quest).bSuccess)
     {
-        ShowInteractionOptions();
+        ShowQuestList();
         return;
     }
 
@@ -190,7 +185,7 @@ void UICNPCDialogueWidget::ShowQuest(FName QuestID)
     else if (Quests->CanOfferQuest(QuestID)) DialogueID = Quest.OfferDialogueID;
     else
     {
-        ShowInteractionOptions();
+        ShowQuestList();
         return;
     }
 
@@ -227,7 +222,8 @@ void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
     if (!Definitions || !Definitions->GetDialogue(DialogueID, Dialogue).bSuccess
         || Dialogue.NPCID != NPC->GetNPCDefinition().ID)
     {
-        ShowInteractionOptions();
+        if (SelectedQuestID.IsNone()) ShowInteractionOptions();
+        else ShowQuestList();
         return;
     }
 
@@ -236,13 +232,15 @@ void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
         [CurrentNodeID](const FICDialogueNode& Candidate) { return Candidate.NodeID == CurrentNodeID; });
     if (!Node)
     {
-        ShowInteractionOptions();
+        if (SelectedQuestID.IsNone()) ShowInteractionOptions();
+        else ShowQuestList();
         return;
     }
     const FICTextLookupResult Line = UICTextLibrary::ResolveText(DialogueStringTable, Node->TextKey);
     if (!Line.bSuccess)
     {
-        ShowInteractionOptions();
+        if (SelectedQuestID.IsNone()) ShowInteractionOptions();
+        else ShowQuestList();
         return;
     }
 
@@ -286,18 +284,20 @@ void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
 
 void UICNPCDialogueWidget::HandleEntry(FName EntryID)
 {
+    if(EntryID==DialogueGiftEntry)
+    {
+        if(NPC)NPC->TryGiveGift(Cast<AICPlayerController>(GetOwningPlayer()),NAME_None);
+        ShowInteractionOptions();return;
+    }
     if (EntryID == DialogueCloseEntry || EntryID == DialogueOptionsEntry
-        || EntryID == DialogueBackEntry)
+        || EntryID == DialogueQuestsEntry || EntryID == DialogueBackEntry)
     {
         CompleteDialogue();
     }
     if (EntryID == DialogueCloseEntry) { CloseDialogue(); return; }
     if (EntryID == DialogueTalkEntry) { ShowInitialDialogue(); return; }
-    if (EntryID == DialogueOptionsEntry || EntryID == DialogueBackEntry)
-    {
-        ShowInteractionOptions();
-        return;
-    }
+    if (EntryID == DialogueOptionsEntry) { ShowInteractionOptions(); return; }
+    if (EntryID == DialogueQuestsEntry || EntryID == DialogueBackEntry) { ShowQuestList(); return; }
     if (!NPC || !GetGameInstance()) return;
 
     UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
@@ -305,7 +305,7 @@ void UICNPCDialogueWidget::HandleEntry(FName EntryID)
     if (EntryID == DialogueAcceptEntry || EntryID == DialogueTurnInEntry)
     {
         if (Quests && (EntryID == DialogueAcceptEntry ? Quests->AcceptQuest(SelectedQuestID)
-            : Quests->TurnInQuest(SelectedQuestID, NPC->GetNPCDefinition().ID))) ShowInteractionOptions();
+            : Quests->TurnInQuest(SelectedQuestID, NPC->GetNPCDefinition().ID))) ShowQuestList();
         return;
     }
 
@@ -331,7 +331,8 @@ void UICNPCDialogueWidget::HandleEntry(FName EntryID)
         if (Choice->NextNodeID.IsNone())
         {
             CompleteDialogue(true);
-            ShowInteractionOptions();
+            if (SelectedQuestID.IsNone()) ShowInteractionOptions();
+            else ShowQuestList();
         }
         else ShowNode(SelectedDialogueID, Choice->NextNodeID);
     }

@@ -300,6 +300,7 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         IC_TRACE_FUNCTION();
         if(Row.SPDrainIntervalPlaySeconds!=10) ItemIssue(Issues,At,TEXT("SPDrainIntervalPlaySeconds"),TEXT("Natural SP drains by one per ten unpaused PlayClock seconds."));
         if(Row.RealSecondsPerGameMinute<=0 || Row.SleepRecoveryPerGameMinute<=0) ItemIssue(Issues,At,TEXT("RealSecondsPerGameMinute"),TEXT("Game-clock scale and sleep recovery must be positive."));
+        if(Row.MinimumSleepGameMinutes!=120 || Row.SleepRecoveryPerGameMinute<1 || Row.SleepRecoveryPerGameMinute!=FMath::FloorToDouble(Row.SleepRecoveryPerGameMinute)) ItemIssue(Issues,At,TEXT("MinimumSleepGameMinutes"),TEXT("Sleep uses integer SP recovery and a minimum of 120 game minutes."));
     });
     ItemEach<FICStatSettingsRow>(Tables,[&](const FICStatSettingsRow& Row,const FItemLocation& At)
     {
@@ -308,14 +309,7 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         if(Row.BaseMaxHP<1) ItemIssue(Issues,At,TEXT("BaseMaxHP"),TEXT("At primary stats of one, maximum HP must remain at least one."));
         if(Row.BaseCriticalChance>Row.CriticalChanceCap) ItemIssue(Issues,At,TEXT("CriticalChanceCap"),TEXT("Critical cap cannot be below the baseline critical chance."));
         if(Row.BaseCriticalMultiplier>Row.CriticalMultiplierCap) ItemIssue(Issues,At,TEXT("CriticalMultiplierCap"),TEXT("Critical multiplier cap cannot be below its baseline."));
-        const TSet<EICStat> Allowed={EICStat::MaxHP,EICStat::MaxMP,EICStat::PhysicalAttack,EICStat::MagicAttack,EICStat::Defense};
-        TSet<EICStat> Seen;
-        for(EICStat Stat:Row.CompanionCHAAffectedStats)
-        {
-            if(!Allowed.Contains(Stat) || Seen.Contains(Stat)) ItemIssue(Issues,At,TEXT("CompanionCHAAffectedStats"),TEXT("Player CHA affects only companion maximum HP/MP, physical/magic attack and defense, once each."));
-            Seen.Add(Stat);
-        }
-        if(Seen.Num()!=5) ItemIssue(Issues,At,TEXT("CompanionCHAAffectedStats"),TEXT("All five designated companion derived stats must receive player CHA."),Row.CompanionCHAAffectedStats.IsEmpty(),bComplete);
+        if(Row.CHABonus!=0 || !Row.CompanionCHAAffectedStats.IsEmpty()) ItemIssue(Issues,At,TEXT("CompanionCHAAffectedStats"),TEXT("Retired CHA settings must have zero bonus and no affected stats."));
     });
     ItemEach<FICCombatSettingsRow>(Tables,[&](const FICCombatSettingsRow& Row,const FItemLocation& At)
     {
@@ -328,6 +322,7 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
     ItemEach<FICPartySettingsRow>(Tables,[&](const FICPartySettingsRow& Row,const FItemLocation& At)
     {
         IC_TRACE_FUNCTION();
+        if(Row.MaximumCompanions!=3 || Row.RequiredRecruitAffinity!=300) ItemIssue(Issues,At,TEXT("MaximumCompanions"),TEXT("Party allows three companions at affinity 300."));
         if(Row.SearchDistanceCm>Row.ChaseDistanceCm || Row.ChaseDistanceCm>Row.RecoveryDistanceCm) ItemIssue(Issues,At,TEXT("RecoveryDistanceCm"),TEXT("Party search, chase and safe recovery ranges must be non-decreasing."));
         if(!Row.FormationOffsetsCm.IsEmpty() && Row.FormationOffsetsCm.Num()<Row.MaximumCompanions) ItemIssue(Issues,At,TEXT("FormationOffsetsCm"),TEXT("Formation must supply a position for every companion slot."));
         if(bComplete && Row.FormationOffsetsCm.IsEmpty()) ItemIssue(Issues,At,TEXT("FormationOffsetsCm"),TEXT("Complete party settings require authored formation positions."));
@@ -338,6 +333,7 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         if(Row.InitialSlots>Row.MaximumSlots) ItemIssue(Issues,At,TEXT("MaximumSlots"),TEXT("Maximum inventory capacity cannot be below initial capacity."));
         if(Row.ExpansionSlots>0 && Row.MaximumSlots>=Row.InitialSlots && (Row.MaximumSlots-Row.InitialSlots)%Row.ExpansionSlots!=0) ItemIssue(Issues,At,TEXT("ExpansionSlots"),TEXT("Fixed expansion steps must reach the configured maximum without overshoot."));
         if(static_cast<int64>(Row.MaximumStorageInstallations)*Row.SlotsPerStorage>MAX_int32) ItemIssue(Issues,At,TEXT("SlotsPerStorage"),TEXT("Combined storage capacity exceeds the supported integer range."));
+        if(Row.MaximumStorageInstallations!=3 || Row.SlotsPerStorage!=40 || Row.DropLifetimePlaySeconds!=600) ItemIssue(Issues,At,TEXT("MaximumStorageInstallations"),TEXT("Storage uses three 40-slot stages; dropped items expire after 600 PlayClock seconds."));
     });
     ItemEach<FICSaveSettingsRow>(Tables,[&](const FICSaveSettingsRow& Row,const FItemLocation& At)
     {

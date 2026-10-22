@@ -72,6 +72,7 @@ void AICAIController::Decide()
     {
         if(bInteractionHold){StopMovement();return;}
         const auto State=S->GetSnapshot(C->GetCharacterID());if(State.IsDowned()){StopExecution();return;}
+        constexpr float ArrivalDistanceCm=150.f;
         FVector Goal;FRotator GoalRotation=FRotator::ZeroRotator;bool HasGoal=false;
         if(State.Mode==EICCharacterMode::Companion)
         {
@@ -81,9 +82,9 @@ void AICAIController::Decide()
         {
             const auto* Schedule=D->Find<FICScheduleRow>(NPC->GetNPCDefinition().ScheduleID,R);const int32 Minute=int32(FMath::FloorToDouble(T->GetClock().GameMinute))%1440;
             if(Schedule)for(const auto& Segment:Schedule->Segments)if(Minute>=Segment.StartGameMinute&&Minute<Segment.EndGameMinute)
-            {FTransform Anchor;HasGoal=GetWorld()->GetSubsystem<UICSpawnSubsystem>()->ResolveLoadedAnchor(Segment.DestinationAnchorID,Anchor);Goal=Anchor.GetLocation();GoalRotation=Anchor.Rotator();if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)<FMath::Square(120.)){auto Updated=State;if(Updated.CurrentAnchorID!=Segment.DestinationAnchorID){Updated.CurrentAnchorID=Segment.DestinationAnchorID;S->SetCharacterState(Updated);}}break;}
+            {FTransform Anchor;HasGoal=GetWorld()->GetSubsystem<UICSpawnSubsystem>()->ResolveLoadedAnchor(Segment.DestinationAnchorID,Anchor);Goal=Anchor.GetLocation();GoalRotation=Anchor.Rotator();if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)<=FMath::Square(ArrivalDistanceCm)){auto Updated=State;if(Updated.CurrentAnchorID!=Segment.DestinationAnchorID){Updated.CurrentAnchorID=Segment.DestinationAnchorID;S->SetCharacterState(Updated);}}break;}
         }
-        if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)>FMath::Square(150.))
+        if(HasGoal&&FVector::DistSquared(C->GetActorLocation(),Goal)>FMath::Square(ArrivalDistanceCm))
         {
 
             C->GetCharacterMovement()->bOrientRotationToMovement=true;

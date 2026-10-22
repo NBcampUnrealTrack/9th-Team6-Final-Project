@@ -1,4 +1,7 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Framework/ICDisplayPolicy.h"
+#include "Camera/CameraComponent.h"
+#include "UI/Framework/ICText.h"
 #include "UI/Management/ICUIManagerSubsystem.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Combat/GAS/ICGameplayTags.h"
@@ -62,6 +65,18 @@ void AICPlayerController::BeginPlay()
 {
     IC_TRACE_FUNCTION();
     Super::BeginPlay();
+    if(PlayerCameraManager)
+    {
+        PlayerCameraManager->DefaultAspectRatio=ICDisplayPolicy::AspectRatio;
+        PlayerCameraManager->bDefaultConstrainAspectRatio=true;
+        if(auto* Target=GetViewTarget())if(auto* Camera=Target->FindComponentByClass<UCameraComponent>())
+        {
+            Camera->SetAspectRatio(ICDisplayPolicy::AspectRatio);
+            Camera->SetConstraintAspectRatio(true);
+        }
+        // Initialize the native camera before the title menu pauses the world.
+        PlayerCameraManager->UpdateCamera(0.f);
+    }
     UE_LOG(LogICCore, Log, TEXT("[Player.BeginPlay] Controller=%s Pawn=%s Local=%d"),*GetNameSafe(this),*GetNameSafe(GetPawn()),IsLocalController());
     if (IsLocalController() && IsMainMenuLevel())
     {
@@ -144,7 +159,7 @@ void AICPlayerController::TryInitializeGameplay()
     if (!State || !Time || !Saves || !GetInventory()) return;
     BindPawnSystems();
     if (!State->RegisterStateParticipant(UICWorldStateSubsystem::PlayerId(),this))
-    { Show(TEXT("플레이어 상태 참여자 중복 등록"));return; }
+    { ShowLocalized(ICText::Get(TEXT("Native_fc69e92a5fa2")));return; }
     bGameplayInitialized=true;
     UE_LOG(LogICCore, Log, TEXT("[Player.Initialized] Controller=%s State=%s Time=%s Saves=%s Inventory=%s"),*GetNameSafe(this),*GetNameSafe(State),*GetNameSafe(Time),*GetNameSafe(Saves),*GetNameSafe(GetInventory()));
     State->OnCharacterChanged.AddUniqueDynamic(this,&ThisClass::CharacterChanged);
@@ -163,7 +178,7 @@ void AICPlayerController::TryInitializeGameplay()
     if (UClass* WidgetClass = QuestTrackerWidgetClass.LoadSynchronous())
     {
         QuestTrackerScreen = CreateWidget<UICQuestTrackerWidget>(this, WidgetClass);
-        if (QuestTrackerScreen) QuestTrackerScreen->AddToPlayerScreen(1);
+        if (QuestTrackerScreen && GetLocalPlayer()) GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>()->AddHUDWidget(QuestTrackerScreen);
     }
     auto* Flow=GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
     if (Flow->bPendingNewGame)
@@ -176,6 +191,7 @@ void AICPlayerController::TryInitializeGameplay()
     else if (State->ExportState().bPlayerCreated)
     {
         RestoreFromWorldState_Implementation(State->ExportState());
+        Flow->CompleteNewGame();
         if (auto* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>())
         {
             Quests->RefreshAvailableQuests();
@@ -185,7 +201,7 @@ void AICPlayerController::TryInitializeGameplay()
     {
         Flow->BeginQuestions();
         SetMenu(TEXT("Create"));
-        Show(TEXT("질문에 답한 뒤 새 게임을 시작하세요."));
+        ShowLocalized(ICText::Get(TEXT("Native_7d16f1b3de57")));
     }
 #if !UE_BUILD_SHIPPING
     EnableCheats();
@@ -244,14 +260,13 @@ void AICPlayerController::UpdateScreens()
         if(!SettingsScreen)
         {
             SettingsScreen=CreateWidget<UICSettingsWidget>(this,UICSettingsWidget::StaticClass());
-            if(SettingsScreen)SettingsScreen->AddToPlayerScreen(1000);
+            if(SettingsScreen&&FrontendUI)FrontendUI->OpenScreen(SettingsScreen,false,1000);
         }
     }
-    else if(SettingsScreen){SettingsScreen->RemoveFromParent();SettingsScreen=nullptr;}
-    if(!IsMainMenuLevel())
+    else if(SettingsScreen){if(FrontendUI)FrontendUI->CloseScreen(SettingsScreen);SettingsScreen=nullptr;}
     {
         const FString SessionMenu=GetSessionMenu();
-        const bool bSessionOpen=SessionMenu==TEXT("Save")||SessionMenu==TEXT("Load");
+        const bool bSessionOpen=SessionMenu==TEXT("Load")||(!IsMainMenuLevel()&&SessionMenu==TEXT("Save"));
         if(bSessionOpen&&SaveLoadWidgetClass)
         {
             if(!SessionSaveLoadScreen)
@@ -259,7 +274,8 @@ void AICPlayerController::UpdateScreens()
                 SessionSaveLoadScreen=CreateWidget<UICSaveLoadWidget>(this,SaveLoadWidgetClass);
                 if(SessionSaveLoadScreen)
                 {
-                    SessionSaveLoadScreen->Configure(SessionMenu==TEXT("Save"),TSoftObjectPtr<UWorld>());
+                    SessionSaveLoadScreen->Configure(SessionMenu==TEXT("Save"),
+                        IsMainMenuLevel()?GetDefault<UICGameFlowSettings>()->PlayMap:TSoftObjectPtr<UWorld>());
                     if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->OpenScreen(SessionSaveLoadScreen,true,100);
                 }
             }
@@ -350,7 +366,7 @@ void AICPlayerController::InventoryChanged()
 {
     IC_TRACE_FUNCTION();auto* Inventory=GetInventory();if(!Inventory)return;TArray<FString> Keys;
     for(const auto& Item:Inventory->GetSnapshot().Equipment){FString Key=Item.InstanceID.ToString()+Item.ItemID.ToString()+FString::FromInt(Item.Grade)+TEXT(":")+FString::FromInt(Item.Upgrade);TArray<FName> Options;Item.Options.GetKeys(Options);Options.Sort(FNameLexicalLess());for(FName ID:Options)Key+=ID.ToString()+FString::SanitizeFloat(Item.Options[ID]);Keys.Add(Key);}Keys.Sort();const FString Current=FString::Join(Keys,TEXT("|"));
-    if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=C->GetICAbilitySystem()){if(Current!=LastEquipmentKey)ASC->NotifyEquipmentChanged();ASC->RebuildDerivedStats();}LastEquipmentKey=Current;OnEquipmentStatsChanged.Broadcast(Inventory->GetEquipmentStats());bDirty=true;
+    if(auto* C=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=C->GetICAbilitySystem()){if(Current!=LastEquipmentKey)ASC->NotifyEquipmentChanged();ASC->RebuildDerivedStats();C->RefreshWeaponAppearance();}LastEquipmentKey=Current;OnEquipmentStatsChanged.Broadcast(Inventory->GetEquipmentStats());bDirty=true;
 }
 void AICPlayerController::InventoryMessage(const FText& Message){ IC_TRACE_FUNCTION();Show(Message.ToString());}
 void AICPlayerController::CharacterChanged(FName ID)
@@ -367,7 +383,14 @@ void AICPlayerController::CharacterChanged(FName ID)
     bDirty=true;
 }
 void AICPlayerController::ClockChanged(){ IC_TRACE_FUNCTION();bDirty=true;}
-void AICPlayerController::Show(const FString& Text){ IC_TRACE_FUNCTION();if(Notice!=Text)UE_LOG(LogICUI, Verbose, TEXT("[UI.Notice] Controller=%s Message=%s"),*GetNameSafe(this),*Text);Notice=Text;bDirty=true;OnNoticeChanged.Broadcast(Notice);}
+void AICPlayerController::Show(const FString& Text){ IC_TRACE_FUNCTION();ShowLocalized(FText::FromString(Text)); }
+void AICPlayerController::ShowLocalized(const FText& Text)
+{
+    IC_TRACE_FUNCTION();
+    const FString Display = Text.ToString();
+    if(Notice!=Display)UE_LOG(LogICUI, Verbose, TEXT("[UI.Notice] Controller=%s Message=%s"),*GetNameSafe(this),*Display);
+    Notice=Display;NoticeDisplayText=Text;bDirty=true;OnNoticeChanged.Broadcast(Notice);
+}
 void AICPlayerController::RefreshSaveSlots(){ IC_TRACE_FUNCTION();if(auto* Saves=GetSaves())SaveSlots=Saves->GetSlotList();bDirty=true;OnSaveSessionChanged.Broadcast();}
 
 void AICPlayerController::SyncSaveSafety()
@@ -380,7 +403,7 @@ void AICPlayerController::SyncSaveSafety()
         Saves->SetSafetyState(Safety);
     }
 }
-void AICPlayerController::SaveStarted(int32 Slot){ IC_TRACE_FUNCTION();Show(Slot==0?TEXT("자동 저장 중..."):FString::Printf(TEXT("수동 슬롯 %d 저장 중..."),Slot));}
+void AICPlayerController::SaveStarted(int32 Slot){ IC_TRACE_FUNCTION();ShowLocalized(Slot==0?ICText::Get(TEXT("Save_AutoInProgress")):ICText::FormatText(TEXT("Native_db67ea4e23cf"),Slot));}
 void AICPlayerController::SaveFinished(int32 Slot,bool bSuccess,const FString& Message)
 {
     IC_TRACE_FUNCTION();
@@ -398,19 +421,19 @@ void AICPlayerController::SaveFinished(int32 Slot,bool bSuccess,const FString& M
         else
         {
             UpdateGamePhase();
-            ReportCreationFailure(Message + TEXT(" 게임 시작 버튼으로 저장을 재시도할 수 있습니다."));
+            ReportCreationFailure(ICText::FormatText(TEXT("Save_RetryNewGame"),GetSaves()?GetSaves()->GetLastMessageText():FText::FromString(Message)).ToString());
         }
 
         UpdateScreens();
     }
-    RefreshSaveSlots();Show((Slot==0?FString(TEXT("자동 저장: ")):FString::Printf(TEXT("수동 슬롯 %d: "),Slot))+Message);
+    RefreshSaveSlots();ShowLocalized(ICText::FormatText(Slot==0?TEXT("Save_AutoResult"):TEXT("Save_ManualResult"),Slot,GetSaves()?GetSaves()->GetLastMessageText():FText::FromString(Message)));
     FinishSessionSave(Slot,bSuccess);
 }
 
 void AICPlayerController::SetMenu(const FString& NewMenu)
 {
     IC_TRACE_FUNCTION();
-    if(bItemTransactionInProgress&&NewMenu!=TEXT("Quit")&&NewMenu!=TEXT("Confirm")){Show(TEXT("효과 요청 처리 중입니다."));return;}
+    if(bItemTransactionInProgress&&NewMenu!=TEXT("Quit")&&NewMenu!=TEXT("Confirm")){ShowLocalized(ICText::Get(TEXT("Native_bfb9fda0713f")));return;}
     if (NewMenu != TEXT("Dialogue") && DialogueScreen)
     {
         UICNPCDialogueWidget* Closing = DialogueScreen;
@@ -426,6 +449,7 @@ void AICPlayerController::SetMenu(const FString& NewMenu)
     }
     ResetHeldInput();CancelTarget();
     if(Menu!=NewMenu)UE_LOG(LogICUI, Log, TEXT("[UI.Menu] From=%s To=%s Created=%d Dead=%d"),*Menu,*NewMenu,bCreated,bDead);
+    if (NewMenu == TEXT("Settings") && Menu != NewMenu) SettingsReturnMenu = Menu;
     Menu=NewMenu;
     if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(NewMenu==TEXT("MainMenu")||NewMenu==TEXT("Loading")||NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
     UpdateScreens();
@@ -515,7 +539,7 @@ void AICPlayerController::FlushWorldState() { IC_TRACE_FUNCTION(); if(bCreated||
 void AICPlayerController::InventoryLootResult(FName ItemID,int32 Accepted,int32 Overflow)
 {
     IC_TRACE_FUNCTION();
-    if(Overflow>0)Show(FString::Printf(TEXT("가방 초과분 %d개를 바닥에 보관했습니다."),Overflow));
+    if(Overflow>0)ShowLocalized(ICText::FormatText(TEXT("Native_82fdda695a4f"),Overflow));
 }
 void AICPlayerController::SynchronizeDrops()
 {

@@ -10,7 +10,7 @@ enum class EPlayerMainStat : uint8
     Dexterity ,
     Intelligence ,
     Constitution ,
-    Charisma ,
+    Charisma UMETA(Hidden),
     Luck ,
     None
 };
@@ -23,7 +23,7 @@ struct FPlayerMainStats
     UPROPERTY(EditAnywhere,BlueprintReadWrite,SaveGame) int32 Dexterity=1;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,SaveGame) int32 Intelligence=1;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,SaveGame) int32 Constitution=1;
-    UPROPERTY(EditAnywhere,BlueprintReadWrite,SaveGame) int32 Charisma=1;
+    UPROPERTY(SaveGame) int32 Charisma=1;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,SaveGame) int32 Luck=1;
 
     int32 Get(EPlayerMainStat Stat) const
@@ -35,7 +35,7 @@ struct FPlayerMainStats
         case EPlayerMainStat::Dexterity:return Dexterity;
         case EPlayerMainStat::Intelligence:return Intelligence;
         case EPlayerMainStat::Constitution:return Constitution;
-        case EPlayerMainStat::Charisma:return Charisma;
+        case EPlayerMainStat::Charisma:return 0;
         case EPlayerMainStat::Luck:return Luck;
         default:return 0;
         }
@@ -51,7 +51,7 @@ struct FPlayerMainStats
         case EPlayerMainStat::Dexterity:Value=&Dexterity;break;
         case EPlayerMainStat::Intelligence:Value=&Intelligence;break;
         case EPlayerMainStat::Constitution:Value=&Constitution;break;
-        case EPlayerMainStat::Charisma:Value=&Charisma;break;
+        case EPlayerMainStat::Charisma:return 0;
         case EPlayerMainStat::Luck:Value=&Luck;break;
         default:return 0;
         }

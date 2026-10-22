@@ -1,4 +1,5 @@
 #include "UI/Save/ICSaveSlotWidget.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "UI/Save/ICSavePreviewHelpers.h"
 #include "Blueprint/WidgetTree.h"
@@ -47,6 +48,7 @@ void UICSaveSlotWidget::SetSelected(bool bSelected)
         if (NormalImage) ButtonStyle.Normal.SetResourceObject(NormalImage);
         if (HoverImage) ButtonStyle.Hovered.SetResourceObject(HoverImage);
         if (PressedImage) ButtonStyle.Pressed.SetResourceObject(PressedImage);
+        if(!NormalImage)ButtonStyle.Normal.TintColor=bSelected?FLinearColor(.18f,.27f,.40f):FLinearColor(.075f,.10f,.15f);
         IC_SaveSlot_Button->SetStyle(ButtonStyle);
         IC_SaveSlot_Button->SetBackgroundColor(FLinearColor::White);
     }
@@ -54,19 +56,18 @@ void UICSaveSlotWidget::SetSelected(bool bSelected)
 }
 void UICSaveSlotWidget::HandleClicked() { IC_TRACE_FUNCTION(); UE_LOG(LogICUI, Verbose, TEXT("[SaveSlot.Picked] Slot=%d Exists=%d Valid=%d Backup=%d"),SlotIndex,Info.bExists,Info.bValid,Info.bUsesBackup);OnSlotPicked.Broadcast(SlotIndex); }
 
-void UICSaveSlotWidget::ConfigureData(const FICSaveSlotInfo& InInfo, UTexture2D* InThumbnail, const TMap<FName, TObjectPtr<UTexture2D>>& Portraits)
+void UICSaveSlotWidget::ConfigureData(const FICSaveSlotInfo& InInfo, const TMap<FName, TObjectPtr<UTexture2D>>& Portraits)
 {
     IC_TRACE_FUNCTION();
-    Info = InInfo; Thumbnail = InThumbnail; PortraitTextures = Portraits;
-    FText Text = FText::Format(NSLOCTEXT("ICSaveUI", "CardEmpty", "{0}\n비어 있음"), ICSavePreviewUI::SlotName(Info.Slot));
-    if (Info.bExists && !Info.bValid) Text = FText::Format(NSLOCTEXT("ICSaveUI", "CardInvalid", "{0}\n읽을 수 없는 저장"), ICSavePreviewUI::SlotName(Info.Slot));
-    else if (Info.bValid) Text = FText::Format(NSLOCTEXT("ICSaveUI", "SessionCardData", "{0}\n{1} · {2}\n{3}\n{4}\n{5}"), ICSavePreviewUI::SlotName(Info.Slot), FText::FromString(Info.PlayerName), ICSavePreviewUI::Date(Info), ICSavePreviewUI::GameTime(Info), ICSavePreviewUI::Location(Info), ICSavePreviewUI::Recovery(Info));
+    Info = InInfo; PortraitTextures = Portraits;
+    FText Text = FText::Format(ICText::Get(TEXT("Native_03ef37db1622")), ICSavePreviewUI::SlotName(Info.Slot));
+    if (Info.bExists && !Info.bValid) Text = FText::Format(ICText::Get(TEXT("Native_a5426b8e5330")), ICSavePreviewUI::SlotName(Info.Slot));
+    else if (Info.bValid) Text = ICSavePreviewUI::Summary(Info);
     Configure(Info.Slot, Text); ApplyData();
 }
 void UICSaveSlotWidget::ApplyData()
 {
     IC_TRACE_FUNCTION();
-    ICSavePreviewUI::SetImage(IC_SaveSlot_Thumbnail, Info.bValid ? Thumbnail.Get() : nullptr);
-    UImage* Images[] = { IC_SaveSlot_Party0.Get(), IC_SaveSlot_Party1.Get(), IC_SaveSlot_Party2.Get(), IC_SaveSlot_Party3.Get(), IC_SaveSlot_Party4.Get() };
-    for (int32 Index = 0; Index < 5; ++Index) ICSavePreviewUI::SetImage(Images[Index], Info.bValid ? ICSavePreviewUI::Portrait(Info, Index, PortraitTextures) : nullptr);
+    UImage* Images[] = { IC_SaveSlot_Party0.Get(), IC_SaveSlot_Party1.Get(), IC_SaveSlot_Party2.Get(), IC_SaveSlot_Party3.Get() };
+    for (int32 Index = 0; Index < 4; ++Index) ICSavePreviewUI::SetImage(Images[Index], Info.bValid ? ICSavePreviewUI::Portrait(Info, Index, PortraitTextures) : nullptr);
 }

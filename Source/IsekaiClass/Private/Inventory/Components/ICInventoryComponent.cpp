@@ -1,4 +1,5 @@
 #include "Inventory/Components/ICInventoryComponent.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -55,9 +56,9 @@ void UICInventoryComponent::WorldInventoryChanged() { IC_TRACE_FUNCTION(); OnCha
 bool UICInventoryComponent::Commit(const FICInventoryState& Snapshot)
 {
     IC_TRACE_FUNCTION();
-    if (!ValidateSnapshot(Snapshot)) return Fail(TEXT("인벤토리 상태 검증 실패. 변경하지 않았습니다."));
+    if (!ValidateSnapshot(Snapshot)) return Fail(*ICText::Get(TEXT("Native_5833b9862e26")).ToString());
     if (WorldState) return WorldState->CommitInventoryState(Snapshot);
-    if(!bStaging)return Fail(TEXT("WorldState가 연결되지 않았습니다. 변경하지 않았습니다."));
+    if(!bStaging)return Fail(*ICText::Get(TEXT("Native_33b632698ed4")).ToString());
     StagingState = Snapshot;
     OnChanged.Broadcast();
     return true;
@@ -89,14 +90,14 @@ int32 UICInventoryComponent::TryAddItem(FName ID, int32 Count)
     IC_TRACE_FUNCTION();
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.TryAddItem.Request] Item=%s Count=%d"),*ID.ToString(),Count);
     const auto* D = Find(ID);
-    if (!D || D->StackLimit<1 || D->StackLimit>99 || Count<=0 || Count>100000) { Fail(TEXT("유효하지 않은 아이템 또는 수량입니다.")); return FMath::Max(0, Count); }
+    if (!D || D->StackLimit<1 || D->StackLimit>99 || Count<=0 || Count>100000) { Fail(*ICText::Get(TEXT("Native_ee6c7695df95")).ToString()); return FMath::Max(0, Count); }
     auto Next = GetSnapshot();
     int32 Added = 0;
     if (D->Kind == EPlayerItemKind::Quest)
     {
         FPlayerContainer C; C.Slots = Next.QuestItems;
 
-        if (Count > 100000) { Fail(TEXT("한 번에 추가할 수 있는 수량을 초과했습니다.")); return Count; }
+        if (Count > 100000) { Fail(*ICText::Get(TEXT("Native_d303952427a0")).ToString()); return Count; }
         C.Slots.SetNum(C.Slots.Num() + FMath::DivideAndRoundUp(Count, FMath::Clamp(D->StackLimit, 1, 99)));
         Added = Insert(C, ID, Count);
         C.Slots.RemoveAll([](const auto& S) { IC_TRACE_FUNCTION(); return S.IsEmpty(); }); Next.QuestItems = MoveTemp(C.Slots);
@@ -112,7 +113,7 @@ bool UICInventoryComponent::AddItem(FName ID, int32 Count, bool bAllowPartial)
 {
     IC_TRACE_FUNCTION();
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.AddItem.Request] Item=%s Count=%d Partial=%d"),*ID.ToString(),Count,bAllowPartial);
-    const auto* D = Find(ID); if (!D || Count <= 0) return Fail(TEXT("유효하지 않은 아이템 또는 수량입니다."));
+    const auto* D = Find(ID); if (!D || Count <= 0) return Fail(*ICText::Get(TEXT("Native_ee6c7695df95")).ToString());
     if (bAllowPartial || D->Kind == EPlayerItemKind::Quest)
     {
         const int32 Left = TryAddItem(ID, Count);
@@ -120,7 +121,7 @@ bool UICInventoryComponent::AddItem(FName ID, int32 Count, bool bAllowPartial)
     }
     auto Next = GetSnapshot();
     const int32 Added = Insert(Next.Bag, ID, Count);
-    if (Added != Count) return Fail(TEXT("가방 공간이 부족합니다. 변경하지 않았습니다."));
+    if (Added != Count) return Fail(*ICText::Get(TEXT("Native_d90ee7cd79e4")).ToString());
     if (!Commit(Next)) return false;
     UE_LOG(LogICInventory, Log, TEXT("[Inventory.Added] Item=%s Count=%d"),*ID.ToString(),Count);OnLootResult.Broadcast(ID, Count, 0); return true;
 }
@@ -149,7 +150,7 @@ bool UICInventoryComponent::Consume(FName ID, int32 Count)
     IC_TRACE_FUNCTION();
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.Consume.Request] Item=%s Count=%d"),*ID.ToString(),Count);
     auto Next = GetSnapshot();
-    if (!Remove(Next.Bag, ID, Count)) return Fail(TEXT("아이템이 없거나 잠겨 있습니다."));
+    if (!Remove(Next.Bag, ID, Count)) return Fail(*ICText::Get(TEXT("Native_86d4e1888edc")).ToString());
     return Commit(Next);
 }
 
@@ -194,7 +195,7 @@ bool UICInventoryComponent::MoveSlot(int32 From, int32 To)
     auto Next = GetSnapshot();
     if (!Next.Bag.Slots.IsValidIndex(From) || !Next.Bag.Slots.IsValidIndex(To) || From == To) return false;
     auto& A = Next.Bag.Slots[From]; auto& B = Next.Bag.Slots[To];
-    if (A.IsEmpty() || A.bLocked || B.bLocked) return Fail(TEXT("빈 칸 또는 잠긴 아이템입니다."));
+    if (A.IsEmpty() || A.bLocked || B.bLocked) return Fail(*ICText::Get(TEXT("Native_bf45b65a47cf")).ToString());
     const auto* D = Find(A.ItemID);
     if (A.ItemID == B.ItemID && D && D->Kind != EPlayerItemKind::Equipment)
     { const int32 N = FMath::Min(A.Count, FMath::Clamp(D->StackLimit, 1, 99) - B.Count); A.Count -= N; B.Count += N; if (!A.Count) A = FPlayerItemInstance(); }
@@ -208,9 +209,9 @@ bool UICInventoryComponent::SplitStack(int32 From, int32 Amount)
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.SplitStack.Request] Slot=%d Amount=%d"),From,Amount);
     auto Next = GetSnapshot(); if (!Next.Bag.Slots.IsValidIndex(From)) return false;
     auto& S = Next.Bag.Slots[From]; const auto* D = Find(S.ItemID);
-    if (!D || S.bLocked || D->Kind == EPlayerItemKind::Equipment || Amount <= 0 || Amount >= S.Count) return Fail(TEXT("이 수량은 분할할 수 없습니다."));
+    if (!D || S.bLocked || D->Kind == EPlayerItemKind::Equipment || Amount <= 0 || Amount >= S.Count) return Fail(*ICText::Get(TEXT("Native_0995f10806e5")).ToString());
     const int32 Empty = Next.Bag.Slots.IndexOfByPredicate([](const auto& X) { IC_TRACE_FUNCTION(); return X.IsEmpty(); });
-    if (Empty == INDEX_NONE) return Fail(TEXT("분할할 빈 칸이 없습니다."));
+    if (Empty == INDEX_NONE) return Fail(*ICText::Get(TEXT("Native_c3223af5a8df")).ToString());
     FPlayerItemInstance Copy = S; Copy.InstanceID = FGuid::NewGuid(); Copy.Count = Amount;
     S.Count -= Amount; Next.Bag.Slots[Empty] = Copy;
     return Commit(Next);
@@ -230,8 +231,8 @@ bool UICInventoryComponent::Discard(int32 Index)
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.Discard.Request] Slot=%d"),Index);
     auto Next = GetSnapshot(); if (!Next.Bag.Slots.IsValidIndex(Index)) return false;
     auto& S = Next.Bag.Slots[Index]; const auto* D = Find(S.ItemID);
-    if (!D || !D->bCanDiscard || S.bLocked) return Fail(TEXT("버릴 수 없는 아이템입니다."));
-    if(!WorldState || !GetWorld() || !GetWorld()->GetGameInstance())return Fail(TEXT("WorldState가 연결되지 않았습니다."));
+    if (!D || !D->bCanDiscard || S.bLocked) return Fail(*ICText::Get(TEXT("Native_e092954ef79e")).ToString());
+    if(!WorldState || !GetWorld() || !GetWorld()->GetGameInstance())return Fail(*ICText::Get(TEXT("Native_f2d3b72a6db7")).ToString());
     auto* Clock=GetWorld()->GetGameInstance()->GetSubsystem<UICTimeSubsystem>();if(!Clock)return false;
     FICDropState Drop;Drop.ID=FGuid::NewGuid();Drop.Contents.Add(S);
     Drop.Position=GetOwner()?GetOwner()->GetActorLocation()+GetOwner()->GetActorForwardVector()*100.f:WorldState->ExportState().PlayerPosition;
@@ -246,12 +247,12 @@ bool UICInventoryComponent::Equip(int32 Index)
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.Equip.Request] Slot=%d Class=%d"),Index,CurrentClass);
     auto Next = GetSnapshot(); if (!Next.Bag.Slots.IsValidIndex(Index)) return false;
     auto& S = Next.Bag.Slots[Index]; const auto* D = Find(S.ItemID);
-    if (!D || D->Kind != EPlayerItemKind::Equipment || D->EquipSlot == EPlayerEquipSlot::None || S.bLocked) return Fail(TEXT("장착할 수 없습니다."));
+    if (!D || D->Kind != EPlayerItemKind::Equipment || D->EquipSlot == EPlayerEquipSlot::None || S.bLocked) return Fail(*ICText::Get(TEXT("Native_cfa5c06f1ded")).ToString());
     FICDefinitionResult Lookup;
     const auto* Gear=GetDefinitions()?GetDefinitions()->Find<FICEquipmentRow>(D->EquipmentID,Lookup):nullptr;
-    if(!Gear || Gear->Slot!=D->EquipSlot)return Fail(TEXT("장비 정의가 누락되었습니다."));
+    if(!Gear || Gear->Slot!=D->EquipSlot)return Fail(*ICText::Get(TEXT("Native_6eec833069e7")).ToString());
     if(Gear->Slot!=EPlayerEquipSlot::Weapon && Gear->RequiredClass!=EICCharacterClass::None && static_cast<int32>(Gear->RequiredClass)!=CurrentClass+1)
-        return Fail(TEXT("현재 직업이 사용할 수 없는 장비입니다."));
+        return Fail(*ICText::Get(TEXT("Native_5256ca0c34f2")).ToString());
     Swap(S, Next.Equipment[static_cast<int32>(D->EquipSlot)]); return Commit(Next);
 }
 
@@ -280,7 +281,7 @@ bool UICInventoryComponent::CycleWeapon()
         const auto* Gear = GetDefinitions() ? GetDefinitions()->Find<FICEquipmentRow>(Item->EquipmentID, Result) : nullptr;
         if (Gear && Gear->WeaponFamily != EICWeaponFamily::None) Candidates.Add(Index);
     }
-    if (Candidates.IsEmpty()) return Fail(TEXT("교체할 무기가 없습니다."));
+    if (Candidates.IsEmpty()) return Fail(*ICText::Get(TEXT("Native_92e884b0dc6b")).ToString());
     auto Family = [&](int32 Index)
     {
         FICDefinitionResult Result;
@@ -306,7 +307,7 @@ bool UICInventoryComponent::Unequip(EPlayerEquipSlot Slot)
     auto Next = GetSnapshot(); const int32 Index = static_cast<int32>(Slot);
     if (!Next.Equipment.IsValidIndex(Index) || Next.Equipment[Index].IsEmpty()) return false;
     const int32 Empty = Next.Bag.Slots.IndexOfByPredicate([](const auto& S) { IC_TRACE_FUNCTION(); return S.IsEmpty(); });
-    if (Empty == INDEX_NONE) return Fail(TEXT("해제할 가방 공간이 없습니다."));
+    if (Empty == INDEX_NONE) return Fail(*ICText::Get(TEXT("Native_89e1471e83a4")).ToString());
     Next.Bag.Slots[Empty] = Next.Equipment[Index]; Next.Equipment[Index] = FPlayerItemInstance(); return Commit(Next);
 }
 
@@ -327,7 +328,7 @@ bool UICInventoryComponent::BindQuickSlot(int32 Quick, int32 Index)
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.BindQuickSlot.Request] Quick=%d BagSlot=%d"),Quick,Index);
     auto Next = GetSnapshot(); if (!Next.QuickSlots.IsValidIndex(Quick) || !Next.Bag.Slots.IsValidIndex(Index)) return false;
     const auto* D = Find(Next.Bag.Slots[Index].ItemID);
-    if (!D || (D->Kind != EPlayerItemKind::Consumable && D->Kind != EPlayerItemKind::Expansion)) return Fail(TEXT("소비품 또는 확장권만 등록할 수 있습니다."));
+    if (!D || (D->Kind != EPlayerItemKind::Consumable && D->Kind != EPlayerItemKind::Expansion)) return Fail(*ICText::Get(TEXT("Native_8f821e2cc767")).ToString());
     Next.QuickSlots[Quick] = D->ItemID; return Commit(Next);
 }
 
@@ -335,8 +336,8 @@ bool UICInventoryComponent::ExpandUsingTicket()
 {
     IC_TRACE_FUNCTION();
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.ExpandUsingTicket.Request] BeforeSlots=%d"),GetSnapshot().Bag.Slots.Num());
-    auto Next = GetSnapshot(); if (Next.Bag.Slots.Num() >= 100) return Fail(TEXT("최대 100칸입니다. 확장권은 소모하지 않았습니다."));
-    if (!Remove(Next.Bag, TEXT("ITM_TKT_001"), 1)) return Fail(TEXT("확장권이 없습니다."));
+    auto Next = GetSnapshot(); if (Next.Bag.Slots.Num() >= 100) return Fail(*ICText::Get(TEXT("Native_ad88655591b8")).ToString());
+    if (!Remove(Next.Bag, TEXT("ITM_TKT_001"), 1)) return Fail(*ICText::Get(TEXT("Native_d1e4a13152f9")).ToString());
     Next.Bag.Slots.SetNum(Next.Bag.Slots.Num() + 10); return Commit(Next);
 }
 
@@ -355,8 +356,29 @@ bool UICInventoryComponent::Transfer(FName ID, int32 Index, bool bToStorage)
     auto& Source = bToStorage ? Next.Bag : *Container; auto& Destination = bToStorage ? *Container : Next.Bag;
     if (!Source.Slots.IsValidIndex(Index) || Source.Slots[Index].IsEmpty() || Source.Slots[Index].bLocked) return false;
     const auto Item = Source.Slots[Index]; FPlayerContainer NewDestination = Destination;
-    if (Insert(NewDestination, Item.ItemID, Item.Count, &Item) != Item.Count) return Fail(TEXT("이동할 공간이 부족합니다. 변경하지 않았습니다."));
+    // Legacy 160-slot saves stay readable/withdrawable; new deposits use at most 120 home slots.
+    const bool LegacyHome=bToStorage&&ID==TEXT("PlayerHome")&&NewDestination.Slots.Num()>120;
+    FPlayerContainer Deposit=NewDestination;
+    if(LegacyHome)Deposit.Slots.SetNum(120);
+    if (Insert(Deposit, Item.ItemID, Item.Count, &Item) != Item.Count) return Fail(*ICText::Get(TEXT("Native_ce19791ea019")).ToString());
+    if(LegacyHome){for(int32 Slot=0;Slot<120;++Slot)NewDestination.Slots[Slot]=Deposit.Slots[Slot];}
+    else NewDestination=MoveTemp(Deposit);
     Destination = MoveTemp(NewDestination); Source.Slots[Index] = FPlayerItemInstance(); return Commit(Next);
+}
+
+bool UICInventoryComponent::SetHomeStorageStage(int32 Stage)
+{
+    if(Stage<1||Stage>3)return false;
+    if(WorldState&&!WorldState->FlushParticipants())return false;
+    auto Next=GetSnapshot();auto& Storage=Next.Storage.FindOrAdd(TEXT("PlayerHome"));
+    const int32 Capacity=Stage*40;
+    // Do not reduce capacity or overwrite items from older saves.
+    if(Storage.Slots.Num()>Capacity)return false;
+    Storage.Slots.SetNum(Capacity);
+    if(!WorldState)return Commit(Next);
+    auto Candidate=WorldState->ExportState();Candidate.Inventory=Next;
+    Candidate.ProgressionStages.Add(TEXT("Home.Storage"),Stage);
+    return ValidateSnapshot(Next)&&WorldState->CommitGameplayTransaction(Candidate,FGuid::NewGuid());
 }
 
 bool UICInventoryComponent::ExchangeItems(const TMap<FName, int32>& Costs, FName ID, int32 Count)
@@ -364,8 +386,8 @@ bool UICInventoryComponent::ExchangeItems(const TMap<FName, int32>& Costs, FName
     IC_TRACE_FUNCTION();
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.ExchangeItems.Request] Result=%s Count=%d CostKinds=%d"),*ID.ToString(),Count,Costs.Num());
     const auto* D = Find(ID); if (!D || Count <= 0 || D->Kind == EPlayerItemKind::Quest) return false;
-    auto Next = GetSnapshot(); for (const auto& Cost : Costs) if (!Remove(Next.Bag, Cost.Key, Cost.Value)) return Fail(TEXT("재료가 부족합니다."));
-    if (Insert(Next.Bag, ID, Count) != Count) return Fail(TEXT("결과물을 보관할 공간이 없습니다."));
+    auto Next = GetSnapshot(); for (const auto& Cost : Costs) if (!Remove(Next.Bag, Cost.Key, Cost.Value)) return Fail(*ICText::Get(TEXT("Native_ae11dc64bfc4")).ToString());
+    if (Insert(Next.Bag, ID, Count) != Count) return Fail(*ICText::Get(TEXT("Native_eaa99b9549f6")).ToString());
     return Commit(Next);
 }
 
@@ -437,7 +459,7 @@ bool UICInventoryComponent::CommitLoot(const FICInventoryState& Inventory,FName 
 {
     IC_TRACE_FUNCTION();
     if(Overflow<=0)return Commit(Inventory);
-    if(!WorldState || !GetWorld() || !GetWorld()->GetGameInstance() || Overflow>100000)return Fail(TEXT("초과 아이템을 보관할 수 없습니다. 변경하지 않았습니다."));
+    if(!WorldState || !GetWorld() || !GetWorld()->GetGameInstance() || Overflow>100000)return Fail(*ICText::Get(TEXT("Native_d93ebfd6d58e")).ToString());
     auto* Clock=GetWorld()->GetGameInstance()->GetSubsystem<UICTimeSubsystem>();const auto* D=Find(ItemID);
     if(!Clock||!D||D->StackLimit<1||D->StackLimit>99)return false;
     FICWorldState Candidate=WorldState->ExportState();Candidate.Inventory=Inventory;

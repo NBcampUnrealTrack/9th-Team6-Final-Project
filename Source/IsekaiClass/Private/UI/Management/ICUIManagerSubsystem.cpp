@@ -16,14 +16,17 @@ bool UICUIManagerSubsystem::EnsureRoot()
     auto* PC = GetLocalPlayer()->GetPlayerController(GetWorld());
     if (!PC)
         return false;
-    auto* Class = LoadClass<UICUIRootWidget>(nullptr, TEXT("/Game/IsekaiClass/UI/Widget/WBP_UIRoot.WBP_UIRoot_C"));
-    Root = CreateWidget<UICUIRootWidget>(PC, Class ? Class : UICUIRootWidget::StaticClass());
+    Root = CreateWidget<UICUIRootWidget>(PC, UICUIRootWidget::StaticClass());
     return Root && Root->AddToPlayerScreen(0);
 }
 void UICUIManagerSubsystem::SetHUD(UUserWidget* Widget)
 {
     if (EnsureRoot())
         Root->SetHUD(Widget);
+}
+void UICUIManagerSubsystem::AddHUDWidget(UUserWidget* Widget)
+{
+    if(EnsureRoot())Root->AddHUDWidget(Widget);
 }
 bool UICUIManagerSubsystem::OpenScreen(UUserWidget* Widget, bool PauseWorld, int32 ZOrder)
 {

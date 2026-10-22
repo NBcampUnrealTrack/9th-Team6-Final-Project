@@ -5,6 +5,7 @@
 #include "Engine/Font.h"
 #if WITH_EDITOR
 #include "Engine/FontFace.h"
+#include "Misc/Paths.h"
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
@@ -51,9 +52,57 @@ UFont* UICBlueprintMaintenanceLibrary::CreateFrontendFont(const FString& Regular
 #endif
 }
 
+bool UICBlueprintMaintenanceLibrary::EnsureFrontendFontFallback()
+{
+#if WITH_EDITOR
+    auto* Font=LoadObject<UFont>(nullptr,TEXT("/Game/IsekaiClass/UI/Fonts/FONT_IC_UI.FONT_IC_UI"));
+    if (!Font) return false;
+    auto& Composite=Font->GetMutableInternalCompositeFont();
+    const bool bHasJapanese=Composite.SubTypefaces.ContainsByPredicate([](const FCompositeSubFont& Face)
+    { return Face.Cultures == TEXT("ja"); });
+    if (bHasJapanese && Composite.FallbackTypeface.Typeface.Fonts.Num()>0) return true;
+
+    const FString File=FPaths::EngineContentDir()/TEXT("Slate/Fonts/DroidSansFallback.ttf");
+    TArray<uint8> Bytes;
+    if (!FFileHelper::LoadFileToArray(Bytes,*File)) return false;
+    Font->Modify();
+    auto* Face=NewObject<UFontFace>(Font,TEXT("IC_CJK_Fallback"));
+    Face->InitializeFromBulkData(File,EFontHinting::Default,Bytes.GetData(),Bytes.Num());
+    Face->LoadingPolicy=EFontLoadingPolicy::Inline;
+    auto AddFaces=[Face](FTypeface& Typeface)
+    {
+        for (const FName Name : {FName(TEXT("Regular")),FName(TEXT("Bold"))})
+        {
+            auto& Entry=Typeface.Fonts.AddDefaulted_GetRef();
+            Entry.Name=Name;Entry.Font=FFontData(Face);
+        }
+    };
+    if (Composite.FallbackTypeface.Typeface.Fonts.IsEmpty()) AddFaces(Composite.FallbackTypeface.Typeface);
+    if (!bHasJapanese)
+    {
+        auto& Japanese=Composite.SubTypefaces.AddDefaulted_GetRef();
+        Japanese.EditorName=TEXT("Japanese");
+        Japanese.Cultures=TEXT("ja");
+        Japanese.CharacterRanges.Add(FInt32Range::Inclusive(0x3000,0x30FF));
+        Japanese.CharacterRanges.Add(FInt32Range::Inclusive(0x3400,0x9FFF));
+        Japanese.CharacterRanges.Add(FInt32Range::Inclusive(0xFF00,0xFFEF));
+        AddFaces(Japanese.Typeface);
+    }
+    Composite.MakeDirty();
+    Font->MarkPackageDirty();
+    return true;
+#else
+    return false;
+#endif
+}
+
 bool UICBlueprintMaintenanceLibrary::ImportUIStrings(UStringTable* Table,const FString& File)
 {
-    return Table&&Table->GetMutableStringTable()->ImportStringsFromCSVFile(File);
+    if (!Table) return false;
+    Table->Modify();
+    if (!Table->GetMutableStringTable()->ImportStringsFromCSVFile(File)) return false;
+    Table->MarkPackageDirty();
+    return true;
 }
 
 TArray<FName> UICBlueprintMaintenanceLibrary::GetFrontendWidgetNames(UBlueprint* Blueprint)
@@ -75,13 +124,12 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
     auto* BP=Cast<UWidgetBlueprint>(Blueprint);if(!BP||!BP->WidgetTree||Width<1||Height<1||!FSlateApplication::IsInitialized())return false;
     auto* Preview=NewObject<UICUIRootWidget>(GetTransientPackage());
     Preview->WidgetTree=DuplicateObject<UWidgetTree>(BP->WidgetTree,Preview);Preview->SetIsEnabled(true);
-    if(Question>=0)
+    if(Question>=0&&Question<5)
     {
         auto SetText=[Preview](const TCHAR* Name,FText Text){if(auto* Widget=Cast<UTextBlock>(Preview->WidgetTree->FindWidget(Name)))Widget->SetText(Text);};
-        SetText(TEXT("TXT_Step"),FText::FromString(FString::Printf(TEXT("%d / 5"),Question+1)));
-        SetText(TEXT("TXT_Question"),ICFrontendLayout::Text(Question<5?*FString::Printf(TEXT("Question%d"),Question+1):TEXT("Review")));
+        SetText(TEXT("TXT_Question"),ICFrontendLayout::Text(*FString::Printf(TEXT("Question%d"),Question+1)));
         if(auto* Name=Preview->WidgetTree->FindWidget(TEXT("EDIT_Name")))Name->SetVisibility(Question==0?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
-        if(auto* Next=Preview->WidgetTree->FindWidget(TEXT("BTN_Next")))Next->SetVisibility(Question==0||Question==5?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
+        if(auto* Next=Preview->WidgetTree->FindWidget(TEXT("BTN_Next")))Next->SetVisibility(Question==0?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
         auto* Table=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Settings/DT_IC_CreationOptions.DT_IC_CreationOptions"));
         for(int32 I=0;I<4;++I)
         {
@@ -90,12 +138,6 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
             FText Value=ICFrontendLayout::Text(I==0?TEXT("Male"):TEXT("Female"));
             if(Table&&Question>1&&Question<5)if(auto* Row=Table->FindRow<FICCreationOptionRow>(FName(*FString::Printf(TEXT("Q%d_%d"),Question+1,I+1)),TEXT("Preview")))Value=Row->Label;
             if(auto* Text=Cast<UTextBlock>(Button->GetContent()))Text->SetText(Value);
-        }
-        if(Question==3)SetText(TEXT("TXT_Detail"),ICFrontendLayout::Text(TEXT("MusicHelp")));
-        if(Question==5)
-        {
-            SetText(TEXT("TXT_Step"),FText::FromString(TEXT("5 / 5 · 시작 준비")));
-            SetText(TEXT("TXT_Detail"),FText::FromString(TEXT("테스트여행자 · 여성\n\n무자본 빙의 개척기 : 0원에서 거부까지\n엘프 재벌 상인의 정보·선물 레시피 연결 예정\n\n사랑하는 사람과 함께 듣던 노래 · 스태프 선택\n시작 무기: 스태프 / 테스트 기술 지급 · NPC 호감도 연결 예정\n\n누군가에게 인정받았던 순간")));
         }
     }
     FWidgetRenderer Renderer(true);
@@ -116,6 +158,9 @@ bool UICBlueprintMaintenanceLibrary::BuildFrontendWidget(UBlueprint* Blueprint,F
     auto* Widget=Cast<UWidgetBlueprint>(Blueprint);if(!Widget||!Widget->WidgetTree)return false;
     Widget->WidgetTree=NewObject<UWidgetTree>(Widget,NAME_None,RF_Transactional);
     ICFrontendLayout::Build(Widget->WidgetTree,Kind);
+    TSet<FName> Names;
+    Widget->WidgetTree->ForEachWidget([&](UWidget* Child){Child->bIsVariable=true;Names.Add(Child->GetFName());Widget->WidgetVariableNameToGuidMap.FindOrAdd(Child->GetFName(),FGuid::NewGuid());});
+    for(auto It=Widget->WidgetVariableNameToGuidMap.CreateIterator();It;++It)if(!Names.Contains(It.Key()))It.RemoveCurrent();
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Widget);
     return Widget->WidgetTree->RootWidget!=nullptr;
 #else

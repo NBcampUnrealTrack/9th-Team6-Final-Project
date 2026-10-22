@@ -23,5 +23,6 @@ private:
     UFUNCTION() void Save();
     UFUNCTION() void Load();
     UFUNCTION() void Settings();
+    UFUNCTION() void GameSettings();
     UFUNCTION() void Quit();
 };

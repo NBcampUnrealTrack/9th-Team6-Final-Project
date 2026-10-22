@@ -1,2 +1,2 @@
-﻿---,RealSecondsPerGameMinute,SPDrainIntervalPlaySeconds,SleepRecoveryPerGameMinute,MinimumSleepGameMinutes,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
-CFG_TIME_001,"2.000000","10.000000","1.000000","60","CFG_TIME_001","","","(GameplayTags=)","1","False","False"
+---,RealSecondsPerGameMinute,SPDrainIntervalPlaySeconds,SleepRecoveryPerGameMinute,MinimumSleepGameMinutes,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+CFG_TIME_001,2.000000,10.000000,1,120,CFG_TIME_001,,,(GameplayTags=),1,False,False

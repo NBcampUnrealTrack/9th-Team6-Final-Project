@@ -418,17 +418,17 @@ namespace ICDefinitionValidation
             CheckAnchorTypes(Row.FarmPlotAnchorIDs, EICAnchorType::FarmPlot, TEXT("FarmPlotAnchorIDs"));
             if (Row.Type == EICHomeType::Player)
             {
-                Check.Require(Row.StorageInstallAnchorIDs.Num() == 4, TEXT("StorageInstallAnchorIDs"), TEXT("Player home must define exactly four fixed storage installation anchors."));
+                Check.Require(Row.StorageInstallAnchorIDs.Num() == 3, TEXT("StorageInstallAnchorIDs"), TEXT("Player home must define exactly three fixed storage installation anchors."));
                 Check.Require(Row.FarmPlotAnchorIDs.Num() == 6, TEXT("FarmPlotAnchorIDs"), TEXT("Player home must define exactly six fixed farm plots."));
-                if (Row.StorageInstallAnchorIDs.Num() > 4 || Row.FarmPlotAnchorIDs.Num() > 6) Check.Add(TEXT("PlayerHome.Anchors"), TEXT("Player home cannot exceed four storage anchors or six farm plots."));
-                if (Row.MaximumStorageInstallations != 4 || Row.StorageSlotsPerInstallation != 40) Check.Add(TEXT("PlayerHome.Capacity"), TEXT("Player storage is four installations, 40 slots each, sharing at most 160 slots."));
+                if (Row.StorageInstallAnchorIDs.Num() > 3 || Row.FarmPlotAnchorIDs.Num() > 6) Check.Add(TEXT("PlayerHome.Anchors"), TEXT("Player home cannot exceed three storage anchors or six farm plots."));
+                if (Row.MaximumStorageInstallations != 3 || Row.StorageSlotsPerInstallation != 40) Check.Add(TEXT("PlayerHome.Capacity"), TEXT("Player storage is three installations, 40 slots each, sharing at most 120 slots."));
                 Check.Require(!Row.SharedStorageGroupID.IsNone(), TEXT("SharedStorageGroupID"), TEXT("All player storage anchors must address one stable shared inventory group."));
                 if (!Row.OwnerNPCID.IsNone() || !Row.NPCContainers.IsEmpty()) Check.Add(TEXT("OwnerNPCID/NPCContainers"), TEXT("Player shared storage is separate from NPC ownership and one-time NPC container contents."));
             }
             else if (!Row.StorageInstallAnchorIDs.IsEmpty() || !Row.FarmPlotAnchorIDs.IsEmpty()) Check.Add(TEXT("PlayerHome.Anchors"), TEXT("Player storage installation and farm plot lists belong only to the player home."));
             if (Row.Type == EICHomeType::NPC) Check.Require(!Row.OwnerNPCID.IsNone(), TEXT("OwnerNPCID"), TEXT("NPC home must identify its owner."));
             if (Row.Type == EICHomeType::Inn) Check.Require(!Row.InnServiceID.IsNone(), TEXT("InnServiceID"), TEXT("Inn beds require their lodging service definition."));
-            if (Row.ContainerAccessAffinity != 100) Check.Add(TEXT("ContainerAccessAffinity"), TEXT("NPC house containers require current affinity 100; bed permissions remain separate."));
+            if (Row.Type==EICHomeType::NPC && Row.ContainerAccessAffinity != 200) Check.Add(TEXT("ContainerAccessAffinity"), TEXT("NPC house containers require affinity 200."));
             for (int32 Index = 0; Index < Row.NPCContainers.Num(); ++Index)
             {
                 const FICHomeContainerDefinition& Container = Row.NPCContainers[Index];

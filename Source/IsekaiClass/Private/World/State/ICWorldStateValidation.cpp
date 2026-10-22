@@ -134,6 +134,8 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
             || (Pair.Value.bPlayerOwned != (Pair.Value.OwnerCharacterID == PlayerId()))) return Fail(TEXT("ContainerOwnership.") + Pair.Key.ToString());
     TMap<FName, int32> HomeCounts;
     TSet<FName> InstalledContainers;
+    // Accept the old fourth installation on load to preserve its contents.
+    // New home definitions and the upgrade API are limited to three stages.
     for (const auto& Pair : S.StorageInstallations)
     {
         const auto& Installation = Pair.Value;

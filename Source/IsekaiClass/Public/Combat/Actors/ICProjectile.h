@@ -12,7 +12,7 @@ class ISEKAICLASS_API AICProjectile : public AActor
 public:
     AICProjectile();
     virtual void Tick(float Seconds) override;
-    void InitializeShot(UICAbilitySystemComponent* Source, const FICSkillEffectRow& Effect, const FICSkillHitDefinition& Hit, const FICAttackCapture& Capture, FVector Direction);
+    void InitializeShot(UICAbilitySystemComponent* Source, const FICSkillEffectRow& Effect, const FICSkillHitDefinition& Hit, const FICAttackCapture& Capture, FVector Direction, const FICCombatPresentation& Presentation);
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<USphereComponent> Collision;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UProjectileMovementComponent> Movement;
@@ -20,6 +20,7 @@ protected:
 private:
     TWeakObjectPtr<UICAbilitySystemComponent> Source;
     FICSkillEffectRow Effect;
+    FICCombatPresentation Presentation;
     FICAttackCapture Captured;
     TSet<TWeakObjectPtr<AActor>> HitActors;
     bool bPierce = false, bStopAtWorld = true, bEnemySource = false;

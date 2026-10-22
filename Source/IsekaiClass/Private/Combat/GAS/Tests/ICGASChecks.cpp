@@ -14,6 +14,10 @@
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Combat/GAS/Attributes/ICAttributeSets.h"
 #include "Combat/GAS/ICGameplayTags.h"
+#include "Combat/GAS/Abilities/ICGameplayAbility.h"
+#include "Combat/GAS/Effects/ICGameplayEffects.h"
+#include "Combat/GAS/Cues/ICCombatCueNotify.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "Combat/GAS/Simulation/ICCombatSimulation.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -77,6 +81,65 @@ bool FICGASCommitCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("First hit commits"),F.ASC->NotifyCombatEvent(A.ActionID,TEXT("AN_HitStart"),0));TestEqual(TEXT("MP paid once"),F.ASC->Capture().MP,90.f);TestEqual(TEXT("First recovery applies once"),F.ASC->Capture().HP,70.f);
     TestFalse(TEXT("Duplicate notify rejected"),F.ASC->NotifyCombatEvent(A.ActionID,TEXT("AN_HitStart"),0));TestTrue(TEXT("Next repeat hits"),F.ASC->NotifyCombatEvent(A.ActionID,TEXT("AN_HitStart"),1));TestEqual(TEXT("Repeat does not charge again"),F.ASC->Capture().MP,90.f);TestEqual(TEXT("Two distinct recoveries"),F.ASC->Capture().HP,80.f);
     F.ASC->CancelAction();TestFalse(TEXT("Old action notify rejected"),F.ASC->NotifyCombatEvent(A.ActionID,TEXT("AN_HitStart"),2));TestFalse(TEXT("Full cooldown persists after committed cancellation"),F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player).bSuccess);TestTrue(TEXT("Cooldown is captured by definition ID"),F.ASC->Capture().Combat.SkillReadyAtPlaySecond.FindRef(F.SkillID)>F.Time->GetClock().PlaySecond);
+    return !HasAnyErrors();
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASSkillEventCheck,"IC.GAS.SkillGameplayEventAndCooldownEffect",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICGASSkillEventCheck::RunTest(const FString& Parameters)
+{
+    FGASFixture F;
+    const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"));
+    auto* Row = F.Skills->FindRow<FICSkillRow>(F.SkillID,TEXT("GAS test"));
+    if (!TestNotNull(TEXT("Fixture skill"),Row)) return false;
+    Row->CooldownTag=Tag;
+    const auto Action=F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player);
+    if (!TestTrue(TEXT("Dedicated skill ability starts"),Action.bSuccess)) return false;
+    FGameplayEventData Event;Event.EventTag=ICTags::HitStartEvent;Event.Instigator=F.Player;Event.EventMagnitude=0;
+    UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(F.Player,ICTags::HitStartEvent,Event);
+    TestEqual(TEXT("Gameplay Event reaches skill ability and commits MP"),F.ASC->Capture().MP,90.f);
+    TestTrue(TEXT("Cooldown GE grants only this skill tag"),F.ASC->HasMatchingGameplayTag(Tag));
+    const auto Saved=F.ASC->Capture();
+    F.ASC->CancelAction();
+    TestTrue(TEXT("Committed cooldown restores"),F.ASC->Restore(Saved));
+    TestTrue(TEXT("Restored cooldown GE grants tag"),F.ASC->HasMatchingGameplayTag(Tag));
+    F.Step(5.1);
+    TestFalse(TEXT("PlayClock expiry removes cooldown GE tag"),F.ASC->HasMatchingGameplayTag(Tag));
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASSkillAssetCheck,"IC.GAS.SkillAssets",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICGASSkillAssetCheck::RunTest(const FString& Parameters)
+{
+    auto* Table=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Combat/DT_IC_Skill.DT_IC_Skill"));
+    if (!TestNotNull(TEXT("Skill data table"),Table)) return false;
+    TArray<FICSkillRow*> Rows;Table->GetAllRows(TEXT("GAS asset validation"),Rows);
+    TestEqual(TEXT("Authored skill count"),Rows.Num(),16);
+    for (const auto& Entry : TArray<TPair<FName,double>>{
+        {TEXT("SKL_START_SWORD_001"),20.}, {TEXT("SKL_START_BOW_001"),30.}, {TEXT("SKL_START_STAFF_001"),30.}})
+        if (const auto* Row=Table->FindRow<FICSkillRow>(Entry.Key,TEXT("Starter cooldown")))
+            TestEqual(Entry.Key.ToString()+TEXT(" cooldown seconds"),Row->CooldownPlaySeconds,Entry.Value);
+    for (const auto* Row:Rows)
+    {
+        const FString Label=Row->ID.ToString();
+        auto* AbilityClass=Row->AbilityClass.LoadSynchronous();
+        const auto* Effect=Row->CooldownEffectClass.LoadSynchronous();
+        if (!TestNotNull(Label+TEXT(" ability class"),AbilityClass) || !TestNotNull(Label+TEXT(" effect"),Effect)) continue;
+        const auto* Ability=Cast<UICSkillGameplayAbility>(AbilityClass->GetDefaultObject());
+        if (!TestNotNull(Label+TEXT(" skill ability"),Ability)) continue;
+        TestEqual(Label+TEXT(" ability ID"),Ability->SkillID,Row->ID);
+        TestTrue(Label+TEXT(" cooldown tag"),Row->CooldownTag.IsValid()&&Ability->CooldownTag==Row->CooldownTag);
+        TestTrue(Label+TEXT(" duration GE"),Effect->IsChildOf(UICSkillCooldownEffect::StaticClass()));
+    }
+    for (const TCHAR* Path:{TEXT("/Game/IsekaiClass/Combat/GAS/Cues/GC_IC_Combat_Cast.GC_IC_Combat_Cast_C"),TEXT("/Game/IsekaiClass/Combat/GAS/Cues/GC_IC_Combat_Impact.GC_IC_Combat_Impact_C")})
+    {
+        auto* Cue=LoadClass<UICCombatCueNotify>(nullptr,Path);
+        if (TestNotNull(Path,Cue))
+        {
+            const auto* Defaults=Cue->GetDefaultObject<UICCombatCueNotify>();
+            TestTrue(TEXT("Cue has a gameplay tag"),Defaults->GameplayCueTag.IsValid());
+            TestFalse(TEXT("Cue has a default Niagara effect"),Defaults->DefaultVFX.IsNull());
+            TestFalse(TEXT("Cue has a default sound"),Defaults->DefaultSound.IsNull());
+        }
+    }
     return !HasAnyErrors();
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASResourcesCheck,"IC.GAS.ResourcesAndPause",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
@@ -192,8 +255,10 @@ void ConfigureInputWeapons(FGASFixture& F)
     FICEquipmentRow BowGear=SwordGear;BowGear.ID=BowItem.EquipmentID;BowGear.ItemID=BowItem.ID;BowGear.WeaponFamily=EICWeaponFamily::Bow;BowGear.RequiredClass=EICCharacterClass::Archer;
     F.Table<FICEquipmentRow>(EICDefinitionType::Equipment,{SwordGear,BowGear});
     auto SwordSkill=*F.Skills->FindRow<FICSkillRow>(F.SkillID,TEXT("Input"));SwordSkill.Purpose=EICSkillPurpose::Heal;SwordSkill.RequiredWeaponFamily=EICWeaponFamily::Sword;SwordSkill.bRequiresEquippedWeapon=true;SwordSkill.TargetRules.Target=EICCombatTarget::PartyMember;SwordSkill.TargetRules.bAllowCaster=true;
+    SwordSkill.CooldownTag=FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"));
     F.Skills->AddRow(SwordSkill.ID,SwordSkill);
     auto BowSkill=SwordSkill;BowSkill.ID=TEXT("SKL_INPUT_997");BowSkill.ClassID=Bow.ID;BowSkill.RequiredWeaponFamily=EICWeaponFamily::Bow;BowSkill.CooldownPlaySeconds=7;
+    BowSkill.CooldownTag=FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_BOW_001"));
     F.Skills->AddRow(BowSkill.ID,BowSkill);
     F.Definitions->ConfigureCatalog(F.Catalog);
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(F.Definitions,0);
@@ -213,6 +278,8 @@ bool FICInputWeaponCheck::RunTest(const FString& Parameters)
     const auto Sword=F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player);
     TestTrue(TEXT("Sword skill activates"),Sword.bSuccess);
     TestTrue(TEXT("Sword effect commits its own cooldown"),F.ASC->NotifyCombatEvent(Sword.ActionID,TEXT("AN_HitStart"),0));
+    TestTrue(TEXT("Sword cooldown GE owns sword tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"))));
+    TestFalse(TEXT("Sword cooldown GE does not own bow tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_BOW_001"))));
     F.ASC->CancelAction();
     const double SwordCooldown=F.ASC->GetSkillCooldownRemaining(F.SkillID);
     TestTrue(TEXT("Changing weapon ignores the original class restriction"),Inventory->CycleWeapon());
@@ -223,6 +290,8 @@ bool FICInputWeaponCheck::RunTest(const FString& Parameters)
     const auto Bow=F.ASC->RequestAction(TEXT("Skill"),BowID,F.Player);
     TestTrue(TEXT("Sword cooldown does not block bow skill"),Bow.bSuccess);
     TestTrue(TEXT("Bow starts an independent cooldown"),F.ASC->NotifyCombatEvent(Bow.ActionID,TEXT("AN_HitStart"),0));
+    TestTrue(TEXT("Bow cooldown GE owns bow tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_BOW_001"))));
+    TestTrue(TEXT("Bow does not remove sword GE"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"))));
     F.ASC->CancelAction();
     TestTrue(TEXT("Skill can be unequipped during its cooldown"),F.ASC->EquipWeaponSkill(EICWeaponFamily::Bow,NAME_None));
     TestTrue(TEXT("Empty skill slot stays empty"),F.ASC->GetCurrentWeaponSkill().IsNone());

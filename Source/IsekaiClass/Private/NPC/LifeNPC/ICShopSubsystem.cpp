@@ -1,4 +1,5 @@
 #include "NPC/LifeNPC/ICShopSubsystem.h"
+#include "UI/Framework/ICText.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Data/Rows/NPC/ICNPCRow.h"
@@ -18,25 +19,25 @@ bool UICShopSubsystem::ResolveService(FName ServiceID,const FICServiceRow*& Serv
     auto* D=GI?GI->GetSubsystem<UICDefinitionSubsystem>():nullptr;
     auto* S=GI?GI->GetSubsystem<UICWorldStateSubsystem>():nullptr;
     auto* T=GI?GI->GetSubsystem<UICTimeSubsystem>():nullptr;
-    if(!D||!S||!T){Reason=TEXT("상점 시스템을 사용할 수 없습니다.");return false;}
+    if(!D||!S||!T){Reason=ICText::Get(TEXT("Native_be0be0fc4e06")).ToString();return false;}
     FICDefinitionResult R;
     const auto* Row=D->Find<FICServiceRow>(ServiceID,R);
-    if(!Row){Reason=TEXT("서비스 정의를 찾을 수 없습니다.");return false;}
-    if(Row->Type!=EICServiceType::Shop){Reason=TEXT("상점형 서비스가 아닙니다.");return false;}
+    if(!Row){Reason=ICText::Get(TEXT("Native_53bfe3e8be69")).ToString();return false;}
+    if(Row->Type!=EICServiceType::Shop){Reason=ICText::Get(TEXT("Native_d2152eb47db0")).ToString();return false;}
     const int32 Minute=int32(FMath::FloorToDouble(T->GetClock().GameMinute))%1440;
 
     bool bOpen=Row->OpeningHours.IsEmpty();
     for(const auto& Hours:Row->OpeningHours)if(Minute>=Hours.OpenGameMinute&&Minute<Hours.CloseGameMinute)bOpen=true;
-    if(!bOpen){Reason=TEXT("지금은 영업 시간이 아닙니다.");return false;}
+    if(!bOpen){Reason=ICText::Get(TEXT("Native_d91cd776aeb6")).ToString();return false;}
     const auto NPC=S->GetSnapshot(Row->NPCID);
-    if(NPC.IsDowned()||NPC.Mode!=EICCharacterMode::Scheduled){Reason=TEXT("상점 주인이 거래할 수 없는 상태입니다.");return false;}
-    if(!Row->WorkAnchorID.IsNone()&&NPC.CurrentAnchorID!=Row->WorkAnchorID){Reason=TEXT("상점 주인이 근무 위치에 없습니다.");return false;}
+    if(NPC.IsDowned()||NPC.Mode!=EICCharacterMode::Scheduled){Reason=ICText::Get(TEXT("Native_cf1fbb44a8a2")).ToString();return false;}
+    if(!Row->WorkAnchorID.IsNone()&&NPC.CurrentAnchorID!=Row->WorkAnchorID){Reason=ICText::Get(TEXT("Native_ae293ed2d69e")).ToString();return false;}
     const auto* NPCRow=D->Find<FICNPCRow>(Row->NPCID,R);
     const auto* Schedule=NPCRow?D->Find<FICScheduleRow>(NPCRow->ScheduleID,R):nullptr;
     bool bWorking=false;
     if(Schedule)for(const auto& Segment:Schedule->Segments)
         if(Minute>=Segment.StartGameMinute&&Minute<Segment.EndGameMinute&&Segment.Activity==EICScheduleActivity::Work&&Segment.ServiceIDs.Contains(ServiceID))bWorking=true;
-    if(!bWorking){Reason=TEXT("상점 주인이 지금 이 서비스를 근무 중이 아닙니다.");return false;}
+    if(!bWorking){Reason=ICText::Get(TEXT("Native_d18d70d85159")).ToString();return false;}
 
     Service=Row;return true;
 }
@@ -66,7 +67,7 @@ bool UICShopSubsystem::GetOffers(FName ServiceID,TArray<FICShopOffer>& Offers,FS
     if(!ResolveService(ServiceID,Service,Reason))return false;
     auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;
     const auto* Shop=D->Find<FICShopRow>(Service->ShopID,R);
-    if(!Shop||Shop->ServiceID!=ServiceID){Reason=TEXT("상점 정의가 없거나 이 서비스와 연결되어 있지 않습니다.");return false;}
+    if(!Shop||Shop->ServiceID!=ServiceID){Reason=ICText::Get(TEXT("Native_93272e76060d")).ToString();return false;}
     TArray<FICShopEntry> Entries=Shop->Entries;
     Entries.StableSort([](const FICShopEntry& A,const FICShopEntry& B){return A.DisplayOrder<B.DisplayOrder;});
     const double Ratio=DiscountRatioFor(*Service);
@@ -87,20 +88,20 @@ bool UICShopSubsystem::Buy(AICPlayerController* Player,FName ServiceID,FName Ite
 {
     IC_TRACE_FUNCTION();
     auto* Inventory=Player?Player->GetInventory():nullptr;
-    if(!Inventory||Count<=0){Reason=TEXT("유효한 플레이어와 1 이상의 수량이 필요합니다.");return false;}
+    if(!Inventory||Count<=0){Reason=ICText::Get(TEXT("Native_7400376ae37f")).ToString();return false;}
     TArray<FICShopOffer> Offers;
     if(!GetOffers(ServiceID,Offers,Reason))return false;
     const FICShopOffer* Offer=Offers.FindByPredicate([ItemID](const FICShopOffer& O){return O.ItemID==ItemID;});
-    if(!Offer){Reason=TEXT("이 상점에서 판매하지 않는 아이템입니다.");return false;}
+    if(!Offer){Reason=ICText::Get(TEXT("Native_9ca560bad446")).ToString();return false;}
     const int64 Total=int64(Offer->FinalPrice)*Count;
     const int32 Before=Player->Gold;
-    if(Total>Before){Reason=TEXT("골드가 부족합니다.");return false;}
+    if(Total>Before){Reason=ICText::Get(TEXT("Native_f3aeeb0c0487")).ToString();return false;}
 
-    if(!Player->SetGold(Before-int32(Total))){Reason=TEXT("골드를 차감하지 못했습니다.");return false;}
+    if(!Player->SetGold(Before-int32(Total))){Reason=ICText::Get(TEXT("Native_8cf07791156c")).ToString();return false;}
     if(!Inventory->AddItem(ItemID,Count,false))
     {
         if(!Player->SetGold(Before))UE_LOG(LogICInventory,Error,TEXT("[Shop.RefundFailed] Service=%s Item=%s Gold=%d"),*ServiceID.ToString(),*ItemID.ToString(),Before);
-        Reason=TEXT("가방에 공간이 부족합니다.");return false;
+        Reason=ICText::Get(TEXT("Native_01be2dd95314")).ToString();return false;
     }
     UE_LOG(LogICInventory,Log,TEXT("[Shop.Buy] Service=%s Item=%s Count=%d Total=%lld Gold=%d->%d"),*ServiceID.ToString(),*ItemID.ToString(),Count,Total,Before,Player->Gold);
     return true;
@@ -110,21 +111,21 @@ bool UICShopSubsystem::Sell(AICPlayerController* Player,FName ServiceID,FName It
 {
     IC_TRACE_FUNCTION();
     auto* Inventory=Player?Player->GetInventory():nullptr;
-    if(!Inventory||Count<=0){Reason=TEXT("유효한 플레이어와 1 이상의 수량이 필요합니다.");return false;}
+    if(!Inventory||Count<=0){Reason=ICText::Get(TEXT("Native_7400376ae37f")).ToString();return false;}
     const FICServiceRow* Service=nullptr;
     if(!ResolveService(ServiceID,Service,Reason))return false;
     const auto* Item=Inventory->Find(ItemID);
-    if(!Item||!Item->bCanSell||Item->SellPrice<=0){Reason=TEXT("판매할 수 없는 아이템입니다.");return false;}
-    if(Inventory->CountItem(ItemID)<Count){Reason=TEXT("보유 수량이 부족합니다.");return false;}
+    if(!Item||!Item->bCanSell||Item->SellPrice<=0){Reason=ICText::Get(TEXT("Native_25b5f09ab4e5")).ToString();return false;}
+    if(Inventory->CountItem(ItemID)<Count){Reason=ICText::Get(TEXT("Native_0d533fd103ed")).ToString();return false;}
     const int64 Total=int64(Item->SellPrice)*Count;
     const int32 Before=Player->Gold;
-    if(int64(Before)+Total>MAX_int32){Reason=TEXT("골드 보유 한도를 넘습니다.");return false;}
+    if(int64(Before)+Total>MAX_int32){Reason=ICText::Get(TEXT("Native_3d428eb4fe40")).ToString();return false;}
 
-    if(!Inventory->Consume(ItemID,Count)){Reason=TEXT("아이템을 소비하지 못했습니다.");return false;}
+    if(!Inventory->Consume(ItemID,Count)){Reason=ICText::Get(TEXT("Native_1aefea6d1ba4")).ToString();return false;}
     if(!Player->SetGold(Before+int32(Total)))
     {
         if(!Inventory->AddItem(ItemID,Count,false))UE_LOG(LogICInventory,Error,TEXT("[Shop.RollbackFailed] Service=%s Item=%s Count=%d"),*ServiceID.ToString(),*ItemID.ToString(),Count);
-        Reason=TEXT("골드를 지급하지 못했습니다.");return false;
+        Reason=ICText::Get(TEXT("Native_eb279504d649")).ToString();return false;
     }
     UE_LOG(LogICInventory,Log,TEXT("[Shop.Sell] Service=%s Item=%s Count=%d Total=%lld Gold=%d->%d"),*ServiceID.ToString(),*ItemID.ToString(),Count,Total,Before,Player->Gold);
     return true;
