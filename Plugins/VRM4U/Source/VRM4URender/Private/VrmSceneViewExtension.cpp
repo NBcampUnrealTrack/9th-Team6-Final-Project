@@ -506,6 +506,10 @@ void FVrmSceneViewExtension::SubscribeToPostProcessingPass(EPostProcessingPass P
 }
 #else
 void FVrmSceneViewExtension::SubscribeToPostProcessingPass(EPostProcessingPass Pass, const FSceneView& InView, FPostProcessingPassDelegateArray& InOutPassCallbacks, bool bIsPassEnabled) {
+	// No capture means no post-process callback or passthrough copy is needed.
+	// Such a copy can retain the old view size while the window backbuffer is resizing.
+	const auto* RenderModule = FModuleManager::GetModulePtr<FVRM4URenderModule>("VRM4URender");
+	if (!RenderModule || RenderModule->CaptureList.IsEmpty() || !FVRM4URenderModule::isCaptureTarget(&InView)) return;
 	if ((int)Pass == (int)EPostProcessingPass::Tonemap-1)
 	{
 		InOutPassCallbacks.Add(

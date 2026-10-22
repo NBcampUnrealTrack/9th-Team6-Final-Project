@@ -1,4 +1,5 @@
 #include "UI/Gameplay/ICGameplayWidget.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "UI/Framework/ICFrontendLayout.h"
@@ -29,6 +30,8 @@ void UICGameplayWidget::NativeOnInitialized()
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::Load);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Settings"))))
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::Settings);
+    if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_GameSettings"))))
+        Button->OnClicked.AddUniqueDynamic(this, &ThisClass::GameSettings);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Quit"))))
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::Quit);
 }
@@ -55,7 +58,8 @@ void UICGameplayWidget::RefreshCurrentScreen()
             Bar->SetPercent(Maximums[I] > 0 ? FMath::Clamp(Values[I] / Maximums[I], 0.f, 1.f) : 0);
     }
     SetText(TEXT("TXT_Hint"), PC->InteractionHint.IsEmpty() ? TEXT("") : TEXT("[F] ") + PC->InteractionHint);
-    SetText(TEXT("TXT_Notice"), PC->Notice);
+    if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Notice"))))
+        Text->SetText(PC->NoticeDisplayText);
     const bool HasPanel = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
                           PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue") && PC->Menu != TEXT("Quest");
     if (auto* Panel = GetWidgetFromName(TEXT("MenuPanel")))
@@ -64,15 +68,18 @@ void UICGameplayWidget::RefreshCurrentScreen()
     {
         const bool Confirm = PC->Menu == TEXT("Confirm");
         const bool Exit = PC->Menu == TEXT("Quit");
-        SetText(TEXT("TXT_Menu"), PC->IsDead()                ? TEXT("쓰러졌습니다")
-                                  : Confirm                   ? TEXT("확인")
-                                  : Exit                      ? TEXT("게임 종료")
-                                  : PC->Menu == TEXT("Pause") ? TEXT("일시 정지")
+        const bool MainMenu = PC->Menu == TEXT("Pause");
+        const bool SettingsMenu = PC->Menu == TEXT("MenuSettings");
+        SetText(TEXT("TXT_Menu"), PC->IsDead()                ? ICText::Get(TEXT("Menu_Dead")).ToString()
+                                  : Confirm                   ? ICText::Get(TEXT("Menu_Confirm")).ToString()
+                                  : Exit                      ? ICText::Get(TEXT("Menu_Exit")).ToString()
+                                  : MainMenu                  ? ICText::Get(TEXT("Menu")).ToString()
+                                  : SettingsMenu              ? ICText::Get(TEXT("Settings")).ToString()
                                                               : PC->Menu);
         FString Body = Confirm ? PC->ModalText : PC->Notice;
         if (PC->Menu == TEXT("Inventory") && PC->GetInventory())
         {
-            Body = FString::Printf(TEXT("골드: %d\n\n"), PC->Gold);
+            Body = ICText::Format(TEXT("Native_d52a2f45cb55"), PC->Gold);
             for (const auto& Item : PC->GetInventory()->GetSnapshot().Bag.Slots)
                 if (!Item.IsEmpty())
                 {
@@ -84,17 +91,30 @@ void UICGameplayWidget::RefreshCurrentScreen()
                                             Item.Count);
                 }
         }
-        SetText(TEXT("TXT_MenuBody"), Body);
+        if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_MenuBody"))))
+            Text->SetText(Confirm ? PC->ModalDisplayText : PC->Menu == TEXT("Inventory") ? FText::FromString(Body) : PC->NoticeDisplayText);
+        if (auto* Scroll = GetWidgetFromName(TEXT("MenuScroll")))
+            Scroll->SetVisibility(MainMenu || SettingsMenu ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
         auto Label = [this](const TCHAR* Name, const TCHAR* Key) {
             if (auto* Button = Cast<UButton>(GetWidgetFromName(Name)))
                 if (auto* Text = Cast<UTextBlock>(Button->GetContent()))
                     Text->SetText(ICFrontendLayout::Text(Key));
         };
-        Label(TEXT("BTN_Resume"), Confirm ? TEXT("Accept") : Exit ? TEXT("Back") : TEXT("Resume"));
+        Label(TEXT("BTN_Resume"), Confirm ? TEXT("Accept") : Exit ? TEXT("Back") : MainMenu ? TEXT("BackToGame") : TEXT("Resume"));
         Label(TEXT("BTN_Quit"), Confirm ? TEXT("Back") : Exit ? TEXT("QuitWithoutSave") : TEXT("Quit"));
-        for (const auto* Name : {TEXT("BTN_Save"), TEXT("BTN_Load"), TEXT("BTN_Settings")})
+        for (const auto* Name : {TEXT("BTN_Party"), TEXT("BTN_Inventory"), TEXT("BTN_Quest"), TEXT("BTN_Codex")})
             if (auto* Button = GetWidgetFromName(Name))
-                Button->SetVisibility(Confirm ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+                Button->SetVisibility(MainMenu ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        for (const auto* Name : {TEXT("BTN_Resume"), TEXT("BTN_Save"), TEXT("BTN_Load"),
+                                TEXT("BTN_Settings"), TEXT("BTN_GameSettings"), TEXT("BTN_Quit")})
+            if (auto* Button = GetWidgetFromName(Name))
+            {
+                const bool Visible = MainMenu ? FCString::Strcmp(Name, TEXT("BTN_Settings")) == 0 || FCString::Strcmp(Name, TEXT("BTN_Resume")) == 0
+                    : SettingsMenu ? FCString::Strcmp(Name, TEXT("BTN_Settings")) != 0
+                    : Confirm ? FCString::Strcmp(Name, TEXT("BTN_Resume")) == 0 || FCString::Strcmp(Name, TEXT("BTN_Quit")) == 0
+                    : FCString::Strcmp(Name, TEXT("BTN_Settings")) != 0;
+                Button->SetVisibility(Visible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+            }
     }
     OnRefreshGameplayUI();
 }
@@ -134,6 +154,11 @@ void UICGameplayWidget::Load()
         PC->OpenLoadMenu();
 }
 void UICGameplayWidget::Settings()
+{
+    if (auto* PC = GetICPlayerController())
+        PC->SetMenu(TEXT("MenuSettings"));
+}
+void UICGameplayWidget::GameSettings()
 {
     if (auto* PC = GetICPlayerController())
         PC->SetMenu(TEXT("Settings"));

@@ -26,10 +26,11 @@ protected:
 
 private:
     int32 Step = 0;
+    bool bStartingNewGame = false;
     UPROPERTY(Transient) TObjectPtr<UEditableTextBox> NameInput;
     UPROPERTY(Transient) TArray<TObjectPtr<UButton>> ChoiceButtons;
     void StoreName();
-    void ConfirmStart();
+    void StartGame();
     UFUNCTION() void Choice0();
     UFUNCTION() void Choice1();
     UFUNCTION() void Choice2();

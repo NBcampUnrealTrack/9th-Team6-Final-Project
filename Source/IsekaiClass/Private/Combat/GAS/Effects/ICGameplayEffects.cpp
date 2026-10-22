@@ -21,3 +21,4 @@ UICHealthEffect::UICHealthEffect() { IC_TRACE_FUNCTION(); AddAmountModifier(*thi
 UICManaEffect::UICManaEffect() { IC_TRACE_FUNCTION(); AddAmountModifier(*this, UICCombatAttributeSet::GetManaAttribute()); }
 UICSPChangeEffect::UICSPChangeEffect() { IC_TRACE_FUNCTION(); AddAmountModifier(*this, UICSurvivalAttributeSet::GetSPAttribute()); }
 UICStatusGameplayEffect::UICStatusGameplayEffect() { IC_TRACE_FUNCTION(); DurationPolicy = EGameplayEffectDurationType::Infinite; }
+UICSkillCooldownEffect::UICSkillCooldownEffect() { DurationPolicy = EGameplayEffectDurationType::HasDuration; DurationMagnitude = FGameplayEffectModifierMagnitude(1.f); }

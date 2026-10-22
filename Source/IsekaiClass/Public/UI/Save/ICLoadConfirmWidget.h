@@ -5,8 +5,6 @@
 #include "ICLoadConfirmWidget.generated.h"
 class UButton;
 class UTextBlock;
-class UImage;
-class UTexture2D;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FICLoadConfirmed);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FICLoadCancelled);
 UCLASS(Abstract, Blueprintable)
@@ -16,7 +14,7 @@ class ISEKAICLASS_API UICLoadConfirmWidget : public UUserWidget
 public:
     UPROPERTY(BlueprintAssignable) FICLoadConfirmed OnConfirmed;
     UPROPERTY(BlueprintAssignable) FICLoadCancelled OnCancelled;
-    void Configure(const FICSaveSlotInfo& InInfo, UTexture2D* InThumbnail);
+    void Configure(const FICSaveSlotInfo& InInfo);
     void ConfigurePrompt(const FText& Text);
 protected:
     virtual void NativeOnInitialized() override;
@@ -24,12 +22,10 @@ protected:
     virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& KeyEvent) override;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidget)) TObjectPtr<UButton> IC_LoadConfirm_Confirm;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidget)) TObjectPtr<UButton> IC_LoadConfirm_Cancel;
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UImage> IC_LoadConfirm_Thumbnail;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> IC_LoadConfirm_Summary;
 private:
     FText Prompt;
     UPROPERTY() FICSaveSlotInfo Info;
-    UPROPERTY() TObjectPtr<UTexture2D> Thumbnail;
     UFUNCTION() void HandleConfirm();
     UFUNCTION() void HandleCancel();
 };

@@ -79,13 +79,6 @@ int32 UICQuestSubsystem::CountOwnedItem(const FICInventoryState& Inventory, FNam
     {
         if (Item.ItemID == ItemID) Count += Item.Count;
     }
-    for (const auto& Storage : Inventory.Storage)
-    {
-        for (const FPlayerItemInstance& Item : Storage.Value.Slots)
-        {
-            if (Item.ItemID == ItemID) Count += Item.Count;
-        }
-    }
     return static_cast<int32>(FMath::Min<int64>(Count, MAX_int32));
 }
 
@@ -231,7 +224,7 @@ bool UICQuestSubsystem::IsObjectiveComplete(const FICQuestObjectiveDefinition& O
             case EICStat::DEX: Value = Player->MainStats.DEX; break;
             case EICStat::INT: Value = Player->MainStats.INT; break;
             case EICStat::CON: Value = Player->MainStats.CON; break;
-            case EICStat::CHA: Value = Player->MainStats.CHA; break;
+            case EICStat::CHA: return false; // Serialized legacy stat; no gameplay conditions.
             case EICStat::LUK: Value = Player->MainStats.LUK; break;
             default: return false;
             }

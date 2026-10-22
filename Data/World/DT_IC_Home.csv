@@ -1,3 +1,13 @@
 ---,Type,RegionID,OwnerNPCID,EntranceAnchorID,BedAnchorIDs,KitchenAnchorIDs,CraftingAnchorIDs,InnServiceID,ContainerAccessAffinity,NPCContainers,StorageInstallAnchorIDs,FarmPlotAnchorIDs,StorageSlotsPerInstallation,MaximumStorageInstallations,SharedStorageGroupID,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
-HOME_MERCHANT_001,"NPC","R01","NPC_R01_101","ANC_MERCHANT_HOME","(""ANC_MERCHANT_BED"")","()","()","None","100","()","()","()","40","4","None","HOME_MERCHANT_001","HOME_MERCHANT_001.NAME","","(GameplayTags=)","1","False","False"
-HOME_RECRUIT_001,"NPC","R01","NPC_R01_001","ANC_RECRUIT_HOME","(""ANC_RECRUIT_BED"")","()","()","None","100","()","()","()","40","4","None","HOME_RECRUIT_001","HOME_RECRUIT_001.NAME","","(GameplayTags=)","1","False","False"
+HOME_MERCHANT_001,NPC,R01,NPC_R01_101,ANC_MERCHANT_HOME,"(""ANC_MERCHANT_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_MERCHANT_001,HOME_MERCHANT_001.NAME,,(GameplayTags=),1,False,False
+HOME_RECRUIT_001,NPC,R01,NPC_R01_001,ANC_RECRUIT_HOME,"(""ANC_RECRUIT_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_RECRUIT_001,HOME_RECRUIT_001.NAME,,(GameplayTags=),1,False,False
+HOME_R01_002,NPC,R01,NPC_R01_002,ANC_R01_002_HOME,"(""ANC_R01_002_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_R01_002,HOME_R01_002.NAME,,(GameplayTags=),1,False,False
+HOME_R01_003,NPC,R01,NPC_R01_003,ANC_R01_003_HOME,"(""ANC_R01_003_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_R01_003,HOME_R01_003.NAME,,(GameplayTags=),1,False,False
+HOME_R01_004,NPC,R01,NPC_R01_004,ANC_R01_004_HOME,"(""ANC_R01_004_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_R01_004,HOME_R01_004.NAME,,(GameplayTags=),1,False,False
+HOME_R01_005,NPC,R01,NPC_R01_005,ANC_R01_005_HOME,"(""ANC_R01_005_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_R01_005,HOME_R01_005.NAME,,(GameplayTags=),1,False,False
+HOME_R01_006,NPC,R01,NPC_R01_006,ANC_R01_006_HOME,"(""ANC_R01_006_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_R01_006,HOME_R01_006.NAME,,(GameplayTags=),1,False,False
+HOME_R01_007,NPC,R01,NPC_R01_007,ANC_R01_007_HOME,"(""ANC_R01_007_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_R01_007,HOME_R01_007.NAME,,(GameplayTags=),1,False,False
+HOME_R01_008,NPC,R01,NPC_R01_008,ANC_R01_008_HOME,"(""ANC_R01_008_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_R01_008,HOME_R01_008.NAME,,(GameplayTags=),1,False,False
+HOME_R01_009,NPC,R01,NPC_R01_009,ANC_R01_009_HOME,"(""ANC_R01_009_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_R01_009,HOME_R01_009.NAME,,(GameplayTags=),1,False,False
+HOME_R01_010,NPC,R01,NPC_R01_010,ANC_R01_010_HOME,"(""ANC_R01_010_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_R01_010,HOME_R01_010.NAME,,(GameplayTags=),1,False,False
+HOME_R01_011,NPC,R01,NPC_R01_011,ANC_R01_011_HOME,"(""ANC_R01_011_BED"")",(),(),None,200,(),(),(),40,3,None,HOME_R01_011,HOME_R01_011.NAME,,(GameplayTags=),1,False,False

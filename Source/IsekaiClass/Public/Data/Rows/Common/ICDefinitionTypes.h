@@ -18,7 +18,7 @@ enum class EICDefinitionType : uint8
 UENUM(BlueprintType)
 enum class EICStat : uint8
 {
-    None , STR , DEX , INT , CON , CHA , LUK , MaxHP , MaxMP , MaxSP , PhysicalAttack ,
+    None , STR , DEX , INT , CON , CHA UMETA(Hidden), LUK , MaxHP , MaxMP , MaxSP , PhysicalAttack ,
     MagicAttack , Defense , AttackSpeed , MoveSpeed , CriticalChance , CriticalMultiplier , AutoDodgeChance
 };
 

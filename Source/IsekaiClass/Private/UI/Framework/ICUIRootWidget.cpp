@@ -57,6 +57,12 @@ void UICUIRootWidget::SetHUD(UUserWidget* Widget)
     if (!HUDLayer)
         return;
     HUDLayer->ClearChildren();
+    AddHUDWidget(Widget);
+}
+
+void UICUIRootWidget::AddHUDWidget(UUserWidget* Widget)
+{
+    if(!HUDLayer)return;
     if (Widget)
     {
         auto* PanelSlot = HUDLayer->AddChildToOverlay(Widget);

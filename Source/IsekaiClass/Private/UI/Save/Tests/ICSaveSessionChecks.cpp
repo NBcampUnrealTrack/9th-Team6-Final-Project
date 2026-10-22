@@ -21,11 +21,13 @@ bool FICSaveSessionCheck::RunTest(const FString& Parameters)
     FICWorldState Data;Data.bPlayerCreated=true;Data.PlayerName=TEXT("세션 검증");Data.FirstSkill=TEXT("SKL_TEST");FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Data.Characters.Add(Player.CharacterId,Player);
     TestTrue(TEXT("Isolated state is valid"),State->RestoreState(Data));
     const FString Prefix=TEXT("IC_Test_Session_")+FGuid::NewGuid().ToString(EGuidFormats::Digits);
-    Saves->ConfigureServices(State,Time,Prefix);Saves->bCaptureSaveThumbnail=false;PC->bCreated=true;
+    Saves->ConfigureServices(State,Time,Prefix);PC->bCreated=true;
     PC->OpenSaveMenu();PC->HandleSessionKey(EKeys::Two);TestEqual(TEXT("Save number key selects manual slot"),PC->SelectedSaveSlot,2);
     PC->OpenLoadMenu();PC->HandleSessionKey(EKeys::Four);TestEqual(TEXT("Load number key selects manual slot"),PC->SelectedLoadSlot,4);TestEqual(TEXT("Load selection preserves save selection"),PC->SelectedSaveSlot,2);
     PC->HandleSessionKey(EKeys::Enter);TestEqual(TEXT("Empty load cannot open confirmation"),PC->Menu,FString(TEXT("Load")));
-    TestTrue(TEXT("Isolated slot created"),Saves->SaveSlotSynchronously(1));PC->RefreshSaveSlots();PC->SelectSessionSlot(1);
+    TestTrue(TEXT("Isolated slot created"),Saves->SaveSlotSynchronously(1));
+    TestEqual(TEXT("Save stores a stable region ID"),Saves->GetSlotList()[1].Preview.Location,FString(TEXT("R01")));
+    PC->RefreshSaveSlots();PC->SelectSessionSlot(1);
     PC->HandleSessionKey(EKeys::Enter);TestEqual(TEXT("Enter opens load confirmation"),PC->Menu,FString(TEXT("Confirm")));
     PC->HandleSessionKey(EKeys::Enter,true);TestEqual(TEXT("Held Enter cannot accept confirmation"),PC->Menu,FString(TEXT("Confirm")));
     PC->HandleSessionKey(EKeys::Escape);TestEqual(TEXT("Cancel returns to load list"),PC->Menu,FString(TEXT("Load")));TestTrue(TEXT("Cancel preserves save file"),Saves->GetSlotList()[1].bValid);
@@ -40,11 +42,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICSavePreviewCheck,"IC.UI.SavePreviewClock",EA
 bool FICSavePreviewCheck::RunTest(const FString& Parameters)
 {
     IC_TRACE_FUNCTION();FICSaveSlotInfo Info;Info.SavedAt=FDateTime(2026,10,7,10,30);
-    TestEqual(TEXT("Date uses two-digit year and minute precision"),ICSavePreviewUI::Date(Info).ToString().Len(),14);
-    Info.Clock.GameMinute=0;TestEqual(TEXT("Midnight uses twelve AM"),ICSavePreviewUI::GameTime(Info).ToString(),FString(TEXT("이세계 1일차 오전 12:00")));
-    Info.Clock.GameMinute=480;TestEqual(TEXT("Initial clock is day one eight AM"),ICSavePreviewUI::GameTime(Info).ToString(),FString(TEXT("이세계 1일차 오전 08:00")));
-    Info.Clock.GameMinute=720;TestEqual(TEXT("Noon uses twelve PM"),ICSavePreviewUI::GameTime(Info).ToString(),FString(TEXT("이세계 1일차 오후 12:00")));
-    Info.Clock.GameMinute=1445;TestEqual(TEXT("Days use cumulative game minutes"),ICSavePreviewUI::GameTime(Info).ToString(),FString(TEXT("이세계 2일차 오전 12:05")));
+    TestFalse(TEXT("Saved date formats for the active culture"),ICSavePreviewUI::Date(Info).IsEmpty());
+    Info.Clock.PlaySecond=0;TestEqual(TEXT("Initial play duration"),ICSavePreviewUI::PlayTime(Info).ToString(),FString(TEXT("00:00:00")));
+    Info.Clock.PlaySecond=3661.9;TestEqual(TEXT("Play duration uses cumulative hours minutes seconds"),ICSavePreviewUI::PlayTime(Info).ToString(),FString(TEXT("01:01:01")));
+    Info.Clock.GameMinute=1445;TestEqual(TEXT("Sleeping does not change displayed play duration"),ICSavePreviewUI::PlayTime(Info).ToString(),FString(TEXT("01:01:01")));
+    Info.Preview.Location=TEXT("L_TestMap");TestEqual(TEXT("Temporary location is always region one"),ICSavePreviewUI::Location(Info).ToString(),FString(TEXT("지역 1")));
+    const FString Summary=ICSavePreviewUI::Summary(Info).ToString();
+    TestTrue(TEXT("Slot labels both play time and save time"),Summary.Contains(TEXT("플레이 시간 01:01:01"))&&Summary.Contains(TEXT("저장 시간 ")));
     Info.bUsesBackup=true;TestTrue(TEXT("Backup preview identifies restored clock"),!ICSavePreviewUI::Recovery(Info).IsEmpty());return !HasAnyErrors();
 }
 #if WITH_EDITOR
@@ -147,6 +151,12 @@ bool FICSaveSessionAssetsCheck::RunTest(const FString& Parameters)
         }
     }
     TestEqual(TEXT("Controller references the existing save WBP"),PCBP->GeneratedClass->GetDefaultObject<AICPlayerController>()->SaveLoadWidgetClass.Get(),WidgetBP->GeneratedClass.Get());
+    TestNull(TEXT("Save list screenshot removed"),WidgetBP->WidgetTree->FindWidget(TEXT("IC_SaveLoad_Thumbnail")));
+    TestNull(TEXT("Slot screenshot removed"),SlotBP->WidgetTree->FindWidget(TEXT("IC_SaveSlot_Thumbnail")));
+    TestNull(TEXT("Confirmation screenshot removed"),ModalBP->WidgetTree->FindWidget(TEXT("IC_LoadConfirm_Thumbnail")));
+    for(int32 I=0;I<4;++I)
+        TestNotNull(TEXT("Four portrait placeholders exist"),SlotBP->WidgetTree->FindWidget(FName(*FString::Printf(TEXT("IC_SaveSlot_Party%d_Empty"),I))));
+    TestNull(TEXT("No fourth companion slot"),SlotBP->WidgetTree->FindWidget(TEXT("IC_SaveSlot_Party4")));
     for(const auto& Pair:TArray<TPair<FName,UClass*>>{{TEXT("ConfirmWidgetClass"),ModalBP->GeneratedClass.Get()},{TEXT("SlotWidgetClass"),SlotBP->GeneratedClass.Get()}})
         TestTrue(TEXT("Save UI child widget class binding"),FindFProperty<FClassProperty>(UICSaveLoadWidget::StaticClass(),Pair.Key)->GetPropertyValue_InContainer(WidgetBP->GeneratedClass->GetDefaultObject()).Get()==Pair.Value);
     for(const TCHAR* Name:{TEXT("IC_SaveLoad_Save"),TEXT("IC_SaveLoad_Delete"),TEXT("IC_SaveLoad_Load"),TEXT("IC_SaveLoad_Close")})

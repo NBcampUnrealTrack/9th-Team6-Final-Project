@@ -63,6 +63,7 @@ void UICNPCDialogueWidget::ShowInteractionOptions()
         default: continue;
         }
         const bool IsSupported = Option.Option == EICNPCInteractionOption::Talk
+            || Option.Option == EICNPCInteractionOption::Gift
             || Option.Option == EICNPCInteractionOption::End;
         AddEntry(EntryID, Option.Label, Option.bEnabled && IsSupported);
     }
@@ -283,6 +284,11 @@ void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
 
 void UICNPCDialogueWidget::HandleEntry(FName EntryID)
 {
+    if(EntryID==DialogueGiftEntry)
+    {
+        if(NPC)NPC->TryGiveGift(Cast<AICPlayerController>(GetOwningPlayer()),NAME_None);
+        ShowInteractionOptions();return;
+    }
     if (EntryID == DialogueCloseEntry || EntryID == DialogueOptionsEntry
         || EntryID == DialogueQuestsEntry || EntryID == DialogueBackEntry)
     {

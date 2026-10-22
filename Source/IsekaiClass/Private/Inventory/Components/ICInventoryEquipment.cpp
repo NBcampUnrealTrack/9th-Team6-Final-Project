@@ -1,4 +1,5 @@
 #include "Inventory/Components/ICInventoryComponent.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -46,26 +47,26 @@ bool UICInventoryComponent::EnhanceEquipment(int32 BagIndex,int32& Gold)
 {
     IC_TRACE_FUNCTION();
     UE_LOG(LogICInventory, Verbose, TEXT("[Equipment.Enhance.Request] BagSlot=%d"),BagIndex);
-    if(!WorldState || !WorldState->FlushParticipants())return Fail(TEXT("플레이어 상태를 반영할 수 없습니다."));
+    if(!WorldState || !WorldState->FlushParticipants())return Fail(*ICText::Get(TEXT("Native_48f0aa8f5fa0")).ToString());
     FICWorldState Next=WorldState->ExportState();
     if(!Next.Inventory.Bag.Slots.IsValidIndex(BagIndex))return false;
     auto& Item=Next.Inventory.Bag.Slots[BagIndex];const auto* D=Find(Item.ItemID);
     auto* Service=GetDefinitions();FICDefinitionResult R;
     const auto* Gear=D&&Service?Service->Find<FICEquipmentRow>(D->EquipmentID,R):nullptr;
     const auto* Rules=Gear?Service->Find<FICEnhancementRow>(Gear->EnhancementID,R):nullptr;
-    if(!D || !Gear || !Rules || D->Kind!=EPlayerItemKind::Equipment || Item.bLocked)return Fail(TEXT("강화 정의가 없거나 강화할 수 없는 아이템입니다."));
-    if(Item.Upgrade>=Rules->MaximumLevel)return Fail(TEXT("이미 최대 강화 단계입니다."));
+    if(!D || !Gear || !Rules || D->Kind!=EPlayerItemKind::Equipment || Item.bLocked)return Fail(*ICText::Get(TEXT("Native_d12d9f957dd8")).ToString());
+    if(Item.Upgrade>=Rules->MaximumLevel)return Fail(*ICText::Get(TEXT("Native_c8da42429422")).ToString());
     const auto* Step=Rules->Steps.FindByPredicate([&](const auto& S){ IC_TRACE_FUNCTION();return S.TargetLevel==Item.Upgrade+1;});
     if(!Step || Step->GoldCost<0 || !FMath::IsFinite(Step->SuccessProbability) || Step->SuccessProbability<0 || Step->SuccessProbability>1)
-        return Fail(TEXT("다음 강화 단계의 설정이 올바르지 않습니다."));
-    if(Next.Gold<Step->GoldCost)return Fail(TEXT("강화 비용이 부족합니다."));
+        return Fail(*ICText::Get(TEXT("Native_930a1862fa32")).ToString());
+    if(Next.Gold<Step->GoldCost)return Fail(*ICText::Get(TEXT("Native_da8a3c82decd")).ToString());
     const bool Success=FMath::FRand()<Step->SuccessProbability;
     if(Success)++Item.Upgrade;Next.Gold-=Step->GoldCost;
     if(!ValidateSnapshot(Next.Inventory) || !WorldState->CommitGameplayTransaction(Next,FGuid::NewGuid()))
-        return Fail(TEXT("강화 거래 검증에 실패했습니다. 아이템과 골드는 변경하지 않았습니다."));
+        return Fail(*ICText::Get(TEXT("Native_302208c1b443")).ToString());
     Gold=Next.Gold;
     UE_LOG(LogICInventory, Log, TEXT("[Equipment.Enhanced] Item=%s Instance=%s Success=%d Level=%d GoldCost=%d RemainingGold=%d"),*Item.ItemID.ToString(),*Item.InstanceID.ToString(),Success,Item.Upgrade,Step->GoldCost,Gold);
-    const FString Message=Success?FString::Printf(TEXT("강화 성공: +%d, %d 골드 소모"),Item.Upgrade,Step->GoldCost):FString::Printf(TEXT("강화 실패: +%d 유지, %d 골드 소모"),Item.Upgrade,Step->GoldCost);
+    const FString Message=Success?ICText::Format(TEXT("Native_c643b185d2cc"),Item.Upgrade,Step->GoldCost):ICText::Format(TEXT("Native_02f174a22410"),Item.Upgrade,Step->GoldCost);
     OnMessage.Broadcast(FText::FromString(Message));
     return Success;
 }

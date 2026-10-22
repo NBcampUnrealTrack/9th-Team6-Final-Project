@@ -1,4 +1,5 @@
 #include "UI/Save/ICLoadConfirmWidget.h"
+#include "UI/Framework/ICText.h"
 #include "UI/Management/ICUIManagerSubsystem.h"
 #include "Engine/LocalPlayer.h"
 #include "Debug/ICLog.h"
@@ -8,7 +9,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Blueprint/WidgetTree.h"
-void UICLoadConfirmWidget::Configure(const FICSaveSlotInfo& InInfo, UTexture2D* InThumbnail) { IC_TRACE_FUNCTION(); Info = InInfo; Thumbnail = InThumbnail; }
+void UICLoadConfirmWidget::Configure(const FICSaveSlotInfo& InInfo) { IC_TRACE_FUNCTION(); Info = InInfo; }
 void UICLoadConfirmWidget::ConfigurePrompt(const FText& Text) { IC_TRACE_FUNCTION();Prompt=Text; }
 void UICLoadConfirmWidget::NativeOnInitialized()
 {
@@ -22,13 +23,12 @@ void UICLoadConfirmWidget::NativeConstruct()
 {
     IC_TRACE_FUNCTION();
     Super::NativeConstruct();
-    ICSavePreviewUI::SetImage(IC_LoadConfirm_Thumbnail, Thumbnail);
-    if (IC_LoadConfirm_Summary) {IC_LoadConfirm_Summary->SetAutoWrapText(true);IC_LoadConfirm_Summary->SetText(FText::Format(NSLOCTEXT("ICSaveUI", "SessionPromptSummary", "{0}\n{1} · {2} · {3}\n{4}\n{5}"),Prompt,ICSavePreviewUI::SlotName(Info.Slot),FText::FromString(Info.PlayerName),Info.bValid?ICSavePreviewUI::Date(Info):FText::GetEmpty(),Info.bValid?ICSavePreviewUI::GameTime(Info):FText::GetEmpty(),ICSavePreviewUI::Recovery(Info)));}
+    if (IC_LoadConfirm_Summary) {IC_LoadConfirm_Summary->SetAutoWrapText(true);IC_LoadConfirm_Summary->SetText(FText::Format(ICText::Get(TEXT("Save_ConfirmSummary")),Prompt,Info.bValid?ICSavePreviewUI::Summary(Info):FText::GetEmpty()));}
     WidgetTree->ForEachWidget([this](UWidget* Widget)
     {
         auto* Label=Cast<UTextBlock>(Widget);if(!Label||Label==IC_LoadConfirm_Summary)return;
         for(auto* Parent=Widget->GetParent();Parent;Parent=Parent->GetParent())if(Parent==IC_LoadConfirm_Confirm)
-        {Label->SetText(NSLOCTEXT("ICSaveUI","AcceptSessionPrompt","확인"));break;}
+        {Label->SetText(ICText::Get(TEXT("Native_468266d639b5")));break;}
     });
 }
 FReply UICLoadConfirmWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& KeyEvent)

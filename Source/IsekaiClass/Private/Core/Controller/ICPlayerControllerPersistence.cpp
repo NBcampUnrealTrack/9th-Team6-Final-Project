@@ -1,4 +1,5 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Inventory/Components/ICInventoryComponent.h"
@@ -21,22 +22,22 @@ bool AICPlayerController::ValidateCreationRequest(FString& OutReason) const
     IC_TRACE_FUNCTION();
     OutReason.Empty();
     if (!GetWorldState() || !GetSaves() || !GetTime() || !GetInventory() || !GetPawn())
-        OutReason = TEXT("플레이어 또는 저장 시스템이 준비되지 않았습니다.");
+        OutReason = ICText::Get(TEXT("Native_e0ede76ffc83")).ToString();
     else if (bCreated)
-        OutReason = TEXT("이미 생성된 캐릭터입니다.");
+        OutReason = ICText::Get(TEXT("Native_bcc3507d6632")).ToString();
     else if (GetSaves()->bSaving)
-        OutReason = TEXT("저장 중입니다. 완료될 때까지 기다려 주세요.");
+        OutReason = ICText::Get(TEXT("Native_d3600620c89f")).ToString();
     else if (bItemTransactionInProgress)
-        OutReason = TEXT("아이템 효과 처리 완료 후 다시 시도하세요.");
+        OutReason = ICText::Get(TEXT("Native_64c7fe1ad82c")).ToString();
     else if (Job < 0 || Job > 3 || Preset < 0 || Preset > 1)
-        OutReason = TEXT("성별과 시작 무기를 다시 선택하세요.");
+        OutReason = ICText::Get(TEXT("Native_5507152d3f55")).ToString();
     else
     {
         const FString Clean = PlayerName.TrimStartAndEnd();
         bool bInvalid = Clean.IsEmpty() || Clean.Len() > 12;
         for (TCHAR Ch : PlayerName)
             if (Ch < TEXT(' ') || Ch == 0x2028 || Ch == 0x2029) bInvalid = true;
-        if (bInvalid) OutReason = TEXT("이름은 공백을 제외한 1~12자이며 줄바꿈을 사용할 수 없습니다.");
+        if (bInvalid) OutReason = ICText::Get(TEXT("Native_6ed5f8122e6b")).ToString();
     }
     return OutReason.IsEmpty();
 }
@@ -55,7 +56,7 @@ bool AICPlayerController::DebugCreatePlayer()
 #if !UE_BUILD_SHIPPING
     if (bCreated)
     {
-        ReportCreationFailure(TEXT("이미 생성된 캐릭터입니다."));
+        ReportCreationFailure(*ICText::Get(TEXT("Native_bcc3507d6632")).ToString());
         return false;
     }
     if (PlayerName.TrimStartAndEnd().IsEmpty())
@@ -85,28 +86,28 @@ void AICPlayerController::CreatePlayer()
         const auto* Rules=Inventory->GetDefinitions()?Inventory->GetDefinitions()->Find<FICNewGameRow>(NewGameDefinitionID,Lookup):nullptr;
         if(!Rules || !Rules->StartingWeapons.IsValidIndex(Job) || !Rules->StartingSkills.IsValidIndex(Job)
             || Rules->StartingQuickSlots.Num()!=4 || Rules->InitialGold<0 || !FMath::IsFinite(Rules->InitialGameMinute) || Rules->InitialGameMinute<0)
-        {ReportCreationFailure(TEXT("새 게임 정의가 누락되었거나 초기 지급 설정이 올바르지 않습니다."));return;}
+        {ReportCreationFailure(*ICText::Get(TEXT("Native_441ae20e4d47")).ToString());return;}
 
         auto* Flow=GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
         const auto* Choice=Flow->bPendingNewGame?Flow->FindOption(3,Flow->Answers.Music):nullptr;
         const auto* Story=Flow->bPendingNewGame?Flow->FindOption(2,Flow->Answers.Story):nullptr;
         if(Flow->bPendingNewGame&&(!Flow->Answers.IsComplete()||!Choice||!Story))
-        {ReportCreationFailure(TEXT("질문지 답변이나 보상 데이터가 올바르지 않습니다."));return;}
+        {ReportCreationFailure(*ICText::Get(TEXT("Native_914e4fd91023")).ToString());return;}
         const FName StartingWeapon=Choice?Choice->WeaponItemID:Rules->StartingWeapons[Job];
         const FName StartingSkill=Choice?Choice->SkillID:Rules->StartingSkills[Job];
         if(!Inventory->GetDefinitions()->Find<FICSkillRow>(StartingSkill,Lookup))
-        {ReportCreationFailure(TEXT("시작 기술 정의를 찾을 수 없습니다."));return;}
+        {ReportCreationFailure(*ICText::Get(TEXT("Native_529dd1461bfe")).ToString());return;}
         UICInventoryComponent* Staging = NewObject<UICInventoryComponent>(this);
         Staging->BeginStaging(Inventory->GetDefinitions(),Job);
         if (!Staging->AddItem(StartingWeapon, 1, false) || !Staging->Equip(0))
-        { ReportCreationFailure(TEXT("초기 무기 지급/장착에 실패했습니다. 아이템 정의를 확인하세요.")); return; }
+        { ReportCreationFailure(*ICText::Get(TEXT("Native_1415298995d1")).ToString()); return; }
         for (const auto& Item : Rules->StartingItems)
             if (!Staging->AddItem(Item.ItemID, Item.Count, false))
-            { ReportCreationFailure(FString::Printf(TEXT("초기 아이템 %s 지급에 실패했습니다."), *Item.ItemID.ToString())); return; }
+            { ReportCreationFailure(ICText::Format(TEXT("Native_076d416ae618"), *Item.ItemID.ToString())); return; }
         FICInventoryState Data = Staging->GetSnapshot();
         Data.QuickSlots = Rules->StartingQuickSlots;
         if (!Inventory->ValidateSnapshot(Data))
-        { ReportCreationFailure(TEXT("초기 인벤토리 검증에 실패했습니다.")); return; }
+        { ReportCreationFailure(*ICText::Get(TEXT("Native_b322167a84ef")).ToString()); return; }
 
         FICWorldState Initial;
         Initial.bPlayerCreated = true;
@@ -124,18 +125,18 @@ void AICPlayerController::CreatePlayer()
                 const auto* NPC=Inventory->GetDefinitions()->Find<FICNPCRow>(Choice->NPCID,Result);
                 const auto* Combat=NPC?Inventory->GetDefinitions()->Find<FICRecruitCombatRow>(NPC->RecruitCombatID,Result):nullptr;
                 if(!NPC||!Combat||Combat->UniqueSkillID!=StartingSkill||!State->EnsureCharacter(Choice->NPCID,EICCharacterKind::Recruitable))
-                {ReportCreationFailure(TEXT("시작 NPC와 고유 기술 연결을 확인하세요."));return;}
+                {ReportCreationFailure(*ICText::Get(TEXT("Native_0e2e404d5095")).ToString());return;}
                 auto NPCState=State->GetSnapshot(Choice->NPCID);NPCState.Affinity=FMath::Clamp(NPCState.Affinity+300,0,500);
                 Initial.Characters.Add(Choice->NPCID,NPCState);
             }
             if(Story&&!Story->RecipeID.IsNone())
             {
-                if(!Inventory->GetDefinitions()->Find<FICRecipeRow>(Story->RecipeID,Lookup)){ReportCreationFailure(TEXT("시작 레시피 정의를 찾을 수 없습니다."));return;}
+                if(!Inventory->GetDefinitions()->Find<FICRecipeRow>(Story->RecipeID,Lookup)){ReportCreationFailure(*ICText::Get(TEXT("Native_cd3eb7a6d18a")).ToString());return;}
                 Initial.UnlockedRecipeIDs.Add(Story->RecipeID);
             }
             if(Story&&!Story->CodexID.IsNone())
             {
-                if(!Inventory->GetDefinitions()->Find<FICCodexRow>(Story->CodexID,Lookup)){ReportCreationFailure(TEXT("시작 인물 정보 정의를 찾을 수 없습니다."));return;}
+                if(!Inventory->GetDefinitions()->Find<FICCodexRow>(Story->CodexID,Lookup)){ReportCreationFailure(*ICText::Get(TEXT("Native_77fc3db18545")).ToString());return;}
                 Initial.CodexEntryIDs.Add(Story->CodexID);
             }
         }
@@ -161,22 +162,22 @@ void AICPlayerController::CreatePlayer()
         {
             FString Failure;UICWorldStateSubsystem::ValidateStateWithReason(Initial,Failure);
             if(auto* Avatar=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=Avatar->GetICAbilitySystem())ASC->CanRestore(InitialCharacterState,Failure);
-            ReportCreationFailure(TEXT("캐릭터 초기 상태 검증에 실패했습니다. ")+Failure);return;
+            ReportCreationFailure(*ICText::Get(TEXT("Native_7c1694148ff4")).ToString()+Failure);return;
         }
         bInitialSavePending = true;
         if (!State->RestoreState(Initial))
-        { bInitialSavePending = false; ReportCreationFailure(TEXT("캐릭터 초기 상태 적용에 실패했습니다.")); return; }
+        { bInitialSavePending = false; ReportCreationFailure(*ICText::Get(TEXT("Native_9bc7a2b31165")).ToString()); return; }
         FICClockState InitialClock;InitialClock.GameMinute=Rules->InitialGameMinute;
-        if(!Time->RestoreClock(InitialClock)){ReportCreationFailure(TEXT("초기 시간 설정에 실패했습니다."));return;}
+        if(!Time->RestoreClock(InitialClock)){ReportCreationFailure(*ICText::Get(TEXT("Native_41dccdc5dc71")).ToString());return;}
         Saves->ResetSession();
     }
 
     Saves->SetAutoSaveSuspended(true);
     SyncSaveSafety();
-    Show(TEXT("캐릭터 생성 및 최초 저장 중…"));
+    ShowLocalized(ICText::Get(TEXT("Native_b081bff2bbb6")));
     if (!Saves->SaveSlot(0))
     {
-        ReportCreationFailure(Saves->GetLastMessage() + TEXT(" 게임 시작 버튼으로 저장을 재시도할 수 있습니다."));
+        ReportCreationFailure(ICText::FormatText(TEXT("Save_RetryNewGame"),Saves->GetLastMessageText()).ToString());
         UpdateGamePhase();
     }
 }
@@ -190,10 +191,10 @@ bool AICPlayerController::SavePlayer()
 {
     IC_TRACE_FUNCTION();
     SyncSaveSafety();auto* Saves=GetSaves();
-    if(!Saves||!bCreated||SelectedSaveSlot<1||SelectedSaveSlot>4){Show(TEXT("수동 저장 슬롯 1~4를 선택하세요."));return false;}
+    if(!Saves||!bCreated||SelectedSaveSlot<1||SelectedSaveSlot>4){ShowLocalized(ICText::Get(TEXT("Native_a443b14e9863")));return false;}
     UE_LOG(LogICSave, Verbose, TEXT("[Player.Save.Request] Slot=%d"),SelectedSaveSlot);
     const bool Accepted=Saves->SaveSlot(SelectedSaveSlot);
-    if(!Accepted)Show(Saves->GetLastMessage());
+    if(!Accepted)ShowLocalized(Saves->GetLastMessageText());
     return Accepted;
 }
 bool AICPlayerController::LoadPlayer()
@@ -203,7 +204,7 @@ bool AICPlayerController::LoadPlayer()
     const bool WasPending=bInitialSavePending;bInitialSavePending=false;
     const bool Loaded=Saves->LoadSlot(SelectedLoadSlot);
     if(Loaded)RefreshSaveSlots();else bInitialSavePending=WasPending;
-    Show(Saves->GetLastMessage());return Loaded;
+    ShowLocalized(Saves->GetLastMessageText());return Loaded;
 }
 
 bool AICPlayerController::AutoSavePlayer()
@@ -212,6 +213,6 @@ bool AICPlayerController::AutoSavePlayer()
     SyncSaveSafety();auto* Saves=GetSaves();
     if(!Saves||(!bCreated&&!bInitialSavePending))return false;
     const bool Accepted=Saves->SaveSlot(0);
-    if(!Accepted)Show(Saves->GetLastMessage());
+    if(!Accepted)ShowLocalized(Saves->GetLastMessageText());
     return Accepted;
 }

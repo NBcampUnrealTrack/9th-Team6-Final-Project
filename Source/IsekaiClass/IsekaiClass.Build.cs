@@ -11,6 +11,7 @@ public class IsekaiClass : ModuleRules
             "Core",
             "CoreUObject",
             "Engine",
+            "AnimGraphRuntime",
             "DeveloperSettings",
             "InputCore",
             "EnhancedInput",
@@ -34,6 +35,10 @@ public class IsekaiClass : ModuleRules
         {
             PrivateDependencyModuleNames.Add("UnrealEd");
             PrivateDependencyModuleNames.Add("UMGEditor");
+            PrivateDependencyModuleNames.Add("AssetRegistry");
+            PrivateDependencyModuleNames.Add("AnimationBlueprintLibrary");
+            PrivateDependencyModuleNames.Add("RenderCore");
+            PrivateDependencyModuleNames.Add("RHI");
         }
     }
 }

@@ -149,7 +149,7 @@ bool FICRealDefinitionAssetsCheck::RunTest(const FString& Parameters)
             Schema.Folder+TEXT("/")+Schema.AssetName.ToString()+TEXT(".")+Schema.AssetName.ToString());
         TestTrue(TEXT("Registered table retains row struct"),Table->GetRowStruct()==Schema.RowStruct.Get());
     }
-    TestEqual(TEXT("Definition, quest, and dialogue String Tables registered"),Catalog->StringTables.Num(),3);
+    TestEqual(TEXT("Definition, quest, dialogue and UI String Tables registered"),Catalog->StringTables.Num(),4);
     bool IsQuestTableRegistered = false;
     for(const auto& Reference:Catalog->StringTables)
     {

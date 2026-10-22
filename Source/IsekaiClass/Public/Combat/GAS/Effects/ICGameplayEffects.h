@@ -11,3 +11,5 @@ UCLASS()
 class ISEKAICLASS_API UICSPChangeEffect : public UGameplayEffect { GENERATED_BODY() public: UICSPChangeEffect(); };
 UCLASS()
 class ISEKAICLASS_API UICStatusGameplayEffect : public UGameplayEffect { GENERATED_BODY() public: UICStatusGameplayEffect(); };
+UCLASS()
+class ISEKAICLASS_API UICSkillCooldownEffect : public UGameplayEffect { GENERATED_BODY() public: UICSkillCooldownEffect(); };

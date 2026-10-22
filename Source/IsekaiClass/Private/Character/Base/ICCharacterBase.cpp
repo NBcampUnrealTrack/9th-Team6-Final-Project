@@ -4,7 +4,81 @@
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "Debug/ICLog.h"
-AICCharacterBase::AICCharacterBase() { IC_TRACE_FUNCTION(); PrimaryActorTick.bCanEverTick = true; }
+#include "Character/Animation/ICCharacterAnimationProfile.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Combat/Actors/ICWeaponActor.h"
+#include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "Inventory/Components/ICInventoryComponent.h"
+#include "Animation/AnimMontage.h"
+void AICCharacterBase::UpdatePresentationTransform(float GroundOffsetCm, const FTransform* BedAnchor)
+{
+    auto* CharacterMesh=GetMesh();auto* Profile=GetAnimationProfile();
+    if(!CharacterMesh||!Profile||!CharacterMesh->GetSkeletalMeshAsset())return;
+    if(PresentationMesh.Get()!=CharacterMesh->GetSkeletalMeshAsset())
+    {PresentationMesh=CharacterMesh->GetSkeletalMeshAsset();StandingMeshTransform=CharacterMesh->GetRelativeTransform();bSleepPresentation=false;}
+    const bool Sleeping=BedAnchor!=nullptr;
+    if(Sleeping)CharacterMesh->SetWorldTransform(Profile->SleepMeshTransform * *BedAnchor, false, nullptr, ETeleportType::TeleportPhysics);
+    else
+    {
+        auto Transform=StandingMeshTransform;Transform.AddToTranslation(FVector(0,0,GroundOffsetCm));
+        CharacterMesh->SetRelativeTransform(Transform,false,nullptr,ETeleportType::TeleportPhysics);
+    }
+    if(Sleeping!=bSleepPresentation)
+    {
+        // A large bed/standing pose change must not leave spring bones carrying the previous pose's inertia.
+        CharacterMesh->ResetAnimInstanceDynamics(ETeleportType::ResetPhysics);
+        if(EquippedWeaponActor)EquippedWeaponActor->SetActorHiddenInGame(Sleeping);
+        bSleepPresentation=Sleeping;
+    }
+    if(EquippedWeaponActor&&EquippedWeaponActor->IsHidden()!=Sleeping)EquippedWeaponActor->SetActorHiddenInGame(Sleeping);
+}
+AICCharacterBase::AICCharacterBase()
+{
+    IC_TRACE_FUNCTION(); PrimaryActorTick.bCanEverTick = true;
+}
+void AICCharacterBase::RefreshWeaponAppearance()
+{
+    if (!AbilitySystem || !GetGameInstance() || !GetMesh()->GetSkeletalMeshAsset()) return;
+    auto* D = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
+    const auto State = AbilitySystem->Capture();
+    const auto* Inventory = FindComponentByClass<UICInventoryComponent>();
+    const auto Items = Inventory ? Inventory->GetSnapshot().Equipment : State.Equipment;
+    const FName ItemID = Items.IsValidIndex(0) ? Items[0].ItemID : NAME_None;
+    if (ItemID == VisualEquipmentID) return;
+    VisualEquipmentID = ItemID;
+    FICDefinitionResult Result;
+    const auto* Item = D ? D->Find<FICItemRow>(ItemID, Result) : nullptr;
+    const auto* Gear = Item ? D->Find<FICEquipmentRow>(Item->EquipmentID, Result) : nullptr;
+    if (EquippedWeaponActor) { EquippedWeaponActor->Destroy(); EquippedWeaponActor = nullptr; }
+    if (Gear)
+    {
+        UClass* Type = Gear->WeaponActorClass.IsNull() ? AICWeaponActor::StaticClass() : Gear->WeaponActorClass.LoadSynchronous();
+        if (!Type) return;
+        FActorSpawnParameters Params; Params.Owner = this; Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        EquippedWeaponActor = GetWorld()->SpawnActor<AICWeaponActor>(Type, GetActorTransform(), Params);
+        if (!EquippedWeaponActor) return;
+        EquippedWeaponActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Gear->AttachSocket);
+        EquippedWeaponActor->SetActorRelativeTransform(Gear->AttachmentTransform);
+        EquippedWeaponActor->Configure(*Gear);
+        EquippedWeaponActor->SetActorHiddenInGame(bSleepPresentation);
+    }
+}
+UICCharacterAnimationProfile* AICCharacterBase::GetAnimationProfile()
+{
+    if(!LoadedAnimationProfile || LoadedAnimationProfile->GetPathName()!=AnimationProfile.ToSoftObjectPath().ToString())
+        LoadedAnimationProfile=AnimationProfile.LoadSynchronous();
+    return LoadedAnimationProfile;
+}
+UAnimMontage* AICCharacterBase::ResolveActionMontage(FName Action)
+{
+    const auto* Profile = GetAnimationProfile();
+    const auto* Set = Profile ? Profile->FindSet(AbilitySystem ? AbilitySystem->GetEquippedWeaponFamily() : Profile->DefaultFamily) : nullptr;
+    if (!Set) return nullptr;
+    if (Action == TEXT("Attack")) return Set->Attack;
+    if (Action == TEXT("Skill")) return Set->Skill;
+    if (Action == TEXT("Dodge")) return Set->Dodge;
+    return nullptr;
+}
 UICWorldStateSubsystem* AICCharacterBase::WorldState() const { IC_TRACE_FUNCTION(); return GetGameInstance() ? GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>() : nullptr; }
 UAbilitySystemComponent* AICCharacterBase::GetAbilitySystemComponent() const { IC_TRACE_FUNCTION(); return AbilitySystem; }
 UICAbilitySystemComponent* AICCharacterBase::GetICAbilitySystem() const { IC_TRACE_FUNCTION(); return AbilitySystem; }
@@ -35,6 +109,7 @@ bool AICCharacterBase::InitializeState(FName ID)
     CharacterID = ID; bRegisteredState = Snapshot.Kind != EICCharacterKind::Player;
     State->OnCharacterChanged.AddUniqueDynamic(this, &ThisClass::StoredCharacterChanged);
     if (AbilitySystem) AbilitySystem->Restore(Snapshot);
+    RefreshWeaponAppearance();
     bZeroHPHandled = Snapshot.IsDowned();
     UE_LOG(LogICCore, Log, TEXT("[Character.Ready] Actor=%s ID=%s GAS=%d"), *GetName(), *ID.ToString(), AbilitySystem != nullptr);
     return true;
@@ -64,7 +139,7 @@ void AICCharacterBase::RestoreFromWorldState_Implementation(const FICWorldState&
 void AICCharacterBase::StoredCharacterChanged(FName ID)
 {
     IC_TRACE_FUNCTION(); if (ID != CharacterID || !AbilitySystem || !WorldState()) return;
-    if (const auto* State = WorldState()->GetStoredCharacter(ID)) {AbilitySystem->Restore(*State);bZeroHPHandled=State->IsDowned();}
+    if (const auto* State = WorldState()->GetStoredCharacter(ID)) {AbilitySystem->Restore(*State);bZeroHPHandled=State->IsDowned();RefreshWeaponAppearance();}
 }
 void AICCharacterBase::HandleZeroHP()
 {
@@ -75,6 +150,7 @@ void AICCharacterBase::OnDefeated_Implementation() { IC_TRACE_FUNCTION(); }
 bool AICCharacterBase::IsHostileTo(const AICCharacterBase* Other) const { IC_TRACE_FUNCTION(); return Other && Other != this && GetClass()->IsChildOf(AICCharacterBase::StaticClass()) && (ActorHasTag(TEXT("IC.Enemy")) != Other->ActorHasTag(TEXT("IC.Enemy"))); }
 void AICCharacterBase::EndPlay(const EEndPlayReason::Type Reason)
 {
+    if (EquippedWeaponActor) EquippedWeaponActor->Destroy();
     IC_TRACE_FUNCTION();
     if (bRegisteredState && WorldState())
     { FlushToWorldState_Implementation(WorldState()); WorldState()->UnregisterStateParticipant(CharacterID, this); WorldState()->OnCharacterChanged.RemoveDynamic(this, &ThisClass::StoredCharacterChanged); }

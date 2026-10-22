@@ -17,5 +17,8 @@ protected:
 private:
     UPROPERTY(Transient) TObjectPtr<UButton> StartButton;
     UFUNCTION() void Start();
+    UFUNCTION() void Continue();
+    UFUNCTION() void SaveList();
+    UFUNCTION() void Settings();
     UFUNCTION() void Quit();
 };
