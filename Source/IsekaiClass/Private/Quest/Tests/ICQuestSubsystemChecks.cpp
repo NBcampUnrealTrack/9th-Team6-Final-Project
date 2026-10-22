@@ -96,6 +96,29 @@ struct FICQuestFixture
     }
 };
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestStorageCheck, "IC.Runtime.QuestPossessionExcludesStorage",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FICQuestStorageCheck::RunTest(const FString& Parameters)
+{
+    FICQuestFixture Fixture;
+    FICQuestObjectiveDefinition Objective;Objective.Type=EICQuestObjectiveType::PossessItem;
+    Objective.RequiredCount=10;
+    Objective.Target.Type=EICDefinitionType::Item;Objective.Target.ID=TEXT("ITM_FOOD_998");
+    auto World=Fixture.State->ExportState();
+    FPlayerItemInstance Item;Item.InstanceID=FGuid::NewGuid();Item.ItemID=Objective.Target.ID;Item.Count=5;
+    World.Inventory.Storage.FindOrAdd(TEXT("PlayerHome")).Slots.Add(Item);
+    int32 Count=-1;FICQuestState Quest;
+    TestTrue(TEXT("Progress resolves"),Fixture.Quests->GetObjectiveProgress(Objective,Quest,World,Count));
+    TestEqual(TEXT("Stored items do not count"),Count,0);
+    World.Inventory.Bag.Slots[0]=Item;
+    Fixture.Quests->GetObjectiveProgress(Objective,Quest,World,Count);
+    TestEqual(TEXT("Withdrawal counts carried items only"),Count,5);
+    World.Inventory.Bag.Slots[0]=FPlayerItemInstance();
+    Fixture.Quests->GetObjectiveProgress(Objective,Quest,World,Count);
+    TestEqual(TEXT("Deposit removes possession progress"),Count,0);
+    return !HasAnyErrors();
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestRuntimeCheck, "IC.Runtime.QuestLifecycle",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 

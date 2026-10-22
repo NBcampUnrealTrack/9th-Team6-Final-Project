@@ -1,4 +1,5 @@
 #include "NPC/Character/ICNPCBase.h"
+#include "UI/Framework/ICText.h"
 #include "AI/ICAIController.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -13,6 +14,8 @@
 #include "TimerManager.h"
 #include "Debug/ICLog.h"
 #include "Core/Controller/ICPlayerController.h"
+#include "Inventory/Components/ICInventoryComponent.h"
+#include "Data/Rows/NPC/ICGiftPreferenceRow.h"
 AICNPCBase::AICNPCBase()
 {
     IC_TRACE_FUNCTION();
@@ -29,6 +32,7 @@ AICNPCBase::AICNPCBase()
 void AICNPCBase::BeginPlay() { IC_TRACE_FUNCTION();Super::BeginPlay();if(!bInitialized&&!NPCDefinitionID.IsNone())InitializeNPC(NPCDefinitionID); }
 bool AICNPCBase::InitializeNPC(FName ID)
 {
+    if (bInitialized) return NPCDefinitionID == ID;
     IC_TRACE_FUNCTION();auto* D=GetGameInstance()?GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;FICDefinitionResult R;
     const auto* NPC=D?D->Find<FICNPCRow>(ID,R):nullptr;if(!NPC||!WorldState())return false;
     const auto Kind=static_cast<EICCharacterKind>(static_cast<int32>(NPC->Type)+1);
@@ -47,8 +51,10 @@ bool AICNPCBase::InitializeNPC(FName ID)
     }
     Definition=*NPC;NPCDefinitionID=ID;GetCharacterMovement()->MaxWalkSpeed=ScheduleMoveSpeed;if(Kind==EICCharacterKind::Recruitable)EnableCombat(true,false);
     if(!InitializeState(ID))return false;
-    if(auto* CharacterMesh=Definition.Mesh.LoadSynchronous())GetMesh()->SetSkeletalMesh(CharacterMesh);
+    AnimationProfile = Definition.AnimationProfile;
+    if(auto* CharacterMesh=Definition.Mesh.LoadSynchronous()){GetMesh()->SetSkeletalMesh(CharacterMesh);GetMesh()->SetRelativeTransform(Definition.MeshTransform);}
     if(auto* Anim=Definition.AnimationClass.LoadSynchronous())GetMesh()->SetAnimInstanceClass(Anim);
+    RefreshWeaponAppearance();
     bInitialized=true;RefreshExecution();return true;
 }
 void AICNPCBase::RefreshExecution()
@@ -111,19 +117,43 @@ void AICNPCBase::EndInteraction()
     }
     UE_LOG(LogICInteraction,Log,TEXT("[NPC.InteractEnd] NPC=%s"),*CharacterID.ToString());
 }
+bool AICNPCBase::TryGiveGift(AICPlayerController* Requester, FName ItemID)
+{
+    if (!Requester || !WorldState() || !Requester->GetPawn()
+        || FVector::DistSquared(Requester->GetPawn()->GetActorLocation(),GetActorLocation())>FMath::Square(350.f)) return false;
+    auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult Result;
+    const auto* Preference=D->Find<FICGiftPreferenceRow>(Definition.GiftPreferenceID,Result);
+    if (!Preference) return false;
+    if (ItemID.IsNone()) for(const auto& Entry:Preference->Items) if(Entry.Preference==EICGiftPreference::Preferred){ItemID=Entry.ItemID;break;}
+    const auto* Item=D->Find<FICItemRow>(ItemID,Result);
+    if(!Item || !Item->bCanGift || !WorldState()->FlushParticipants())return false;
+    auto Next=WorldState()->ExportState();auto* NPC=Next.Characters.Find(CharacterID);
+    if(!NPC || NPC->Mode!=EICCharacterMode::Scheduled || NPC->IsDowned() || NPC->Affinity>=500)return false;
+    const auto* Entry=Preference->Items.FindByPredicate([ItemID](const auto& E){return E.ItemID==ItemID;});
+    const int32 Delta=Entry&&Entry->Preference==EICGiftPreference::Preferred?Preference->PreferredAffinityDelta:0;
+    if(Delta<=0)return false;
+    auto* Slot=Next.Inventory.Bag.Slots.FindByPredicate([ItemID](const auto& S){return S.ItemID==ItemID&&!S.IsEmpty()&&!S.bLocked;});
+    if(!Slot){Requester->Show(*ICText::Get(TEXT("Native_1b92f3386b82")).ToString());return false;}
+    if(--Slot->Count==0)*Slot=FPlayerItemInstance();
+    NPC->Affinity=FMath::Clamp(NPC->Affinity+Delta,0,500);
+    if(NPC->Affinity>=100)if(const auto* Combat=D->Find<FICRecruitCombatRow>(Definition.RecruitCombatID,Result))
+        if(auto* Player=Next.Characters.Find(UICWorldStateSubsystem::PlayerId()))Player->UnlockedSkillIDs.Add(Combat->UniqueSkillID);
+    if(!WorldState()->CommitGameplayTransaction(Next,FGuid::NewGuid()))return false;
+    Requester->ShowLocalized(ICText::FormatText(TEXT("Native_70097e9476da"),Delta));return true;
+}
 FText AICNPCBase::GetInteractionText() const
 {
     IC_TRACE_FUNCTION();
-    return FText::FromString(TEXT("F: 대화하기"));
+    return ICText::Get(TEXT("NPC_TalkHint"));
 }
 TArray<FICNPCInteractionOption> AICNPCBase::GetInteractionOptions() const
 {
     IC_TRACE_FUNCTION();
     TArray<FICNPCInteractionOption> Options;
-    auto Add=[&Options](EICNPCInteractionOption Kind,const TCHAR* Label,FName ServiceID,bool bEnabled)
-    { FICNPCInteractionOption Option;Option.Option=Kind;Option.Label=FText::FromString(Label);Option.ServiceID=ServiceID;Option.bEnabled=bEnabled;Options.Add(Option); };
-    Add(EICNPCInteractionOption::Talk,TEXT("대화하기"),NAME_None,true);
-    Add(EICNPCInteractionOption::Gift,TEXT("선물하기"),NAME_None,true);
+    auto Add=[&Options](EICNPCInteractionOption Kind,const FText& Label,FName ServiceID,bool bEnabled)
+    { FICNPCInteractionOption Option;Option.Option=Kind;Option.Label=Label;Option.ServiceID=ServiceID;Option.bEnabled=bEnabled;Options.Add(Option); };
+    Add(EICNPCInteractionOption::Talk,ICText::Get(TEXT("NPC_Talk")),NAME_None,true);
+    Add(EICNPCInteractionOption::Gift,ICText::Get(TEXT("NPC_Gift")),NAME_None,true);
 
     auto* D=GetGameInstance()?GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;
     if(D)
@@ -132,9 +162,9 @@ TArray<FICNPCInteractionOption> AICNPCBase::GetInteractionOptions() const
         for(const FName ID:Definition.ServiceIDs)
         {
             const auto* Service=D->Find<FICServiceRow>(ID,R);
-            if(Service&&Service->Type==EICServiceType::Shop){Add(EICNPCInteractionOption::Trade,TEXT("거래하기"),ID,Working.Contains(ID));break;}
+            if(Service&&Service->Type==EICServiceType::Shop){Add(EICNPCInteractionOption::Trade,ICText::Get(TEXT("NPC_Trade")),ID,Working.Contains(ID));break;}
         }
     }
-    Add(EICNPCInteractionOption::End,TEXT("대화 끝내기"),NAME_None,true);
+    Add(EICNPCInteractionOption::End,ICText::Get(TEXT("NPC_EndTalk")),NAME_None,true);
     return Options;
 }

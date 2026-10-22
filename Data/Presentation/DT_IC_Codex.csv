@@ -1,1 +1,2 @@
-﻿---,Category,Subject,Registration,DisplayOrder,Image,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+---,Category,Subject,Registration,DisplayOrder,Image,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+CDX_NPC_R01_008,NPC,"(Type=NPC,ID=""NPC_R01_008"")",FirstNPCConversation,8,None,CDX_NPC_R01_008,CDX_NPC_R01_008.NAME,CDX_NPC_R01_008.DESCRIPTION,(GameplayTags=),1,False,False

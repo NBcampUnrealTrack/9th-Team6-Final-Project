@@ -4,6 +4,8 @@
 #include "Data/Rows/Combat/ICCombatTypes.h"
 #include "ICSkillRows.generated.h"
 
+class UGameplayAbility;
+class UGameplayEffect;
 
 USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICSkillRow : public FICDefinitionRow
@@ -32,6 +34,9 @@ struct ISEKAICLASS_API FICSkillRow : public FICDefinitionRow
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill", meta=(ClampMin="0")) double RecoveryPlaySeconds = 0.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill", meta=(ClampMin="0")) double CooldownPlaySeconds = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GAS") TSoftClassPtr<UGameplayAbility> AbilityClass;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GAS") TSoftClassPtr<UGameplayEffect> CooldownEffectClass;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GAS") FGameplayTag CooldownTag;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill", meta=(ClampMin="0")) double BeforeFirstEffectRetryPlaySeconds = 1.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill") FICSkillCancelRules CancelRules;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill") TArray<FICSkillHitDefinition> Hits;

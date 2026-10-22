@@ -1,4 +1,5 @@
 #include "UI/Quest/ICQuestDisplay.h"
+#include "UI/Framework/ICText.h"
 
 #include "Quest/ICQuestSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -24,6 +25,6 @@ FText FICQuestDisplay::FormatObjective(const FText& Description, const FICQuestO
         return Description;
     }
 
-    return FText::Format(NSLOCTEXT("ICQuest", "ObjectiveProgress", "{0} ({1}/{2})"),
+    return FText::Format(ICText::Get(TEXT("Native_516e57ce9608")),
         Description, FText::AsNumber(CurrentCount), FText::AsNumber(Objective.RequiredCount));
 }

@@ -14,9 +14,12 @@ AICProjectile::AICProjectile()
     Collision->SetCollisionProfileName(TEXT("BlockAllDynamic"));Collision->SetNotifyRigidBodyCollision(true);Collision->OnComponentHit.AddDynamic(this,&ThisClass::Hit);
     Movement=CreateDefaultSubobject<UICProjectileMovementComponent>(TEXT("ProjectileMovement"));Movement->ProjectileGravityScale=0;Movement->bRotationFollowsVelocity=true;
 }
-void AICProjectile::InitializeShot(UICAbilitySystemComponent* InSource,const FICSkillEffectRow& InEffect,const FICSkillHitDefinition& Rule,const FICAttackCapture& InCapture,FVector Direction)
+void AICProjectile::InitializeShot(UICAbilitySystemComponent* InSource,const FICSkillEffectRow& InEffect,const FICSkillHitDefinition& Rule,const FICAttackCapture& InCapture,FVector Direction,const FICCombatPresentation& InPresentation)
 {
-    IC_TRACE_FUNCTION();Source=InSource;Effect=InEffect;Captured=InCapture;bPierce=Rule.bPierceTargets;bStopAtWorld=Rule.bStopAtWorldCollision;
+    IC_TRACE_FUNCTION();Source=InSource;Effect=InEffect;Captured=InCapture;Presentation=InPresentation;
+    if (!Effect.Presentation.ImpactVFX.IsNull()) Presentation.ImpactVFX=Effect.Presentation.ImpactVFX;
+    if (!Effect.Presentation.ImpactSound.IsNull()) Presentation.ImpactSound=Effect.Presentation.ImpactSound;
+    bPierce=Rule.bPierceTargets;bStopAtWorld=Rule.bStopAtWorldCollision;
     RemainingTargets=FMath::Max(1,Rule.MaximumTargets);bEnemySource=InSource&&InSource->GetAvatarActor()&&InSource->GetAvatarActor()->ActorHasTag(TEXT("IC.Enemy"));
     if(InSource&&InSource->GetAvatarActor())Collision->IgnoreActorWhenMoving(InSource->GetAvatarActor(),true);
     for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)if(It->ActorHasTag(TEXT("IC.Enemy"))==bEnemySource)Collision->IgnoreActorWhenMoving(*It,true);
@@ -35,7 +38,7 @@ void AICProjectile::Hit(UPrimitiveComponent* Component,AActor* Other,UPrimitiveC
     if(Character&&Character->ActorHasTag(TEXT("IC.Enemy"))!=bEnemySource&&Character->GetICAbilitySystem())
     {
         HitActors.Add(Other);auto* Target=Character->GetICAbilitySystem();
-        if(Source.IsValid())Source->ExecuteEffect(Effect,Target,&Captured);
+        if(Source.IsValid()) {if(Source->ExecuteEffect(Effect,Target,&Captured))Source->PlayCombatCue(true,Presentation,Character,Result.ImpactPoint);}
         else if(Effect.Kind==EICSkillEffectKind::Damage)Target->ApplyDamage(Captured,nullptr,Effect.bCanCritical,Effect.bCanBeGuarded,Effect.bCanBeAutoDodged,Effect.bCancelsCastingOnEffectiveHit);
         if(!bPierce||--RemainingTargets<=0)Destroy();else {Collision->IgnoreActorWhenMoving(Other,true);Movement->Activate();}
     }

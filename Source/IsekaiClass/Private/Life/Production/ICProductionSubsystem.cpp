@@ -1,4 +1,5 @@
 #include "Life/Production/ICProductionSubsystem.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Data/Rows/World/ICAnchorRow.h"
@@ -33,48 +34,48 @@ bool UICProductionSubsystem::StartRecipe(FName RecipeID,FName WorkAnchorID,UICIn
     IC_TRACE_FUNCTION();
     JobID.Invalidate();Reason.Reset();
     auto Fail=[&](const TCHAR* Text){ IC_TRACE_FUNCTION();Reason=Text;UE_LOG(LogICProduction, Verbose, TEXT("[Production.Start.Rejected] Recipe=%s Anchor=%s Reason=%s"),*RecipeID.ToString(),*WorkAnchorID.ToString(),Text);return false;};FICDefinitionResult R;
-    if(!Definitions||!State||!Clock||!Inventory)return Fail(TEXT("생산 시스템이 준비되지 않았습니다."));
+    if(!Definitions||!State||!Clock||!Inventory)return Fail(*ICText::Get(TEXT("Native_1e038cacd7e3")).ToString());
     const auto* Recipe=Definitions->Find<FICRecipeRow>(RecipeID,R);
     const auto* Production=Recipe?Definitions->Find<FICProductionRow>(Recipe->ProductionID,R):nullptr;
     const auto* Anchor=Definitions->Find<FICAnchorRow>(WorkAnchorID,R);
-    if(!Recipe||!Production||!Anchor)return Fail(TEXT("레시피·생산·작업 앵커 정의가 누락되었습니다."));
+    if(!Recipe||!Production||!Anchor)return Fail(*ICText::Get(TEXT("Native_da3541bc00b0")).ToString());
     if(Recipe->ResultKind!=EICProductionResultKind::BagItems || Production->ResultKind!=EICProductionResultKind::BagItems)
-        return Fail(TEXT("이 작업은 설치·채집 등 전용 생산 경로가 필요합니다."));
+        return Fail(*ICText::Get(TEXT("Native_ed13b90bdcba")).ToString());
     if(!Recipe->UnlockConditions.IsEmpty()||!Production->StartConditions.IsEmpty())
-        return Fail(TEXT("생산 조건 판정기가 연결되지 않았습니다. 변경하지 않았습니다."));
-    if(!Production->WorkAnchorIDs.IsEmpty()&&!Production->WorkAnchorIDs.Contains(WorkAnchorID))return Fail(TEXT("이 작업대에서 수행할 수 없는 생산입니다."));
+        return Fail(*ICText::Get(TEXT("Native_adde31bc12cb")).ToString());
+    if(!Production->WorkAnchorIDs.IsEmpty()&&!Production->WorkAnchorIDs.Contains(WorkAnchorID))return Fail(*ICText::Get(TEXT("Native_fb46dc569135")).ToString());
     if(Production->DurationPlaySeconds!=Recipe->WorkDurationPlaySeconds || Production->SPCost!=Recipe->SPCost)
-        return Fail(TEXT("레시피와 생산 정의의 시간·비용이 일치하지 않습니다."));
+        return Fail(*ICText::Get(TEXT("Native_73708968b76d")).ToString());
     if(!FMath::IsFinite(Recipe->WorkDurationPlaySeconds)||Recipe->WorkDurationPlaySeconds<0||!FMath::IsFinite(Recipe->SPCost)||Recipe->SPCost<0)
-        return Fail(TEXT("제작 시간·SP 비용 설정이 올바르지 않습니다."));
-    if(!State->FlushParticipants())return Fail(TEXT("현재 상태를 반영할 수 없습니다."));
+        return Fail(*ICText::Get(TEXT("Native_8420321993ee")).ToString());
+    if(!State->FlushParticipants())return Fail(*ICText::Get(TEXT("Native_ed7cb0d52fdb")).ToString());
     FICWorldState Next=State->ExportState();
-    if(!Next.bPlayerCreated)return Fail(TEXT("플레이어가 생성되지 않았습니다."));
-    if(!Recipe->bUnlockedByDefault&&!Next.UnlockedRecipeIDs.Contains(RecipeID))return Fail(TEXT("아직 해금되지 않은 레시피입니다."));
+    if(!Next.bPlayerCreated)return Fail(*ICText::Get(TEXT("Native_44dad2d7eb9d")).ToString());
+    if(!Recipe->bUnlockedByDefault&&!Next.UnlockedRecipeIDs.Contains(RecipeID))return Fail(*ICText::Get(TEXT("Native_3186c7959639")).ToString());
     for(const auto& Pair:Next.ProductionJobs)
         if(Pair.Value.OwnerCharacterID==UICWorldStateSubsystem::PlayerId()&&(Pair.Value.Status==EICProductionJobStatus::Running||Pair.Value.Status==EICProductionJobStatus::Ready))
-            return Fail(TEXT("진행 중인 작업을 완료하거나 취소하세요."));
+            return Fail(*ICText::Get(TEXT("Native_c6ffb67d4c4b")).ToString());
     auto* Player=Next.Characters.Find(UICWorldStateSubsystem::PlayerId());
-    if(!Player||Player->HP<=0||Player->IsDowned()||Player->SP<Recipe->SPCost)return Fail(TEXT("제작할 수 없는 상태이거나 SP가 부족합니다."));
+    if(!Player||Player->HP<=0||Player->IsDowned()||Player->SP<Recipe->SPCost)return Fail(*ICText::Get(TEXT("Native_f17087bb7433")).ToString());
     for(const auto& Tool:Recipe->Tools)if(!Definitions->Find<FICItemRow>(Tool.ItemID,R)||Tool.Count<=0||Inventory->CountItem(Tool.ItemID)<Tool.Count)
-        return Fail(TEXT("필수 도구가 없거나 도구 정의가 누락되었습니다."));
+        return Fail(*ICText::Get(TEXT("Native_b6a433a1e2f6")).ToString());
     for(const auto& Tool:Production->Tools)if(!Definitions->Find<FICItemRow>(Tool.ItemID,R)||Tool.Count<=0||Inventory->CountItem(Tool.ItemID)<Tool.Count)
-        return Fail(TEXT("필수 생산 도구가 없습니다."));
+        return Fail(*ICText::Get(TEXT("Native_7cfdcdab4ecb")).ToString());
 
-    if(Recipe->Ingredients.IsEmpty()||Recipe->Results.IsEmpty())return Fail(TEXT("재료·결과 정의가 비어 있습니다."));
+    if(Recipe->Ingredients.IsEmpty()||Recipe->Results.IsEmpty())return Fail(*ICText::Get(TEXT("Native_adb58b3f2cfa")).ToString());
     TMap<FName,int64> Costs;
     for(const auto& Cost:Recipe->Ingredients)
     {
-        if(Cost.Count<=0||!Definitions->Find<FICItemRow>(Cost.ItemID,R))return Fail(TEXT("재료 정의 또는 수량이 올바르지 않습니다."));
-        Costs.FindOrAdd(Cost.ItemID)+=Cost.Count;if(Costs[Cost.ItemID]>MAX_int32)return Fail(TEXT("재료 수량이 범위를 초과했습니다."));
+        if(Cost.Count<=0||!Definitions->Find<FICItemRow>(Cost.ItemID,R))return Fail(*ICText::Get(TEXT("Native_4c18c41902f5")).ToString());
+        Costs.FindOrAdd(Cost.ItemID)+=Cost.Count;if(Costs[Cost.ItemID]>MAX_int32)return Fail(*ICText::Get(TEXT("Native_be3592e134a1")).ToString());
     }
     FICInventoryState Preview=Next.Inventory;
-    for(const auto& Cost:Costs)if(!Inventory->Remove(Preview.Bag,Cost.Key,Cost.Value))return Fail(TEXT("재료가 부족하거나 잠겨 있습니다."));
+    for(const auto& Cost:Costs)if(!Inventory->Remove(Preview.Bag,Cost.Key,Cost.Value))return Fail(*ICText::Get(TEXT("Native_1a362c4b1158")).ToString());
     for(const auto& Result:Recipe->Results)
     {
         const auto* Item=Definitions->Find<FICItemRow>(Result.ItemID,R);
         if(!Item||Item->Kind==EPlayerItemKind::Quest||Result.Count<=0||Inventory->Insert(Preview.Bag,Result.ItemID,Result.Count)!=Result.Count)
-            return Fail(TEXT("결과 정의가 누락되었거나 결과물을 보관할 공간이 없습니다."));
+            return Fail(*ICText::Get(TEXT("Native_d290b2e0fe80")).ToString());
     }
     FICProductionJobState Job;Job.JobID=FGuid::NewGuid();Job.OwnerCharacterID=Player->CharacterId;
     Job.RecipeID=RecipeID;Job.ProductionID=Recipe->ProductionID;Job.WorkAnchorID=WorkAnchorID;
@@ -89,31 +90,31 @@ bool UICProductionSubsystem::StartRecipe(FName RecipeID,FName WorkAnchorID,UICIn
             FICMaterialReservationState Reservation;Reservation.ItemInstanceID=Item.InstanceID;Reservation.ItemID=Item.ItemID;
             Reservation.Count=FMath::Min(Remaining,Item.Count);Job.Materials.Add(Reservation);Remaining-=Reservation.Count;
         }
-        if(Remaining)return Fail(TEXT("재료 예약 재검사에 실패했습니다."));
+        if(Remaining)return Fail(*ICText::Get(TEXT("Native_7be88f327b17")).ToString());
     }
     Next.ProductionJobs.Add(Job.JobID,Job);
-    if(!Inventory->ValidateSnapshot(Next.Inventory)||!State->CommitGameplayTransaction(Next,Job.JobID))return Fail(TEXT("생산 시작 검증에 실패했습니다. 변경하지 않았습니다."));
-    RuntimeInventory=Inventory;JobID=Job.JobID;UE_LOG(LogICProduction, Log, TEXT("[Production.Started] Job=%s Recipe=%s Anchor=%s CompleteAt=%.2f SPCost=%.2f"),*JobID.ToString(),*RecipeID.ToString(),*WorkAnchorID.ToString(),Job.CompletesAtPlaySecond,Job.ReservedSP);OnProductionChanged.Broadcast(JobID,TEXT("제작 시작"));return true;
+    if(!Inventory->ValidateSnapshot(Next.Inventory)||!State->CommitGameplayTransaction(Next,Job.JobID))return Fail(*ICText::Get(TEXT("Native_a03ef09e44cf")).ToString());
+    RuntimeInventory=Inventory;JobID=Job.JobID;UE_LOG(LogICProduction, Log, TEXT("[Production.Started] Job=%s Recipe=%s Anchor=%s CompleteAt=%.2f SPCost=%.2f"),*JobID.ToString(),*RecipeID.ToString(),*WorkAnchorID.ToString(),Job.CompletesAtPlaySecond,Job.ReservedSP);OnProductionChanged.Broadcast(JobID,ICText::Get(TEXT("Production_Started")).ToString());return true;
 }
 
 bool UICProductionSubsystem::CompleteJob(FGuid JobID,UICInventoryComponent* Inventory,FString& Reason)
 {
     IC_TRACE_FUNCTION();
     Reason.Reset();auto Fail=[&](const TCHAR* Text){ IC_TRACE_FUNCTION();Reason=Text;UE_LOG(LogICProduction, Verbose, TEXT("[Production.Complete.Rejected] Job=%s Reason=%s"),*JobID.ToString(),Text);return false;};FICDefinitionResult R;
-    if(!State||!Clock||!Definitions||!Inventory)return Fail(TEXT("생산 시스템이 준비되지 않았습니다."));
-    if(!State->FlushParticipants())return Fail(TEXT("현재 상태를 반영할 수 없습니다."));
+    if(!State||!Clock||!Definitions||!Inventory)return Fail(*ICText::Get(TEXT("Native_1e038cacd7e3")).ToString());
+    if(!State->FlushParticipants())return Fail(*ICText::Get(TEXT("Native_ed7cb0d52fdb")).ToString());
     FICWorldState Next=State->ExportState();auto* Job=Next.ProductionJobs.Find(JobID);
-    if(!Job || Job->Status==EICProductionJobStatus::Cancelled || Job->Status==EICProductionJobStatus::Completed)return Fail(TEXT("이미 완료·취소된 작업이거나 존재하지 않습니다."));
-    if(Clock->GetClock().PlaySecond<Job->CompletesAtPlaySecond)return Fail(TEXT("아직 제작 시간이 남아 있습니다."));
+    if(!Job || Job->Status==EICProductionJobStatus::Cancelled || Job->Status==EICProductionJobStatus::Completed)return Fail(*ICText::Get(TEXT("Native_2003cd00007c")).ToString());
+    if(Clock->GetClock().PlaySecond<Job->CompletesAtPlaySecond)return Fail(*ICText::Get(TEXT("Native_b7ee8700f83d")).ToString());
     const auto* Recipe=Definitions->Find<FICRecipeRow>(Job->RecipeID,R);
     const auto* Production=Definitions->Find<FICProductionRow>(Job->ProductionID,R);
     if(!Recipe||!Production||Recipe->ProductionID!=Job->ProductionID||Recipe->ResultKind!=EICProductionResultKind::BagItems||Recipe->Results.IsEmpty())
-        return Fail(TEXT("완료에 필요한 정의가 누락되거나 변경되었습니다."));
-    if(Job->OwnerCharacterID!=UICWorldStateSubsystem::PlayerId())return Fail(TEXT("이 작업은 NPC 생산 경로에서 처리해야 합니다."));
+        return Fail(*ICText::Get(TEXT("Native_9bd6a6be260b")).ToString());
+    if(Job->OwnerCharacterID!=UICWorldStateSubsystem::PlayerId())return Fail(*ICText::Get(TEXT("Native_0b3335415e48")).ToString());
     if(!Job->bCostsCommitted)
     {
         auto* Owner=Next.Characters.Find(Job->OwnerCharacterID);
-        if(!Owner||Owner->SP<Job->ReservedSP||Next.Gold<Job->ReservedGold)return Fail(TEXT("예약 비용을 확정할 수 없습니다."));
+        if(!Owner||Owner->SP<Job->ReservedSP||Next.Gold<Job->ReservedGold)return Fail(*ICText::Get(TEXT("Native_bf04650a49c0")).ToString());
         Owner->SP-=Job->ReservedSP;Next.Gold-=Job->ReservedGold;
     }
 
@@ -121,22 +122,22 @@ bool UICProductionSubsystem::CompleteJob(FGuid JobID,UICInventoryComponent* Inve
     {
         if(Reserved.Timing==EICProductionMaterialTiming::ConsumeAtStart&&Job->bCostsCommitted)continue;
         auto* Item=Next.Inventory.Bag.Slots.FindByPredicate([&](const auto& I){ IC_TRACE_FUNCTION();return I.InstanceID==Reserved.ItemInstanceID;});
-        if(!Item||Item->ItemID!=Reserved.ItemID||Item->bLocked||Item->Count<Reserved.Count||!Inventory->Find(Item->ItemID))return Fail(TEXT("예약 재료를 확인할 수 없습니다."));
+        if(!Item||Item->ItemID!=Reserved.ItemID||Item->bLocked||Item->Count<Reserved.Count||!Inventory->Find(Item->ItemID))return Fail(*ICText::Get(TEXT("Native_b7bed5bf8b3c")).ToString());
         Item->Count-=Reserved.Count;if(Item->Count==0)*Item=FPlayerItemInstance();
     }
     for(const auto& Result:Recipe->Results)
         if(Result.Count<=0||Inventory->Insert(Next.Inventory.Bag,Result.ItemID,Result.Count)!=Result.Count)
-            return Fail(TEXT("결과 정의가 누락되었거나 가방 공간이 부족합니다. 변경하지 않았습니다."));
+            return Fail(*ICText::Get(TEXT("Native_58afefb41c27")).ToString());
     Job->Status=EICProductionJobStatus::Completed;Job->bResultsCommitted=Job->bCostsCommitted=true;Job->CompletionTransactionID=FGuid::NewGuid();
     const FGuid Transaction=Job->CompletionTransactionID;
-    if(!Inventory->ValidateSnapshot(Next.Inventory)||!State->CommitGameplayTransaction(Next,Transaction))return Fail(TEXT("생산 완료 거래 검증에 실패했습니다."));
+    if(!Inventory->ValidateSnapshot(Next.Inventory)||!State->CommitGameplayTransaction(Next,Transaction))return Fail(*ICText::Get(TEXT("Native_92ba81004379")).ToString());
     UE_LOG(LogICProduction, Log, TEXT("[Production.Completed] Job=%s Transaction=%s"),*JobID.ToString(),*Transaction.ToString());
     if (UICQuestSubsystem* Quests = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICQuestSubsystem>() : nullptr)
     {
         Quests->ReportObjectiveEvent(EICQuestObjectiveType::Craft, Job->RecipeID, 1, JobID,
             Production->Activity, Recipe->Results[0].ItemID);
     }
-    OnProductionChanged.Broadcast(JobID,TEXT("제작 완료"));return true;
+    OnProductionChanged.Broadcast(JobID,ICText::Get(TEXT("Production_Complete")).ToString());return true;
 }
 
 bool UICProductionSubsystem::CancelJob(FGuid JobID)
@@ -146,7 +147,7 @@ bool UICProductionSubsystem::CancelJob(FGuid JobID)
     if(!Job||Job->Status==EICProductionJobStatus::Completed||Job->Status==EICProductionJobStatus::Cancelled)return false;
     Job->Status=EICProductionJobStatus::Cancelled;
     if(!State->CommitGameplayTransaction(Next,FGuid::NewGuid()))return false;
-    UE_LOG(LogICProduction, Log, TEXT("[Production.Cancelled] Job=%s: 예약 재료 해제"),*JobID.ToString());OnProductionChanged.Broadcast(JobID,TEXT("작업 취소. 예약 재료 해제"));return true;
+    UE_LOG(LogICProduction, Log, TEXT("[Production.Cancelled] Job=%s: 예약 재료 해제"),*JobID.ToString());OnProductionChanged.Broadcast(JobID,ICText::Get(TEXT("Production_Cancelled")).ToString());return true;
 }
 
 void UICProductionSubsystem::PlaySecondsAdvanced(double Seconds)

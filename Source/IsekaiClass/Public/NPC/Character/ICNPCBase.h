@@ -49,6 +49,7 @@ public:
 
     UFUNCTION(BlueprintCallable,Category="IC|NPC")
     void EndInteraction();
+    UFUNCTION(BlueprintCallable, Category="IC|NPC") bool TryGiveGift(AICPlayerController* Requester, FName ItemID);
 
     UFUNCTION(BlueprintPure,Category="IC|NPC")
     FText GetInteractionText() const;
@@ -62,7 +63,7 @@ public:
     UPROPERTY(BlueprintAssignable,Category="IC|NPC")
     FICNPCInteractionStarted OnInteractionStarted;
 
-    UPROPERTY(EditInstanceOnly,BlueprintReadOnly,Category="IC|NPC")
+    UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="IC|NPC")
     FName NPCDefinitionID;
 
 protected:

@@ -86,6 +86,7 @@ public:
     void AdvanceNaturalSP(double Seconds);
     void NotifyEquipmentChanged();
     bool NotifyFromMontage(int32 MontageInstanceID,FName Event,int32 HitIndex);
+    void PlayCombatCue(bool bImpact, const FICCombatPresentation& Presentation, AActor* Recipient, const FVector& Location);
     void SetOrdinaryStaggerImmunity(bool Immune) { bOrdinaryStaggerImmune=Immune; }
     UPROPERTY(BlueprintAssignable) FICGASStateChanged OnStateChanged;
 private:
@@ -94,6 +95,8 @@ private:
     UPROPERTY(Transient) TObjectPtr<UICSurvivalAttributeSet> Survival;
     UPROPERTY(Transient) TObjectPtr<UICGameplayAbility> RunningAbility;
     FGameplayAbilitySpecHandle AbilityHandle;
+    TMap<FName, FGameplayAbilitySpecHandle> SkillAbilityHandles;
+    TMap<FName, FActiveGameplayEffectHandle> CooldownEffectHandles;
     FICCharacterState Runtime;
     TMap<FGuid, FActiveGameplayEffectHandle> EffectHandles;
     TMap<EICStat, double> MonsterBase;
@@ -124,4 +127,7 @@ private:
     void SyncEffectHandles();
     void ClearActionTags();
     void UnlockSkills();
+    FGameplayAbilitySpecHandle GetOrGrantSkillAbility(const FICSkillRow& Row);
+    void SyncCooldownEffects();
+    void ApplySkillCooldown(const FICSkillRow& Row, double Duration);
 };

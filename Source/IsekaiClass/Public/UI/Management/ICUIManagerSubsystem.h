@@ -30,6 +30,7 @@ public:
     void SetMenuContext(APlayerController* Controller, UUserWidget* Focus, bool MenuOpen);
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void CloseAllScreens();
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void SetHUD(UUserWidget* Widget);
+    void AddHUDWidget(UUserWidget* Widget);
 
 private:
     UPROPERTY(Transient) TObjectPtr<UICUIRootWidget> Root;

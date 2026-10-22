@@ -1,4 +1,5 @@
 #include "World/Spawn/ICSpawnSubsystem.h"
+#include "UI/Framework/ICText.h"
 #include "Inventory/Rewards/ICRewardService.h"
 #include "World/Anchors/ICWorldAnchor.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -125,16 +126,16 @@ bool UICSpawnSubsystem::CanReviveAtCurrentPlacement(AICCharacterBase* Target) co
 }
 AICNPCBase* UICSpawnSubsystem::ReserveReviveTarget(FName ID,UICAbilitySystemComponent* Caster,FString& Reason)
 {
-    IC_TRACE_FUNCTION();Reason.Empty();if(!Caster){Reason=TEXT("시전자가 없습니다.");return nullptr;}
+    IC_TRACE_FUNCTION();Reason.Empty();if(!Caster){Reason=ICText::Get(TEXT("Native_01e3d20fd15d")).ToString();return nullptr;}
     auto* S=GetWorld()->GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();auto* D=GetWorld()->GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();const auto State=S->GetSnapshot(ID);FTransform Transform;FICDefinitionResult R;
-    if(State.CharacterId.IsNone()||!State.IsDowned()||State.PartySlot<0||State.Kind!=EICCharacterKind::Recruitable){Reason=TEXT("부활할 Downed 동료가 없습니다.");return nullptr;}
-    if(auto* Existing=Cast<AICNPCBase>(FindCharacter(ID))){if(!CanReviveAtCurrentPlacement(Existing)){Reason=TEXT("안전하게 부활할 공간이 없습니다.");return nullptr;}Existing->HoldDownedActor();ReviveReservations.Add(ID,Caster);return Existing;}
-    if(!FindSafePartyPlacement(ID,Transform)){Reason=TEXT("안전하게 부활할 공간이 없습니다.");return nullptr;}
+    if(State.CharacterId.IsNone()||!State.IsDowned()||State.PartySlot<0||State.Kind!=EICCharacterKind::Recruitable){Reason=ICText::Get(TEXT("Native_e9d0ed549f03")).ToString();return nullptr;}
+    if(auto* Existing=Cast<AICNPCBase>(FindCharacter(ID))){if(!CanReviveAtCurrentPlacement(Existing)){Reason=ICText::Get(TEXT("Native_06b639551f1b")).ToString();return nullptr;}Existing->HoldDownedActor();ReviveReservations.Add(ID,Caster);return Existing;}
+    if(!FindSafePartyPlacement(ID,Transform)){Reason=ICText::Get(TEXT("Native_06b639551f1b")).ToString();return nullptr;}
     const auto* Row=D->Find<FICNPCRow>(ID,R);UClass* Type=Row?(Row->ActorClass.IsNull()?AICNPCBase::StaticClass():Row->ActorClass.LoadSynchronous()):nullptr;
-    if(!Type||!Type->IsChildOf(AICNPCBase::StaticClass())){Reason=TEXT("NPC 실행 클래스가 올바르지 않습니다.");return nullptr;}
+    if(!Type||!Type->IsChildOf(AICNPCBase::StaticClass())){Reason=ICText::Get(TEXT("Native_d21587f276c1")).ToString();return nullptr;}
     FActorSpawnParameters Params;Params.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     auto* Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Transform,Params);
-    if(!Actor||!Actor->InitializeNPC(ID)){if(Actor){Actor->ReleaseForLoad();Actor->Destroy();}Reason=TEXT("부활 대상의 상태를 준비하지 못했습니다.");return nullptr;}
+    if(!Actor||!Actor->InitializeNPC(ID)){if(Actor){Actor->ReleaseForLoad();Actor->Destroy();}Reason=ICText::Get(TEXT("Native_8bee5d678230")).ToString();return nullptr;}
     Actor->SetActorEnableCollision(false);NPCs.Add(ID,Actor);ReviveReservations.Add(ID,Caster);return Actor;
 }
 void UICSpawnSubsystem::Deinitialize()

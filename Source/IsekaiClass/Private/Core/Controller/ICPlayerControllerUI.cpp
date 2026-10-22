@@ -1,4 +1,5 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Inventory/Components/ICInventoryComponent.h"
@@ -36,7 +37,7 @@ void AICPlayerController::ExecuteUI(const FString& Command,int32 Index)
         SyncSaveSafety();
         const bool WasPending=bInitialSavePending;bInitialSavePending=false;
         if(Saves->ImportLegacySave()){SelectedLoadSlot=1;RefreshSaveSlots();}else bInitialSavePending=WasPending;
-        Show(Saves->GetLastMessage());return;
+        ShowLocalized(Saves->GetLastMessageText());return;
     }
     if(!Inventory)return;
     if(Command==TEXT("Preset")){if(bCreated||bInitialSavePending||Index<0||Index>1)return;Preset=Index;if(auto* TargetCharacter=Cast<AICPlayerCharacter>(GetPawn()))TargetCharacter->ApplyPreset(Preset);bDirty=true;return;}
@@ -58,11 +59,11 @@ void AICPlayerController::ExecuteUI(const FString& Command,int32 Index)
         if(Command==TEXT("Use"))BeginItem(Item.ItemID);
         else if(Command==TEXT("Equip"))Inventory->Equip(SelectedBag);
         else if(Command==TEXT("Enhance"))
-        {if(Menu!=TEXT("Craft")||ActiveStation!=TEXT("Forge"))Show(TEXT("대장간 강화 메뉴에서만 강화할 수 있습니다."));else{Inventory->EnhanceEquipment(SelectedBag,Gold);FlushWorldState();}}
+        {if(Menu!=TEXT("Craft")||ActiveStation!=TEXT("Forge"))ShowLocalized(ICText::Get(TEXT("Native_c9f617feea22")));else{Inventory->EnhanceEquipment(SelectedBag,Gold);FlushWorldState();}}
         else if(Command==TEXT("Lock"))Inventory->ToggleLock(SelectedBag);
         else if(Command==TEXT("Discard"))Inventory->Discard(SelectedBag);
         else if(Command==TEXT("Split"))Inventory->SplitStack(SelectedBag,Item.Count/2);
-        else if(Command==TEXT("Move")){MoveFrom=SelectedBag;Show(TEXT("이동할 칸을 선택하세요."));}
+        else if(Command==TEXT("Move")){MoveFrom=SelectedBag;ShowLocalized(ICText::Get(TEXT("Native_ba18d7855c06")));}
         else if(Command==TEXT("Quick"))Inventory->BindQuickSlot(Index,SelectedBag);
         else if(Command==TEXT("Deposit"))Inventory->Transfer(OpenStorage,SelectedBag,true);
     }

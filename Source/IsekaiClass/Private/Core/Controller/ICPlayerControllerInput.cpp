@@ -1,4 +1,5 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Framework/ICText.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Combat/GAS/ICGameplayTags.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -182,7 +183,7 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
                 for (const auto& Pair:State.Characters)
                     if(Pair.Value.Mode==EICCharacterMode::Companion && Pair.Value.PartySlot==Slot)
                     { Found=SelectTarget(Pair.Key); break; }
-                if(!Found)Show(TEXT("해당 동료를 대상으로 선택할 수 없습니다."));
+                if(!Found)ShowLocalized(ICText::Get(TEXT("Native_daafd25225b3")));
             }
         }
         else if (Command==EICInputCommand::Confirm || (Command==EICInputCommand::Skill&&!PendingSkill.IsNone())) ConfirmSelectedTarget();
@@ -343,10 +344,10 @@ void AICPlayerController::Interact()
             bAny=true;const FVector Offset=It->GetActorLocation()-GetPawn()->GetActorLocation();
             if(Offset.Size()<=250.f){bNear=true;bFront|=FVector::DotProduct(FRotator(0,GetControlRotation().Yaw,0).Vector(),Offset.GetSafeNormal2D())>=0.35f;}
         }
-        Show(!bAny?TEXT("이 맵에 상호작용 상자가 없습니다."):!bNear?TEXT("상자에 250cm 이내로 접근하세요."):!bFront?TEXT("상자가 있는 방향을 바라보세요."):TEXT("상자가 가려져 있습니다. 벽 너머에서는 사용할 수 없습니다."));return;
+        ShowLocalized(ICText::Get(!bAny?TEXT("Interaction_NoBox"):!bNear?TEXT("Interaction_BoxTooFar"):!bFront?TEXT("Interaction_BoxBehind"):TEXT("Interaction_BoxOccluded")));return;
     }
     UE_LOG(LogICInteraction, Verbose, TEXT("[Interaction.Request] Object=%s"),*GetPathNameSafe(Object));
-    if(!Object->TryInteract(this))Show(TEXT("현재 이 대상과 상호작용할 수 없습니다. 액터 설정을 확인하세요."));
+    if(!Object->TryInteract(this))ShowLocalized(ICText::Get(TEXT("Native_a103f45b5902")));
 }
 
 
@@ -410,7 +411,7 @@ void AICPlayerController::ExecuteCombatInput(FName Action,int32 Slot)
             if(State.Mode==EICCharacterMode::Companion&&State.PartySlot==Slot&&!State.IsDowned()) { Caster=*It; break; }
         }
         ASC=Caster?Caster->GetICAbilitySystem():nullptr;
-        if(!ASC) { Show(TEXT("활성 동료가 없습니다.")); return; }
+        if(!ASC) { ShowLocalized(ICText::Get(TEXT("Native_921b4891409d"))); return; }
         FICDefinitionResult Result;
         const auto* NPC=ASC->Definitions()?ASC->Definitions()->Find<FICNPCRow>(Caster->GetCharacterID(),Result):nullptr;
         const auto* Base=NPC?ASC->Definitions()->Find<FICRecruitCombatRow>(NPC->RecruitCombatID,Result):nullptr;
@@ -421,7 +422,7 @@ void AICPlayerController::ExecuteCombatInput(FName Action,int32 Slot)
     else if(Action==TEXT("Skill"))
     {
         SkillID=ASC->GetCurrentWeaponSkill();
-        if(SkillID.IsNone()) { Show(TEXT("현재 무기에 장착한 해금 스킬이 없습니다.")); return; }
+        if(SkillID.IsNone()) { ShowLocalized(ICText::Get(TEXT("Native_3d573f64fc4c"))); return; }
     }
     if(Action==TEXT("Skill"))
     {
@@ -467,5 +468,5 @@ void AICPlayerController::RequestFishing()
 {
     if(!CanHandleGameplayInput()||HasTargetSelection())return;
     if(OnFishingRequested.IsBound())OnFishingRequested.Broadcast();
-    else Show(TEXT("이 지역에 연결된 낚시 기능이 없습니다."));
+    else ShowLocalized(ICText::Get(TEXT("Native_38e9e70ca3e5")));
 }

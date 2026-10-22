@@ -1,4 +1,5 @@
 #include "Inventory/Actors/ICDroppedItem.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Inventory/Components/ICInventoryComponent.h"
@@ -24,7 +25,8 @@ void AICDroppedItem::Initialize(const FICDropState& Record)
     RecordID=Record.ID;DropID=FName(*Record.ID.ToString(EGuidFormats::Digits));Item=Record.Contents.IsEmpty()?FPlayerItemInstance():Record.Contents[0];
     FString Name=Item.ItemID.ToString();
     if(auto* GI=GetGameInstance())if(auto* Definitions=GI->GetSubsystem<UICDefinitionSubsystem>())
-    {FICDefinitionResult Result;if(const auto* Row=Definitions->Find<FICItemRow>(Item.ItemID,Result))Name=Row->GetLabel().ToString();}
+    {FICDefinitionResult Result;if(const auto* Row=Definitions->Find<FICItemRow>(Item.ItemID,Result))
+    {Name=Row->GetLabel().ToString();if(auto* Asset=Row->WorldMesh.LoadSynchronous()){Mesh->SetStaticMesh(Asset);Mesh->SetRelativeScale3D(Row->WorldMeshScale);}}}
     Label->SetText(FText::FromString(FString::Printf(TEXT("%s ×%d"),*Name,Item.Count)));
     UE_LOG(LogICInventory, VeryVerbose, TEXT("[Drop.Display] Actor=%s Drop=%s Item=%s Count=%d"),*GetNameSafe(this),*RecordID.ToString(),*Item.ItemID.ToString(),Item.Count);
 }
@@ -58,11 +60,11 @@ void AICDroppedItem::TryPickup(AICPlayerController* Controller)
         if(Added==Stored.Count)for(auto& Slot:Next.Inventory.Bag.Slots)if(Slot.InstanceID==Copy.InstanceID)Slot.InstanceID=Stored.InstanceID;
         Stored.Count-=Added;Changed=true;
     }
-    if(!Changed){Controller->Show(TEXT("가방 공간이 부족합니다."));return;}
+    if(!Changed){Controller->Show(*ICText::Get(TEXT("Native_79850feffc76")).ToString());return;}
     Record->Contents.RemoveAll([](const auto& I){ IC_TRACE_FUNCTION();return I.IsEmpty();});
     if(Record->Contents.IsEmpty())Next.Drops.RemoveAll([&](const auto& D){ IC_TRACE_FUNCTION();return D.ID==RecordID;});
     if(!Inventory->ValidateSnapshot(Next.Inventory)||!State->CommitGameplayTransaction(Next,FGuid::NewGuid()))
-    {Controller->Show(TEXT("습득 상태 검증에 실패했습니다. 변경하지 않았습니다."));return;}
+    {Controller->Show(*ICText::Get(TEXT("Native_f9318b541d5b")).ToString());return;}
     UE_LOG(LogICInventory, Log, TEXT("[Drop.PickedUp] Drop=%s RemainingWorldDrops=%d"),*RecordID.ToString(),Next.Drops.Num());
-    Controller->Show(TEXT("아이템을 습득했습니다."));
+    Controller->Show(*ICText::Get(TEXT("Native_6c9d6b39ff41")).ToString());
 }

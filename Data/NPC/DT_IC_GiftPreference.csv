@@ -1,1 +1,3 @@
-﻿---,PreferredAffinityDelta,NeutralAffinityDelta,DislikedAffinityDelta,Items,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+---,PreferredAffinityDelta,NeutralAffinityDelta,DislikedAffinityDelta,Items,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+GIFT_R01_COMMON,20,0,0,"((ItemID=""ITEM_P0_01"",Preference=Preferred))",GIFT_R01_COMMON,GIFT_R01_COMMON.NAME,,(GameplayTags=),1,False,False
+GIFT_R01_HERO,20,0,0,"((ItemID=""ITEM_P0_01"",Preference=Preferred),(ItemID=""ITEM_HERO_GIFT"",Preference=Preferred))",GIFT_R01_HERO,GIFT_R01_HERO.NAME,GIFT_R01_HERO.DESCRIPTION,(GameplayTags=),1,False,False

@@ -40,8 +40,10 @@ float FPlayerSurvivalState::ConsumeSP(float Amount)
 int32 FPlayerSurvivalState::CalculateSleepMinutes(float RecoveryPerGameMinute) const
 {
     IC_TRACE_FUNCTION();
-    if (RecoveryPerGameMinute <= 0.f || SP >= MaxSP) return 0;
-    return FMath::CeilToInt((MaxSP - SP) / RecoveryPerGameMinute);
+    if (!FMath::IsFinite(RecoveryPerGameMinute) || RecoveryPerGameMinute < 1.f) return 0;
+    const int64 Recovery = FMath::FloorToInt64(RecoveryPerGameMinute);
+    const int64 Missing = FMath::CeilToInt64(FMath::Max(0.f, MaxSP - SP));
+    return static_cast<int32>(FMath::Clamp<int64>((Missing + Recovery - 1) / Recovery, 120, MAX_int32));
 }
 
 float FPlayerSurvivalState::AdvanceNaturalSP(double PlaySeconds)

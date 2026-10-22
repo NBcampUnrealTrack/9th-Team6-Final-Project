@@ -7,7 +7,7 @@
 #include "ICCharacterStateTypes.generated.h"
 
 UENUM(BlueprintType)
-enum class EICMainStat : uint8 { STR , DEX , INT , CON , CHA , LUK  };
+enum class EICMainStat : uint8 { STR , DEX , INT , CON , CHA UMETA(Hidden), LUK  };
 
 UENUM(BlueprintType)
 enum class EICCharacterKind : uint8 { Player , Recruitable , Resident , Background  };
@@ -26,7 +26,7 @@ struct FICMainStats
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) int32 DEX = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) int32 INT = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) int32 CON = 1;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) int32 CHA = 1;
+    UPROPERTY(SaveGame) int32 CHA = 1; // Preserve old saves without exposing retired gameplay.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) int32 LUK = 1;
     bool IsValid() const;
     bool Set(EICMainStat Stat, int32 Value);

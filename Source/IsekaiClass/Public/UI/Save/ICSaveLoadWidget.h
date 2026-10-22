@@ -36,19 +36,16 @@ protected:
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> IC_SaveLoad_Title;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> IC_SaveLoad_Detail;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> IC_SaveLoad_Notice;
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UImage> IC_SaveLoad_Thumbnail;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UImage> IC_SaveLoad_Party0;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UImage> IC_SaveLoad_Party1;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UImage> IC_SaveLoad_Party2;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UImage> IC_SaveLoad_Party3;
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UImage> IC_SaveLoad_Party4;
     UPROPERTY(EditDefaultsOnly, Category="IC|Save UI") TSubclassOf<UICLoadConfirmWidget> ConfirmWidgetClass;
     UPROPERTY(EditDefaultsOnly, Category="IC|Portraits") TMap<FName, TObjectPtr<UTexture2D>> PortraitTextures;
     UPROPERTY(EditDefaultsOnly, Category="IC|Save UI") TSubclassOf<UICSaveSlotWidget> SlotWidgetClass;
 private:
     UPROPERTY() TArray<TObjectPtr<UICSaveSlotWidget>> SlotRows;
     UPROPERTY() TArray<FICSaveSlotInfo> DisplaySlots;
-    UPROPERTY() TArray<TObjectPtr<UTexture2D>> ThumbnailTextures;
     UPROPERTY() TObjectPtr<UICLoadConfirmWidget> ConfirmScreen;
     UFUNCTION() void HandleLoadConfirmed();
     UFUNCTION() void HandleLoadCancelled();

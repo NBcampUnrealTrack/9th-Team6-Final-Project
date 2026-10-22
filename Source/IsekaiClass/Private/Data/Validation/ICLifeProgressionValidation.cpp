@@ -119,7 +119,7 @@ bool IsPrimaryStat(EICStat Stat)
 {
     IC_TRACE_FUNCTION();
     return Stat == EICStat::STR || Stat == EICStat::DEX || Stat == EICStat::INT
-        || Stat == EICStat::CON || Stat == EICStat::CHA || Stat == EICStat::LUK;
+        || Stat == EICStat::CON || Stat == EICStat::LUK;
 }
 
 bool IsGatheringActivity(EICLifeActivity Activity)

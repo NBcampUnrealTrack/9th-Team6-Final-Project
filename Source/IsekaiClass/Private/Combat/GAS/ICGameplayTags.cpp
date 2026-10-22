@@ -12,4 +12,15 @@ namespace ICTags
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Returning, "IC.State.Returning", "몬스터 귀환 중입니다. 공격·피해·재어그로를 차단합니다.");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Exhausted, "IC.State.Exhausted", "플레이어 SP 0의 탈진입니다. 전투 입력은 계속 허용합니다.");
     UE_DEFINE_GAMEPLAY_TAG_COMMENT(Staggered, "IC.State.Staggered", "유효 피격 경직입니다.");
+    UE_DEFINE_GAMEPLAY_TAG(CombatEvent, "IC.Event.Combat");
+    UE_DEFINE_GAMEPLAY_TAG(EffectCommitEvent, "IC.Event.Combat.EffectCommit");
+    UE_DEFINE_GAMEPLAY_TAG(HitStartEvent, "IC.Event.Combat.HitStart");
+    UE_DEFINE_GAMEPLAY_TAG(HitEndEvent, "IC.Event.Combat.HitEnd");
+    UE_DEFINE_GAMEPLAY_TAG(ProjectileFireEvent, "IC.Event.Combat.ProjectileFire");
+    UE_DEFINE_GAMEPLAY_TAG(CancelWindowStartEvent, "IC.Event.Combat.CancelWindowStart");
+    UE_DEFINE_GAMEPLAY_TAG(CancelWindowEndEvent, "IC.Event.Combat.CancelWindowEnd");
+    UE_DEFINE_GAMEPLAY_TAG(IFrameStartEvent, "IC.Event.Combat.IFrameStart");
+    UE_DEFINE_GAMEPLAY_TAG(IFrameEndEvent, "IC.Event.Combat.IFrameEnd");
+    UE_DEFINE_GAMEPLAY_TAG(CueCast, "GameplayCue.IC.Combat.Cast");
+    UE_DEFINE_GAMEPLAY_TAG(CueImpact, "GameplayCue.IC.Combat.Impact");
 }

@@ -37,11 +37,11 @@ struct ISEKAICLASS_API FICHomeRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Home") TArray<FName> CraftingAnchorIDs;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Home") FName InnServiceID;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPCContainers", meta=(ClampMin="0", ClampMax="100")) int32 ContainerAccessAffinity = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPCContainers", meta=(ClampMin="0", ClampMax="500")) int32 ContainerAccessAffinity = 200;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="NPCContainers") TArray<FICHomeContainerDefinition> NPCContainers;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PlayerHome", meta=(EditCondition="Type == EICHomeType::Player")) TArray<FName> StorageInstallAnchorIDs;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PlayerHome", meta=(EditCondition="Type == EICHomeType::Player")) TArray<FName> FarmPlotAnchorIDs;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PlayerHome", meta=(ClampMin="1")) int32 StorageSlotsPerInstallation = 40;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PlayerHome", meta=(ClampMin="1", ClampMax="4")) int32 MaximumStorageInstallations = 4;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PlayerHome", meta=(ClampMin="1", ClampMax="3")) int32 MaximumStorageInstallations = 3;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PlayerHome") FName SharedStorageGroupID;
 };
