@@ -54,6 +54,8 @@ public:
     UFUNCTION(BlueprintCallable) bool BindQuickSlot(int32 QuickIndex, int32 BagIndex);
     UFUNCTION(BlueprintCallable) bool ExpandUsingTicket();
     UFUNCTION(BlueprintCallable) void EnsureStorage(FName ContainerID);
+    /** Called by an approved home upgrade transaction; never shrinks occupied legacy slots. */
+    UFUNCTION(BlueprintCallable, Category="IC|Home") bool SetHomeStorageStage(int32 Stage);
     UFUNCTION(BlueprintCallable) bool Transfer(FName ContainerID, int32 Index, bool bToStorage);
     UFUNCTION(BlueprintCallable) bool ExchangeItems(const TMap<FName, int32>& Costs, FName ResultID, int32 ResultCount);
     UFUNCTION(BlueprintPure) bool ValidateDefinitions() const;

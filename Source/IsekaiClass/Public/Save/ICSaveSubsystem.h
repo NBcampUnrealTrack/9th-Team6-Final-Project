@@ -42,6 +42,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Save") bool DeleteSlot(int32 Slot);
     UFUNCTION(BlueprintCallable, Category="IC|Save") bool DeleteLegacySave();
     UFUNCTION(BlueprintPure, Category="IC|Save") FString GetSaveBlockReason(bool bAutoSave) const;
+    FText GetSaveBlockReasonText(bool bAutoSave) const;
     FString GetLegacySavePath() const;
     bool HasLegacySave() const;
     void SetAutoSaveSuspended(bool bSuspended);
@@ -55,16 +56,16 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="IC|Save") void SetPreviewLocation(const FString& Location) { IC_TRACE_FUNCTION(); PreviewLocation = Location.Left(128); }
     UFUNCTION(BlueprintPure, Category="IC|Save") FString GetPreviewLocation() const { IC_TRACE_FUNCTION(); return PreviewLocation; }
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Save") bool bCaptureSaveThumbnail = true;
     FString GetLastMessage() const { IC_TRACE_FUNCTION(); return LastMessage; }
+    FText GetLastMessageText() const { IC_TRACE_FUNCTION(); return LastMessageText; }
 private:
     FString PreviewLocation;
-    bool CaptureThumbnail(TArray<uint8>& OutPNG);
     UPROPERTY() TObjectPtr<UICWorldStateSubsystem> WorldState;
     UPROPERTY() TObjectPtr<UICTimeSubsystem> Time;
     FICSaveSafety Safety;
     FString Prefix = TEXT("IC_Team");
     FString LastMessage;
+    FText LastMessageText;
     double LastSavePlaySecond = 0;
     double RetryAfterPlaySecond = 0;
     FName PendingReason;
@@ -74,4 +75,5 @@ private:
     UICSaveGame* ReadSlot(int32 Slot, bool bAllowBackup, bool& bUsedBackup) const;
     bool ValidateSave(const UICSaveGame* Save, int32 Slot) const;
     void FinishSave(int32 Slot, bool bSuccess, double CapturedPlaySecond, uint64 CapturedGeneration, const FString& Message);
+    void SetLastMessage(const FText& Text) { LastMessageText = Text; LastMessage = Text.ToString(); }
 };

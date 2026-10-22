@@ -1,4 +1,5 @@
 #include "Life/Crafting/ICCraftingComponent.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Life/Production/ICProductionSubsystem.h"
@@ -26,7 +27,7 @@ bool UICCraftingComponent::StartCraft(FName RecipeID,FName WorkAnchorID,UICInven
     IC_TRACE_FUNCTION();
     auto* GI=GetWorld()?GetWorld()->GetGameInstance():nullptr;
     auto* Service=GI?GI->GetSubsystem<UICProductionSubsystem>():nullptr;
-    if(!Service){JobID.Invalidate();Reason=TEXT("생산 시스템이 준비되지 않았습니다.");UE_LOG(LogICProduction, Warning, TEXT("[Craft.Start.Rejected] Recipe=%s Anchor=%s: %s"),*RecipeID.ToString(),*WorkAnchorID.ToString(),*Reason);return false;}
+    if(!Service){JobID.Invalidate();Reason=ICText::Get(TEXT("Craft_NotReady")).ToString();UE_LOG(LogICProduction, Warning, TEXT("[Craft.Start.Rejected] Recipe=%s Anchor=%s: %s"),*RecipeID.ToString(),*WorkAnchorID.ToString(),*Reason);return false;}
     return Service->StartRecipe(RecipeID,WorkAnchorID,Inventory,JobID,Reason);
 }
 bool UICCraftingComponent::GetRecipeDefinition(FName RecipeID,FPlayerRecipeDefinition& Definition) const

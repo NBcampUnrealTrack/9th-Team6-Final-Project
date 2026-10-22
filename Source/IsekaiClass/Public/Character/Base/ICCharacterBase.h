@@ -5,6 +5,10 @@
 #include "World/State/ICStateParticipant.h"
 #include "ICCharacterBase.generated.h"
 class UICAbilitySystemComponent;
+class UICCharacterAnimationProfile;
+class AICWeaponActor;
+class UAnimMontage;
+class USkeletalMesh;
 
 UCLASS(Abstract)
 class ISEKAICLASS_API AICCharacterBase : public ACharacter, public IAbilitySystemInterface, public IICStateParticipant
@@ -13,6 +17,12 @@ class ISEKAICLASS_API AICCharacterBase : public ACharacter, public IAbilitySyste
 public:
     AICCharacterBase();
     virtual void BeginPlay() override;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="IC|Presentation") TSoftObjectPtr<UICCharacterAnimationProfile> AnimationProfile;
+    UPROPERTY(Transient, BlueprintReadOnly, Category="IC|Presentation") TObjectPtr<AICWeaponActor> EquippedWeaponActor;
+    UFUNCTION(BlueprintCallable, Category="IC|Presentation") void RefreshWeaponAppearance();
+    UAnimMontage* ResolveActionMontage(FName Action);
+    UICCharacterAnimationProfile* GetAnimationProfile();
+    void UpdatePresentationTransform(float GroundOffsetCm, const FTransform* BedAnchor);
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
     UICAbilitySystemComponent* GetICAbilitySystem() const;
@@ -36,4 +46,10 @@ protected:
     bool bUsePrimaryStats = false, bUsePlayerSP = false;
     UICWorldStateSubsystem* WorldState() const;
     UFUNCTION() virtual void StoredCharacterChanged(FName ID);
+private:
+    FName VisualEquipmentID;
+    UPROPERTY(Transient) TObjectPtr<UICCharacterAnimationProfile> LoadedAnimationProfile;
+    TWeakObjectPtr<USkeletalMesh> PresentationMesh;
+    FTransform StandingMeshTransform;
+    bool bSleepPresentation = false;
 };

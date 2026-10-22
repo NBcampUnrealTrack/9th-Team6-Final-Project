@@ -1,4 +1,5 @@
 #include "Core/Flow/ICGameFlowSubsystem.h"
+#include "UI/Framework/ICText.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Core/Flow/ICLoadingScreenSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -71,13 +72,13 @@ bool UICGameFlowSubsystem::BeginNewGame(AICPlayerController* Controller)
     const auto* Reward = FindOption(3, Answers.Music);
     if (!Reward || Reward->WeaponItemID.IsNone() || Reward->SkillID.IsNone())
     {
-        Fail(TEXT("시작 보상 데이터가 없습니다. DT_IC_CreationOptions를 확인하세요."));
+        Fail(*ICText::Get(TEXT("Native_7cfd365c9376")).ToString());
         return false;
     }
     const FString Map = GetDefault<UICGameFlowSettings>()->PlayMap.GetLongPackageName();
     if (!FPackageName::DoesPackageExist(Map))
     {
-        Fail(TEXT("플레이 맵을 찾을 수 없습니다."));
+        Fail(*ICText::Get(TEXT("Native_490372b4bb9c")).ToString());
         return false;
     }
     auto* Saves = GetGameInstance()->GetSubsystem<UICSaveSubsystem>();
@@ -85,12 +86,12 @@ bool UICGameFlowSubsystem::BeginNewGame(AICPlayerController* Controller)
     auto* Time = GetGameInstance()->GetSubsystem<UICTimeSubsystem>();
     if (!Saves || !State || !Time || Saves->bSaving)
     {
-        Fail(TEXT("저장 시스템이 준비되지 않았습니다."));
+        Fail(*ICText::Get(TEXT("Native_2075ebc443b0")).ToString());
         return false;
     }
     if (!State->RestoreState(FICWorldState()))
     {
-        Fail(TEXT("새 게임 상태를 초기화할 수 없습니다."));
+        Fail(*ICText::Get(TEXT("Native_e06970c5392f")).ToString());
         return false;
     }
     Saves->ResetSession();

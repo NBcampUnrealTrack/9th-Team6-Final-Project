@@ -4,6 +4,7 @@
 #include "ICItemRows.generated.h"
 
 class UTexture2D;
+class AICWeaponActor;
 
 UENUM(BlueprintType)
 enum class EICItemTarget : uint8 { None , PlayerOnly , LivingParty , DownedCompanion , NonCompanionRecruit  };
@@ -16,6 +17,8 @@ struct ISEKAICLASS_API FICItemRow : public FPlayerItemDefinition
 {
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSoftObjectPtr<UTexture2D> Icon;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") TSoftObjectPtr<UStaticMesh> WorldMesh;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") FVector WorldMeshScale = FVector(.25f);
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EICItemTarget UseTarget = EICItemTarget::None;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bAllowNonCompanionRecruitUse = false;
@@ -45,6 +48,7 @@ struct ISEKAICLASS_API FICEquipmentRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EICCharacterClass RequiredClass = EICCharacterClass::None;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FICStatModifier> BaseModifiers;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSoftObjectPtr<UStaticMesh> WeaponMesh;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon") TSoftClassPtr<AICWeaponActor> WeaponActorClass;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName AttachSocket;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FTransform AttachmentTransform;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName EnhancementID;

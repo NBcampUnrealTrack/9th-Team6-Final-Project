@@ -66,6 +66,7 @@ USTRUCT(BlueprintType)
 struct FICSavePreview
 {
     GENERATED_BODY()
+    // Stable region ID (currently R01); resolve its display name through a String Table.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) FString Location;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) TArray<FName> PartyIds;
     UPROPERTY(BlueprintReadOnly, SaveGame) TArray<uint8> ThumbnailPNG;

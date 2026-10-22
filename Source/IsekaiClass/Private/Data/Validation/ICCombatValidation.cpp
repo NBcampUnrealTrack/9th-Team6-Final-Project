@@ -238,7 +238,7 @@ void ValidateCombat(const TArray<FICDefinitionTable>& Tables, bool bComplete, TA
         const TCHAR* EquipmentFields[] = {TEXT("WeaponID"), TEXT("ClothesID"), TEXT("RingID"), TEXT("NecklaceID")};
         for (int32 Index = 0; Index < UE_ARRAY_COUNT(Equipment); ++Index)
         {
-            if (Equipment[Index].IsNone()) Missing(Issues, At, FString(TEXT("InitialEquipment.")) + EquipmentFields[Index], TEXT("Author all four recruit initial equipment slots."), bComplete);
+            if (Index==0 && Equipment[Index].IsNone()) Missing(Issues, At, FString(TEXT("InitialEquipment.")) + EquipmentFields[Index], TEXT("Author the recruit's initial weapon."), bComplete);
         }
     });
 

@@ -1,16 +1,21 @@
 #include "Core/Flow/ICLoadingScreenSubsystem.h"
+#include "UI/Framework/ICText.h"
 #include "Core/Flow/ICGameFlowSubsystem.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "MoviePlayer.h"
 #include "Widgets/Layout/SBorder.h"
+#include "Widgets/Layout/SScaleBox.h"
+#include "Widgets/Layout/SBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Images/SThrobber.h"
 #include "Styling/CoreStyle.h"
 #include "Framework/Application/SlateApplication.h"
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Framework/ICDisplayPolicy.h"
+#include "Engine/Font.h"
 
 void UICLoadingScreenSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -43,10 +48,17 @@ void UICLoadingScreenSubsystem::BeforeMap(const FString& MapName)
         (GetWorld() && GetWorld()->WorldType == EWorldType::PIE))
         return;
     FLoadingScreenAttributes Screen;
+    // Slate's loading thread outlives the old world's GC; keep its UObject font alive.
+    LoadingFont=LoadObject<UFont>(nullptr,TEXT("/Game/IsekaiClass/UI/Fonts/FONT_IC_UI.FONT_IC_UI"));
     Screen.bAutoCompleteWhenLoadingCompletes = true;
     Screen.bMoviesAreSkippable = false;
     Screen.MinimumLoadingScreenDisplayTime = 0.4f;
     Screen.WidgetLoadingScreen =
+        SNew(SBorder).Padding(0).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+        .BorderBackgroundColor(FLinearColor::Black)
+        [SNew(SScaleBox).Stretch(EStretch::ScaleToFit).HAlign(HAlign_Center).VAlign(VAlign_Center)
+        [SNew(SBox).WidthOverride(ICDisplayPolicy::DesignWidth).HeightOverride(ICDisplayPolicy::DesignHeight)
+        [
         SNew(SBorder)
             .BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
             .BorderBackgroundColor(FLinearColor(0.025f, 0.035f, 0.06f))
@@ -57,13 +69,13 @@ void UICLoadingScreenSubsystem::BeforeMap(const FString& MapName)
                      .AutoHeight()
                      .HAlign(HAlign_Center)
                      .Padding(0, 0, 0, 28)[SNew(STextBlock)
-                                               .Text(FText::FromString(TEXT("이세계클래스")))
+                                               .Text(ICText::Get(TEXT("Title")))
                                                .Font(ICFrontendLayout::Font(36, true))] +
                  SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 18)[SNew(SThrobber)] +
                  SVerticalBox::Slot().AutoHeight().HAlign(
                      HAlign_Center)[SNew(STextBlock)
-                                        .Text(FText::FromString(TEXT("새로운 세계를 불러오는 중…")))
-                                        .Font(ICFrontendLayout::Font(20))]];
+                                        .Text(ICText::Get(TEXT("Loading")))
+                                        .Font(ICFrontendLayout::Font(20))]]]]];
     GetMoviePlayer()->SetupLoadingScreen(Screen);
 }
 
@@ -82,5 +94,5 @@ void UICLoadingScreenSubsystem::TravelFailed(UWorld* World, ETravelFailure::Type
     bArmed = false;
     if (IsMoviePlayerEnabled())
         GetMoviePlayer()->StopMovie();
-    GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->Fail(TEXT("맵 이동에 실패했습니다: ") + Reason);
+    GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->Fail(*ICText::Get(TEXT("Native_43628d6993c8")).ToString() + Reason);
 }

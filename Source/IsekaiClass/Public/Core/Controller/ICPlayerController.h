@@ -58,6 +58,8 @@ public:
     TSubclassOf<UICMainMenuWidget> MainMenuWidgetClass;
     UFUNCTION(BlueprintPure, Category="IC|Main Menu")
     bool IsMainMenuLevel() const;
+    UFUNCTION(BlueprintCallable, Category="IC|Main Menu")
+    bool ContinueLatestSave();
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|New Game") FName NewGameDefinitionID=TEXT("CFG_NEWGAME_001");
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
     TSubclassOf<UICCharacterCreateWidget> CharacterCreateWidgetClass;
@@ -114,6 +116,7 @@ public:
     UPROPERTY(BlueprintReadOnly) int32 SelectedLoadSlot=0;
     UPROPERTY(BlueprintReadOnly) TArray<FICSaveSlotInfo> SaveSlots;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString ModalText;
+    UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") FText ModalDisplayText;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString InteractionHint;
     UFUNCTION(BlueprintPure,Category="IC|Input") FString MenuCancelLabel() const;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Items") TSubclassOf<AICDroppedItem> DroppedItemClass;
@@ -132,6 +135,7 @@ public:
     AICNPCBase* FindNPCInteractionTarget() const;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString Menu=TEXT("Create");
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString Notice;
+    UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") FText NoticeDisplayText;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FName OpenStorage;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FName ActiveStation;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FName ActiveWorkAnchor;
@@ -179,6 +183,7 @@ public:
     UFUNCTION(BlueprintCallable,Category="IC|UI") void ExecuteUI(const FString& Command,int32 Index=0);
     UFUNCTION(BlueprintCallable,Category="IC|UI") void SetMenu(const FString& NewMenu);
     UFUNCTION(BlueprintCallable,Category="IC|UI") void Show(const FString& Text);
+    void ShowLocalized(const FText& Text);
     UFUNCTION(BlueprintCallable,Category="IC|Session") bool SavePlayer();
     bool AutoSavePlayer();
     UFUNCTION(BlueprintCallable,Category="IC|Session") bool LoadPlayer();
@@ -202,7 +207,7 @@ public:
 private:
     TSoftObjectPtr<UWorld> SessionGameplayMap;
     UPROPERTY(Transient) TObjectPtr<UICSaveLoadWidget> SessionSaveLoadScreen;
-    void LoadSelectedSessionSlot();
+    bool LoadSelectedSessionSlot();
     void ExecuteCombatInput(FName Action,int32 Slot);
     void SelectCombatTarget(bool Next);
     void BeginSkillTarget(class AICCharacterBase* Caster, FName SkillID);
@@ -216,6 +221,7 @@ private:
     TObjectPtr<UICMainMenuWidget> MainMenuWidget;
     UPROPERTY(Transient) TObjectPtr<UICLoadingWidget> LoadingScreen;
     FString SaveReturnMenu;
+    FString SettingsReturnMenu;
     FString LoadReturnMenu=TEXT("Create");
     FString QuitReturnMenu;
     FString ModalReturnMenu;
@@ -225,6 +231,7 @@ private:
     bool bQuitAfterWrite=false;
     bool bSessionClosing=false;
     void ShowModal(const FString& Action,const FString& Text,int32 Slot=INDEX_NONE);
+    void ShowModal(const FString& Action,const FText& Text,int32 Slot=INDEX_NONE);
     void CompleteQuit();
     bool bItemTransactionInProgress=false;
     bool bDead=false;

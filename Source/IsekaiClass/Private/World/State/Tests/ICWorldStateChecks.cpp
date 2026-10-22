@@ -102,7 +102,7 @@ bool FICStateRoundTripCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Spawn progress"),Restored.SpawnSlots.FindChecked(TEXT("SPN_TEST_0")).bDefeated);
     TestEqual(TEXT("Ownership persists"),Restored.ContainerOwnership.Num(),1);
     TestEqual(TEXT("Storage installation persists"),Restored.StorageInstallations.Num(),1);
-    TestEqual(TEXT("Screenshot payload persists"),Loaded->Preview.ThumbnailPNG.Num(),3);
+    TestTrue(TEXT("Screenshot payload is discarded without changing gameplay state"),Loaded->Preview.ThumbnailPNG.IsEmpty());
     auto* State=NewObject<UICWorldStateSubsystem>(NewObject<UGameInstance>());TestTrue(TEXT("World restore"),State->RestoreState(Restored));
     TestEqual(TEXT("Production resumes with remaining time"),State->GetProductionRemainingSeconds(Job.JobID,Loaded->Clock.PlaySecond),27.0);
     TestEqual(TEXT("Production ready clamps at zero"),State->GetProductionRemainingSeconds(Job.JobID,400),0.0);
@@ -197,7 +197,7 @@ bool FICProductionSaveCheck::RunTest(const FString& Parameters)
     FICClockState Clock;Clock.GameMinute=900;Clock.PlaySecond=333;
     TestTrue(TEXT("Initialize production state"),WorldState->RestoreState(S));Time->RestoreClock(Clock);
     const FString Prefix=TEXT("IC_Test_WorldState_")+FGuid::NewGuid().ToString(EGuidFormats::Digits);
-    TestTrue(TEXT("Isolated save services"),Saves->ConfigureServices(WorldState,Time,Prefix));Saves->bCaptureSaveThumbnail=false;
+    TestTrue(TEXT("Isolated save services"),Saves->ConfigureServices(WorldState,Time,Prefix));
     TestTrue(TEXT("Production does not block manual save"),Saves->CanSave(false));
     TestTrue(TEXT("Production saved through actual save service"),Saves->SaveSlotSynchronously(1));
     WorldState->SetPlayerGold(10);Clock.PlaySecond=500;Time->RestoreClock(Clock);
@@ -222,7 +222,7 @@ bool FICSaveRecoveryCheck::RunTest(const FString& Parameters)
 {
     IC_TRACE_FUNCTION();auto* GI=NewObject<UGameInstance>();auto* State=NewObject<UICWorldStateSubsystem>(GI);auto* Time=NewObject<UICTimeSubsystem>(GI);auto* Saves=NewObject<UICSaveSubsystem>(GI);
     const FString Prefix=TEXT("IC_Test_Recovery_")+FGuid::NewGuid().ToString(EGuidFormats::Digits);
-    State->RestoreState(PlayerWorld());Saves->ConfigureServices(State,Time,Prefix);Saves->bCaptureSaveThumbnail=false;
+    State->RestoreState(PlayerWorld());Saves->ConfigureServices(State,Time,Prefix);
     FICClockState Clock;Clock.PlaySecond=10;Time->RestoreClock(Clock);TestTrue(TEXT("First auto save"),Saves->SaveSlotSynchronously(0));const auto First=Saves->GetSlotList()[0];
     Clock.GameMinute=900;Clock.PlaySecond=40;Time->RestoreClock(Clock);State->SetPlayerGold(321);TestTrue(TEXT("Second auto save rotates old backup"),Saves->SaveSlotSynchronously(0));
     TArray<uint8> Bytes;TestTrue(TEXT("Read only isolated auto file"),FFileHelper::LoadFileToArray(Bytes,*Saves->GetSlotPath(0)));
@@ -268,7 +268,7 @@ bool FICAsyncSlotCheck::RunTest(const FString& Parameters)
 {
     IC_TRACE_FUNCTION();auto* GI=NewObject<UGameInstance>();auto* State=NewObject<UICWorldStateSubsystem>(GI);auto* Time=NewObject<UICTimeSubsystem>(GI);auto* Saves=NewObject<UICSaveSubsystem>(GI);
     State->RestoreState(PlayerWorld());FICClockState Clock;Clock.PlaySecond=333;Time->RestoreClock(Clock);
-    Saves->ConfigureServices(State,Time,TEXT("IC_Test_Async_")+FGuid::NewGuid().ToString(EGuidFormats::Digits));Saves->bCaptureSaveThumbnail=false;
+    Saves->ConfigureServices(State,Time,TEXT("IC_Test_Async_")+FGuid::NewGuid().ToString(EGuidFormats::Digits));
     if(!TestTrue(TEXT("Async request accepted"),Saves->SaveSlot(1)))return false;
     TestTrue(TEXT("Write remains pending until game-thread completion"),Saves->bSaving);
     Clock.PlaySecond=1000;Time->RestoreClock(Clock);State->SetPlayerGold(123);
