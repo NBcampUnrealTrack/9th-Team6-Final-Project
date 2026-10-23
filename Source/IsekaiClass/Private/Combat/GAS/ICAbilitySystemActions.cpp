@@ -10,6 +10,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Combat/Actors/ICProjectile.h"
 #include "Character/Base/ICCharacterBase.h"
+#include "Player/Character/ICPlayerCharacter.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "EngineUtils.h"
@@ -23,6 +24,8 @@ FICCombatResult UICAbilitySystemComponent::RequestAction(FName Action,FName Skil
 {
     IC_TRACE_FUNCTION();FICCombatResult Result;
     if(Action==TEXT("BlockEnd")){SetGuarding(false);Result.bSuccess=true;return Result;}
+    if(const auto* Player=Cast<AICPlayerCharacter>(GetAvatarActor());Player&&Player->IsSwitchingWeapon())
+    {Result.Reason=ICText::Get(TEXT("Native_fd75bc5b6f2b")).ToString();return Result;}
     if(Action!=TEXT("Attack")&&Action!=TEXT("BlockStart")&&Action!=TEXT("Dodge")&&Action!=TEXT("Skill")){Result.Reason=ICText::Get(TEXT("Native_ea5b77a89d9b")).ToString();return Result;}
     if(!IsAlive()||HasMatchingGameplayTag(ICTags::Returning)||HasMatchingGameplayTag(ICTags::Staggered)){Result.Reason=ICText::Get(TEXT("Native_1c6d5b86f441")).ToString();return Result;}
     if(Action==TEXT("Attack")&&RunningAbility&&RequestedAction==TEXT("Attack"))
@@ -92,6 +95,7 @@ bool UICAbilitySystemComponent::ValidateAction(FString& Reason) const
     const bool NeedWeapon=RequestedAction==TEXT("Attack")||(RequestedAction==TEXT("Skill")&&Skill.bRequiresEquippedWeapon);
     if(NeedWeapon&&Primary)
     {
+        if(GetEquippedWeaponFamily()==EICWeaponFamily::None){Reason=ICText::Get(TEXT("Native_ea2dc7f92393")).ToString();return false;}
         const auto Items=Runtime.Kind==EICCharacterKind::Player&&GetOwner()->FindComponentByClass<UICInventoryComponent>()?GetOwner()->FindComponentByClass<UICInventoryComponent>()->GetSnapshot().Equipment:Runtime.Equipment;
         bool Found=false;for(const auto& Item:Items)
         {const auto* I=D->Find<FICItemRow>(Item.ItemID,R);const auto* E=I?D->Find<FICEquipmentRow>(I->EquipmentID,R):nullptr;

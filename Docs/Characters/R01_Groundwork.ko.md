@@ -81,6 +81,27 @@ Shift는 기존 회피 대시 규칙을 유지한다. 순간 이동과 대시를
 
 ## 무기 교체
 
+플레이어는 칼·활·마법 스태프·치유 완드의 장착칸을 각각 하나씩 가진다.
+새 게임은 기존 선택에 따른 초보자용 무기 한 종류만 지급하고 빈손으로 시작한다.
+우클릭은 장착된 칸만 정해진 순서로 돌고 마지막에는 빈손으로 돌아온다.
+장착 무기가 1/2/3/4개라면 각각 그 개수만큼 꺼낸 후 빈손이 되며, 가방에만 있는
+무기는 순환하지 않는다. 넣기는 장착 해제가 아니므로 장착칸과 가방 내용은 유지한다.
+
+다른 무기로 바꿀 때는 이전 무기 넣기 → 다음 무기 꺼내기를 한 번의 입력으로
+재생한다. 마지막 무기에서는 넣기만 재생한다. Montage의 ICWeapon Notify가 손의
+무기를 숨기거나 표시하며, 전환 중 연타·공격·기술은 실행되지 않는다. 중단·사망·로드는
+진행 중 동작을 정리하고 마지막으로 확정된 꺼냄/넣음 상태를 사용한다.
+
+FICInventoryState의 Equipment[Weapon]은 전투에 선택한 인스턴스를 유지하고,
+WeaponSlots에는 나머지 장착 무기만 보관한다. GetWeaponLoadout()은 둘을 합쳐
+항상 칼/활/스태프/완드 순서의 4칸을 반환한다. 같은 인스턴스를 중복 저장하지 않으며,
+기존 세이브의 무기 한 칸도 그대로 읽는다. bWeaponSheathed와 모든 장착 무기는
+기존 저장 경로에 함께 직렬화된다.
+
+Tools/Characters/setup_weapon_switch.py는 남녀 플레이어의 빈손 이동과 무기별
+넣기·꺼내기 Montage 및 UI 문구를 연결한다. 원본 클립과 NPC 설정은 유지한다.
+회귀 검사는 IC.Input.WeaponCycle* 및 IC.Input.WeaponSwitchAndIndependentCooldowns에 있다.
+
 장비 DT의 WeaponActorClass가 공통 AICWeaponActor를 상속한 BP를 가리킨다.
 BP가 원본 메시를 보유하고, 기존 WeaponMesh 필드는 필요할 때의 명시적 메시
 오버라이드로 남긴다. 초기 무기는 Arming_Sword, Bow_2, Bone_Spear_2,

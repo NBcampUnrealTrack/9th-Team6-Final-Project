@@ -215,7 +215,7 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     if(Command==EICInputCommand::Interact) { Interact(); return; }
     if(Command==EICInputCommand::Fishing) { RequestFishing(); return; }
     if(Command==EICInputCommand::SwitchWeapon)
-    { if(GetInventory()&&GetInventory()->CycleWeapon()) { FlushWorldState(); bDirty=true; OnCombatRequest.Broadcast(TEXT("SwitchWeapon"),0); } return; }
+    { if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());PlayerPawn&&PlayerPawn->RequestCycleWeapon()) { FlushWorldState(); bDirty=true; OnCombatRequest.Broadcast(TEXT("SwitchWeapon"),0); } return; }
     FName Action=NAME_None;
     switch(Command)
     {

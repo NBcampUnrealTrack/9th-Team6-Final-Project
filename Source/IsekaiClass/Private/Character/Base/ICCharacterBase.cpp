@@ -17,20 +17,24 @@ void AICCharacterBase::UpdatePresentationTransform(float GroundOffsetCm, const F
     if(PresentationMesh.Get()!=CharacterMesh->GetSkeletalMeshAsset())
     {PresentationMesh=CharacterMesh->GetSkeletalMeshAsset();StandingMeshTransform=CharacterMesh->GetRelativeTransform();bSleepPresentation=false;}
     const bool Sleeping=BedAnchor!=nullptr;
-    if(Sleeping)CharacterMesh->SetWorldTransform(Profile->SleepMeshTransform * *BedAnchor, false, nullptr, ETeleportType::TeleportPhysics);
+    // SkeletalMesh MoveComponent resets animation dynamics for every teleport,
+    // even when the requested transform is unchanged. Routine presentation
+    // updates must preserve spring state; the transition below resets it once.
+    if(Sleeping)CharacterMesh->SetWorldTransform(Profile->SleepMeshTransform * *BedAnchor, false, nullptr, ETeleportType::None);
     else
     {
         auto Transform=StandingMeshTransform;Transform.AddToTranslation(FVector(0,0,GroundOffsetCm));
-        CharacterMesh->SetRelativeTransform(Transform,false,nullptr,ETeleportType::TeleportPhysics);
+        CharacterMesh->SetRelativeTransform(Transform,false,nullptr,ETeleportType::None);
     }
     if(Sleeping!=bSleepPresentation)
     {
         // A large bed/standing pose change must not leave spring bones carrying the previous pose's inertia.
         CharacterMesh->ResetAnimInstanceDynamics(ETeleportType::ResetPhysics);
-        if(EquippedWeaponActor)EquippedWeaponActor->SetActorHiddenInGame(Sleeping);
+        if(EquippedWeaponActor)EquippedWeaponActor->SetActorHiddenInGame(Sleeping||bWeaponSheathed);
         bSleepPresentation=Sleeping;
     }
-    if(EquippedWeaponActor&&EquippedWeaponActor->IsHidden()!=Sleeping)EquippedWeaponActor->SetActorHiddenInGame(Sleeping);
+    const bool HideWeapon=Sleeping||bWeaponSheathed;
+    if(EquippedWeaponActor&&EquippedWeaponActor->IsHidden()!=HideWeapon)EquippedWeaponActor->SetActorHiddenInGame(HideWeapon);
 }
 AICCharacterBase::AICCharacterBase()
 {
@@ -42,9 +46,15 @@ void AICCharacterBase::RefreshWeaponAppearance()
     auto* D = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
     const auto State = AbilitySystem->Capture();
     const auto* Inventory = FindComponentByClass<UICInventoryComponent>();
-    const auto Items = Inventory ? Inventory->GetSnapshot().Equipment : State.Equipment;
+    const auto InventoryState = Inventory ? Inventory->GetSnapshot() : FICInventoryState();
+    bWeaponSheathed = Inventory && InventoryState.bWeaponSheathed;
+    const auto Items = Inventory ? InventoryState.Equipment : State.Equipment;
     const FName ItemID = Items.IsValidIndex(0) ? Items[0].ItemID : NAME_None;
-    if (ItemID == VisualEquipmentID) return;
+    if (ItemID == VisualEquipmentID)
+    {
+        if (EquippedWeaponActor) EquippedWeaponActor->SetActorHiddenInGame(bSleepPresentation||bWeaponSheathed);
+        return;
+    }
     VisualEquipmentID = ItemID;
     FICDefinitionResult Result;
     const auto* Item = D ? D->Find<FICItemRow>(ItemID, Result) : nullptr;
@@ -60,7 +70,7 @@ void AICCharacterBase::RefreshWeaponAppearance()
         EquippedWeaponActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Gear->AttachSocket);
         EquippedWeaponActor->SetActorRelativeTransform(Gear->AttachmentTransform);
         EquippedWeaponActor->Configure(*Gear);
-        EquippedWeaponActor->SetActorHiddenInGame(bSleepPresentation);
+        EquippedWeaponActor->SetActorHiddenInGame(bSleepPresentation||bWeaponSheathed);
     }
 }
 UICCharacterAnimationProfile* AICCharacterBase::GetAnimationProfile()

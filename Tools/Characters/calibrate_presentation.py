@@ -10,7 +10,7 @@ import unreal as u
 try:
     path=Path(u.Paths.project_dir())/'Tools/Characters/setup_assets.py'
     setup={}
-    exec(compile(path.read_text(encoding='utf-8').split('\ntry:main()')[0],str(path),'exec'),setup)
+    exec(compile(path.read_text(encoding='utf-8').split('\nif __name__ ==')[0],str(path),'exec'),setup)
     for index in range(13):
         player=index<2
         identifier=('PLAYER_M' if index==0 else 'PLAYER_F') if player else f'NPC_R01_{index-1:03}'

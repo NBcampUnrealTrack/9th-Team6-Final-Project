@@ -105,6 +105,7 @@ void AICPlayerController::CreatePlayer()
             if (!Staging->AddItem(Item.ItemID, Item.Count, false))
             { ReportCreationFailure(ICText::Format(TEXT("Native_076d416ae618"), *Item.ItemID.ToString())); return; }
         FICInventoryState Data = Staging->GetSnapshot();
+        Data.bWeaponSheathed = true;
         Data.QuickSlots = Rules->StartingQuickSlots;
         if (!Inventory->ValidateSnapshot(Data))
         { ReportCreationFailure(*ICText::Get(TEXT("Native_b322167a84ef")).ToString()); return; }
