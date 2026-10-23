@@ -34,6 +34,7 @@ void ICSaveDataMigration::NormalizeInventoryIDs(FICWorldState& State)
     for(auto& Value:State.Inventory.Bag.Slots)Item(Value);
     for(auto& Value:State.Inventory.QuestItems)Item(Value);
     for(auto& Value:State.Inventory.Equipment)Item(Value);
+    for(auto& Value:State.Inventory.WeaponSlots)Item(Value);
     for(auto& Container:State.Inventory.Storage)for(auto& Value:Container.Value.Slots)Item(Value);
     for(auto& Value:State.Inventory.QuickSlots)ID(Value);
     for(auto& Character:State.Characters)for(auto& Value:Character.Value.Equipment)Item(Value);

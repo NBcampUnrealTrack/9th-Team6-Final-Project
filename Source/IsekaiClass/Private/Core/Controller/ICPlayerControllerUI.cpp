@@ -51,6 +51,7 @@ void AICPlayerController::ExecuteUI(const FString& Command,int32 Index)
     if(Command==TEXT("Chest")){SelectedStorage=Index;bDirty=true;return;}
     if(Command==TEXT("Sort"))Inventory->SortBag();
     else if(Command==TEXT("Unequip"))Inventory->Unequip(static_cast<EPlayerEquipSlot>(Index));
+    else if(Command==TEXT("UnequipWeapon"))Inventory->UnequipWeapon(static_cast<EICWeaponFamily>(Index));
     else if(Command==TEXT("Expand"))Inventory->ExpandUsingTicket();
     else if(Command==TEXT("Withdraw"))Inventory->Transfer(OpenStorage,SelectedStorage,false);
     else if(Snapshot.Bag.Slots.IsValidIndex(SelectedBag))

@@ -52,4 +52,5 @@ private:
     TWeakObjectPtr<USkeletalMesh> PresentationMesh;
     FTransform StandingMeshTransform;
     bool bSleepPresentation = false;
+    bool bWeaponSheathed = false;
 };

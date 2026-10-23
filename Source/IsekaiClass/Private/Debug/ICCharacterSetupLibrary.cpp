@@ -9,13 +9,43 @@
 #include "Animation/Skeleton.h"
 #include "AnimationBlueprintLibrary.h"
 #include "Combat/Animation/ICCombatAnimNotify.h"
+#include "Combat/Animation/ICWeaponAnimNotify.h"
 #include "Misc/PackageName.h"
 #include "Components/BoxComponent.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 #include "NavigationSystem.h"
 #include "NavigationData.h"
 #include "EngineUtils.h"
+#include "Core/Controller/ICPlayerController.h"
+#include "Save/ICSaveSubsystem.h"
+#include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
+#include "UnrealClient.h"
 #endif
+
+bool UICCharacterSetupLibrary::PrepareLiveCharacterReview(UWorld* World)
+{
+#if WITH_EDITOR
+    if(!World||World->WorldType!=EWorldType::PIE)return false;
+    auto* PC=Cast<AICPlayerController>(UGameplayStatics::GetPlayerController(World,0));
+    if(!PC||PC->bCreated||PC->Menu!=TEXT("Create")||!PC->GetSaves())return false;
+    if(!PC->GetSaves()->ConfigureServices(PC->GetWorldState(),PC->GetTime(),TEXT("IC_Visual_")+FGuid::NewGuid().ToString(EGuidFormats::Digits)))return false;
+    PC->PlayerName=TEXT("VisualReview");
+    return PC->DebugCreatePlayer();
+#else
+    return false;
+#endif
+}
+
+void UICCharacterSetupLibrary::CaptureLiveCharacterReview(UWorld* World,const FString& Name)
+{
+#if WITH_EDITOR
+    if(!World||World->WorldType!=EWorldType::PIE)return;
+    const FString Folder=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("LiveCharacterReview"));
+    IFileManager::Get().MakeDirectory(*Folder,true);
+    FScreenshotRequest::RequestScreenshot(Folder/(FPaths::MakeValidFileName(Name)+TEXT(".png")),false,false);
+#endif
+}
 
 bool UICCharacterSetupLibrary::PrepareTestNavigation(UWorld* World)
 {
@@ -137,6 +167,27 @@ UAnimMontage* UICCharacterSetupLibrary::CreateActionMontage(const FString& Path,
         if(Notify)Notify->Event=TEXT("AN_EffectCommit");
     }
     Asset->PostEditChange();if(!Existing)FAssetRegistryModule::AssetCreated(Asset);Asset->MarkPackageDirty();return Asset;
+#else
+    return nullptr;
+#endif
+}
+
+UAnimMontage* UICCharacterSetupLibrary::CreateWeaponTransitionMontage(const FString& Path,UAnimSequence* Sequence,bool bDraw,float VisibilityFraction)
+{
+#if WITH_EDITOR
+    auto* Montage=CreateActionMontage(Path,Sequence,false);
+    if(!Montage)return nullptr;
+    const FName TrackName=TEXT("ICWeapon");
+    if(Montage->AnimNotifyTracks.ContainsByPredicate([&](const FAnimNotifyTrack& Track){return Track.TrackName==TrackName;}))
+        UAnimationBlueprintLibrary::RemoveAnimationNotifyTrack(Montage,TrackName);
+    UAnimationBlueprintLibrary::AddAnimationNotifyTrack(Montage,TrackName);
+    auto* Notify=Cast<UICWeaponAnimNotify>(UAnimationBlueprintLibrary::AddAnimationNotifyEvent(
+        Montage,TrackName,Sequence->GetPlayLength()*FMath::Clamp(VisibilityFraction,.05f,.95f),UICWeaponAnimNotify::StaticClass()));
+    if(!Notify)return nullptr;
+    Notify->bDraw=bDraw;
+    Montage->BlendIn.SetBlendTime(.12f);Montage->BlendOut.SetBlendTime(.12f);
+    Montage->PostEditChange();Montage->MarkPackageDirty();
+    return Montage;
 #else
     return nullptr;
 #endif

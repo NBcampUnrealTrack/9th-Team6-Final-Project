@@ -29,7 +29,7 @@ def run():
         check(row['ClassID']==classes[family],key+' fixed class')
         check(row['bClassmate']==(number>=9),key+' classmate flag')
         check(row['bEndingTarget'] is False,key+' ending registration deferred')
-        check(row['GiftPreferenceID']=='GIFT_R01_COMMON',key+' common gift')
+        check(row['GiftPreferenceID']==('GIFT_R01_HERO' if number==8 else 'GIFT_R01_COMMON'),key+' approved gift preference')
         check(combat[row['RecruitCombatID']]['WeaponFamily']==family,key+' fixed weapon family')
         bp=u.load_asset(GAME+'/NPC/Blueprints/R01/BP_'+key)
         check(bp is not None,key+' Blueprint exists')
@@ -63,6 +63,31 @@ def verify_profile(profile,mesh,count,key):
             animation=getattr(entry,name)
             check(animation is not None,key+' '+str(family)+' '+name+' assigned')
             check(animation.get_editor_property('skeleton')==skeleton,key+' '+str(family)+' '+name+' target skeleton')
+    verify_springs(mesh,key)
+
+
+def verify_springs(mesh,key):
+    folder=mesh.get_path_name().rsplit('/',1)[0]
+    name=mesh.get_name().removeprefix('SK_')
+    meta=u.load_asset(folder+'/VM_'+name+'_VrmMeta')
+    check(meta is not None,key+' VRM metadata loads')
+    if not meta:return
+    check(mesh.get_editor_property('post_process_anim_blueprint') is not None,key+' VRM post process assigned')
+    data=meta.get_editor_property('vrm1_spring_bone_meta')
+    groups=data.get_editor_property('collider_groups');colliders=data.get_editor_property('colliders')
+    bones=[str(bone) for bone in u.ICCharacterSetupLibrary.get_character_bones(mesh)]
+    valid=True;linked=True
+    for spring in data.get_editor_property('springs'):
+        joints=spring.get_editor_property('joints');links=spring.get_editor_property('collider_groups')
+        root=str(joints[0].get_editor_property('bone_name')) if joints else ''
+        if any(word in root.lower() for word in ['skirt','sleeve','hair']):linked=linked and bool(links)
+        for joint in joints:
+            index=joint.get_editor_property('bone_no')
+            valid=valid and 0<=index<len(bones) and bones[index]==str(joint.get_editor_property('bone_name'))
+        valid=valid and all(0<=index<len(groups) for index in links)
+    for group in groups:valid=valid and all(0<=index<len(colliders) for index in group.get_editor_property('colliders'))
+    check(valid,key+' spring bones and collider indices are valid')
+    check(linked,key+' hair and clothing chains have body collision links')
 
 
 run()

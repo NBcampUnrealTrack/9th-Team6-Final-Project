@@ -335,8 +335,11 @@ public:
             Test->TestEqual(TEXT("Answers survive map travel"), Snapshot.CreationAnswers.Music, 2);
             Test->TestEqual(TEXT("Gender follows answer"), PC->Preset, 1);
             Test->TestEqual(TEXT("No NPC fabricated for unconfigured choice"), Snapshot.CreationAnswers.Story, 2);
-            Test->TestEqual(TEXT("Staff granted by music choice"), PC->GetInventory()->GetEquippedWeaponFamily(),
+            Test->TestEqual(TEXT("Staff granted by music choice"), PC->GetInventory()->GetSelectedWeaponFamily(),
                             EICWeaponFamily::Staff);
+            Test->TestEqual(TEXT("New game starts with empty hands"), PC->GetInventory()->GetEquippedWeaponFamily(),
+                            EICWeaponFamily::None);
+            Test->TestTrue(TEXT("Starting weapon is owned but put away"), Snapshot.Inventory.bWeaponSheathed);
             Test->TestTrue(TEXT("Initial auto save completed"),
                            PC->GetSaves()->GetSlotList()[0].bValid && !PC->GetSaves()->bSaving);
             Test->TestNotNull(TEXT("HUD mounted"), PC->Screen.Get());

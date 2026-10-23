@@ -4,6 +4,13 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Player/Character/ICPlayerCharacter.h"
+#include "Character/Animation/ICCharacterAnimationProfile.h"
+#include "Character/Animation/ICCharacterAnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Animation/AnimMontage.h"
+#include "Save/ICSaveGame.h"
+#include "Kismet/GameplayStatics.h"
 #include "Enemy/Character/ICEnemyBase.h"
 #include "NPC/Character/ICNPCBase.h"
 #include "AI/ICAIController.h"
@@ -262,7 +269,7 @@ void ConfigureInputWeapons(FGASFixture& F)
     F.Skills->AddRow(BowSkill.ID,BowSkill);
     F.Definitions->ConfigureCatalog(F.Catalog);
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(F.Definitions,0);
-    check(Staging->AddItem(SwordItem.ID,1,false));check(Staging->Equip(0));check(Staging->AddItem(BowItem.ID,1,false));
+    check(Staging->AddItem(SwordItem.ID,1,false));check(Staging->Equip(0));check(Staging->AddItem(BowItem.ID,1,false));check(Staging->Equip(0));
     check(F.Player->Inventory->ApplySnapshot(Staging->GetSnapshot()));
     auto Player=F.ASC->Capture();Player.UnlockedSkillIDs.Add(BowSkill.ID);check(F.ASC->Restore(Player));
 }
@@ -301,7 +308,165 @@ bool FICInputWeaponCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Load restores skill loadout and cooldowns"),F.ASC->Restore(Saved));
     TestEqual(TEXT("Saved weapon skill remains equipped"),F.ASC->GetCurrentWeaponSkill(),BowID);
     TestEqual(TEXT("Saved bow cooldown is unchanged"),F.ASC->GetSkillCooldownRemaining(BowID),7.);
-    TestEqual(TEXT("Both weapons remain owned"),Inventory->GetSnapshot().Bag.Slots[0].Count+Inventory->GetSnapshot().Equipment[0].Count,2);
+    TestEqual(TEXT("Both weapons remain in their equipment slots"),Inventory->GetWeaponLoadout()[0].Count+Inventory->GetWeaponLoadout()[1].Count,2);
+    TestTrue(TEXT("Switching does not put either weapon in the bag"),Inventory->GetSnapshot().Bag.Slots[0].IsEmpty());
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICEmptyHandCycleCheck,"IC.Input.WeaponCycleEmptyHandsAndFullBag",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICEmptyHandCycleCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    auto* Inventory=F.Player->Inventory.Get();
+    auto OnlySword=Inventory->GetSnapshot();
+    OnlySword.WeaponSlots[1]=FPlayerItemInstance();
+    OnlySword.bWeaponSheathed=true;
+    const FGuid SwordID=OnlySword.Equipment[0].InstanceID;
+    TestTrue(TEXT("Single owned weapon can start put away"),Inventory->ApplySnapshot(OnlySword));
+    TestEqual(TEXT("Put-away weapon is not an active family"),F.ASC->GetEquippedWeaponFamily(),EICWeaponFamily::None);
+    TestTrue(TEXT("Empty hands have no Q skill"),F.ASC->GetCurrentWeaponSkill().IsNone());
+    TestFalse(TEXT("An owned but put-away weapon cannot attack"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,F.Player).bSuccess);
+    TestFalse(TEXT("An owned but put-away weapon cannot cast its weapon skill"),F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player).bSuccess);
+    TestTrue(TEXT("Own an unequipped bow in the bag"),Inventory->AddItem(TEXT("ITM_INPUT_997"),1,false));
+    for(int32 Index=1;Index<OnlySword.Bag.Slots.Num();++Index)
+        TestTrue(TEXT("Fill every bag slot with a separate same-family weapon"),Inventory->AddItem(OnlySword.Equipment[0].ItemID,1,false));
+    for(int32 Repeat=0;Repeat<3;++Repeat)
+    {
+        TestTrue(TEXT("Single-weapon cycle draws even when the bag is full"),Inventory->CycleWeapon());
+        TestEqual(TEXT("Draw selects the owned sword"),F.ASC->GetEquippedWeaponFamily(),EICWeaponFamily::Sword);
+        TestTrue(TEXT("Single-weapon cycle returns to empty hands"),Inventory->CycleWeapon());
+        TestTrue(TEXT("Weapon is put away"),Inventory->IsWeaponSheathed());
+        TestEqual(TEXT("Repeated cycles preserve the selected instance"),Inventory->GetSnapshot().Equipment[0].InstanceID,SwordID);
+        TestTrue(TEXT("Bow in the bag never enters the equipment cycle"),Inventory->GetWeaponLoadout()[1].IsEmpty());
+    }
+    TestTrue(TEXT("Full bag remains valid"),Inventory->ValidateState());
+    auto Empty=FICInventoryState();
+    TestTrue(TEXT("No-weapon state is valid"),Inventory->ApplySnapshot(Empty));
+    TestFalse(TEXT("Right click without any weapon does nothing"),F.Player->RequestCycleWeapon());
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICWeaponCycleSaveCheck,"IC.Input.WeaponCycleOrderAndSave",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICWeaponCycleSaveCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    auto* Inventory=F.Player->Inventory.Get();
+    const FGuid SwordID=Inventory->GetSnapshot().Equipment[0].InstanceID;
+    for(const auto Family:{EICWeaponFamily::Bow,EICWeaponFamily::None,EICWeaponFamily::Sword,EICWeaponFamily::Bow,EICWeaponFamily::None})
+    {
+        TestTrue(TEXT("Cycle advances through owned families and empty hands"),Inventory->CycleWeapon());
+        TestEqual(TEXT("Missing families are skipped and empty hands follow the last family"),Inventory->GetEquippedWeaponFamily(),Family);
+        auto* Save=NewObject<UICSaveGame>();Save->WorldState=F.State->ExportState();Save->Clock=F.Time->GetClock();
+        TArray<uint8> Bytes;
+        TestTrue(TEXT("Weapon state encodes in the real save envelope"),UICSaveGame::EncodeForFile(Save,Bytes));
+        auto* Loaded=UICSaveGame::DecodeFile(Bytes);
+        if(!TestNotNull(TEXT("Weapon state decodes from the real save envelope"),Loaded))return false;
+        TestEqual(TEXT("Drawn/put-away flag survives serialization"),Loaded->WorldState.Inventory.bWeaponSheathed,Inventory->IsWeaponSheathed());
+        TestEqual(TEXT("Selected weapon instance survives serialization"),Loaded->WorldState.Inventory.Equipment[0].InstanceID,Inventory->GetSnapshot().Equipment[0].InstanceID);
+        TestTrue(TEXT("Loaded inventory restores"),Inventory->ApplySnapshot(Loaded->WorldState.Inventory));
+    }
+    TestTrue(TEXT("Removing the sword from its equipment slot puts it in the bag"),Inventory->UnequipWeapon(EICWeaponFamily::Sword));
+    TestTrue(TEXT("Empty hands can still draw the selected bow"),Inventory->CycleWeapon());
+    TestEqual(TEXT("An unequipped sword in the bag is skipped"),Inventory->GetEquippedWeaponFamily(),EICWeaponFamily::Bow);
+    TestEqual(TEXT("The unequipped sword instance remains owned"),Inventory->GetSnapshot().Bag.Slots[0].InstanceID,SwordID);
+    TestTrue(TEXT("Sword equipment slot is now empty"),Inventory->GetWeaponLoadout()[0].IsEmpty());
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICWeaponMontageCycleCheck,"IC.Input.WeaponCycleMontageAndInterruption",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICWeaponMontageCycleCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    auto* Player=F.Player;auto* Inventory=Player->Inventory.Get();
+    auto* Mesh=LoadObject<USkeletalMesh>(nullptr,TEXT("/Game/IsekaiClass/Player/SamplePlayer/Male/SK_Player_M.SK_Player_M"));
+    auto* Profile=LoadObject<UICCharacterAnimationProfile>(nullptr,TEXT("/Game/IsekaiClass/Animation/Player/MainMale/DA_ANIM_PLAYER_M.DA_ANIM_PLAYER_M"));
+    if(!TestNotNull(TEXT("Player mesh"),Mesh)||!TestNotNull(TEXT("Authored player animation profile"),Profile))return false;
+    TestNotNull(TEXT("Dedicated empty-hand locomotion"),Profile->Unarmed.Locomotion.Get());
+    for(const auto& Entry:Profile->WeaponSets)
+    { TestNotNull(TEXT("Every weapon family has a draw montage"),Entry.Value.Draw.Get());TestNotNull(TEXT("Every weapon family has a put-away montage"),Entry.Value.Sheathe.Get()); }
+    Player->AnimationProfile=Profile;Player->GetMesh()->SetSkeletalMesh(Mesh);Player->GetMesh()->SetAnimInstanceClass(UICCharacterAnimInstance::StaticClass());
+    auto Step=[&](float Seconds)
+    {
+        for(float Elapsed=0;Elapsed<Seconds;Elapsed+=.025f)
+        {Player->GetMesh()->TickAnimation(.025f,false);Player->GetMesh()->RefreshBoneTransforms();Player->GetMesh()->ConditionallyDispatchQueuedAnimEvents();}
+    };
+    Inventory->SetWeaponSheathed(true);Step(.05f);
+    auto* Anim=Cast<UICCharacterAnimInstance>(Player->GetMesh()->GetAnimInstance());
+    if(!TestNotNull(TEXT("Player native animation instance"),Anim))return false;
+    TestEqual(TEXT("Empty hands select the neutral locomotion"),Anim->Locomotion.Get(),Profile->Unarmed.Locomotion.Get());
+    TestTrue(TEXT("Right click begins drawing"),Player->RequestCycleWeapon());
+    TestTrue(TEXT("Drawing is an active transition"),Player->IsSwitchingWeapon());
+    TestTrue(TEXT("Weapon remains put away before the draw notify"),Inventory->IsWeaponSheathed());
+    TestFalse(TEXT("Repeated right click cannot skip the current transition"),Player->RequestCycleWeapon());
+    TestFalse(TEXT("Attack is blocked during the transition"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,Player).bSuccess);
+    TestFalse(TEXT("Weapon skill is blocked during the transition"),F.ASC->RequestAction(TEXT("Skill"),F.SkillID,Player).bSuccess);
+    const auto* Sword=Profile->WeaponSets.Find(EICWeaponFamily::Sword);
+    Step(Sword->Draw->GetPlayLength()*.7f);
+    TestFalse(TEXT("Draw notify reveals the weapon before the montage ends"),Inventory->IsWeaponSheathed());
+    TestTrue(TEXT("Recovery remains locked after reveal"),Player->IsSwitchingWeapon());
+    Step(Sword->Draw->GetPlayLength());
+    TestFalse(TEXT("Draw completion unlocks input"),Player->IsSwitchingWeapon());
+    TestEqual(TEXT("Sword is active after drawing"),Inventory->GetEquippedWeaponFamily(),EICWeaponFamily::Sword);
+    TestTrue(TEXT("Right click begins sword-to-bow transition"),Player->RequestCycleWeapon());
+    Step(Sword->Sheathe->GetPlayLength()*.7f);
+    TestTrue(TEXT("Put-away notify creates a temporary empty-hand interval"),Inventory->IsWeaponSheathed());
+    TestTrue(TEXT("Transition continues without another click"),Player->IsSwitchingWeapon());
+    Step(Sword->Sheathe->GetPlayLength()+Profile->WeaponSets[EICWeaponFamily::Bow].Draw->GetPlayLength()+.5f);
+    TestFalse(TEXT("Both montages complete from one click"),Player->IsSwitchingWeapon());
+    TestEqual(TEXT("Bow is now active"),Inventory->GetEquippedWeaponFamily(),EICWeaponFamily::Bow);
+    TestTrue(TEXT("Last weapon begins putting away"),Player->RequestCycleWeapon());
+    Step(Profile->WeaponSets[EICWeaponFamily::Bow].Sheathe->GetPlayLength()+.5f);
+    TestEqual(TEXT("Last weapon ends at empty hands"),Inventory->GetEquippedWeaponFamily(),EICWeaponFamily::None);
+    TestFalse(TEXT("Empty-hand state unlocks input"),Player->IsSwitchingWeapon());
+    TestTrue(TEXT("New cycle begins drawing the first weapon"),Player->RequestCycleWeapon());
+    Anim->Montage_Stop(0);
+    Step(.1f);
+    TestFalse(TEXT("Interrupted montage cannot leave switching stuck"),Player->IsSwitchingWeapon());
+    TestTrue(TEXT("Interrupted early draw keeps the weapon put away"),Inventory->IsWeaponSheathed());
+    TestFalse(TEXT("Stale or invalid montage notifications are rejected"),Player->NotifyWeaponVisibility(INDEX_NONE,true));
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICFourWeaponCycleCheck,"IC.Input.WeaponCycleFourFamilies",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICFourWeaponCycleCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    UDataTable* Items=nullptr;UDataTable* Equipment=nullptr;
+    for(const auto& Binding:F.Catalog->Tables)
+    {
+        if(Binding.RowStruct==FICItemRow::StaticStruct())Items=Binding.Table.LoadSynchronous();
+        if(Binding.RowStruct==FICEquipmentRow::StaticStruct())Equipment=Binding.Table.LoadSynchronous();
+    }
+    for(const auto& Pair:TArray<TPair<EICWeaponFamily,FString>>{{EICWeaponFamily::Staff,TEXT("996")},{EICWeaponFamily::Wand,TEXT("995")}})
+    {
+        auto Item=*Items->FindRow<FICItemRow>(TEXT("ITM_INPUT_998"),TEXT("Four weapons"));
+        auto Gear=*Equipment->FindRow<FICEquipmentRow>(TEXT("EQP_INPUT_998"),TEXT("Four weapons"));
+        Item.ID=FName(*(TEXT("ITM_INPUT_")+Pair.Value));Item.ItemID=Item.ID;Item.EquipmentID=FName(*(TEXT("EQP_INPUT_")+Pair.Value));
+        Gear.ID=Item.EquipmentID;Gear.ItemID=Item.ID;Gear.WeaponFamily=Pair.Key;
+        Items->AddRow(Item.ID,Item);Equipment->AddRow(Gear.ID,Gear);
+    }
+    F.Definitions->ConfigureCatalog(F.Catalog);
+    auto* Inventory=F.Player->Inventory.Get();
+    TestTrue(TEXT("Own staff"),Inventory->AddItem(TEXT("ITM_INPUT_996"),1,false));
+    TestTrue(TEXT("Staff has its own equipment slot"),Inventory->Equip(0));
+    for(const auto Expected:{EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::None,EICWeaponFamily::Sword})
+    {
+        TestTrue(TEXT("Three equipped weapons cycle"),Inventory->CycleWeapon());
+        TestEqual(TEXT("Three weapons return to empty hands after the third"),Inventory->GetEquippedWeaponFamily(),Expected);
+    }
+    TestTrue(TEXT("Own wand"),Inventory->AddItem(TEXT("ITM_INPUT_995"),1,false));
+    TestTrue(TEXT("Healing wand has its own equipment slot"),Inventory->Equip(0));
+    const auto Slots=Inventory->GetWeaponLoadout();
+    for(const auto Expected:{EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::Wand,EICWeaponFamily::None,EICWeaponFamily::Sword})
+    {
+        TestTrue(TEXT("Four-weapon cycle advances"),Inventory->CycleWeapon());
+        TestEqual(TEXT("Sword, bow, staff, wand, empty hands repeat in order"),Inventory->GetEquippedWeaponFamily(),Expected);
+        const auto CurrentSlots=Inventory->GetWeaponLoadout();
+        for(int32 Index=0;Index<4;++Index)
+            TestEqual(TEXT("Every weapon stays in the same family equipment slot"),CurrentSlots[Index].InstanceID,Slots[Index].InstanceID);
+        for(const auto& Item:Inventory->GetSnapshot().Bag.Slots)
+            TestTrue(TEXT("Cycling all four weapons leaves the bag empty"),Item.IsEmpty());
+    }
     return !HasAnyErrors();
 }
 

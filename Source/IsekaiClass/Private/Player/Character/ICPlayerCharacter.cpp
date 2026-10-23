@@ -43,6 +43,7 @@ void AICPlayerCharacter::HandleZeroHP()
 {
     IC_TRACE_FUNCTION();
     if(bZeroHPHandled)return;
+    CancelWeaponTransition();
     if(auto* PC=Cast<AICPlayerController>(GetController()))PC->PlayerDied();
     Super::HandleZeroHP();
 }
@@ -50,6 +51,7 @@ void AICPlayerCharacter::HandleZeroHP()
 void AICPlayerCharacter::ApplyPreset(int32 Preset)
 {
     IC_TRACE_FUNCTION();
+    CancelWeaponTransition();
     CurrentPreset=Preset;
     if (auto* D = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>() : nullptr)
     {

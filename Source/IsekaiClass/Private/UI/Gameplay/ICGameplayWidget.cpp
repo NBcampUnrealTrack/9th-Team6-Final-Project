@@ -7,6 +7,10 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/ProgressBar.h"
+#include "Components/Border.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/ScrollBox.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 
@@ -34,6 +38,25 @@ void UICGameplayWidget::NativeOnInitialized()
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::GameSettings);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Quit"))))
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::Quit);
+    if (auto* Scroll=Cast<UScrollBox>(GetWidgetFromName(TEXT("MenuScroll")));Scroll&&!GetWidgetFromName(TEXT("WeaponSlots")))
+    {
+        auto* Body=GetWidgetFromName(TEXT("TXT_MenuBody"));
+        Scroll->ClearChildren();
+        auto* Slots=WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("WeaponSlots"));
+        Scroll->AddChild(Slots);
+        for (int32 Index=0;Index<4;++Index)
+        {
+            auto* Border=WidgetTree->ConstructWidget<UBorder>();
+            Border->SetPadding(FMargin(10));Border->SetBrushColor(FLinearColor(.07f,.10f,.15f,1));
+            auto* Label=WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),FName(*FString::Printf(TEXT("TXT_WeaponSlot%d"),Index)));
+            Label->SetFont(ICFrontendLayout::Font(16,false));Label->SetAutoWrapText(true);
+            Border->SetContent(Label);
+            auto* CellSlot=Slots->AddChildToHorizontalBox(Border);
+            CellSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));CellSlot->SetPadding(FMargin(3,8));
+        }
+        Slots->SetVisibility(ESlateVisibility::Collapsed);
+        if (Body) Scroll->AddChild(Body);
+    }
 }
 void UICGameplayWidget::RefreshCurrentScreen()
 {
@@ -70,11 +93,29 @@ void UICGameplayWidget::RefreshCurrentScreen()
         const bool Exit = PC->Menu == TEXT("Quit");
         const bool MainMenu = PC->Menu == TEXT("Pause");
         const bool SettingsMenu = PC->Menu == TEXT("MenuSettings");
+        const bool ShowWeapons=PC->GetInventory()&&(PC->Menu==TEXT("Inventory")||PC->Menu==TEXT("Equipment"));
+        if (auto* Slots=GetWidgetFromName(TEXT("WeaponSlots")))
+            Slots->SetVisibility(ShowWeapons?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
+        if (ShowWeapons)
+        {
+            auto* Inventory=PC->GetInventory();const auto Slots=Inventory->GetWeaponLoadout();
+            const TCHAR* Names[]={TEXT("WeaponSlot_Sword"),TEXT("WeaponSlot_Bow"),TEXT("WeaponSlot_Staff"),TEXT("WeaponSlot_Wand")};
+            for (int32 Index=0;Index<4;++Index)
+            {
+                FPlayerItemDefinition Item;
+                const bool Filled=!Slots[Index].IsEmpty()&&Inventory->GetItemDefinition(Slots[Index].ItemID,Item);
+                const bool Active=static_cast<int32>(Inventory->GetEquippedWeaponFamily())==Index+1;
+                const FText Status=ICText::Get(!Filled?TEXT("WeaponSlot_Empty"):Active?TEXT("WeaponSlot_Active"):TEXT("WeaponSlot_Equipped"));
+                SetText(*FString::Printf(TEXT("TXT_WeaponSlot%d"),Index),ICText::Get(Names[Index]).ToString()+TEXT("\n\n")
+                    +(Filled?Item.DisplayName.ToString()+TEXT("\n"):TEXT(""))+Status.ToString());
+            }
+        }
         SetText(TEXT("TXT_Menu"), PC->IsDead()                ? ICText::Get(TEXT("Menu_Dead")).ToString()
                                   : Confirm                   ? ICText::Get(TEXT("Menu_Confirm")).ToString()
                                   : Exit                      ? ICText::Get(TEXT("Menu_Exit")).ToString()
                                   : MainMenu                  ? ICText::Get(TEXT("Menu")).ToString()
                                   : SettingsMenu              ? ICText::Get(TEXT("Settings")).ToString()
+                                  : PC->Menu==TEXT("Equipment") ? ICText::Get(TEXT("Equipment")).ToString()
                                                               : PC->Menu);
         FString Body = Confirm ? PC->ModalText : PC->Notice;
         if (PC->Menu == TEXT("Inventory") && PC->GetInventory())
@@ -92,7 +133,8 @@ void UICGameplayWidget::RefreshCurrentScreen()
                 }
         }
         if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_MenuBody"))))
-            Text->SetText(Confirm ? PC->ModalDisplayText : PC->Menu == TEXT("Inventory") ? FText::FromString(Body) : PC->NoticeDisplayText);
+            Text->SetText(Confirm ? PC->ModalDisplayText : PC->Menu == TEXT("Inventory") ? FText::FromString(Body)
+                : PC->Menu==TEXT("Equipment")?ICText::Get(TEXT("WeaponSlot_CycleHint")):PC->NoticeDisplayText);
         if (auto* Scroll = GetWidgetFromName(TEXT("MenuScroll")))
             Scroll->SetVisibility(MainMenu || SettingsMenu ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
         auto Label = [this](const TCHAR* Name, const TCHAR* Key) {

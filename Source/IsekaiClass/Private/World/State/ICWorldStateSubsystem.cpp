@@ -229,10 +229,10 @@ bool UICWorldStateSubsystem::ValidateInventoryShape(const FICInventoryState& I, 
 {
     IC_TRACE_FUNCTION();
     if (I.Bag.Slots.Num() < 20 || I.Bag.Slots.Num() > 100 || (I.Bag.Slots.Num() - 20) % 10 != 0
-        || I.Equipment.Num() != 4 || I.QuickSlots.Num() != 4) return false;
+        || I.Equipment.Num() != 4 || I.WeaponSlots.Num() != 4 || I.QuickSlots.Num() != 4) return false;
     TSet<FGuid> Local;
     TSet<FGuid>& IDs = ExistingIDs ? *ExistingIDs : Local;
-    if (!ValidItems(I.Bag.Slots, IDs) || !ValidItems(I.QuestItems, IDs) || !ValidItems(I.Equipment, IDs)) return false;
+    if (!ValidItems(I.Bag.Slots, IDs) || !ValidItems(I.QuestItems, IDs) || !ValidItems(I.Equipment, IDs) || !ValidItems(I.WeaponSlots, IDs)) return false;
     for (const auto& Container : I.Storage)
     {
         const int32 Slots=Container.Value.Slots.Num();

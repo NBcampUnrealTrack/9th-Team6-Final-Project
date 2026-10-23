@@ -17,6 +17,7 @@
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "Debug/ICCharacterSetupLibrary.h"
 
 namespace
 {
@@ -111,4 +112,18 @@ bool FICCharacterPoseCheck::RunTest(const FString&)
     }
     World->DestroyWorld(false);return true;
 }
+#if WITH_EDITOR
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICSecondaryMotionCheck,"IC.Characters.SecondaryMotionResetAndLengths",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICSecondaryMotionCheck::RunTest(const FString&)
+{
+    return TestTrue(TEXT("13 character meshes retain bone lengths, remain stable at rest, and reset to the current pose at 30/60/120/144 Hz"),
+        UICCharacterSetupLibrary::ReviewSecondaryMotion(TEXT("Regression"),false));
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICHairDrapeCheck,"IC.Characters.HairGravityAndLowFrameRate",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICHairDrapeCheck::RunTest(const FString&)
+{
+    return TestTrue(TEXT("Female rear hair falls under world gravity at 8/30/60/120 Hz without changing bone lengths"),
+        UICCharacterSetupLibrary::ReviewHairDrape(TEXT("Regression")));
+}
+#endif
 #endif

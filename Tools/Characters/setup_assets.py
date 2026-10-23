@@ -73,6 +73,11 @@ def preview_mesh(animation,pack):
 
 def source_rig(pack,mesh):
     path=GAME+'/Animation/Common/Retarget/IK_SRC_'+pack
+    if EAL.does_asset_exist(path):
+        rig=asset(path)
+        if u.IKRigController.get_controller(rig).get_skeletal_mesh()!=mesh:
+            raise RuntimeError('Existing source IK rig belongs to another mesh: '+path)
+        return rig
     rig=create(path,u.IKRigDefinition,u.IKRigDefinitionFactory())
     ctl=u.IKRigController.get_controller(rig)
     if not ctl.set_skeletal_mesh(mesh):raise RuntimeError('Source mesh rejected')
@@ -225,6 +230,7 @@ def main():
     import_tables();REPORT['complete']=True;checkpoint();u.log('IC_CHARACTER_SETUP_COMPLETE')
 
 
-try:main()
-except Exception as error:
-    REPORT['error']=str(error);checkpoint();raise
+if __name__ == '__main__':
+    try:main()
+    except Exception as error:
+        REPORT['error']=str(error);checkpoint();raise

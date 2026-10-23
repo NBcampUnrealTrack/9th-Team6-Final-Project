@@ -79,6 +79,8 @@ int32 UICQuestSubsystem::CountOwnedItem(const FICInventoryState& Inventory, FNam
     {
         if (Item.ItemID == ItemID) Count += Item.Count;
     }
+    for (const FPlayerItemInstance& Item : Inventory.WeaponSlots)
+        if (Item.ItemID == ItemID) Count += Item.Count;
     return static_cast<int32>(FMath::Min<int64>(Count, MAX_int32));
 }
 
@@ -669,6 +671,7 @@ void UICQuestSubsystem::HandleInventoryChanged()
         for (const FPlayerItemInstance& Item : Inventory.Bag.Slots) ItemIDs.Add(Item.ItemID);
         for (const FPlayerItemInstance& Item : Inventory.QuestItems) ItemIDs.Add(Item.ItemID);
         for (const FPlayerItemInstance& Item : Inventory.Equipment) ItemIDs.Add(Item.ItemID);
+        for (const FPlayerItemInstance& Item : Inventory.WeaponSlots) ItemIDs.Add(Item.ItemID);
         for (const auto& Storage : Inventory.Storage)
         {
             for (const FPlayerItemInstance& Item : Storage.Value.Slots) ItemIDs.Add(Item.ItemID);

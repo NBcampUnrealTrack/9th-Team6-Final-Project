@@ -29,6 +29,12 @@ struct FICInventoryState
     UPROPERTY(BlueprintReadOnly, SaveGame) FPlayerContainer Bag;
     UPROPERTY(BlueprintReadOnly, SaveGame) TArray<FPlayerItemInstance> QuestItems;
     UPROPERTY(BlueprintReadOnly, SaveGame) TArray<FPlayerItemInstance> Equipment;
+    /** Additional equipped weapons, indexed by family - 1. The selected instance
+     * remains in Equipment[Weapon] for combat/save compatibility; GetWeaponLoadout
+     * combines both into the four permanent equipment slots without duplication. */
+    UPROPERTY(BlueprintReadOnly, SaveGame) TArray<FPlayerItemInstance> WeaponSlots;
+    /** The selected weapon stays owned/equipped while put away. Old saves keep their drawn weapon. */
+    UPROPERTY(BlueprintReadOnly, SaveGame) bool bWeaponSheathed = false;
     UPROPERTY(BlueprintReadOnly, SaveGame) TArray<FName> QuickSlots;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, FPlayerContainer> Storage;
     FICInventoryState()
@@ -36,6 +42,7 @@ struct FICInventoryState
         IC_TRACE_FUNCTION();
         Bag.Slots.SetNum(20);
         Equipment.SetNum(4);
+        WeaponSlots.SetNum(4);
         QuickSlots.SetNum(4);
         Storage.Add(TEXT("PlayerHome")).Slots.SetNum(40);
     }
