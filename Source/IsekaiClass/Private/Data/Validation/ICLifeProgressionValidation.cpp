@@ -577,10 +577,10 @@ void ValidateLifeProgression(const TArray<FICDefinitionTable>& Tables, bool bCom
             QuestIDs.Add(Row.ID);
             Quests.Add(Row.ID, &Row);
         }
-        if (Row.QuestType != EICQuestType::General && (Row.bAllowAbandon || Row.bRepeatable))
+        if (Row.QuestType != EICQuestType::General && Row.bRepeatable)
         {
-            AddIssue(Issues, Site, Row.bAllowAbandon ? TEXT("bAllowAbandon") : TEXT("bRepeatable"),
-                TEXT("Main and chain quests are one-time quests and cannot be abandoned or repeated."));
+            AddIssue(Issues, Site, TEXT("bRepeatable"),
+                TEXT("Main and chain quests cannot be repeated after completion."));
         }
         if (Row.CompletionMode == EICQuestCompletionMode::NPCInteraction)
         {

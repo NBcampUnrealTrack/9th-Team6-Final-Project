@@ -58,6 +58,12 @@ void UICQuestWidget::RefreshQuests()
     UClass* ItemClass = QuestItemWidgetClass.LoadSynchronous();
     TArray<FName> QuestIDs;
     FICQuestDisplay::GetActiveQuestIDs(Snapshot, QuestIDs);
+    // Keep abandoned quests accessible, including auto-accept quests with no offer NPC.
+    for (const auto& Entry : Snapshot.Quests)
+    {
+        if (Entry.Value.bAbandoned) QuestIDs.Add(Entry.Key);
+    }
+    QuestIDs.Sort(FNameLexicalLess());
 
     for (FName QuestID : QuestIDs)
     {

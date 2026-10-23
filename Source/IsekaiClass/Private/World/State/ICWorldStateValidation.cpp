@@ -63,7 +63,8 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
     for (const auto& Pair : S.Quests)
     {
         const auto& Q = Pair.Value;
-        if (Q.CompletionCount < 0 || !TimeValid(Q.AcceptedAtGameMinute) || !TimeValid(Q.CompletedAtGameMinute)
+        if ((Q.bAbandoned && (Q.bAccepted || Q.bCompleted))
+            || Q.CompletionCount < 0 || !TimeValid(Q.AcceptedAtGameMinute) || !TimeValid(Q.CompletedAtGameMinute)
             || (Q.bRewardClaimed && (!Q.bCompleted || !Q.RewardTransactionID.IsValid() || !S.CompletedTransactionIDs.Contains(Q.RewardTransactionID)))) return Fail(TEXT("Quests.") + Pair.Key.ToString());
     }
     TMap<FGuid, const FPlayerItemInstance*> BagItems;

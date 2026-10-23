@@ -5,6 +5,7 @@
 #include "Engine/GameInstance.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Quest/ICQuestSubsystem.h"
+#include "Save/ICSaveGame.h"
 #include "Time/ICTimeSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
 
@@ -272,6 +273,115 @@ bool FICQuestDialogueDeliveryCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Repeat quest can be accepted again"), Fixture.Quests->AcceptQuest(Definition.ID));
     World = Fixture.State->ExportState();
     TestEqual(TEXT("Repeat quest grants a fresh item"), World.Inventory.QuestItems.Num(), 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestAbandonCheck, "IC.Runtime.QuestAbandonReaccept",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FICQuestAbandonCheck::RunTest(const FString& Parameters)
+{
+    FICQuestFixture Fixture;
+    UDataTable* Table = Fixture.Catalog->Tables.Last().Table.LoadSynchronous();
+    TestFalse(TEXT("Unknown quest cannot be abandoned"), Fixture.Quests->AbandonQuest(TEXT("QST_MISSING")));
+    TestFalse(TEXT("False flag prevents abandonment"), Fixture.Quests->AbandonQuest(TEXT("QST_RING_998")));
+
+    for (EICQuestType Type : {EICQuestType::General, EICQuestType::Main, EICQuestType::Chain})
+    {
+        FICQuestRow Definition;
+        Definition.ID = FName(*FString::Printf(TEXT("QST_ABANDON_%d"), static_cast<int32>(Type)));
+        Definition.QuestType = Type;
+        Definition.bAllowAbandon = true;
+        Definition.IsAutoAccept = true;
+        Definition.OfferNPCID = TEXT("NPC_R01_101");
+        Definition.CompletionMode = EICQuestCompletionMode::SystemEvent;
+        FICQuestObjectiveDefinition Objective;
+        Objective.ObjectiveID = TEXT("OBJ_DEFEAT");
+        Objective.Type = EICQuestObjectiveType::Defeat;
+        Objective.Target.Type = EICDefinitionType::Monster;
+        Objective.Target.ID = TEXT("MON_ABANDON_998");
+        Objective.RequiredCount = 3;
+        FICQuestObjectiveGroup Group;
+        Group.Objectives.Add(Objective);
+        Definition.ObjectiveGroups.Add(Group);
+        Table->AddRow(Definition.ID, Definition);
+        Fixture.Quests->RefreshAvailableQuests();
+        TestTrue(TEXT("Quest auto accepted"), Fixture.State->ExportState().Quests.FindChecked(Definition.ID).bAccepted);
+        TestTrue(TEXT("Objective progresses"), Fixture.Quests->ReportObjectiveEvent(
+            EICQuestObjectiveType::Defeat, Objective.Target.ID, 1, FGuid::NewGuid()));
+        TestTrue(TEXT("All types honor true flag"), Fixture.Quests->CanAbandonQuest(Definition.ID));
+        TestTrue(TEXT("Abandon succeeds"), Fixture.Quests->AbandonQuest(Definition.ID));
+        TestFalse(TEXT("Already abandoned quest is rejected"), Fixture.Quests->AbandonQuest(Definition.ID));
+        Fixture.Quests->RefreshAvailableQuests();
+        FICQuestState Progress = Fixture.State->ExportState().Quests.FindChecked(Definition.ID);
+        TestTrue(TEXT("Auto acceptance stays suppressed"), Progress.bAbandoned && !Progress.bAccepted);
+        TestEqual(TEXT("Abandon clears objectives"), Progress.Objectives.Num(), 0);
+        TestTrue(TEXT("Abandoned auto quest can be offered by NPC"), Fixture.Quests->CanOfferQuest(Definition.ID));
+
+        UICSaveGame* Save = NewObject<UICSaveGame>();
+        Save->WorldState = Fixture.State->ExportState();
+        Save->Clock = Fixture.Time->GetClock();
+        TArray<uint8> Bytes;
+        TestTrue(TEXT("Abandoned quest can be saved"), UICSaveGame::EncodeForFile(Save, Bytes));
+        UICSaveGame* Loaded = UICSaveGame::DecodeFile(Bytes);
+        TestNotNull(TEXT("Save decodes"), Loaded);
+        if (Loaded)
+        {
+            TestTrue(TEXT("Abandon flag survives serialization"), Loaded->WorldState.Quests.FindChecked(Definition.ID).bAbandoned);
+            TestTrue(TEXT("Saved world restores"), Fixture.State->RestoreState(Loaded->WorldState));
+            TestFalse(TEXT("Restore does not auto reaccept"), Fixture.State->ExportState().Quests.FindChecked(Definition.ID).bAccepted);
+        }
+        TestTrue(TEXT("Manual reaccept succeeds"), Fixture.Quests->AcceptQuest(Definition.ID));
+        Progress = Fixture.State->ExportState().Quests.FindChecked(Definition.ID);
+        TestTrue(TEXT("Reaccept activates quest"), Progress.bAccepted && !Progress.bAbandoned);
+        TestEqual(TEXT("Reaccept starts fresh"), Progress.Objectives.Num(), 0);
+        TestTrue(TEXT("Objective can be completed"), Fixture.Quests->ReportObjectiveEvent(
+            EICQuestObjectiveType::Defeat, Objective.Target.ID, 3, FGuid::NewGuid()));
+        TestFalse(TEXT("Completed quest cannot be abandoned"), Fixture.Quests->AbandonQuest(Definition.ID));
+        TestFalse(TEXT("Abandon does not make completed one-time quests repeatable"), Fixture.Quests->AcceptQuest(Definition.ID));
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestAbandonItemsCheck, "IC.Runtime.QuestAbandonItems",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FICQuestAbandonItemsCheck::RunTest(const FString& Parameters)
+{
+    FICQuestFixture Fixture;
+    FICQuestRow Definition;
+    Definition.ID = TEXT("QST_ABANDON_ITEMS_998");
+    Definition.bAllowAbandon = true;
+    Definition.CompletionMode = EICQuestCompletionMode::NPCInteraction;
+    Definition.TurnInNPCID = TEXT("NPC_R01_101");
+    FICItemAmount Grant;
+    Grant.ItemID = TEXT("ITM_QST_998");
+    Grant.Count = 2;
+    Definition.AcceptanceQuestItems.Add(Grant);
+    FICQuestObjectiveDefinition Objective;
+    Objective.ObjectiveID = TEXT("OBJ_ITEMS");
+    Objective.Type = EICQuestObjectiveType::DeliverItem;
+    Objective.Target.Type = EICDefinitionType::Item;
+    Objective.Target.ID = Grant.ItemID;
+    Objective.RequiredCount = 2;
+    FICQuestObjectiveGroup Group;
+    Group.Objectives.Add(Objective);
+    Definition.ObjectiveGroups.Add(Group);
+    Fixture.Catalog->Tables.Last().Table.LoadSynchronous()->AddRow(Definition.ID, Definition);
+    TestTrue(TEXT("Accept with quest items"), Fixture.Quests->AcceptQuest(Definition.ID));
+    TestTrue(TEXT("Abandon with quest items"), Fixture.Quests->AbandonQuest(Definition.ID));
+    TestTrue(TEXT("Reaccept with retained items"), Fixture.Quests->AcceptQuest(Definition.ID));
+    int32 QuestItemCount = 0;
+    for (const FPlayerItemInstance& Item : Fixture.State->GetInventorySnapshot().QuestItems)
+        if (Item.ItemID == Grant.ItemID) QuestItemCount += Item.Count;
+    TestEqual(TEXT("Acceptance grants do not accumulate"), QuestItemCount, 2);
+    TestTrue(TEXT("Can deliver before abandoning"), Fixture.Quests->DeliverItem(Definition.ID, Objective.ObjectiveID));
+    TestTrue(TEXT("Delivered quest can still be abandoned before turn-in"), Fixture.Quests->AbandonQuest(Definition.ID));
+    TestTrue(TEXT("Reaccept replenishes consumed quest items"), Fixture.Quests->AcceptQuest(Definition.ID));
+    QuestItemCount = 0;
+    for (const FPlayerItemInstance& Item : Fixture.State->GetInventorySnapshot().QuestItems)
+        if (Item.ItemID == Grant.ItemID) QuestItemCount += Item.Count;
+    TestEqual(TEXT("Consumed grant replenished once"), QuestItemCount, 2);
     return true;
 }
 

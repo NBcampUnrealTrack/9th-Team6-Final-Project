@@ -151,12 +151,28 @@ bool UICQuestSubsystem::AcceptQuest(FName QuestID)
         {
             return false;
         }
+        // Keep quest items on abandon; only replenish missing grants on reacceptance.
+        const FICQuestState* Previous = Candidate.Quests.Find(QuestID);
+        TMap<FName, int32> GrantCounts;
         for (const FICItemAmount& Item : Definition.AcceptanceQuestItems)
         {
+            if (Item.Count <= 0 || GrantCounts.FindRef(Item.ItemID) > MAX_int32 - Item.Count)
+            {
+                return false;
+            }
+            GrantCounts.FindOrAdd(Item.ItemID) += Item.Count;
+        }
+        for (const auto& Grant : GrantCounts)
+        {
             FICItemRow ItemDefinition;
-            if (!Definitions->GetItem(Item.ItemID, ItemDefinition).bSuccess
-                || ItemDefinition.Kind != EPlayerItemKind::Quest
-                || !Staging->AddItem(Item.ItemID, Item.Count, false))
+            if (!Definitions->GetItem(Grant.Key, ItemDefinition).bSuccess
+                || ItemDefinition.Kind != EPlayerItemKind::Quest)
+            {
+                return false;
+            }
+            const int32 Count = Previous && Previous->bAbandoned
+                ? FMath::Max(0, Grant.Value - CountOwnedItem(Candidate.Inventory, Grant.Key)) : Grant.Value;
+            if (Count > 0 && !Staging->AddItem(Grant.Key, Count, false))
             {
                 return false;
             }
@@ -165,6 +181,7 @@ bool UICQuestSubsystem::AcceptQuest(FName QuestID)
     }
     FICQuestState& Quest = Candidate.Quests.FindOrAdd(QuestID);
     Quest.bAccepted = true;
+    Quest.bAbandoned = false;
     Quest.bCompleted = false;
     Quest.bRewardClaimed = false;
     Quest.RewardTransactionID.Invalidate();
@@ -180,6 +197,44 @@ bool UICQuestSubsystem::AcceptQuest(FName QuestID)
         EvaluateQuests();
     }
     return true;
+}
+
+bool UICQuestSubsystem::CanAcceptQuest(FName QuestID) const
+{
+    FICQuestRow Definition;
+    return Definitions && State && Time && Definitions->GetQuest(QuestID, Definition).bSuccess
+        && CanAccept(Definition, State->ExportState());
+}
+
+bool UICQuestSubsystem::CanAbandonQuest(FName QuestID) const
+{
+    if (!Definitions || !State) return false;
+    FICQuestRow Definition;
+    const FICWorldState World = State->ExportState();
+    const FICQuestState* Quest = World.Quests.Find(QuestID);
+    return Quest && Quest->bAccepted && !Quest->bCompleted
+        && Definitions->GetQuest(QuestID, Definition).bSuccess && Definition.bAllowAbandon;
+}
+
+bool UICQuestSubsystem::AbandonQuest(FName QuestID)
+{
+    if (IsProcessing || !CanAbandonQuest(QuestID)) return false;
+    FICWorldState Candidate = State->ExportState();
+    FICQuestState& Quest = Candidate.Quests.FindChecked(QuestID);
+    Quest.bAccepted = false;
+    Quest.bAbandoned = true;
+    Quest.Objectives.Reset();
+    // Retain inventory and completion history; abandon grants no rewards.
+    TGuardValue<bool> Guard(IsProcessing, true);
+    if (!State->CommitGameplayTransaction(Candidate, FGuid::NewGuid())) return false;
+    UE_LOG(LogICWorldState, Log, TEXT("[Quest.Abandoned] Quest=%s"), *QuestID.ToString());
+    return true;
+}
+
+bool UICQuestSubsystem::IsObjectiveSatisfied(const FICQuestObjectiveDefinition& Objective,
+    const FICQuestState& Quest, const FICWorldState& World) const
+{
+    return IsObjectiveComplete(Objective, Quest, World);
 }
 
 bool UICQuestSubsystem::IsObjectiveComplete(const FICQuestObjectiveDefinition& Objective,
@@ -501,7 +556,8 @@ bool UICQuestSubsystem::CanOfferQuest(FName QuestID) const
     if (!Definitions || !State) return false;
     FICQuestRow Definition;
     return Definitions->GetQuest(QuestID, Definition).bSuccess
-        && !Definition.IsAutoAccept && !Definition.OfferNPCID.IsNone()
+        && (!Definition.IsAutoAccept || State->ExportState().Quests.FindRef(QuestID).bAbandoned)
+        && !Definition.OfferNPCID.IsNone()
         && CanAccept(Definition, State->ExportState());
 }
 
@@ -788,7 +844,8 @@ void UICQuestSubsystem::EvaluateQuests()
             }
             FICWorldState World = State->ExportState();
             const FICQuestState* Quest = World.Quests.Find(QuestID);
-            if ((!Quest || !Quest->bAccepted) && Definition.IsAutoAccept && CanAccept(Definition, World))
+            if ((!Quest || (!Quest->bAccepted && !Quest->bAbandoned))
+                && Definition.IsAutoAccept && CanAccept(Definition, World))
             {
                 if (AcceptQuest(QuestID))
                 {

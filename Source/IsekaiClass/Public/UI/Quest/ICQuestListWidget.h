@@ -6,6 +6,7 @@
 
 class UStringTable;
 class UTextBlock;
+class UButton;
 struct FICQuestRow;
 struct FICQuestState;
 struct FICWorldState;
@@ -21,6 +22,16 @@ public:
         const UICQuestSubsystem* Quests, UStringTable* Strings);
 
 private:
+    FName DisplayedQuestID;
+    bool bReaccept = false;
+
+    // Existing BP layouts remain usable; a native button is added when absent.
+    UPROPERTY(meta=(BindWidgetOptional))
+    TObjectPtr<UButton> QuestAbandonButton;
+
+    void UpdateAction(const FICQuestRow& Definition, const FICQuestState& Quest);
+    UFUNCTION() void RequestQuestAction();
+
     UPROPERTY(meta=(BindWidget))
     TObjectPtr<UTextBlock> QuestNameText;
 

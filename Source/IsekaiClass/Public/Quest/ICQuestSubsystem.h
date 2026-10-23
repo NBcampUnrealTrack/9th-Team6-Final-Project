@@ -28,6 +28,18 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Quest")
     bool AcceptQuest(FName QuestID);
 
+    UFUNCTION(BlueprintPure, Category="IC|Quest")
+    bool CanAbandonQuest(FName QuestID) const;
+
+    UFUNCTION(BlueprintCallable, Category="IC|Quest")
+    bool AbandonQuest(FName QuestID);
+
+    UFUNCTION(BlueprintPure, Category="IC|Quest")
+    bool CanAcceptQuest(FName QuestID) const;
+
+    bool IsObjectiveSatisfied(const FICQuestObjectiveDefinition& Objective, const FICQuestState& Quest,
+        const FICWorldState& World) const;
+
     UFUNCTION(BlueprintCallable, Category="IC|Quest")
     bool TurnInQuest(FName QuestID, FName NPCID);
 

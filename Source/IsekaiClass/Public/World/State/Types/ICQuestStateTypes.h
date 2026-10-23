@@ -9,6 +9,8 @@ struct FICQuestState
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) bool bAccepted = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) bool bCompleted = false;
+    // Prevent abandoned auto-accept quests from restarting, including after loading.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) bool bAbandoned = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) TMap<FName, int32> Objectives;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) bool bRewardClaimed = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) FGuid RewardTransactionID;

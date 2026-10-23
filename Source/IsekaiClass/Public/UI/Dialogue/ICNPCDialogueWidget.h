@@ -45,13 +45,17 @@ private:
     UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text")
     TObjectPtr<UStringTable> DialogueStringTable;
 
+    UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText QuestPromptText;
     UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText QuestEntryFormatText;
     UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText CloseText;
     UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText BackText;
     UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText NextText;
+    UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText QuestsText;
     UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText AcceptText;
     UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText TurnInText;
     UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText ReadyStatusText;
+    UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText ActiveStatusText;
+    UPROPERTY(EditDefaultsOnly, Category="IC|Dialogue|Text") FText OfferStatusText;
 
     UPROPERTY(Transient)
     TObjectPtr<AICNPCBase> NPC;
@@ -63,6 +67,7 @@ private:
 
     void ShowInteractionOptions();
     void ShowInitialDialogue();
+    void ShowQuestList();
     void AddQuestEntries();
     void ShowQuest(FName QuestID);
     void ShowNode(FName DialogueID, FName NodeID = NAME_None);
