@@ -1,4 +1,6 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Gameplay/ICDeathWidget.h"
+#include "Life/Production/ICGatheringSubsystem.h"
 #include "UI/Framework/ICDisplayPolicy.h"
 #include "Camera/CameraComponent.h"
 #include "UI/Framework/ICText.h"
@@ -15,7 +17,6 @@
 #include "Inventory/Actors/ICDroppedItem.h"
 #include "Player/State/ICPlayerStateConversions.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
-#include "UI/Quest/ICQuestWidget.h"
 #include "UI/Quest/ICQuestTrackerWidget.h"
 #include "UI/Dialogue/ICNPCDialogueWidget.h"
 #include "UI/MainMenu/ICMainMenuWidget.h"
@@ -175,6 +176,8 @@ void AICPlayerController::TryInitializeGameplay()
         Screen=CreateWidget<UICGameplayWidget>(this,GameplayWidgetClass);
         if (Screen && GetLocalPlayer()) GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>()->SetHUD(Screen);
     }
+    QuestTrackerScreen = Screen ? Cast<UICQuestTrackerWidget>(Screen->GetWidgetFromName(TEXT("HUD_QuestTracker"))) : nullptr;
+    if (!QuestTrackerScreen)
     if (UClass* WidgetClass = QuestTrackerWidgetClass.LoadSynchronous())
     {
         QuestTrackerScreen = CreateWidget<UICQuestTrackerWidget>(this, WidgetClass);
@@ -259,7 +262,8 @@ void AICPlayerController::UpdateScreens()
     {
         if(!SettingsScreen)
         {
-            SettingsScreen=CreateWidget<UICSettingsWidget>(this,UICSettingsWidget::StaticClass());
+            auto* Class=LoadClass<UICSettingsWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Settings.WBP_IC_Settings_C"));
+            SettingsScreen=CreateWidget<UICSettingsWidget>(this,Class?Class:UICSettingsWidget::StaticClass());
             if(SettingsScreen&&FrontendUI)FrontendUI->OpenScreen(SettingsScreen,false,1000);
         }
     }
@@ -296,31 +300,19 @@ void AICPlayerController::UpdateScreens()
         }
     }
     else if (CharacterCreateScreen && CharacterCreateScreen->IsActivated()&&FrontendUI) FrontendUI->CloseScreen(CharacterCreateScreen);
-    if (Menu==TEXT("Quest") && !QuestScreen)
+    if(Menu==TEXT("Death"))
     {
-        if (UClass* WidgetClass = QuestWidgetClass.LoadSynchronous())
+        if(!DeathScreen)
         {
-            QuestScreen = CreateWidget<UICQuestWidget>(this, WidgetClass);
-            if (QuestScreen && GetLocalPlayer())
-            {
-                if (auto* UI = GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())
-                {
-                    UI->OpenScreen(QuestScreen, true, 50);
-                }
-            }
+            auto* Class=LoadClass<UICDeathWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Death.WBP_IC_Death_C"));
+            DeathScreen=CreateWidget<UICDeathWidget>(this,Class?Class:UICDeathWidget::StaticClass());
+            if(DeathScreen&&FrontendUI)FrontendUI->OpenScreen(DeathScreen,true,200);
         }
     }
-    else if (Menu!=TEXT("Quest") && QuestScreen)
+    else if(DeathScreen)
     {
-        UICQuestWidget* Closing = QuestScreen.Get();
-        QuestScreen = nullptr;
-        if (GetLocalPlayer())
-        {
-            if (auto* UI = GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())
-            {
-                UI->CloseScreen(Closing);
-            }
-        }
+        auto* Closing=DeathScreen.Get();DeathScreen=nullptr;
+        if(FrontendUI)FrontendUI->CloseScreen(Closing);
     }
     if (Screen) Screen->RefreshCurrentScreen();
 }
@@ -343,11 +335,11 @@ void AICPlayerController::EndPlay(const EEndPlayReason::Type Reason)
     if(CharacterCreateScreen){CharacterCreateScreen->RemoveFromParent();CharacterCreateScreen=nullptr;}
     if(Screen){Screen->RemoveFromParent();Screen=nullptr;}
     if(QuestTrackerScreen){QuestTrackerScreen->RemoveFromParent();QuestTrackerScreen=nullptr;}
-    QuestScreen=nullptr;
     if(MainMenuWidget){MainMenuWidget->RemoveFromParent();MainMenuWidget=nullptr;}
     LoadingScreen=nullptr;
     if(SettingsScreen){SettingsScreen->RemoveFromParent();SettingsScreen=nullptr;}
     SessionSaveLoadScreen=nullptr;
+    DeathScreen=nullptr;
     if(GetGameInstance())if(auto* Production=GetGameInstance()->GetSubsystem<UICProductionSubsystem>())Production->OnProductionChanged.RemoveDynamic(this,&ThisClass::ProductionChanged);
     Super::EndPlay(Reason);
 }
@@ -430,10 +422,12 @@ void AICPlayerController::SaveFinished(int32 Slot,bool bSuccess,const FString& M
     FinishSessionSave(Slot,bSuccess);
 }
 
-void AICPlayerController::SetMenu(const FString& NewMenu)
+void AICPlayerController::SetMenu(const FString& RequestedMenu)
 {
     IC_TRACE_FUNCTION();
-    if(bItemTransactionInProgress&&NewMenu!=TEXT("Quit")&&NewMenu!=TEXT("Confirm")){ShowLocalized(ICText::Get(TEXT("Native_bfb9fda0713f")));return;}
+    const FString NewMenu=bDead&&!IsMainMenuLevel()&&RequestedMenu!=TEXT("Death")&&RequestedMenu!=TEXT("Load")&&RequestedMenu!=TEXT("Confirm")&&RequestedMenu!=TEXT("Loading")?TEXT("Death"):RequestedMenu;
+    if(bItemTransactionInProgress&&NewMenu!=TEXT("Quit")&&NewMenu!=TEXT("Confirm")&&NewMenu!=TEXT("Death")){ShowLocalized(ICText::Get(TEXT("Native_bfb9fda0713f")));return;}
+    if(!NewMenu.IsEmpty()&&GetGameInstance())GetGameInstance()->GetSubsystem<UICGatheringSubsystem>()->CancelGather();
     if (NewMenu != TEXT("Dialogue") && DialogueScreen)
     {
         UICNPCDialogueWidget* Closing = DialogueScreen;
@@ -451,11 +445,11 @@ void AICPlayerController::SetMenu(const FString& NewMenu)
     if(Menu!=NewMenu)UE_LOG(LogICUI, Log, TEXT("[UI.Menu] From=%s To=%s Created=%d Dead=%d"),*Menu,*NewMenu,bCreated,bDead);
     if (NewMenu == TEXT("Settings") && Menu != NewMenu) SettingsReturnMenu = Menu;
     Menu=NewMenu;
-    if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(NewMenu==TEXT("MainMenu")||NewMenu==TEXT("Loading")||NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
+    if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(bDead||NewMenu==TEXT("MainMenu")||NewMenu==TEXT("Loading")||NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
     UpdateScreens();
     InteractionHint.Empty();bShowMouseCursor=!NewMenu.IsEmpty();
     if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);}
-    UUserWidget* Focus=LoadingScreen?static_cast<UUserWidget*>(LoadingScreen.Get()):SettingsScreen?static_cast<UUserWidget*>(SettingsScreen.Get()):SessionSaveLoadScreen?static_cast<UUserWidget*>(SessionSaveLoadScreen.Get()):CharacterCreateScreen&&CharacterCreateScreen->IsActivated()?static_cast<UUserWidget*>(CharacterCreateScreen.Get()):IsMainMenuLevel()?static_cast<UUserWidget*>(MainMenuWidget.Get()):static_cast<UUserWidget*>(Screen.Get());
+    UUserWidget* Focus=LoadingScreen?static_cast<UUserWidget*>(LoadingScreen.Get()):SettingsScreen?static_cast<UUserWidget*>(SettingsScreen.Get()):SessionSaveLoadScreen?static_cast<UUserWidget*>(SessionSaveLoadScreen.Get()):DeathScreen?static_cast<UUserWidget*>(DeathScreen.Get()):CharacterCreateScreen&&CharacterCreateScreen->IsActivated()?static_cast<UUserWidget*>(CharacterCreateScreen.Get()):IsMainMenuLevel()?static_cast<UUserWidget*>(MainMenuWidget.Get()):static_cast<UUserWidget*>(Screen.Get());
     if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->SetMenuContext(this,Focus,!NewMenu.IsEmpty());
     FlushPressedKeys();bDirty=true;UpdateGamePhase();SyncSaveSafety();OnMenuChanged.Broadcast(Menu);
 }

@@ -7,6 +7,7 @@
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Interaction/ICInteractionActor.h"
+#include "Life/Production/ICGatheringSubsystem.h"
 #include "NPC/Character/ICNPCBase.h"
 #include "UI/Dialogue/ICNPCDialogueWidget.h"
 #include "UI/Management/ICUIManagerSubsystem.h"
@@ -19,6 +20,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "EngineUtils.h"
+#include "Engine/GameInstance.h"
 
 void AICPlayerController::SetupInputComponent()
 {
@@ -61,6 +63,7 @@ void AICPlayerController::Move(const FInputActionValue& Value)
     if (auto* TargetCharacter=Cast<AICPlayerCharacter>(GetPawn()))
     {
         const FVector2D Axis=Value.Get<FVector2D>().GetClampedToMaxSize(1.f);
+        if(!Axis.IsNearlyZero())GetGameInstance()->GetSubsystem<UICGatheringSubsystem>()->CancelGather();
         const FRotator Yaw(0,GetControlRotation().Yaw,0);
         TargetCharacter->AddMovementInput(Yaw.Vector(),Axis.Y);
         TargetCharacter->AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y),Axis.X);
@@ -150,6 +153,12 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     if (Command==EICInputCommand::SprintDodge) Command=EICInputCommand::Dodge;
     if (Command==EICInputCommand::TargetToggle) Command=EICInputCommand::NextTarget;
     if(IsMainMenuLevel()||Menu==TEXT("Create")||Menu==TEXT("Loading"))return;
+    if(auto* Gathering=GetGameInstance()->GetSubsystem<UICGatheringSubsystem>();Gathering&&Gathering->IsGathering()
+        &&Command!=EICInputCommand::Roll&&Command!=EICInputCommand::QuestFollow)
+    {
+        Gathering->CancelGather();
+        if(Command==EICInputCommand::Interact||Command==EICInputCommand::Menu)return;
+    }
     if (Menu==TEXT("Confirm"))
     { if(Command==EICInputCommand::Confirm)ConfirmModal(true); else if(Command==EICInputCommand::Menu)ConfirmModal(false); return; }
     if (Menu==TEXT("Quit")) { if(Command==EICInputCommand::Menu)CloseSessionMenu(); return; }
@@ -160,6 +169,7 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
         else if(Command==EICInputCommand::Menu)CloseSessionMenu();
         return;
     }
+    if(bDead)return;
     if (Command==EICInputCommand::Load) { OpenLoadMenu(); return; }
     if (Command==EICInputCommand::Menu)
     {
@@ -210,6 +220,8 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     }
     if(TargetMenu) { SetMenu(Menu==TargetMenu?TEXT(""):TargetMenu); return; }
     if(!CanHandleGameplayInput())return;
+    // Reserved input commands; rolling and quest auto-follow will be implemented later.
+    if(Command==EICInputCommand::Roll || Command==EICInputCommand::QuestFollow)return;
     if(Command==EICInputCommand::QuickSlot) { if(GetInventory())BeginItem(GetInventory()->GetSnapshot().QuickSlots[Slot],Slot); return; }
     if(Command==EICInputCommand::Jump) { if(auto* InputCharacter=Cast<ACharacter>(GetPawn()))InputCharacter->Jump(); return; }
     if(Command==EICInputCommand::Interact) { Interact(); return; }
@@ -220,7 +232,13 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     switch(Command)
     {
         case EICInputCommand::Attack:Action=TEXT("Attack");break;
-        case EICInputCommand::Dodge:Action=TEXT("Dodge");break;
+        case EICInputCommand::Dodge:
+        {
+            const auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());
+            const auto* ASC=PlayerCharacter?PlayerCharacter->GetICAbilitySystem():nullptr;
+            Action=ASC&&ASC->HasRecentCombat()?TEXT("Dodge"):TEXT("Dash");
+            break;
+        }
         case EICInputCommand::NextTarget:Action=TEXT("NextTarget");break;
         case EICInputCommand::ClearTarget:Action=TEXT("ClearTarget");break;
         case EICInputCommand::Skill:Action=TEXT("Skill");break;
@@ -398,6 +416,12 @@ void AICPlayerController::ExecuteCombatInput(FName Action,int32 Slot)
     auto* Caster=static_cast<AICCharacterBase*>(PlayerCharacter);
     auto* ASC=Caster?Caster->GetICAbilitySystem():nullptr;
     if(!ASC)return;
+    if(Action==TEXT("Dash") || Action==TEXT("Dodge"))
+    {
+        const auto Result=ASC->RequestAction(Action,NAME_None,nullptr);
+        if(!Result.bSuccess)Show(Result.Reason);
+        return;
+    }
     if(Action==TEXT("ClearTarget")) { CombatTarget.Reset(); TargetOccludedAt=-1; return; }
     if(Action==TEXT("NextTarget")) { SelectCombatTarget(true); return; }
     FName SkillID;

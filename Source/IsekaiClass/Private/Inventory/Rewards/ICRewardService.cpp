@@ -46,6 +46,27 @@ bool FICRewardService::PrepareMonsterDefeat(FICWorldState& Candidate,FName Key,c
         for(FName ID:Reward->UnlockRecipeIDs){if(!D->Find<FICRecipeRow>(ID,R)){Reason=R.Reason;return false;}Next.UnlockedRecipeIDs.Add(ID);}
     }
     if(Gold>MAX_int32||Gold<0){Reason=ICText::Get(TEXT("Native_86bddc6005a7")).ToString();return false;}
+    if(Drop&&Drop->bAutoCollectItems&&!Ground.Contents.IsEmpty())
+    {
+        auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(D,Next.Job);
+        if(!Staging->ApplySnapshot(Next.Inventory)){Reason=TEXT("Cannot stage monster loot inventory");return false;}
+        TArray<FPlayerItemInstance> Overflow;
+        for(auto Item:Ground.Contents)
+        {
+            const int32 Remainder=Staging->TryAddItemInstance(Item);
+            if(Remainder>0)
+            {
+                if(Remainder<Item.Count)Item.InstanceID=FGuid::NewGuid();
+                Item.Count=Remainder;Overflow.Add(Item);
+            }
+        }
+        Next.Inventory=Staging->GetSnapshot();Ground.Contents=MoveTemp(Overflow);
+    }
+    if(Monster.PetCodexIndex>=0&&Monster.PetCodexIndex<55)
+    {
+        int32& Essence=Next.Codex.PetEssence.FindOrAdd(Monster.PetCodexIndex);
+        Essence=static_cast<int32>(FMath::Min<int64>(MAX_int32,static_cast<int64>(Essence)+Random.RandRange(1,10)));
+    }
     Next.Gold=Gold;if(!Ground.Contents.IsEmpty())Next.Drops.Add(Ground);Next.Flags.Add(FirstFlag,true);Next.CompletedTransactionIDs.Add(Slot->IncarnationID);auto& Updated=Next.SpawnSlots.FindChecked(Key);Updated.bRewardPending=false;
     if(!UICWorldStateSubsystem::ValidateState(Next)){Reason=ICText::Get(TEXT("Native_8ea2e2c4ddba")).ToString();return false;}Candidate=MoveTemp(Next);return true;
 }

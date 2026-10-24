@@ -53,6 +53,7 @@ TArray<FICDefinitionSchema> UICDefinitionLibrary::GetDefinitionSchemas()
         if (Value==INDEX_NONE) continue;
         FICDefinitionSchema Schema; Schema.Type=static_cast<EICDefinitionType>(Value); Schema.RowStruct=Struct;
         Schema.AssetName=FName(*(TEXT("DT_IC_")+Kind));
+        if(Kind==TEXT("Ranching"))Schema.AssetName=TEXT("DT_Ranching");
         FString Group;
         switch (Schema.Type)
         {
@@ -65,7 +66,7 @@ TArray<FICDefinitionSchema> UICDefinitionLibrary::GetDefinitionSchemas()
         case EICDefinitionType::NPC: case EICDefinitionType::Schedule: case EICDefinitionType::GiftPreference: case EICDefinitionType::Dialogue: case EICDefinitionType::Service: case EICDefinitionType::Shop: Group=TEXT("NPC"); break;
         case EICDefinitionType::Region: case EICDefinitionType::Anchor: case EICDefinitionType::Spawner: case EICDefinitionType::Warp: case EICDefinitionType::Home: case EICDefinitionType::Map: case EICDefinitionType::Landmark: Group=TEXT("World"); break;
         case EICDefinitionType::Recipe: Group=TEXT("Recipes"); break;
-        case EICDefinitionType::Production: case EICDefinitionType::Resource: case EICDefinitionType::Crop: case EICDefinitionType::Fish: case EICDefinitionType::FishingPoint: Group=TEXT("Life"); break;
+        case EICDefinitionType::Production: case EICDefinitionType::Resource: case EICDefinitionType::Crop: case EICDefinitionType::Fish: case EICDefinitionType::FishingPoint: case EICDefinitionType::Ranching: Group=TEXT("Life"); break;
         case EICDefinitionType::Quest: case EICDefinitionType::Progression: case EICDefinitionType::Ending: Group=TEXT("Quest"); break;
         case EICDefinitionType::IDRegistry: Group=TEXT("Registry"); break;
         default: Group=TEXT("Presentation"); break;
@@ -219,7 +220,7 @@ bool UICDefinitionLibrary::ValidateTables(const TArray<FICDefinitionTable>& Tabl
             FString RefField=Field;
             if(Struct->GetFName()==TEXT("ICSkillHitDefinition") && Field==TEXT("EffectID")) RefField=TEXT("SkillEffectID");
             if(Struct->GetFName()==TEXT("ICBossPatternChoice") && Field==TEXT("PatternID")) RefField=TEXT("BossPatternID");
-            if(Struct->GetFName()==TEXT("ICInitialEquipment") || Field==TEXT("StartingWeaponID") || Field==TEXT("StartingClothesID")) RefField=TEXT("EquipmentID");
+            if(Struct->GetFName()==TEXT("ICInitialEquipment") || Field==TEXT("StartingWeaponID")) RefField=TEXT("EquipmentID");
             if(Field.StartsWith(TEXT("SkillSlot")) && Field.EndsWith(TEXT("ID"))) RefField=TEXT("SkillID");
             InspectProperty(T,Row,P,P->ContainerPtrToValuePtr<void>(Data),Path.IsEmpty()?Field:Path+TEXT(".")+Field,RefField);
         }
@@ -236,7 +237,7 @@ bool UICDefinitionLibrary::ValidateTables(const TArray<FICDefinitionTable>& Tabl
                 const auto* Item=reinterpret_cast<const FICItemRow*>(Pair.Value);
                 if(Item->ItemID!=Item->ID)Issue(T,Pair.Key,TEXT("ItemID"),TEXT("Legacy ItemID must equal ID."));
                 if(Item->StackLimit<1||Item->StackLimit>99||Item->BuyPrice<0||Item->SellPrice<0)Issue(T,Pair.Key,TEXT("StackLimit/Price"),TEXT("Invalid stack count or negative price."));
-                if(Item->Kind==EPlayerItemKind::Equipment && (Item->StackLimit!=1||Item->EquipSlot==EPlayerEquipSlot::None))Issue(T,Pair.Key,TEXT("EquipSlot"),TEXT("Equipment requires one item per slot and an equipment slot."));
+                if(Item->Kind==EPlayerItemKind::Equipment && (Item->StackLimit!=1||Item->EquipSlot!=EPlayerEquipSlot::Weapon))Issue(T,Pair.Key,TEXT("EquipSlot"),TEXT("Equipment requires a single weapon."));
                 if(Item->Tab==EPlayerItemTab::Quest && (Item->bCanDiscard||Item->bCanSell))Issue(T,Pair.Key,TEXT("Quest"),TEXT("Quest items cannot be discarded or sold."));
                 if(Item->Category==EPlayerItemCategory::Book && (Item->GrowthStat==EPlayerMainStat::None||!(Item->GrowthAmount==1||Item->GrowthAmount==3||Item->GrowthAmount==5)))Issue(T,Pair.Key,TEXT("GrowthAmount"),TEXT("Growth books require one stat and +1/+3/+5."));
             }

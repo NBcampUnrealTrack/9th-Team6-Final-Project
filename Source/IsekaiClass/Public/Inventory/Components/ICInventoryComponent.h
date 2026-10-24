@@ -45,6 +45,10 @@ public:
     UFUNCTION(BlueprintCallable) bool ToggleLock(int32 Index);
     UFUNCTION(BlueprintCallable) bool Discard(int32 Index);
     UFUNCTION(BlueprintCallable) bool Equip(int32 Index);
+    UFUNCTION(BlueprintCallable) bool EquipForCharacter(FName CharacterID, int32 BagIndex);
+    UFUNCTION(BlueprintCallable) bool UnequipForCharacter(FName CharacterID, EPlayerEquipSlot Slot);
+    /** Permanently removes the selected stack. Quest and locked items are protected. */
+    UFUNCTION(BlueprintCallable) bool TrashItem(int32 BagIndex);
     UFUNCTION(BlueprintCallable, Category="IC|Weapons") bool CycleWeapon();
     UFUNCTION(BlueprintPure, Category="IC|Weapons") EICWeaponFamily GetEquippedWeaponFamily() const;
     UFUNCTION(BlueprintPure, Category="IC|Weapons") EICWeaponFamily GetSelectedWeaponFamily() const;

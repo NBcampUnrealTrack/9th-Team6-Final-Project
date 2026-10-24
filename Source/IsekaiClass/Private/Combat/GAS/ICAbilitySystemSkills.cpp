@@ -5,6 +5,7 @@
 #include "Combat/GAS/ICGameplayTags.h"
 #include "Character/Base/ICCharacterBase.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "Enemy/Character/ICEnemyBase.h"
 
 FGameplayAbilitySpecHandle UICAbilitySystemComponent::GetOrGrantSkillAbility(const FICSkillRow& Row)
 {
@@ -57,6 +58,11 @@ void UICAbilitySystemComponent::SyncCooldownEffects()
 
 void UICAbilitySystemComponent::PlayCombatCue(bool bImpact, const FICCombatPresentation& Presentation, AActor* Recipient, const FVector& Location)
 {
+    // Configured monster reactions already play once from the applied HP loss,
+    // including periodic and projectile damage. Do not add the generic impact.
+    if(bImpact)if(const auto* Enemy=Cast<AICEnemyBase>(Recipient))
+        if(!Enemy->GetMonsterDefinition().HitVFX.IsNull()||!Enemy->GetMonsterDefinition().HitSound.IsNull())return;
+    if(bImpact&&Cast<AICEnemyBase>(GetAvatarActor())&&Presentation.ImpactVFX.IsNull()&&Presentation.ImpactSound.IsNull())return;
     auto* Payload = NewObject<UICCombatCuePayload>(this);
     Payload->Presentation = Presentation;
     Payload->bImpact = bImpact;

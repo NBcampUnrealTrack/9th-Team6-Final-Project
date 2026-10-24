@@ -8,6 +8,7 @@
 #include "World/State/Types/ICWorldProgressStateTypes.h"
 #include "World/State/Types/ICClockStateTypes.h"
 #include "World/State/Types/ICLifeStateTypes.h"
+#include "World/State/Types/ICCodexStateTypes.h"
 #include "ICWorldStateTypes.generated.h"
 
 USTRUCT(BlueprintType)
@@ -41,6 +42,7 @@ struct FICWorldState
     UPROPERTY(BlueprintReadOnly, SaveGame) TSet<FName> DiscoveredRegionIDs;
     UPROPERTY(BlueprintReadOnly, SaveGame) TSet<FName> DiscoveredAnchorIDs;
     UPROPERTY(BlueprintReadOnly, SaveGame) TSet<FName> CodexEntryIDs;
+    UPROPERTY(BlueprintReadOnly, SaveGame) FICCodexState Codex;
     UPROPERTY(BlueprintReadOnly, SaveGame) TSet<FName> UnlockedRecipeIDs;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, int32> ProgressionStages;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, bool> Flags;

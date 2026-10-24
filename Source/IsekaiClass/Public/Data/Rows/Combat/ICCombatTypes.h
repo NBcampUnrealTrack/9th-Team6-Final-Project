@@ -171,9 +171,6 @@ struct ISEKAICLASS_API FICInitialEquipment
     GENERATED_BODY()
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Equipment") FName WeaponID;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Equipment") FName ClothesID;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Equipment") FName RingID;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Equipment") FName NecklaceID;
 };
 
 

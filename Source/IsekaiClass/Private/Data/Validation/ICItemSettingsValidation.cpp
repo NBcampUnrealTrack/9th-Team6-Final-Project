@@ -133,9 +133,8 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
     {
         IC_TRACE_FUNCTION();
         if(Row.ItemID.IsNone()) ItemIssue(Issues,At,TEXT("ItemID"),TEXT("Equipment requires its inventory item definition."),true,bComplete);
-        if(Row.Slot==EPlayerEquipSlot::None) ItemIssue(Issues,At,TEXT("Slot"),TEXT("Equipment requires one of the four equipment slots."),true,bComplete);
+        if(Row.Slot!=EPlayerEquipSlot::Weapon) ItemIssue(Issues,At,TEXT("Slot"),TEXT("Only weapons can be equipped."),true,bComplete);
         if(Row.Slot==EPlayerEquipSlot::Weapon && Row.WeaponFamily==EICWeaponFamily::None) ItemIssue(Issues,At,TEXT("WeaponFamily"),TEXT("A weapon requires its fixed family."),true,bComplete);
-        if(Row.Slot!=EPlayerEquipSlot::Weapon && Row.WeaponFamily!=EICWeaponFamily::None) ItemIssue(Issues,At,TEXT("WeaponFamily"),TEXT("Clothes, rings and necklaces are not weapon families."));
         EICWeaponFamily Expected=EICWeaponFamily::None;
         switch(Row.RequiredClass)
         {
@@ -166,15 +165,11 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
     {
         IC_TRACE_FUNCTION();
         CheckInitialEquipment(Row.StartingWeaponID,EPlayerEquipSlot::Weapon,Row.WeaponFamily,At,TEXT("StartingWeaponID"));
-        CheckInitialEquipment(Row.StartingClothesID,EPlayerEquipSlot::Clothes,Row.WeaponFamily,At,TEXT("StartingClothesID"));
     });
     ItemEach<FICRecruitCombatRow>(Tables,[&](const FICRecruitCombatRow& Row,const FItemLocation& At)
     {
         IC_TRACE_FUNCTION();
         CheckInitialEquipment(Row.InitialEquipment.WeaponID,EPlayerEquipSlot::Weapon,Row.WeaponFamily,At,TEXT("InitialEquipment.WeaponID"));
-        CheckInitialEquipment(Row.InitialEquipment.ClothesID,EPlayerEquipSlot::Clothes,Row.WeaponFamily,At,TEXT("InitialEquipment.ClothesID"));
-        CheckInitialEquipment(Row.InitialEquipment.RingID,EPlayerEquipSlot::Ring,Row.WeaponFamily,At,TEXT("InitialEquipment.RingID"));
-        CheckInitialEquipment(Row.InitialEquipment.NecklaceID,EPlayerEquipSlot::Necklace,Row.WeaponFamily,At,TEXT("InitialEquipment.NecklaceID"));
     });
     ItemEach<FICEnhancementRow>(Tables,[&](const FICEnhancementRow& Row,const FItemLocation& At)
     {
@@ -201,7 +196,7 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         IC_TRACE_FUNCTION();
         if(Row.Stat==EICStat::None) ItemIssue(Issues,At,TEXT("Stat"),TEXT("Random options require an explicit stat."),true,bComplete);
         if(Row.MinimumValue>Row.MaximumValue) ItemIssue(Issues,At,TEXT("MaximumValue"),TEXT("Option maximum must be at least its minimum."));
-        if(Row.AllowedSlots.Contains(EPlayerEquipSlot::None)) ItemIssue(Issues,At,TEXT("AllowedSlots"),TEXT("None is not an equipment slot; use an empty list for unrestricted slots."));
+        for(auto Allowed:Row.AllowedSlots)if(Allowed!=EPlayerEquipSlot::Weapon)ItemIssue(Issues,At,TEXT("AllowedSlots"),TEXT("Only weapons can receive equipment options."));
         if(Row.AllowedWeaponFamilies.Contains(EICWeaponFamily::None)) ItemIssue(Issues,At,TEXT("AllowedWeaponFamilies"),TEXT("Use an empty family list for unrestricted non-weapon options."));
     });
     ItemEach<FICOptionPoolRow>(Tables,[&](const FICOptionPoolRow& Row,const FItemLocation& At)
@@ -317,6 +312,7 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         if(Row.RunSpeedCmPerSecond<Row.WalkSpeedCmPerSecond) ItemIssue(Issues,At,TEXT("RunSpeedCmPerSecond"),TEXT("Running cannot be slower than walking."));
         if(Row.InputBufferPlaySeconds>Row.ComboWindowPlaySeconds) ItemIssue(Issues,At,TEXT("ComboWindowPlaySeconds"),TEXT("Combo connection window must cover its input buffer."));
         if(Row.DodgeInvulnerabilityPlaySeconds>Row.DodgeCooldownPlaySeconds) ItemIssue(Issues,At,TEXT("DodgeCooldownPlaySeconds"),TEXT("Dodge cooldown must cover its invulnerability span."));
+        if(Row.DashDurationPlaySeconds<=0 || Row.DashDurationPlaySeconds>Row.DodgeCooldownPlaySeconds) ItemIssue(Issues,At,TEXT("DashDurationPlaySeconds"),TEXT("Dash duration must be positive and fit within the shared movement cooldown."));
         if(Row.HitStaggerPlaySeconds>Row.HitStaggerIntervalPlaySeconds) ItemIssue(Issues,At,TEXT("HitStaggerIntervalPlaySeconds"),TEXT("Repeat stagger interval must cover the stagger span."));
     });
     ItemEach<FICPartySettingsRow>(Tables,[&](const FICPartySettingsRow& Row,const FItemLocation& At)

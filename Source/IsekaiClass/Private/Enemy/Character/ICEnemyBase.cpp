@@ -12,9 +12,30 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Debug/ICLog.h"
 #include "Quest/ICQuestSubsystem.h"
+#include "Components/WidgetComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "UI/Gameplay/ICCombatFeedbackWidget.h"
+#include "Animation/AnimSequence.h"
+#include "Animation/AnimSingleNodeInstance.h"
+#include "Kismet/GameplayStatics.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
+#include "Sound/SoundBase.h"
 AICEnemyBase::AICEnemyBase()
 {
     IC_TRACE_FUNCTION();AbilitySystem=CreateDefaultSubobject<UICAbilitySystemComponent>(TEXT("ICAbilitySystem"));AIControllerClass=AICAIController::StaticClass();AutoPossessAI=EAutoPossessAI::Disabled;Tags.Add(TEXT("IC.Enemy"));
+    GetCapsuleComponent()->InitCapsuleSize(42,96);
+    GetCapsuleComponent()->SetCanEverAffectNavigation(false);
+    GetMesh()->SetRelativeLocation(FVector(0,0,-96));
+    GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    GetCharacterMovement()->bOrientRotationToMovement=false;
+    GetCharacterMovement()->bUseControllerDesiredRotation=true;
+    GetCharacterMovement()->RotationRate=FRotator(0,540,0);
+    bUseControllerRotationYaw=false;
+    HealthBar=CreateDefaultSubobject<UWidgetComponent>(TEXT("MonsterHealthBar"));
+    HealthBar->SetupAttachment(GetRootComponent());HealthBar->SetWidgetSpace(EWidgetSpace::Screen);
+    HealthBar->SetDrawSize({180,16});HealthBar->SetRelativeLocation({0,0,140});
+    HealthBar->SetCollisionEnabled(ECollisionEnabled::NoCollision);HealthBar->SetCanEverAffectNavigation(false);
 }
 bool AICEnemyBase::InitializeEnemy(FName SpawnerID,const FICSpawnSlotDefinition& Slot,const FTransform& Origin)
 {
@@ -27,8 +48,20 @@ bool AICEnemyBase::InitializeEnemy(FName SpawnerID,const FICSpawnSlotDefinition&
     FICCharacterState State;State.CharacterId=SpawnKey;State.Kind=EICCharacterKind::Background;State.MaxHP=State.HP=S.MaxHP;State.MaxMP=State.MP=S.MaxMP;State.SP=0;State.MaxSP=1;State.Position=Origin.GetLocation();State.Rotation=Origin.Rotator();
     if(!AbilitySystem->Restore(State))return false;AbilitySystem->SetOrdinaryStaggerImmunity(Definition.bImmuneToOrdinaryHitStagger);
     GetCharacterMovement()->MaxWalkSpeed=AbilitySystem->Stat(EICStat::MoveSpeed);
+    GetCharacterMovement()->bOrientRotationToMovement=false;
+    GetCharacterMovement()->bUseControllerDesiredRotation=true;
+    GetCharacterMovement()->RotationRate=FRotator(0,540,0);
     if(auto* CharacterMesh=Definition.Mesh.LoadSynchronous())GetMesh()->SetSkeletalMesh(CharacterMesh);
     if(auto* Anim=Definition.AnimationClass.LoadSynchronous())GetMesh()->SetAnimInstanceClass(Anim);
+    bEnemyInitialized=true;
+    PresentAnimation(Definition.IdleAnimation.LoadSynchronous(),true);
+    if(auto* WidgetClass=LoadClass<UICMonsterHealthWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_MonsterHealthBar.WBP_IC_MonsterHealthBar_C")))
+    {
+        HealthBar->SetWidgetClass(WidgetClass);HealthBar->InitWidget();
+        if(auto* Widget=Cast<UICMonsterHealthWidget>(HealthBar->GetUserWidgetObject()))Widget->SetEnemy(this);
+        const auto Bounds=GetMesh()->CalcBounds(GetMesh()->GetComponentTransform());
+        HealthBar->SetWorldLocation(FVector(GetActorLocation().X,GetActorLocation().Y,Bounds.Origin.Z+Bounds.BoxExtent.Z+30));
+    }
     auto Next=WorldState()->ExportState();auto& InitialSlot=Next.SpawnSlots.FindOrAdd(SpawnKey);InitialSlot.SpawnerID=SpawnerID;InitialSlot.SlotIndex=Slot.SpawnSlotIndex;InitialSlot.MonsterID=Definition.ID;InitialSlot.MaxHP=InitialSlot.HP=S.MaxHP;InitialSlot.MaxMP=InitialSlot.MP=S.MaxMP;InitialSlot.bDefeated=false;InitialSlot.bRewardPending=false;InitialSlot.IncarnationID=FGuid::NewGuid();InitialSlot.RespawnReadyAtPlaySecond=0;if(!WorldState()->ApplyWorldProgress(Next))return false;
     if(!FlushToWorldState_Implementation(WorldState()))return false;
     if(!GetController())SpawnDefaultController();if(auto* AI=Cast<AICAIController>(GetController()))AI->StartExecution(nullptr,Definition.BehaviorTree.LoadSynchronous());
@@ -49,11 +82,13 @@ void AICEnemyBase::BeginReturn()
     IC_TRACE_FUNCTION();if(bReturning||!AbilitySystem->IsAlive())return;bReturning=true;AbilitySystem->CancelAction();AbilitySystem->SetGuarding(false);
     const auto C=AbilitySystem->Capture();for(const auto& E:C.Combat.Effects)AbilitySystem->RemoveStatus(E.InstanceID);
     AbilitySystem->SetLooseGameplayTagCount(ICTags::Returning,1);AbilitySystem->SetVitals(C.MaxHP,C.MaxMP,0);
+    HitAnimationUntil=0;
 }
-void AICEnemyBase::FinishReturn() { IC_TRACE_FUNCTION();bReturning=false;AbilitySystem->SetLooseGameplayTagCount(ICTags::Returning,0);FlushToWorldState_Implementation(WorldState()); }
+void AICEnemyBase::FinishReturn() { IC_TRACE_FUNCTION();bReturning=false;SetActorRotation(OriginTransform.Rotator());if(auto* AI=Cast<AICAIController>(GetController()))AI->SetControlRotation(OriginTransform.Rotator());AbilitySystem->SetLooseGameplayTagCount(ICTags::Returning,0);FlushToWorldState_Implementation(WorldState()); }
 void AICEnemyBase::HandleZeroHP()
 {
     IC_TRACE_FUNCTION();if(bDefeatCommitted||!WorldState())return;bDefeatCommitted=true;if(auto* AI=Cast<AICAIController>(GetController()))AI->StopExecution();
+    WorldState()->FlushParticipants();
     FlushToWorldState_Implementation(WorldState());auto State=WorldState()->ExportState();auto& S=State.SpawnSlots.FindChecked(SpawnKey);S.bDefeated=true;S.HP=0;
     S.RespawnReadyAtPlaySecond=AbilitySystem->PlaySecond()+(SlotDefinition.bOverrideRespawnTime?SlotDefinition.RespawnPlaySeconds:Definition.RespawnPlaySeconds);
     State.MonsterKilledAt.Add(SpawnKey,AbilitySystem->PlaySecond());if(Definition.Kind!=EICMonsterKind::Normal)State.DefeatedBosses.Add(Definition.ID);S.bRewardPending=true;
@@ -64,7 +99,10 @@ void AICEnemyBase::HandleZeroHP()
     }
     auto Rewards=WorldState()->ExportState();FString Reason;if(FICRewardService::PrepareMonsterDefeat(Rewards,SpawnKey,Definition,AbilitySystem->Definitions(),AbilitySystem->PlaySecond(),Reason))WorldState()->CommitGameplayTransaction(Rewards,Rewards.SpawnSlots.FindChecked(SpawnKey).IncarnationID);
     else UE_LOG(LogICInventory,Warning,TEXT("[Enemy.RewardPending] Key=%s Reason=%s"),*SpawnKey.ToString(),*Reason);
-    UE_LOG(LogICWorldState,Log,TEXT("[Enemy.Defeated] Key=%s ReadyAt=%.2f"),*SpawnKey.ToString(),S.RespawnReadyAtPlaySecond);SetActorEnableCollision(false);SetLifeSpan(1.f);
+    UE_LOG(LogICWorldState,Log,TEXT("[Enemy.Defeated] Key=%s ReadyAt=%.2f"),*SpawnKey.ToString(),S.RespawnReadyAtPlaySecond);SetActorEnableCollision(false);
+    GetCharacterMovement()->StopMovementImmediately();HealthBar->SetVisibility(false);
+    auto* Death=Definition.DeathAnimation.LoadSynchronous();PresentAnimation(Death,false);
+    SetLifeSpan(Death?FMath::Max(1.f,Death->GetPlayLength()):1.f);
     Super::HandleZeroHP();
 }
 void AICEnemyBase::EndPlay(const EEndPlayReason::Type Reason)
@@ -72,4 +110,42 @@ void AICEnemyBase::EndPlay(const EEndPlayReason::Type Reason)
     IC_TRACE_FUNCTION();if(!bSuppressPersistence&&!bDefeatCommitted&&WorldState()&&!SpawnKey.IsNone())
     {FlushToWorldState_Implementation(WorldState());auto State=WorldState()->ExportState();auto& S=State.SpawnSlots.FindChecked(SpawnKey);S.Position=OriginTransform.GetLocation();S.Rotation=OriginTransform.Rotator();S.HP=S.MaxHP;S.MP=S.MaxMP;S.Combat=FICCombatState();WorldState()->ApplyWorldProgress(State);}
     Super::EndPlay(Reason);
+}
+void AICEnemyBase::PresentAnimation(UAnimSequence* Animation,bool Loop,float Rate)
+{
+    if(!Animation)return;
+    PresentedAnimation=Animation;GetMesh()->PlayAnimation(Animation,Loop);GetMesh()->SetPlayRate(Rate);
+}
+void AICEnemyBase::PlayHitReaction()
+{
+    if(!bEnemyInitialized)return;
+    const FVector Impact=GetMesh()->Bounds.Origin;
+    if(auto* VFX=Definition.HitVFX.LoadSynchronous())UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(),VFX,Impact);
+    if(auto* Sound=Definition.HitSound.LoadSynchronous())UGameplayStatics::PlaySoundAtLocation(this,Sound,GetActorLocation());
+    if(!bDefeatCommitted)
+        if(auto* Animation=Definition.HitAnimation.LoadSynchronous())
+        {
+            HitAnimationUntil=AbilitySystem->PlaySecond()+.3;
+            PresentAnimation(Animation,false,FMath::Max(.1f,Animation->GetPlayLength()/.3f));
+        }
+}
+void AICEnemyBase::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    if(!bEnemyInitialized||bDefeatCommitted||!AbilitySystem->IsAlive()||!Definition.AnimationClass.IsNull())return;
+    if(AbilitySystem->PlaySecond()<HitAnimationUntil)return;
+    const FGuid Action=AbilitySystem->GetActionID();
+    if(Action.IsValid()&&!IsReturning())
+    {
+        if(Action!=PresentedAction)
+        {
+            PresentedAction=Action;
+            if(auto* Animation=Definition.AttackAnimation.LoadSynchronous())
+                PresentAnimation(Animation,false,Animation->GetPlayLength()/.8f);
+        }
+        return;
+    }
+    PresentedAction.Invalidate();
+    auto* Animation=GetVelocity().SizeSquared2D()>25?Definition.MoveAnimation.LoadSynchronous():Definition.IdleAnimation.LoadSynchronous();
+    if(Animation&&Animation!=PresentedAnimation)PresentAnimation(Animation,true);
 }

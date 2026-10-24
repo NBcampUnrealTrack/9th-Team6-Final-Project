@@ -40,4 +40,19 @@ void ICSaveDataMigration::NormalizeInventoryIDs(FICWorldState& State)
     for(auto& Character:State.Characters)for(auto& Value:Character.Value.Equipment)Item(Value);
     for(auto& Drop:State.Drops)for(auto& Value:Drop.Contents)Item(Value);
     for(auto& Job:State.ProductionJobs)for(auto& Value:Job.Value.Materials)ID(Value.ItemID);
+    NormalizeWeaponOnly(State);
+}
+
+void ICSaveDataMigration::NormalizeWeaponOnly(FICWorldState& State)
+{
+    auto Retired=[](FName ID){const auto Name=ID.ToString();return Name.StartsWith(TEXT("EQP_ARM_"))||Name.StartsWith(TEXT("EQP_RNG_"))||Name.StartsWith(TEXT("EQP_NCK_"));};
+    auto Clean=[&](TArray<FPlayerItemInstance>& Items){for(auto& Item:Items)if(Retired(Item.ItemID))Item={};};
+    Clean(State.Inventory.Bag.Slots);Clean(State.Inventory.QuestItems);Clean(State.Inventory.Equipment);Clean(State.Inventory.WeaponSlots);
+    if(State.Inventory.Equipment.Num()==4)State.Inventory.Equipment.SetNum(1);
+    for(auto& Pair:State.Inventory.Storage)Clean(Pair.Value.Slots);
+    for(auto& ID:State.Inventory.QuickSlots)if(Retired(ID))ID=NAME_None;
+    for(auto& Pair:State.Characters){Clean(Pair.Value.Equipment);if(Pair.Value.Equipment.Num()==4)Pair.Value.Equipment.SetNum(1);}
+    for(auto& Drop:State.Drops){Clean(Drop.Contents);Drop.Contents.RemoveAll([](const auto& Item){return Item.IsEmpty();});}
+    State.Drops.RemoveAll([](const auto& Drop){return Drop.Contents.IsEmpty();});
+    for(auto It=State.Codex.AcquiredItemIDs.CreateIterator();It;++It)if(Retired(*It))It.RemoveCurrent();
 }

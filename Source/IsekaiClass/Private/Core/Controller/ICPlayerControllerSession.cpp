@@ -134,6 +134,7 @@ bool AICPlayerController::LoadSelectedSessionSlot()
 void AICPlayerController::OpenSaveMenu(bool bQuitAfter)
 {
     IC_TRACE_FUNCTION();
+    if(bDead){SetMenu(TEXT("Death"));return;}
     if(!bCreated){ShowLocalized(ICText::Get(TEXT("Native_1d492b506be0")));return;}
     if(Menu==TEXT("Confirm"))return;
     if(bItemTransactionInProgress){ShowLocalized(ICText::Get(TEXT("Native_b8c492a66d83")));return;}
@@ -159,14 +160,14 @@ void AICPlayerController::CloseSessionMenu()
     if(Menu==TEXT("Save")){bExitAfterSave=false;SetMenu(SaveReturnMenu);return;}
     if(Menu==TEXT("Load"))
     {
-        SetMenu(IsMainMenuLevel()?LoadReturnMenu:bDead?TEXT("Pause"):!bCreated?TEXT("Create"):LoadReturnMenu);
-        if(bDead)ShowLocalized(ICText::Get(TEXT("Native_9a58031f26cd")));
+        SetMenu(IsMainMenuLevel()?LoadReturnMenu:bDead?TEXT("Death"):!bCreated?TEXT("Create"):LoadReturnMenu);
         return;
     }
     if(Menu==TEXT("Quit")){bQuitAfterWrite=false;bExitAfterSave=false;SetMenu(QuitReturnMenu);return;}
     if(Menu==TEXT("Settings")){SetMenu(SettingsReturnMenu);return;}
     if(Menu==TEXT("MenuSettings")){SetMenu(TEXT("Pause"));return;}
-    SetMenu(bDead?TEXT("Load"):bCreated?TEXT(""):TEXT("Create"));
+    if(Menu==TEXT("Death"))return;
+    SetMenu(bDead?TEXT("Death"):bCreated?TEXT(""):TEXT("Create"));
 }
 void AICPlayerController::RequestManualSave()
 {
@@ -197,10 +198,11 @@ void AICPlayerController::RequestCreatePlayer()
 void AICPlayerController::RequestQuit()
 {
     IC_TRACE_FUNCTION();
-    if(Menu==TEXT("Confirm"))return;
-    if(Menu!=TEXT("Quit"))QuitReturnMenu=Menu;
-    bExitAfterSave=false;bQuitAfterWrite=false;SetMenu(TEXT("Quit"));
-    ShowLocalized(ICText::Get(TEXT("Native_a621b4655617")));
+    if(Menu==TEXT("Confirm")||bSessionClosing)return;
+    bExitAfterSave=false;
+    if(auto* Saves=GetSaves();Saves&&Saves->bSaving)
+    {bQuitAfterWrite=true;ShowLocalized(ICText::Get(TEXT("Native_fc02a78eddf6")));return;}
+    CompleteQuit();
 }
 void AICPlayerController::RequestDelete(bool bLegacy)
 {
@@ -242,14 +244,14 @@ void AICPlayerController::QuitWithoutSave()
 {
     IC_TRACE_FUNCTION();
     if(Menu!=TEXT("Quit"))return;
-    if(auto* Saves=GetSaves();Saves&&Saves->bSaving)
-    {bQuitAfterWrite=true;ShowLocalized(ICText::Get(TEXT("Native_fc02a78eddf6")));return;}
-    CompleteQuit();
+    RequestQuit();
 }
 void AICPlayerController::FinishSessionSave(int32 Slot,bool bSuccess)
 {
     IC_TRACE_FUNCTION();
-    if(bQuitAfterWrite||(bExitAfterSave&&Slot==SelectedSaveSlot&&Slot>=1))
+    // A direct quit finishes after any existing write, without opening another choice screen.
+    if(bQuitAfterWrite){CompleteQuit();return;}
+    if(bExitAfterSave&&Slot==SelectedSaveSlot&&Slot>=1)
     {
         if(bSuccess){CompleteQuit();return;}
         bQuitAfterWrite=false;bExitAfterSave=false;SetMenu(TEXT("Quit"));

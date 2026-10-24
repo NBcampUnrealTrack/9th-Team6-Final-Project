@@ -7,8 +7,62 @@
 #include "Debug/ICLog.h"
 #include "UI/Framework/ICUIRootWidget.h"
 #include "CommonActivatableWidget.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/NavigationConfig.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/PanelWidget.h"
+#include "Components/WidgetSwitcher.h"
+namespace
+{
+UWidget* FirstKeyboardTarget(UWidget* Widget)
+{
+    if(!Widget||!Widget->IsVisible()||!Widget->GetIsEnabled())return nullptr;
+    if(auto* User=Cast<UUserWidget>(Widget))
+    {if(User->WidgetTree)if(auto* Target=FirstKeyboardTarget(User->WidgetTree->RootWidget))return Target;}
+    else if(auto* Switcher=Cast<UWidgetSwitcher>(Widget))
+    {if(auto* Target=FirstKeyboardTarget(Switcher->GetActiveWidget()))return Target;}
+    else if(auto* Panel=Cast<UPanelWidget>(Widget))
+        for(auto* Child:Panel->GetAllChildren())if(auto* Target=FirstKeyboardTarget(Child))return Target;
+    const auto Slate=Widget->GetCachedWidget();return Slate.IsValid()&&Slate->SupportsKeyboardFocus()?Widget:nullptr;
+}
+class FICKeyboardNavigation : public FNavigationConfig
+{
+public:
+    explicit FICKeyboardNavigation(TSharedRef<FNavigationConfig> InFallback):Fallback(InFallback){}
+    virtual EUINavigation GetNavigationDirectionFromKey(const FKeyEvent& Event) const override
+    {
+        const FKey Key=Event.GetKey();
+        if((Key==EKeys::W||Key==EKeys::A||Key==EKeys::S||Key==EKeys::D)&&!Event.IsControlDown()&&!Event.IsAltDown())
+        {
+            const auto Focus=FSlateApplication::Get().GetUserFocusedWidget(Event.GetUserIndex());
+            const FName Type=Focus.IsValid()?Focus->GetType():NAME_None;
+            // Character creation, save names and other text fields must still accept WASD letters.
+            if(Type==TEXT("SEditableText")||Type==TEXT("SMultiLineEditableText")||Type==TEXT("SEditableTextBox")||Type==TEXT("SMultiLineEditableTextBox"))return EUINavigation::Invalid;
+            return Key==EKeys::W?EUINavigation::Up:Key==EKeys::S?EUINavigation::Down:Key==EKeys::A?EUINavigation::Left:EUINavigation::Right;
+        }
+        return Fallback->GetNavigationDirectionFromKey(Event);
+    }
+    virtual EUINavigation GetNavigationDirectionFromAnalog(const FAnalogInputEvent& Event) override {return Fallback->GetNavigationDirectionFromAnalog(Event);}
+    virtual EUINavigationAction GetNavigationActionFromKey(const FKeyEvent& Event) const override {return Fallback->GetNavigationActionFromKey(Event);}
+private:
+    TSharedRef<FNavigationConfig> Fallback;
+};
+int32 KeyboardNavigationUsers=0;
+TSharedPtr<FNavigationConfig> PreviousKeyboardNavigation,KeyboardNavigation;
+void RegisterKeyboardNavigation()
+{
+    if(KeyboardNavigationUsers++==0)
+    {PreviousKeyboardNavigation=FSlateApplication::Get().GetNavigationConfig();KeyboardNavigation=MakeShared<FICKeyboardNavigation>(PreviousKeyboardNavigation.ToSharedRef());FSlateApplication::Get().SetNavigationConfig(KeyboardNavigation.ToSharedRef());}
+}
+void UnregisterKeyboardNavigation()
+{
+    if(--KeyboardNavigationUsers==0)
+    {if(FSlateApplication::IsInitialized()&&FSlateApplication::Get().GetNavigationConfig()==KeyboardNavigation)FSlateApplication::Get().SetNavigationConfig(PreviousKeyboardNavigation.ToSharedRef());KeyboardNavigation.Reset();PreviousKeyboardNavigation.Reset();}
+}
+}
 bool UICUIManagerSubsystem::EnsureRoot()
 {
+    if(!bKeyboardNavigationRegistered&&FSlateApplication::IsInitialized()){RegisterKeyboardNavigation();bKeyboardNavigationRegistered=true;}
     if (Root && Root->GetWorld() == GetWorld() && Root->IsInViewport())
         return true;
     if (Root)
@@ -101,9 +155,11 @@ void UICUIManagerSubsystem::RefreshContext()
         if (Focus)
         {
             Mode.SetWidgetToFocus(Focus->TakeWidget());
+            UWidget* Desired=nullptr;
             if (auto* Active = Cast<UCommonActivatableWidget>(Focus))
-                if (auto* Desired = Active->GetDesiredFocusTarget())
-                    Mode.SetWidgetToFocus(Desired->TakeWidget());
+                Desired=Active->GetDesiredFocusTarget();
+            if(!Desired)Desired=FirstKeyboardTarget(Focus);
+            if(Desired)Mode.SetWidgetToFocus(Desired->TakeWidget());
         }
         PC->SetInputMode(Mode);
     }
@@ -176,5 +232,6 @@ void UICUIManagerSubsystem::Deinitialize()
 {
     IC_TRACE_FUNCTION();
     CloseAllScreens();
+    if(bKeyboardNavigationRegistered){UnregisterKeyboardNavigation();bKeyboardNavigationRegistered=false;}
     Super::Deinitialize();
 }

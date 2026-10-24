@@ -7,6 +7,9 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FICCharacterChanged, FName, CharacterId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FICStateChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FICCombatDamageReceived, AActor*, Victim, float, Amount);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FICMonsterRewardReceived, int32, Gold, const TArray<FICItemAmount>&, Items, FName, MonsterID, int32, Essence);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FICItemsReceived, const TArray<FICItemAmount>&, Items);
 
 UCLASS()
 class ISEKAICLASS_API UICWorldStateSubsystem : public UGameInstanceSubsystem
@@ -18,6 +21,9 @@ public:
     UPROPERTY(BlueprintAssignable) FICStateChanged OnWorldRestored;
     UPROPERTY(BlueprintAssignable) FICStateChanged OnPlayerGoldChanged;
     UPROPERTY(BlueprintAssignable) FICStateChanged OnDropsChanged;
+    UPROPERTY(BlueprintAssignable) FICCombatDamageReceived OnCombatDamageReceived;
+    UPROPERTY(BlueprintAssignable) FICMonsterRewardReceived OnMonsterRewardReceived;
+    UPROPERTY(BlueprintAssignable) FICItemsReceived OnItemsReceived;
 
     static FName PlayerId() { IC_TRACE_FUNCTION(); return TEXT("CHR_PLAYER"); }
     static bool IsCharacterIdValid(FName ID);
@@ -50,6 +56,7 @@ public:
     static bool ValidateInventoryShape(const FICInventoryState& Inventory, TSet<FGuid>* ExistingIDs = nullptr);
     bool ApplyWorldProgress(const FICWorldState& Candidate);
 private:
+    static void RecordAcquiredItems(FICWorldState& World);
     bool AdvanceOfflineCharacter(FName ID);
     UPROPERTY() FICWorldState State;
     TMap<FName, TWeakObjectPtr<UObject>> Participants;

@@ -41,7 +41,7 @@ struct FICInventoryState
     {
         IC_TRACE_FUNCTION();
         Bag.Slots.SetNum(20);
-        Equipment.SetNum(4);
+        Equipment.SetNum(1);
         WeaponSlots.SetNum(4);
         QuickSlots.SetNum(4);
         Storage.Add(TEXT("PlayerHome")).Slots.SetNum(40);
