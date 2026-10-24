@@ -26,7 +26,6 @@ struct ISEKAICLASS_API FICClassRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") FName SkillSlot3ID;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") FName SkillSlot4ID;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") FName StartingWeaponID;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") FName StartingClothesID;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") TArray<FICNormalAttackStage> NormalAttackStages;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") FName WeaponRightSocket = TEXT("weapon_r");

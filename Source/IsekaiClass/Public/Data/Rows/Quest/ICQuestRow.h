@@ -121,6 +121,9 @@ struct ISEKAICLASS_API FICQuestRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Acceptance")
     bool IsAutoAccept = false;
 
+    /** Display an available quest in the journal before the player accepts it. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") bool bListBeforeAccept=false;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Quest")
     FName RegionID;
 

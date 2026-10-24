@@ -9,6 +9,7 @@ class UAnimInstance;
 class UBehaviorTree;
 class UBlackboardData;
 class USkeletalMesh;
+class UAnimSequence;
 
 
 USTRUCT(BlueprintType)
@@ -138,6 +139,17 @@ struct ISEKAICLASS_API FICMonsterRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftClassPtr<APawn> PawnClass;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<USkeletalMesh> Mesh;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftClassPtr<UAnimInstance> AnimationClass;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UAnimSequence> IdleAnimation;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UAnimSequence> MoveAnimation;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UAnimSequence> AttackAnimation;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UAnimSequence> HitAnimation;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UAnimSequence> DeathAnimation;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<USoundBase> HitSound;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UNiagaraSystem> HitVFX;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UTexture2D> Portrait;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pet", meta=(ClampMin="-1",ClampMax="54")) int32 PetCodexIndex=INDEX_NONE;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pet") FText PetName;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pet", meta=(MultiLine=true)) FText PetBuffDescription;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pet") TArray<FICStatModifier> PetBuffs;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<USoundBase> BattleBGM;
 };

@@ -1,4 +1,10 @@
 #include "UI/Gameplay/ICGameplayWidget.h"
+#include "UI/Gameplay/ICGameMenuWidget.h"
+#include "UI/Gameplay/ICCompanionGroupWidget.h"
+#include "UI/Gameplay/ICCharacterStatusWidget.h"
+#include "UI/Gameplay/ICQuickSlotsWidget.h"
+#include "World/State/ICWorldStateSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Core/Controller/ICPlayerController.h"
@@ -26,6 +32,16 @@ void UICGameplayWidget::NativeOnInitialized()
     if (!WidgetTree->RootWidget)
         ICFrontendLayout::Build(WidgetTree, TEXT("HUD"));
     SetIsFocusable(true);
+    if (auto* Menu = Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu"))))
+    {
+        Menu->OnResumeRequested.AddUniqueDynamic(this, &ThisClass::Resume);
+        Menu->OnBackRequested.AddUniqueDynamic(this, &ThisClass::Back);
+        Menu->OnSaveRequested.AddUniqueDynamic(this, &ThisClass::Save);
+        Menu->OnLoadRequested.AddUniqueDynamic(this, &ThisClass::Load);
+        Menu->OnGameSettingsRequested.AddUniqueDynamic(this, &ThisClass::GameSettings);
+        Menu->OnQuitRequested.AddUniqueDynamic(this, &ThisClass::Quit);
+        return;
+    }
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Resume"))))
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::Resume);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Save"))))
@@ -63,6 +79,45 @@ void UICGameplayWidget::RefreshCurrentScreen()
     auto* PC = GetICPlayerController();
     if (!PC)
         return;
+    if (auto* Status = Cast<UICCharacterStatusWidget>(GetWidgetFromName(TEXT("HUD_PlayerStatus"))))
+    {
+        auto* State = PC->GetWorldState();
+        const bool HasPlayer = State && State->GetStoredCharacter(UICWorldStateSubsystem::PlayerId());
+        const FICWorldState Info = State ? State->ExportState() : FICWorldState();
+        const int32 Preset = HasPlayer ? Info.Preset : PC->Preset;
+        Status->CharacterID = UICWorldStateSubsystem::PlayerId();
+        Status->DisplayName = FText::FromString(HasPlayer ? Info.PlayerName : PC->PlayerName);
+        Status->Portrait = nullptr;
+        auto* Definitions = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>() : nullptr;
+        if (Definitions && !Status->DisplayName.IsEmpty() && Preset >= 0 && Preset <= 1)
+        {
+            FICDefinitionResult Result;
+            const FName ID = Preset == 1 ? TEXT("PRESET_PLAYER_F") : TEXT("PRESET_PLAYER_M");
+            if (const auto* Definition = Definitions->Find<FICPlayerPresetRow>(ID, Result))
+                Status->Portrait = Definition->Portrait.LoadSynchronous();
+        }
+        FICCharacterState Snapshot;
+        if (HasPlayer) Snapshot = PC->GetPlayerSnapshot();
+        else Snapshot.HP = Snapshot.MP = Snapshot.SP = Snapshot.MaxHP = Snapshot.MaxMP = Snapshot.MaxSP = 0.f;
+        Status->UpdateVitals(Snapshot);
+    }
+    if (auto* Companions = Cast<UICCompanionGroupWidget>(GetWidgetFromName(TEXT("HUD_Companions"))))
+        Companions->RefreshCompanions();
+    if (auto* QuickSlots = Cast<UICQuickSlotsWidget>(GetWidgetFromName(TEXT("HUD_QuickSlots"))))
+        QuickSlots->RefreshQuickSlots();
+    if (auto* Menu = Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu"))))
+    {
+        if (auto* Hint = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Hint"))))
+            Hint->SetText(FText::FromString(PC->InteractionHint.IsEmpty() ? TEXT("") : TEXT("[F] ") + PC->InteractionHint));
+        if (auto* Notice = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Notice"))))
+            Notice->SetText(PC->NoticeDisplayText);
+        const bool Open = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Death") && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
+            PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue");
+        Menu->SetVisibility(Open ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        Menu->SetSessionPresentation(PC->Menu, PC->Menu == TEXT("Confirm") ? PC->ModalDisplayText : PC->NoticeDisplayText);
+        OnRefreshGameplayUI();
+        return;
+    }
     auto SetText = [this](const TCHAR* Name, const FString& Value) {
         if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(Name)))
             Text->SetText(FText::FromString(Value));
@@ -83,8 +138,8 @@ void UICGameplayWidget::RefreshCurrentScreen()
     SetText(TEXT("TXT_Hint"), PC->InteractionHint.IsEmpty() ? TEXT("") : TEXT("[F] ") + PC->InteractionHint);
     if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Notice"))))
         Text->SetText(PC->NoticeDisplayText);
-    const bool HasPanel = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
-                          PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue") && PC->Menu != TEXT("Quest");
+    const bool HasPanel = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Death") && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
+                          PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue");
     if (auto* Panel = GetWidgetFromName(TEXT("MenuPanel")))
         Panel->SetVisibility(HasPanel ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     if (HasPanel)
@@ -165,10 +220,12 @@ FReply UICGameplayWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyE
     auto* PC = GetICPlayerController();
     if (PC && PC->HandleSessionKey(Event.GetKey(), Event.IsRepeat()))
         return FReply::Handled();
-    if (PC && !Event.IsRepeat() &&
-        (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::Gamepad_FaceButton_Right))
+    if(auto* Menu=Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu")));Menu&&Menu->IsVisible())
+        if(Menu->HandleMenuKey(Event.GetKey(),Event.IsRepeat()))return FReply::Handled();
+    if (PC &&
+        (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::Equals || Event.GetKey() == EKeys::Gamepad_FaceButton_Right))
     {
-        PC->HandleInputCommand(EICInputCommand::Menu);
+        if (!Event.IsRepeat()) PC->HandleInputCommand(EICInputCommand::Menu);
         return FReply::Handled();
     }
     return Super::NativeOnKeyDown(Geometry, Event);
@@ -184,6 +241,10 @@ void UICGameplayWidget::Resume()
         else
             PC->SetMenu(TEXT(""));
     }
+}
+void UICGameplayWidget::Back()
+{
+    if (auto* PC = GetICPlayerController()) PC->HandleInputCommand(EICInputCommand::Menu);
 }
 void UICGameplayWidget::Save()
 {

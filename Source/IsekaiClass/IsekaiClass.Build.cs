@@ -28,6 +28,7 @@ public class IsekaiClass : ModuleRules
             "GameplayStateTreeModule",
             "NavigationSystem",
             "Niagara",
+            "GeometryCollectionEngine",
             "AIModule"
         });
 

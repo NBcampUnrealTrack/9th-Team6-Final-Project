@@ -16,13 +16,23 @@ class ISEKAICLASS_API UICDialogueEntryWidget : public UUserWidget
 
 public:
     void SetEntry(FName InEntryID, const FText& InLabel, bool IsEnabled = true);
+    UFUNCTION(BlueprintPure, Category="IC|Dialogue") FText GetEntryText() const;
+    UFUNCTION(BlueprintCallable, Category="IC|Dialogue") void FocusEntry();
+    bool CanSelectEntry() const;
+    bool HasEntryFocus() const;
+    FName GetEntryID() const { return EntryID; }
+    void ActivateEntry();
+    void SetSelected(bool Selected);
+    UPROPERTY(BlueprintReadOnly, Category="IC|Dialogue") bool bSelected = false;
 
     UPROPERTY(BlueprintAssignable, Category="IC|Dialogue")
     FICDialogueEntryPressed OnEntryPressed;
+    UPROPERTY(BlueprintAssignable, Category="IC|Dialogue") FICDialogueEntryPressed OnEntryFocused;
 
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
+    virtual void NativeOnAddedToFocusPath(const FFocusEvent& FocusEvent) override;
 
 private:
     UPROPERTY(meta=(BindWidget))
@@ -35,4 +45,5 @@ private:
 
     UFUNCTION()
     void HandleClicked();
+    UFUNCTION() void HandleHovered();
 };

@@ -1,1 +1,3 @@
-﻿---,Items,Gold,Affinity,UnlockRecipeIDs,Overflow,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+---,Items,Gold,Affinity,UnlockRecipeIDs,Overflow,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+RWD_RING_001,"((ItemID=""ITM_FOOD_001"",Count=10))",0,,,RejectAll,RWD_RING_001,RWD_RING_001.NAME,RWD_RING_001.DESCRIPTION,(GameplayTags=),1,False,False
+RWD_NPC_TALK_100,,100,,,RejectAll,RWD_NPC_TALK_100,RWD_NPC_TALK_100.NAME,,(GameplayTags=),1,False,False

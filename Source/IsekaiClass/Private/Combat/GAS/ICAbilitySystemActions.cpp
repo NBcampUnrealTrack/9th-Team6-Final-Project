@@ -19,6 +19,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/GameInstance.h"
 #include "Debug/ICLog.h"
+#include "Enemy/Character/ICEnemyBase.h"
 
 FICCombatResult UICAbilitySystemComponent::RequestAction(FName Action,FName SkillID,AICCharacterBase* Target)
 {
@@ -26,14 +27,17 @@ FICCombatResult UICAbilitySystemComponent::RequestAction(FName Action,FName Skil
     if(Action==TEXT("BlockEnd")){SetGuarding(false);Result.bSuccess=true;return Result;}
     if(const auto* Player=Cast<AICPlayerCharacter>(GetAvatarActor());Player&&Player->IsSwitchingWeapon())
     {Result.Reason=ICText::Get(TEXT("Native_fd75bc5b6f2b")).ToString();return Result;}
-    if(Action!=TEXT("Attack")&&Action!=TEXT("BlockStart")&&Action!=TEXT("Dodge")&&Action!=TEXT("Skill")){Result.Reason=ICText::Get(TEXT("Native_ea5b77a89d9b")).ToString();return Result;}
+    const bool bMovementAction=Action==TEXT("Dodge")||Action==TEXT("Dash");
+    if(Action!=TEXT("Attack")&&Action!=TEXT("BlockStart")&&!bMovementAction&&Action!=TEXT("Skill")){Result.Reason=ICText::Get(TEXT("Native_ea5b77a89d9b")).ToString();return Result;}
     if(!IsAlive()||HasMatchingGameplayTag(ICTags::Returning)||HasMatchingGameplayTag(ICTags::Staggered)){Result.Reason=ICText::Get(TEXT("Native_1c6d5b86f441")).ToString();return Result;}
+    // Reject retries before cancelling the current action or its invulnerability.
+    if(bMovementAction&&GetMovementCooldownRemaining()>0){Result.Reason=ICText::Get(TEXT("Native_1d8c24e7202d")).ToString();return Result;}
     if(Action==TEXT("Attack")&&RunningAbility&&RequestedAction==TEXT("Attack"))
     {FICDefinitionResult R;const auto* Settings=Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;BufferedAttackUntil=PlaySecond()+(Settings?Settings->InputBufferPlaySeconds:.2);Result.bSuccess=true;Result.ActionID=CurrentID;return Result;}
     if(RunningAbility)
     {
-        if(Action!=TEXT("BlockStart")&&Action!=TEXT("Dodge")){Result.Reason=ICText::Get(TEXT("Native_fd75bc5b6f2b")).ToString();return Result;}
-        if(RequestedAction==TEXT("Skill")&&((Action==TEXT("BlockStart")&&!Skill.CancelRules.bCancelOnGuard)||(Action==TEXT("Dodge")&&!Skill.CancelRules.bCancelOnDodge)))
+        if(Action!=TEXT("BlockStart")&&!bMovementAction){Result.Reason=ICText::Get(TEXT("Native_fd75bc5b6f2b")).ToString();return Result;}
+        if(RequestedAction==TEXT("Skill")&&((Action==TEXT("BlockStart")&&!Skill.CancelRules.bCancelOnGuard)||(bMovementAction&&!Skill.CancelRules.bCancelOnDodge)))
         {Result.Reason=ICText::Get(TEXT("Native_1a1e17fc67c9")).ToString();return Result;}
         if(RequestedAction==TEXT("Attack")&&!Skill.Montage.IsNull()&&!bCancelWindow){Result.Reason=ICText::Get(TEXT("Native_b9ea9c49d323")).ToString();return Result;}
         CancelAction();
@@ -51,8 +55,8 @@ FICCombatResult UICAbilitySystemComponent::RequestAction(FName Action,FName Skil
 bool UICAbilitySystemComponent::ValidateAction(FString& Reason) const
 {
     IC_TRACE_FUNCTION();Reason.Empty();if(!IsAlive()||!GetAvatarActor()){Reason=ICText::Get(TEXT("Native_bbbc8695b0b0")).ToString();return false;}
-    if(RequestedAction==TEXT("Dodge")&&PlaySecond()<DodgeReadyAt){Reason=ICText::Get(TEXT("Native_1d8c24e7202d")).ToString();return false;}
-    if(RequestedAction==TEXT("BlockStart")||RequestedAction==TEXT("Dodge"))return true;
+    if((RequestedAction==TEXT("Dodge")||RequestedAction==TEXT("Dash"))&&GetMovementCooldownRemaining()>0){Reason=ICText::Get(TEXT("Native_1d8c24e7202d")).ToString();return false;}
+    if(RequestedAction==TEXT("BlockStart")||RequestedAction==TEXT("Dodge")||RequestedAction==TEXT("Dash"))return true;
     auto* D=Definitions();if(!D){Reason=ICText::Get(TEXT("Native_28179a32287e")).ToString();return false;}FICDefinitionResult R;
     if(RequestedAction==TEXT("Skill"))
     {
@@ -134,8 +138,23 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
         if (auto* Montage = Character->ResolveActionMontage(RequestedAction)) { Skill.Montage = Montage; Skill.CastSection = NAME_None; }
     RunningAbility=Ability;CurrentID=FGuid::NewGuid();StartedAt=PlaySecond();StartLocation=Character->GetActorLocation();bCommitted=false;bCancelWindow=false;ActiveMontageInstanceID=INDEX_NONE;EmittedHits.Reset();HitReceipts.Reset();OpenTraceHits.Reset();LastTraceStart.Reset();LastTraceEnd.Reset();TraceEndsAt.Reset();
     FICCombatSettingsRow Defaults;const auto* Moves=D?D->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;if(!Moves)Moves=&Defaults;
-    if(RequestedAction==TEXT("Dodge"))
-    {DodgeReadyAt=StartedAt+Moves->DodgeCooldownPlaySeconds;ActionEndsAt=StartedAt+Moves->DodgeInvulnerabilityPlaySeconds;DodgeDirection=Character->GetLastMovementInputVector().GetSafeNormal2D();if(DodgeDirection.IsNearlyZero())DodgeDirection=Character->GetActorForwardVector();SetLooseGameplayTagCount(ICTags::Dodging,1);SetLooseGameplayTagCount(ICTags::Invulnerable,1);}
+    if(RequestedAction==TEXT("Dodge")||RequestedAction==TEXT("Dash"))
+    {
+        const bool bDodge=RequestedAction==TEXT("Dodge");
+        MovementCooldownDuration=FMath::Max(0.,Moves->DodgeCooldownPlaySeconds);
+        DodgeReadyAt=StartedAt+MovementCooldownDuration;
+        MovementDuration=FMath::Max(.01,bDodge?Moves->DodgeInvulnerabilityPlaySeconds:Moves->DashDurationPlaySeconds);
+        MovementDistance=FMath::Max(0.,bDodge?Moves->DodgeDistanceCm:Moves->DashDistanceCm);
+        MovementAlpha=0;
+        ActionEndsAt=StartedAt+MovementDuration;
+        DodgeDirection=Character->GetPendingMovementInputVector().GetSafeNormal2D();
+        if(DodgeDirection.IsNearlyZero())DodgeDirection=Character->GetLastMovementInputVector().GetSafeNormal2D();
+        if(DodgeDirection.IsNearlyZero())DodgeDirection=Character->GetActorForwardVector().GetSafeNormal2D();
+        Character->GetCharacterMovement()->StopMovementImmediately();
+        // A dash shares the cooldown and movement path, but grants no dodge immunity.
+        SetLooseGameplayTagCount(ICTags::Dodging,1);
+        SetLooseGameplayTagCount(ICTags::Invulnerable,bDodge?1:0);
+    }
     else
     {const double Rate=RequestedAction==TEXT("Attack")?FMath::Max(.01,Stat(EICStat::AttackSpeed)):1;ActionEndsAt=StartedAt+FMath::Max(.01,Skill.CastPlaySeconds+Skill.RecoveryPlaySeconds)/Rate;SetLooseGameplayTagCount(RequestedAction==TEXT("Attack")?ICTags::Attacking:ICTags::Casting,1);
      if(auto* Montage=Skill.Montage.LoadSynchronous())if(auto* Anim=Character->GetMesh()->GetAnimInstance()){Anim->Montage_Play(Montage,RequestedAction==TEXT("Attack")?Stat(EICStat::AttackSpeed):1);FOnMontageEnded Ended;const FGuid ActionGUID=CurrentID;Ended.BindWeakLambda(this,[this,ActionGUID](UAnimMontage* EndedMontage,bool Interrupted){if(CurrentID==ActionGUID&&RunningAbility)RunningAbility->Finish(Interrupted);});Anim->Montage_SetEndDelegate(Ended,Montage);if(auto* Instance=Anim->GetActiveInstanceForMontage(Montage))ActiveMontageInstanceID=Instance->GetInstanceID();if(!Skill.CastSection.IsNone())Anim->Montage_JumpToSection(Skill.CastSection,Montage);}}
@@ -169,9 +188,14 @@ void UICAbilitySystemComponent::EndCurrentAction(bool Cancelled)
 void UICAbilitySystemComponent::AdvanceAction(double Now)
 {
     IC_TRACE_FUNCTION();if(!CurrentID.IsValid())return;auto* C=Cast<AICCharacterBase>(GetAvatarActor());if(!C){CancelAction();return;}
-    if(RequestedAction==TEXT("Dodge"))
-    {FICDefinitionResult R;FICCombatSettingsRow Defaults;const auto* Rules=Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;if(!Rules)Rules=&Defaults;
-     const double Alpha=FMath::Clamp((Now-StartedAt)/FMath::Max(.01,Rules->DodgeInvulnerabilityPlaySeconds),0.,1.);C->SetActorLocation(StartLocation+DodgeDirection*Rules->DodgeDistanceCm*Alpha,true);}
+    if(RequestedAction==TEXT("Dodge")||RequestedAction==TEXT("Dash"))
+    {
+        const double Alpha=FMath::Clamp((Now-StartedAt)/MovementDuration,0.,1.);
+        // Apply only this frame's movement: collision and gravity must not be undone
+        // by repeatedly steering toward an absolute position captured at input time.
+        C->AddActorWorldOffset(DodgeDirection*MovementDistance*(Alpha-MovementAlpha),true);
+        MovementAlpha=Alpha;
+    }
     else
     {
         if(RequestedAction==TEXT("Skill")&&!bCommitted){FString Failure;if(!ValidateAction(Failure)){CancelAction();return;}}
@@ -266,6 +290,9 @@ bool UICAbilitySystemComponent::EmitHit(int32 Index,bool ContinueTrace)
     for(auto* Target:Targets)
     {
         if(!Target||!Target->GetICAbilitySystem()||Previous+Applied>=Hit->MaximumTargets)continue;
+        // A bite is validated again when it lands: leaving its reach must evade it.
+        if(RequestedAction==TEXT("Attack"))if(const auto* Enemy=Cast<AICEnemyBase>(C))
+            if(!C->IsHostileTo(Target)||FVector::DistSquared(C->GetActorLocation(),Target->GetActorLocation())>FMath::Square(Enemy->GetMonsterDefinition().AttackRangeCm))continue;
         const FString Receipt=FString::Printf(TEXT("%d:%u"),Index,Target->GetUniqueID());if(HitReceipts.Contains(Receipt))continue;
         FHitResult Wall;FCollisionQueryParams Q;Q.AddIgnoredActor(C);Q.AddIgnoredActor(Target);
         if(Hit->bStopAtWorldCollision&&GetWorld()->LineTraceSingleByChannel(Wall,C->GetActorLocation(),Target->GetActorLocation(),ECC_Visibility,Q))continue;

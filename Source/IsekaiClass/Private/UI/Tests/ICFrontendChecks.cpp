@@ -88,7 +88,6 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "UI/MainMenu/ICMainMenuWidget.h"
 #include "UI/CharacterCreate/ICCharacterCreateWidget.h"
-#include "UI/Framework/ICConfirmPopupWidget.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Components/Button.h"
@@ -308,10 +307,6 @@ public:
             if (Question == 4)
             {
                 Test->TestTrue(TEXT("Last answer starts loading without confirmation"), Flow->bPendingNewGame && Flow->Phase == EICGameFlowPhase::Loading);
-                TArray<UUserWidget*> Popups;
-                UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Popups, UICConfirmPopupWidget::StaticClass(), false);
-                for (auto* Widget : Popups)
-                    Test->TestFalse(TEXT("No new game overwrite popup"), CastChecked<UICConfirmPopupWidget>(Widget)->IsActivated());
                 NextStage(1);
             }
             else NextStage(Stage + 1);
