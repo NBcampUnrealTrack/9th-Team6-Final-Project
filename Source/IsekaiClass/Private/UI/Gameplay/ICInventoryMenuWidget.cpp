@@ -28,7 +28,7 @@
 
 namespace
 {
-const FLinearColor Gold(1,.74f,.3f), Slate(.16f,.21f,.3f);
+const FLinearColor Gold(1,.74f,.3f), InventoryButtonColor(.16f,.21f,.3f);
 FName Indexed(const TCHAR* Prefix,int32 I){return FName(*FString::Printf(TEXT("%s%d"),Prefix,I));}
 UTextBlock* Label(UWidgetTree* T,FName Name,FText Text,int32 Size=16)
 {
@@ -47,7 +47,7 @@ UButton* Button(UWidgetTree* T,FName Name,FText Text,bool WithCaption=true)
     auto* B=T->ConstructWidget<UButton>(UButton::StaticClass(),Name);auto Style=B->GetStyle();
     for(auto* Brush:{&Style.Normal,&Style.Hovered,&Style.Pressed})
     {Brush->DrawAs=ESlateBrushDrawType::Box;Brush->Margin=FMargin(0);Brush->TintColor=FLinearColor::White;}
-    B->SetStyle(Style);B->SetBackgroundColor(Slate);
+    B->SetStyle(Style);B->SetBackgroundColor(InventoryButtonColor);
     if(!WithCaption)return B;
     auto* Caption=Label(T,FName(*(Name.ToString()+TEXT("_Text"))),Text);Caption->SetJustification(ETextJustify::Center);
     auto* S=Cast<UButtonSlot>(B->SetContent(Caption));S->SetPadding(FMargin(10,7));return B;
@@ -84,7 +84,7 @@ void UICInventorySlotWidget::Present(int32 Index,FText Name,UTexture2D* Icon,int
     Caption(this,TEXT("TXT_Count"),Count>0?FText::AsNumber(Count):FText::GetEmpty());
     auto* Image=CastChecked<UImage>(GetWidgetFromName(TEXT("IMG_Icon")));Image->SetBrushFromTexture(Icon);
     Image->SetVisibility(Icon?ESlateVisibility::HitTestInvisible:ESlateVisibility::Hidden);
-    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Select")))->SetBackgroundColor(Selected?Gold:Slate);
+    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Select")))->SetBackgroundColor(Selected?Gold:InventoryButtonColor);
 }
 void UICInventorySlotWidget::Pick(){OnPicked.Broadcast(CellIndex);}
 
@@ -112,8 +112,8 @@ void UICItemConfirmWidget::NativeOnInitialized()
 void UICItemConfirmWidget::Present(FText Message){Choice=1;Caption(this,TEXT("TXT_Message"),Message);SetVisibility(ESlateVisibility::Visible);RefreshChoice();}
 void UICItemConfirmWidget::RefreshChoice()
 {
-    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Accept")))->SetBackgroundColor(Choice==0?Gold:Slate);
-    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Cancel")))->SetBackgroundColor(Choice==1?Gold:Slate);
+    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Accept")))->SetBackgroundColor(Choice==0?Gold:InventoryButtonColor);
+    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Cancel")))->SetBackgroundColor(Choice==1?Gold:InventoryButtonColor);
 }
 bool UICItemConfirmWidget::HandleKey(FKey Key,bool Repeat)
 {
@@ -164,7 +164,7 @@ void UICInventoryItemPopupWidget::Present(FText Name,FText Description,UTexture2
 void UICInventoryItemPopupWidget::SetMessage(FText Message)
 {Caption(this,TEXT("TXT_Message"),Message);GetWidgetFromName(TEXT("TXT_Message"))->SetVisibility(Message.IsEmpty()?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);}
 void UICInventoryItemPopupWidget::RefreshSelection()
-{for(int32 I=0;I<Buttons.Num();++I)CastChecked<UButton>(GetWidgetFromName(Buttons[I]))->SetBackgroundColor(I==ActionIndex?Gold:Slate);}
+{for(int32 I=0;I<Buttons.Num();++I)CastChecked<UButton>(GetWidgetFromName(Buttons[I]))->SetBackgroundColor(I==ActionIndex?Gold:InventoryButtonColor);}
 bool UICInventoryItemPopupWidget::HandleKey(FKey Key,bool Repeat)
 {
     if(Key==EKeys::Escape||Key==EKeys::Equals||Key==EKeys::Gamepad_FaceButton_Right){if(!Repeat)Back();return true;}
@@ -364,8 +364,8 @@ void UICInventoryMenuWidget::RefreshPresentation()
     GetWidgetFromName(TEXT("ItemPopup"))->SetVisibility(bDetailOpen&&!bPickingQuickSlot?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     GetWidgetFromName(TEXT("ItemPopup"))->SetIsEnabled(!bConfirming);
     if(bDetailOpen)RefreshDetail();
-    CastChecked<UButton>(GetWidgetFromName(TEXT("TAB_Normal")))->SetBackgroundColor(ItemTab==EPlayerItemTab::Normal?Gold:Slate);
-    CastChecked<UButton>(GetWidgetFromName(TEXT("TAB_Quest")))->SetBackgroundColor(ItemTab==EPlayerItemTab::Quest?Gold:Slate);
+    CastChecked<UButton>(GetWidgetFromName(TEXT("TAB_Normal")))->SetBackgroundColor(ItemTab==EPlayerItemTab::Normal?Gold:InventoryButtonColor);
+    CastChecked<UButton>(GetWidgetFromName(TEXT("TAB_Quest")))->SetBackgroundColor(ItemTab==EPlayerItemTab::Quest?Gold:InventoryButtonColor);
     GetWidgetFromName(TEXT("BTN_CancelQuick"))->SetVisibility(bPickingQuickSlot?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     Caption(this,TEXT("TXT_QuickPrompt"),bPickingQuickSlot?NSLOCTEXT("ICInventory","ChooseQuick","등록할 퀵슬롯을 선택하세요."):NSLOCTEXT("ICInventory","QuickSlots","퀵슬롯"));
     for(int32 I=0;I<4;++I)

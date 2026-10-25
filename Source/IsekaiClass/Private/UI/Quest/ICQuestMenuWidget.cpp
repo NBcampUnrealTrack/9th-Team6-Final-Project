@@ -24,14 +24,14 @@
 namespace
 {
 const FLinearColor QuestGlowColor(1,.77f,.32f), QuestButtonColor(.18f,.23f,.32f);
-UTextBlock* Label(UWidgetTree* T,FName Name,FText Value,int32 Font=17,bool Wrap=false)
+UTextBlock* QuestMenuLabel(UWidgetTree* T,FName Name,FText Value,int32 Font=17,bool Wrap=false)
 {
     auto* W=T->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),Name);W->SetText(Value);W->SetAutoWrapText(Wrap);
     W->SetFont(ICFrontendLayout::Font(Font,Font>=24));W->SetColorAndOpacity(FLinearColor(.92f,.94f,.98f));
     W->SetVisibility(ESlateVisibility::HitTestInvisible);return W;
 }
-void Row(UVerticalBox* P,UWidget* W,float Gap=10){P->AddChildToVerticalBox(W)->SetPadding(FMargin(0,0,0,Gap));}
-UButton* Button(UWidgetTree* T,FName Name,FText Text,bool Caption=true)
+void QuestMenuRow(UVerticalBox* P,UWidget* W,float Gap=10){P->AddChildToVerticalBox(W)->SetPadding(FMargin(0,0,0,Gap));}
+UButton* QuestMenuButton(UWidgetTree* T,FName Name,FText Text,bool Caption=true)
 {
     auto* B=T->ConstructWidget<UButton>(UButton::StaticClass(),Name);auto Style=B->GetStyle();
     for(auto* Brush:{&Style.Normal,&Style.Hovered,&Style.Pressed})
@@ -39,7 +39,7 @@ UButton* Button(UWidgetTree* T,FName Name,FText Text,bool Caption=true)
     B->SetStyle(Style);B->SetBackgroundColor(QuestButtonColor);
     if(Caption)
     {
-        auto* TextWidget=Label(T,FName(*(Name.ToString()+TEXT("_Text"))),Text,18);TextWidget->SetJustification(ETextJustify::Center);
+        auto* TextWidget=QuestMenuLabel(T,FName(*(Name.ToString()+TEXT("_Text"))),Text,18);TextWidget->SetJustification(ETextJustify::Center);
         auto* S=CastChecked<UButtonSlot>(B->SetContent(TextWidget));S->SetPadding(FMargin(12,10));
     }
     return B;
@@ -54,11 +54,11 @@ FText DefinitionName(const FString& Key,FName ID)
     auto* Strings=LoadObject<UStringTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_Definitions.ST_IC_Definitions"));
     const auto Text=UICTextLibrary::ResolveText(Strings,Key);return Text.bSuccess?Text.Text:FText::FromName(ID);
 }
-void SetText(UUserWidget* W,const TCHAR* Name,FText Text)
+void QuestMenuSetText(UUserWidget* W,const TCHAR* Name,FText Text)
 {if(auto* T=Cast<UTextBlock>(W->GetWidgetFromName(Name)))T->SetText(Text);}
 void SetMessage(UICQuestDetailWidget* W,FText Text)
-{SetText(W,TEXT("TXT_Message"),Text);W->GetWidgetFromName(TEXT("TXT_Message"))->SetVisibility(Text.IsEmpty()?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);}
-UClass* WidgetClass(const TCHAR* Asset,UClass* Fallback)
+{QuestMenuSetText(W,TEXT("TXT_Message"),Text);W->GetWidgetFromName(TEXT("TXT_Message"))->SetVisibility(Text.IsEmpty()?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);}
+UClass* QuestMenuWidgetClass(const TCHAR* Asset,UClass* Fallback)
 {
     const auto Path=FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Asset,Asset);
     auto* C=LoadClass<UUserWidget>(nullptr,*Path);return C?C:Fallback;
@@ -94,10 +94,10 @@ FText RewardText(const FICQuestRow& Quest,UICDefinitionSubsystem* D)
 bool UICQuestMenuEntryWidget::BuildLayout(UWidgetTree* T)
 {
     auto* Glow=T->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("SelectionGlow"));Glow->SetPadding(FMargin(3));T->RootWidget=Glow;
-    auto* B=Button(T,TEXT("BTN_Quest"),FText::GetEmpty(),false);Glow->SetContent(B);
+    auto* B=QuestMenuButton(T,TEXT("BTN_Quest"),FText::GetEmpty(),false);Glow->SetContent(B);
     auto* Column=T->ConstructWidget<UVerticalBox>();auto* BS=CastChecked<UButtonSlot>(B->SetContent(Column));BS->SetPadding(FMargin(18,12));BS->SetHorizontalAlignment(HAlign_Fill);
-    auto* Title=Label(T,TEXT("TXT_Title"),FText::GetEmpty(),21);Title->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);Row(Column,Title,6);
-    auto* Summary=Label(T,TEXT("TXT_Summary"),FText::GetEmpty(),16);Summary->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);Row(Column,Summary,0);
+    auto* Title=QuestMenuLabel(T,TEXT("TXT_Title"),FText::GetEmpty(),21);Title->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);QuestMenuRow(Column,Title,6);
+    auto* Summary=QuestMenuLabel(T,TEXT("TXT_Summary"),FText::GetEmpty(),16);Summary->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);QuestMenuRow(Column,Summary,0);
     return true;
 }
 void UICQuestMenuEntryWidget::NativeOnInitialized()
@@ -107,7 +107,7 @@ void UICQuestMenuEntryWidget::NativeOnInitialized()
 }
 void UICQuestMenuEntryWidget::Present(FName ID,FText Title,FText Summary,bool Selected)
 {
-    QuestID=ID;bSelected=Selected;SetText(this,TEXT("TXT_Title"),Title);SetText(this,TEXT("TXT_Summary"),Summary);
+    QuestID=ID;bSelected=Selected;QuestMenuSetText(this,TEXT("TXT_Title"),Title);QuestMenuSetText(this,TEXT("TXT_Summary"),Summary);
     CastChecked<UBorder>(GetWidgetFromName(TEXT("SelectionGlow")))->SetBrushColor(Selected?QuestGlowColor:FLinearColor(.08f,.12f,.19f));
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Quest")))->SetBackgroundColor(Selected?FLinearColor(.26f,.29f,.34f):FLinearColor(.10f,.15f,.22f));
 }
@@ -121,24 +121,24 @@ void UICQuestMenuEntryWidget::Pick(){OnPicked.Broadcast(QuestID);}
 bool UICQuestDetailWidget::BuildLayout(UWidgetTree* T)
 {
     auto* Column=T->ConstructWidget<UVerticalBox>();T->RootWidget=Column;
-    Row(Column,Label(T,TEXT("TXT_Name"),FText::GetEmpty(),30,true),6);
-    auto* Status=Label(T,TEXT("TXT_Status"),FText::GetEmpty(),16);Status->SetColorAndOpacity(QuestGlowColor);Row(Column,Status,12);
+    QuestMenuRow(Column,QuestMenuLabel(T,TEXT("TXT_Name"),FText::GetEmpty(),30,true),6);
+    auto* Status=QuestMenuLabel(T,TEXT("TXT_Status"),FText::GetEmpty(),16);Status->SetColorAndOpacity(QuestGlowColor);QuestMenuRow(Column,Status,12);
     auto* Scroll=T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("DetailScroll"));
     Column->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     auto* Content=T->ConstructWidget<UVerticalBox>();Scroll->AddChild(Content);
-    Row(Content,Label(T,TEXT("TXT_Description"),FText::GetEmpty(),18,true),12);
-    Row(Content,Label(T,TEXT("ObjectivesHeading"),NSLOCTEXT("ICQuestMenu","Objectives","목표"),20),8);
-    Row(Content,Label(T,TEXT("TXT_Objectives"),FText::GetEmpty(),17,true),12);
-    Row(Content,Label(T,TEXT("RewardsHeading"),NSLOCTEXT("ICQuestMenu","Rewards","보상"),20),8);
-    Row(Content,Label(T,TEXT("TXT_Rewards"),FText::GetEmpty(),17,true),12);
-    Row(Column,Label(T,TEXT("TXT_Message"),FText::GetEmpty(),15,true),8);
+    QuestMenuRow(Content,QuestMenuLabel(T,TEXT("TXT_Description"),FText::GetEmpty(),18,true),12);
+    QuestMenuRow(Content,QuestMenuLabel(T,TEXT("ObjectivesHeading"),NSLOCTEXT("ICQuestMenu","Objectives","목표"),20),8);
+    QuestMenuRow(Content,QuestMenuLabel(T,TEXT("TXT_Objectives"),FText::GetEmpty(),17,true),12);
+    QuestMenuRow(Content,QuestMenuLabel(T,TEXT("RewardsHeading"),NSLOCTEXT("ICQuestMenu","Rewards","보상"),20),8);
+    QuestMenuRow(Content,QuestMenuLabel(T,TEXT("TXT_Rewards"),FText::GetEmpty(),17,true),12);
+    QuestMenuRow(Column,QuestMenuLabel(T,TEXT("TXT_Message"),FText::GetEmpty(),15,true),8);
     T->FindWidget(TEXT("TXT_Message"))->SetVisibility(ESlateVisibility::Collapsed);
-    auto* Warning=Label(T,TEXT("SwitchNotice"),NSLOCTEXT("ICQuestMenu","SwitchNotice","다른 퀘스트를 시작하면 이전 퀘스트의 진행도가 초기화됩니다."),14,true);
-    Warning->SetColorAndOpacity(FLinearColor(.8f,.74f,.61f));Row(Column,Warning,10);
-    auto* Actions=T->ConstructWidget<UHorizontalBox>();Row(Column,Actions,10);
-    auto* Abandon=Actions->AddChildToHorizontalBox(Button(T,TEXT("BTN_Abandon"),NSLOCTEXT("ICQuestMenu","Abandon","포기")));Abandon->SetSize(FSlateChildSize(ESlateSizeRule::Fill));Abandon->SetPadding(FMargin(0,0,8,0));
-    Actions->AddChildToHorizontalBox(Button(T,TEXT("BTN_Start"),NSLOCTEXT("ICQuestMenu","Start","시작하기")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    Row(Column,Button(T,TEXT("BTN_Back"),NSLOCTEXT("ICQuestMenu","Back","뒤로가기")),0);return true;
+    auto* Warning=QuestMenuLabel(T,TEXT("SwitchNotice"),NSLOCTEXT("ICQuestMenu","SwitchNotice","다른 퀘스트를 시작하면 이전 퀘스트의 진행도가 초기화됩니다."),14,true);
+    Warning->SetColorAndOpacity(FLinearColor(.8f,.74f,.61f));QuestMenuRow(Column,Warning,10);
+    auto* Actions=T->ConstructWidget<UHorizontalBox>();QuestMenuRow(Column,Actions,10);
+    auto* Abandon=Actions->AddChildToHorizontalBox(QuestMenuButton(T,TEXT("BTN_Abandon"),NSLOCTEXT("ICQuestMenu","Abandon","포기")));Abandon->SetSize(FSlateChildSize(ESlateSizeRule::Fill));Abandon->SetPadding(FMargin(0,0,8,0));
+    Actions->AddChildToHorizontalBox(QuestMenuButton(T,TEXT("BTN_Start"),NSLOCTEXT("ICQuestMenu","Start","시작하기")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    QuestMenuRow(Column,QuestMenuButton(T,TEXT("BTN_Back"),NSLOCTEXT("ICQuestMenu","Back","뒤로가기")),0);return true;
 }
 void UICQuestDetailWidget::NativeOnInitialized()
 {
@@ -154,9 +154,9 @@ void UICQuestDetailWidget::Present(FName ID)
     FICQuestRow Definition;if(!D||!State||!D->GetQuest(ID,Definition).bSuccess)return;
     if(QuestID!=ID){QuestID=ID;Scroll(-1000000);SetMessage(this,FText::GetEmpty());}
     const auto World=State->ExportState();const auto Quest=World.Quests.FindRef(ID);
-    SetText(this,TEXT("TXT_Name"),QuestText(Definition.NameKey,FText::FromName(ID)));
-    SetText(this,TEXT("TXT_Description"),QuestText(Definition.DescriptionKey));
-    SetText(this,TEXT("TXT_Status"),Quest.bStarted?NSLOCTEXT("ICQuestMenu","Running","진행 중"):Quest.bAccepted?NSLOCTEXT("ICQuestMenu","Waiting","대기 중"):NSLOCTEXT("ICQuestMenu","Available","수락 가능"));
+    QuestMenuSetText(this,TEXT("TXT_Name"),QuestText(Definition.NameKey,FText::FromName(ID)));
+    QuestMenuSetText(this,TEXT("TXT_Description"),QuestText(Definition.DescriptionKey));
+    QuestMenuSetText(this,TEXT("TXT_Status"),Quest.bStarted?NSLOCTEXT("ICQuestMenu","Running","진행 중"):Quest.bAccepted?NSLOCTEXT("ICQuestMenu","Waiting","대기 중"):NSLOCTEXT("ICQuestMenu","Available","수락 가능"));
     TArray<FText> Lines;
     for(const auto& Group:Definition.ObjectiveGroups)
     {
@@ -164,8 +164,8 @@ void UICQuestDetailWidget::Present(FName ID)
         for(const auto& Objective:Group.Objectives)
         {const auto Text=QuestText(Objective.DescriptionKey,FText::FromName(Objective.ObjectiveID));Lines.Add(FICQuestDisplay::FormatObjective(Text,Objective,Quest,World,Q));}
     }
-    SetText(this,TEXT("ObjectivesHeading"),Definition.ObjectiveGroupPolicy==EICConditionPolicy::Any?NSLOCTEXT("ICQuestMenu","AnyGroup","목표 (그룹 중 하나 달성)"):NSLOCTEXT("ICQuestMenu","Objectives","목표"));
-    SetText(this,TEXT("TXT_Objectives"),FText::Join(FText::FromString(TEXT("\n")),Lines));SetText(this,TEXT("TXT_Rewards"),RewardText(Definition,D));
+    QuestMenuSetText(this,TEXT("ObjectivesHeading"),Definition.ObjectiveGroupPolicy==EICConditionPolicy::Any?NSLOCTEXT("ICQuestMenu","AnyGroup","목표 (그룹 중 하나 달성)"):NSLOCTEXT("ICQuestMenu","Objectives","목표"));
+    QuestMenuSetText(this,TEXT("TXT_Objectives"),FText::Join(FText::FromString(TEXT("\n")),Lines));QuestMenuSetText(this,TEXT("TXT_Rewards"),RewardText(Definition,D));
     GetWidgetFromName(TEXT("BTN_Start"))->SetIsEnabled(Quest.bAccepted&&!Quest.bStarted&&!Quest.bCompleted);
     GetWidgetFromName(TEXT("BTN_Abandon"))->SetIsEnabled(Quest.bAccepted&&!Quest.bCompleted&&Definition.bAllowAbandon);
 }
@@ -184,12 +184,12 @@ bool UICQuestMenuWidget::BuildLayout(UWidgetTree* T)
 {
     auto* Pages=T->ConstructWidget<UWidgetSwitcher>(UWidgetSwitcher::StaticClass(),TEXT("QuestPages"));T->RootWidget=Pages;
     auto* List=T->ConstructWidget<UVerticalBox>();Pages->AddChild(List);
-    Row(List,Label(T,TEXT("ListHeading"),NSLOCTEXT("ICQuestMenu","Journal","퀘스트 목록"),26),14);
-    Row(List,Label(T,TEXT("TXT_Empty"),NSLOCTEXT("ICQuestMenu","Empty","수락한 퀘스트가 없습니다."),18),0);
+    QuestMenuRow(List,QuestMenuLabel(T,TEXT("ListHeading"),NSLOCTEXT("ICQuestMenu","Journal","퀘스트 목록"),26),14);
+    QuestMenuRow(List,QuestMenuLabel(T,TEXT("TXT_Empty"),NSLOCTEXT("ICQuestMenu","Empty","수락한 퀘스트가 없습니다."),18),0);
     auto* Scroll=T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("QuestScroll"));
     List->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     Scroll->AddChild(T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("QuestEntries")));
-    auto* Detail=T->ConstructWidget<UICQuestDetailWidget>(WidgetClass(TEXT("WBP_IC_QuestDetail"),UICQuestDetailWidget::StaticClass()),TEXT("QuestDetail"));Pages->AddChild(Detail);
+    auto* Detail=T->ConstructWidget<UICQuestDetailWidget>(QuestMenuWidgetClass(TEXT("WBP_IC_QuestDetail"),UICQuestDetailWidget::StaticClass()),TEXT("QuestDetail"));Pages->AddChild(Detail);
     for(int32 I=0;I<Pages->GetNumWidgets();++I){auto* S=CastChecked<UWidgetSwitcherSlot>(Pages->GetWidgetAtIndex(I)->Slot);S->SetHorizontalAlignment(HAlign_Fill);S->SetVerticalAlignment(VAlign_Fill);}
     return true;
 }
@@ -225,8 +225,8 @@ void UICQuestMenuWidget::RefreshQuests()
     auto* Entries=CastChecked<UVerticalBox>(GetWidgetFromName(TEXT("QuestEntries")));
     if(Entries->GetChildrenCount()!=QuestIDs.Num())
     {
-        Entries->ClearChildren();auto* C=WidgetClass(TEXT("WBP_IC_QuestMenuEntry"),UICQuestMenuEntryWidget::StaticClass());
-        for(int32 I=0;I<QuestIDs.Num();++I){auto* Entry=WidgetTree->ConstructWidget<UICQuestMenuEntryWidget>(C);Entry->OnPicked.AddUniqueDynamic(this,&ThisClass::QuestPicked);Row(Entries,Entry,12);}
+        Entries->ClearChildren();auto* C=QuestMenuWidgetClass(TEXT("WBP_IC_QuestMenuEntry"),UICQuestMenuEntryWidget::StaticClass());
+        for(int32 I=0;I<QuestIDs.Num();++I){auto* Entry=WidgetTree->ConstructWidget<UICQuestMenuEntryWidget>(C);Entry->OnPicked.AddUniqueDynamic(this,&ThisClass::QuestPicked);QuestMenuRow(Entries,Entry,12);}
     }
     for(int32 I=0;I<QuestIDs.Num();++I)
     {

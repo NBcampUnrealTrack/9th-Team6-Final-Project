@@ -21,7 +21,7 @@
 
 namespace
 {
-constexpr int32 Columns=5;
+constexpr int32 GiftGridColumns=5;
 FText ItemName(const FICItemRow* Row,FName ID)
 {return Row&&!Row->DisplayName.IsEmpty()?Row->DisplayName:FText::FromName(ID);}
 }
@@ -70,13 +70,13 @@ void UICNPCGiftWidget::RefreshItems()
         Counts.FindOrAdd(Item.ItemID)=static_cast<int32>(FMath::Min<int64>(MAX_int32,int64(Counts.FindRef(Item.ItemID))+Item.Count));
     }
     Grid->ClearChildren();Cells.Reset();
-    const int32 Capacity=FMath::Max(20,FMath::DivideAndRoundUp(ItemIDs.Num(),Columns)*Columns);
+    const int32 Capacity=FMath::Max(20,FMath::DivideAndRoundUp(ItemIDs.Num(),GiftGridColumns)*GiftGridColumns);
     for(int32 Index=0;Index<Capacity;++Index)
     {
         auto* Cell=CreateWidget<UICInventorySlotWidget>(GetOwningPlayer(),CellClass);
         Cell->SetClipping(EWidgetClipping::ClipToBounds);
         Cell->OnPicked.AddUniqueDynamic(this,&ThisClass::ItemPicked);
-        Grid->AddChildToGrid(Cell,Index/Columns,Index%Columns)->SetPadding(FMargin(4));Cells.Add(Cell);
+        Grid->AddChildToGrid(Cell,Index/GiftGridColumns,Index%GiftGridColumns)->SetPadding(FMargin(4));Cells.Add(Cell);
     }
     if(bConfirming&&!Counts.Contains(PendingID))
     {bConfirming=false;PendingID=NAME_None;GetWidgetFromName(TEXT("GiftConfirm"))->SetVisibility(ESlateVisibility::Collapsed);}
@@ -120,10 +120,10 @@ void UICNPCGiftWidget::RefreshPresentation()
 void UICNPCGiftWidget::MoveSelection(int32 Horizontal,int32 Vertical)
 {
     if(bBackSelected){if(Vertical<0)Select(SelectedIndex);return;}
-    if(Vertical<0&&SelectedIndex<Columns)return;
-    if(Vertical>0&&SelectedIndex+Columns>=Cells.Num()){Select(SelectedIndex,true);return;}
-    if(Horizontal&&((Horizontal<0&&SelectedIndex%Columns==0)||(Horizontal>0&&SelectedIndex%Columns==Columns-1)))return;
-    Select(SelectedIndex+Horizontal+Vertical*Columns);
+    if(Vertical<0&&SelectedIndex<GiftGridColumns)return;
+    if(Vertical>0&&SelectedIndex+GiftGridColumns>=Cells.Num()){Select(SelectedIndex,true);return;}
+    if(Horizontal&&((Horizontal<0&&SelectedIndex%GiftGridColumns==0)||(Horizontal>0&&SelectedIndex%GiftGridColumns==GiftGridColumns-1)))return;
+    Select(SelectedIndex+Horizontal+Vertical*GiftGridColumns);
 }
 void UICNPCGiftWidget::NativeTick(const FGeometry& Geometry,float DeltaSeconds)
 {
