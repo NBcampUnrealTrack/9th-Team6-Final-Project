@@ -449,3 +449,6 @@ RCP_R01_COOK_27,Recipe,R01,None,/Game/IsekaiClass/Data/DataTable/Recipes/DT_IC_R
 RCP_R01_COOK_28,Recipe,R01,None,/Game/IsekaiClass/Data/DataTable/Recipes/DT_IC_Recipe.DT_IC_Recipe,R01 life prototype.,RCP_R01_COOK_28,RCP_R01_COOK_28.NAME,,(GameplayTags=),1,False,False
 RCP_R01_COOK_29,Recipe,R01,None,/Game/IsekaiClass/Data/DataTable/Recipes/DT_IC_Recipe.DT_IC_Recipe,R01 life prototype.,RCP_R01_COOK_29,RCP_R01_COOK_29.NAME,,(GameplayTags=),1,False,False
 RCP_R01_COOK_30,Recipe,R01,None,/Game/IsekaiClass/Data/DataTable/Recipes/DT_IC_Recipe.DT_IC_Recipe,R01 life prototype.,RCP_R01_COOK_30,RCP_R01_COOK_30.NAME,,(GameplayTags=),1,False,False
+MON_COMBAT_TEST_001,Monster,None,None,/Game/IsekaiClass/Data/DataTable/Combat/DT_IC_Monster.DT_IC_Monster,Combat test enemy; spawned only by its L_TestMap anchor.,MON_COMBAT_TEST_001,,,(GameplayTags=),1,False,False
+ANC_COMBAT_TEST_001,Anchor,None,None,/Game/IsekaiClass/Data/DataTable/World/DT_IC_Anchor.DT_IC_Anchor,Combat test enemy; spawned only by its L_TestMap anchor.,ANC_COMBAT_TEST_001,,,(GameplayTags=),1,False,False
+SPN_COMBAT_TEST_001,Spawner,None,None,/Game/IsekaiClass/Data/DataTable/World/DT_IC_Spawner.DT_IC_Spawner,Combat test enemy; spawned only by its L_TestMap anchor.,SPN_COMBAT_TEST_001,,,(GameplayTags=),1,False,False

@@ -207,6 +207,33 @@ UBlendSpace1D* UICCharacterSetupLibrary::CreateLocomotion(const FString& Path, U
     return nullptr;
 #endif
 }
+UBlendSpace* UICCharacterSetupLibrary::CreateCombatLocomotion(const FString& Path,UAnimSequence* Idle,const TArray<UAnimSequence*>& Directions)
+{
+#if WITH_EDITOR
+    if(!Path.StartsWith(TEXT("/Game/IsekaiClass/Animation/"))||!Idle||Directions.Num()!=8)return nullptr;
+    for(auto* Clip:Directions)if(!Clip||Clip->GetSkeleton()!=Idle->GetSkeleton())return nullptr;
+    if(auto* Existing=LoadObject<UBlendSpace>(nullptr,*Path))return Existing;
+    auto* Asset=NewObject<UBlendSpace>(CreatePackage(*Path),*FPackageName::GetLongPackageAssetName(Path),RF_Public|RF_Standalone);
+    Asset->SetSkeleton(Idle->GetSkeleton());
+    for(int32 Axis=0;Axis<2;++Axis)
+    {
+        auto& Parameter=const_cast<FBlendParameter&>(Asset->GetBlendParameter(Axis));
+        Parameter.DisplayName=Axis==0?TEXT("ForwardSpeed"):TEXT("RightSpeed");
+        Parameter.Min=-450;Parameter.Max=450;
+    }
+    Asset->AddSample(Idle,FVector::ZeroVector);
+    for(int32 Index=0;Index<8;++Index)
+    {
+        const float Angle=Index*PI/4.f;
+        Asset->AddSample(Directions[Index],FVector(FMath::Cos(Angle)*450,FMath::Sin(Angle)*450,0));
+    }
+    Asset->ValidateSampleData();Asset->ResampleData();Asset->PostEditChange();
+    FAssetRegistryModule::AssetCreated(Asset);Asset->MarkPackageDirty();return Asset;
+#else
+    return nullptr;
+#endif
+}
+
 UAnimMontage* UICCharacterSetupLibrary::CreateActionMontage(const FString& Path,UAnimSequence* Sequence,bool bCombatNotify)
 {
 #if WITH_EDITOR

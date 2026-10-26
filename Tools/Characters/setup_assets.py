@@ -63,7 +63,10 @@ def sequence(pack,name):
 
 def preview_mesh(animation,pack):
     skeleton=animation.get_editor_property('skeleton')
-    for file in (ROOT/'Content/IsekaiClass/Animation/SampleAnimation'/pack/'Demo').rglob('*.uasset'):
+    source_root=ROOT/'Content/IsekaiClass/Animation/SampleAnimation'/pack
+    mesh_files=list((source_root/'Demo').rglob('*.uasset'))
+    mesh_files.extend(p for p in source_root.rglob('*.uasset') if p not in mesh_files)
+    for file in mesh_files:
         if not file.stem.startswith(('SK_','SKM_')):continue
         path='/Game/'+file.relative_to(ROOT/'Content').with_suffix('').as_posix()
         item=u.load_asset(path)
@@ -187,7 +190,12 @@ def setup_character(identifier,mesh_path,rig_path,folder,families,sets):
             save(montage);actions[action]=montage
         family_key=getattr(u.ICWeaponFamily,family.upper())
         offset=previous[family_key].get_editor_property('ground_offset_cm') if family_key in previous else 0.0
-        mapped[family_key]=u.ICCharacterAnimationSet(locomotion=blend,jump=clips['jump'],attack=actions['attack'],skill=actions['skill'],hit=actions['hit'],ground_offset_cm=offset)
+        dash=previous[family_key].get_editor_property('dodge') if family_key in previous else None
+        sprint=previous[family_key].get_editor_property('sprint') if family_key in previous else None
+        mapped[family_key]=u.ICCharacterAnimationSet(locomotion=blend,jump=clips['jump'],sprint=sprint,attack=actions['attack'],skill=actions['skill'],hit=actions['hit'],dodge=dash,ground_offset_cm=offset)
+        if family_key in previous:
+            for prop in ['jump_start','fall_loop','land','combat_locomotion','directional_dodges']:
+                mapped[family_key].set_editor_property(prop,previous[family_key].get_editor_property(prop))
     sleep=retarget('Sleep_Animation',{'sleep':sequence('Sleep_Animation','anim_Sleep_06_L')},mesh,rig,folder+'/Sleep')['sleep']
     profile.set_editor_property('weapon_sets',mapped);profile.set_editor_property('sleep',sleep)
     profile.set_editor_property('default_family',getattr(u.ICWeaponFamily,families[0].upper()));save(profile)

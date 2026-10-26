@@ -69,6 +69,8 @@ public:
     UFUNCTION(BlueprintPure, Category="IC|Movement") float GetMovementCooldownProgress() const;
     UFUNCTION(BlueprintCallable, Category="IC|Combat")
     void CancelAction();
+    void ClearBufferedInput();
+    bool CanAcceptInteractionInput() const;
     UFUNCTION(BlueprintCallable, Category="IC|Combat") bool NotifyCombatEvent(FGuid ActionID, FName Event, int32 HitIndex);
     UFUNCTION(BlueprintPure, Category="IC|Combat") FGuid GetActionID() const;
     UFUNCTION(BlueprintCallable, Category="IC|Combat") bool ApplyStatus(FName EffectID, UICAbilitySystemComponent* Source);
@@ -79,6 +81,9 @@ public:
     bool ApplyDamage(const FICAttackCapture& Attack, UICAbilitySystemComponent* Source, bool Critical, bool Guardable, bool AutoDodge, bool CancelCasting);
     void SetGuarding(bool Guarding);
     bool IsAlive() const;
+    bool CanAcceptMovementInput() const;
+    bool HandleMovementInput();
+    bool CanAcceptJumpInput() const;
     bool HasRecentCombat() const;
     void MarkCombat();
     bool BeginRequestedAction(UICGameplayAbility* Ability);
@@ -114,6 +119,8 @@ private:
     double MovementCooldownDuration = 0, MovementDuration = 0, MovementDistance = 0, MovementAlpha = 0;
     int32 ComboIndex = 0;
     double ComboReadyUntil = 0, BufferedAttackUntil = 0;
+    FName BufferedInputAction;
+    TWeakObjectPtr<AICCharacterBase> BufferedInputTarget;
     bool bCommitted = false, bReady = false, bRestoring = false, bEnding = false, bGuarding = false;
     bool bOrdinaryStaggerImmune = false;
     bool bCancelWindow=false;

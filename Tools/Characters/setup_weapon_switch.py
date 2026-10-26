@@ -70,6 +70,13 @@ def configure_player(gender, suffix):
     sword = sets[u.ICWeaponFamily.SWORD]
     profile.set_editor_property("unarmed", u.ICCharacterAnimationSet(
         locomotion=locomotion, jump=neutral["jump"], hit=sword.get_editor_property("hit"),
+        dodge=profile.get_editor_property("unarmed").get_editor_property("dodge"),
+        sprint=profile.get_editor_property("unarmed").get_editor_property("sprint"),
+        jump_start=profile.get_editor_property("unarmed").get_editor_property("jump_start"),
+        fall_loop=profile.get_editor_property("unarmed").get_editor_property("fall_loop"),
+        land=profile.get_editor_property("unarmed").get_editor_property("land"),
+        combat_locomotion=profile.get_editor_property("unarmed").get_editor_property("combat_locomotion"),
+        directional_dodges=profile.get_editor_property("unarmed").get_editor_property("directional_dodges"),
         ground_offset_cm=sword.get_editor_property("ground_offset_cm")))
     profile.set_editor_property("weapon_sets", sets)
     setup.save(profile)

@@ -15,7 +15,14 @@ struct ISEKAICLASS_API FICCharacterAnimationSet
     GENERATED_BODY()
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UBlendSpace> Locomotion;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UBlendSpace> CombatLocomotion;
+    /** Clockwise: forward, forward-right, right, back-right, back, back-left, left, forward-left. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<TObjectPtr<UAnimMontage>> DirectionalDodges;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> Jump;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> JumpStart;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> FallLoop;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> Land;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> Sprint;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimMontage> Attack;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimMontage> Skill;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimMontage> Hit;

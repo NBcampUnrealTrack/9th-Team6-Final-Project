@@ -23,6 +23,15 @@ class ISEKAICLASS_API AICPlayerCharacter : public AICCharacterBase
     GENERATED_BODY()
 public:
     AICPlayerCharacter();
+    bool bSprintHeld = false;
+    FVector MovementIntent=FVector::ZeroVector;
+    bool IsSprinting() const;
+    void AdjustCameraDistance(float Axis);
+    void UpdateCameraDistance(float DeltaSeconds);
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Camera",meta=(ClampMin="50")) float MinimumCameraDistance=200.f;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Camera",meta=(ClampMin="50")) float MaximumCameraDistance=650.f;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Camera",meta=(ClampMin="1")) float CameraZoomStep=50.f;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Movement",meta=(ClampMin="1")) float SprintSpeedMultiplier=1.5f;
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual bool InitializeState(FName ID) override;
@@ -43,6 +52,7 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Movement") float CameraSensitivity=1.0f;
     UFUNCTION(BlueprintCallable) void ApplyPreset(int32 Preset);
 private:
+    float DesiredCameraDistance=-1.f;
     enum class EWeaponTransition : uint8 { Idle, Sheathing, Drawing };
     EWeaponTransition WeaponTransition = EWeaponTransition::Idle;
     FGuid PendingWeaponID, TransitionWeaponID;

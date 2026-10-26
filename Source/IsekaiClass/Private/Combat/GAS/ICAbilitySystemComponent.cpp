@@ -60,7 +60,8 @@ bool UICAbilitySystemComponent::Restore(const FICCharacterState& State)
     RebuildDerivedStats(); SetVitals(State.HP, State.MP, State.SP); SyncEffectHandles(); SyncCooldownEffects();
     SetLooseGameplayTagCount(ICTags::Downed, State.IsDowned() ? 1 : 0);
     SetLooseGameplayTagCount(ICTags::Dead,State.HP<=0&&State.Kind!=EICCharacterKind::Recruitable?1:0);LastTickAt = PlaySecond(); }
-    UpdateShouldTick();OnStateChanged.Broadcast(); return true;
+    UpdateShouldTick();
+    OnStateChanged.Broadcast(); return true;
 }
 FICCharacterState UICAbilitySystemComponent::Capture() const
 {
@@ -129,7 +130,8 @@ bool UICAbilitySystemComponent::GetShouldTick() const
 bool UICAbilitySystemComponent::HasRecentCombat() const
 {
     IC_TRACE_FUNCTION(); FICDefinitionResult R; auto* Rule = Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;
-    return PlaySecond() - RecentCombatAt < (Rule ? Rule->RecentCombatPlaySeconds : 8);
+    const double Grace = Runtime.Kind == EICCharacterKind::Player ? (Rule ? Rule->PlayerCombatGracePlaySeconds : 5) : (Rule ? Rule->RecentCombatPlaySeconds : 8);
+    return IsAlive() && (HasMatchingGameplayTag(ICTags::Dodging) || PlaySecond() - RecentCombatAt < Grace);
 }
 void UICAbilitySystemComponent::MarkCombat() { IC_TRACE_FUNCTION(); RecentCombatAt = PlaySecond(); }
 double UICAbilitySystemComponent::GetMovementCooldownRemaining() const

@@ -97,6 +97,7 @@ struct ISEKAICLASS_API FICCombatSettingsRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double HitStaggerIntervalPlaySeconds = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double CanceledCastRetryPlaySeconds = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double RecentCombatPlaySeconds = 8;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double PlayerCombatGracePlaySeconds = 5;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double DefenseFormulaK = 100;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double InteractionDistanceCm = 250;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double LockOnDistanceCm = 2500;

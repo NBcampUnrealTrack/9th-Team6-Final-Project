@@ -1,6 +1,8 @@
 #include "Player/Character/ICPlayerCharacter.h"
+#include "Player/Character/ICCameraSpringArm.h"
 #include "UI/Framework/ICDisplayPolicy.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
+#include "Combat/GAS/ICGameplayTags.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Debug/ICLog.h"
@@ -14,6 +16,32 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 
+void AICPlayerCharacter::AdjustCameraDistance(float Axis)
+{
+    if(!CameraArm)return;
+    if(DesiredCameraDistance<0)DesiredCameraDistance=CameraArm->TargetArmLength;
+    const float Minimum=FMath::Max(50.f,MinimumCameraDistance);
+    DesiredCameraDistance=FMath::Clamp(DesiredCameraDistance-Axis*CameraZoomStep,Minimum,FMath::Max(Minimum,MaximumCameraDistance));
+}
+void AICPlayerCharacter::UpdateCameraDistance(float DeltaSeconds)
+{
+    if(!CameraArm)return;
+    if(DesiredCameraDistance<0)DesiredCameraDistance=CameraArm->TargetArmLength;
+    const float Minimum=FMath::Max(50.f,MinimumCameraDistance);
+    DesiredCameraDistance=FMath::Clamp(DesiredCameraDistance,Minimum,FMath::Max(Minimum,MaximumCameraDistance));
+    CameraArm->TargetArmLength=FMath::FInterpTo(CameraArm->TargetArmLength,DesiredCameraDistance,DeltaSeconds,10.f);
+}
+
+bool AICPlayerCharacter::IsSprinting() const
+{
+    return bSprintHeld && AbilitySystem && AbilitySystem->IsAlive()
+        && !AbilitySystem->HasRecentCombat()
+        && !IsSwitchingWeapon() && !AbilitySystem->GetActionID().IsValid()
+        && !AbilitySystem->HasMatchingGameplayTag(ICTags::Staggered)
+        && !AbilitySystem->HasMatchingGameplayTag(ICTags::Returning)
+        && GetCharacterMovement()->IsMovingOnGround();
+}
+
 AICPlayerCharacter::AICPlayerCharacter()
 {
     IC_TRACE_FUNCTION();
@@ -22,7 +50,7 @@ AICPlayerCharacter::AICPlayerCharacter()
     Inventory=CreateDefaultSubobject<UICInventoryComponent>(TEXT("Inventory"));
     Crafting=CreateDefaultSubobject<UICCraftingComponent>(TEXT("Crafting"));
     QuestGuide=CreateDefaultSubobject<UICQuestGuideComponent>(TEXT("QuestGuide"));
-    CameraArm=CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraArm"));
+    CameraArm=CreateDefaultSubobject<UICCameraSpringArm>(TEXT("CameraArm"));
     CameraArm->SetupAttachment(RootComponent);
     CameraArm->TargetArmLength=420;
     CameraArm->bUsePawnControlRotation=true;
