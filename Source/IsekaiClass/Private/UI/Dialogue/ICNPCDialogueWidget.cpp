@@ -64,8 +64,7 @@ void UICNPCDialogueWidget::ShowInteractionOptions()
     bRecruitEntryShown = false;
     bDismissEntryShown = false;
     SelectedQuestID = NAME_None;
-    SelectedDialogueID = NAME_None;
-    SelectedNodeID = NAME_None;
+    ResetDialogue();
     ClearEntries();
     DialogueText->SetText(FText::GetEmpty());
     if (!NPC) return;
@@ -96,27 +95,32 @@ void UICNPCDialogueWidget::ShowInteractionOptions()
     }
 }
 
+void UICNPCDialogueWidget::ResetDialogue()
+{
+    SelectedDialogueID = NAME_None;
+    SelectedNodeID = NAME_None;
+    DialogueEventID.Invalidate();
+}
+
 void UICNPCDialogueWidget::ShowInitialDialogue()
 {
     if (!NPC || !GetGameInstance()) return;
 
+    SelectedQuestID = NAME_None;
+    ResetDialogue();
     const FICNPCRow& Definition = NPC->GetNPCDefinition();
-    UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
-    for (const FName DialogueID : Definition.DialogueIDs)
+    UICQuestSubsystem* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>();
+    const FName ObjectiveDialogueID = Quests ? Quests->GetNPCObjectiveDialogue(Definition.ID) : NAME_None;
+    if (!ObjectiveDialogueID.IsNone() && TryShowNode(ObjectiveDialogueID)) return;
+    for (FName DialogueID : Definition.DialogueIDs)
     {
-        FICDialogueRow Dialogue;
-        if (Definitions && Definitions->GetDialogue(DialogueID, Dialogue).bSuccess
-            && Dialogue.NPCID == Definition.ID)
-        {
-            ShowNode(DialogueID);
-            return;
-        }
+        if (TryShowNode(DialogueID)) return;
     }
-    bShowingInteractionOptions=false;
-    SelectedDialogueID=NAME_None;SelectedNodeID=NAME_None;DialogueEventID=FGuid::NewGuid();
+    bShowingInteractionOptions = false;
+    DialogueEventID = FGuid::NewGuid();
     ClearEntries();
     DialogueText->SetText(NSLOCTEXT("ICDialogue","Greeting","안녕하세요. 무슨 일로 오셨나요?"));
-    AddEntry(DialogueOptionsEntry,NextText);
+    AddEntry(DialogueOptionsEntry, NextText);
 }
 
 void UICNPCDialogueWidget::NativeDestruct()
@@ -252,7 +256,7 @@ void UICNPCDialogueWidget::ShowQuestList()
 {
     bShowingInteractionOptions = false;
     SelectedQuestID = NAME_None;
-    SelectedDialogueID = NAME_None;
+    ResetDialogue();
     ClearEntries();
     DialogueText->SetText(QuestPromptText);
     if (!NPC || !GetGameInstance()) return;
@@ -333,8 +337,7 @@ void UICNPCDialogueWidget::ShowQuest(FName QuestID)
 
     if (DialogueID.IsNone())
     {
-        SelectedDialogueID = NAME_None;
-        SelectedNodeID = NAME_None;
+        ResetDialogue();
         ClearEntries();
         const FICTextLookupResult Description = UICTextLibrary::ResolveText(QuestStringTable, Quest.DescriptionKey);
         DialogueText->SetText(Description.bSuccess ? Description.Text : FText::FromName(QuestID));
@@ -358,16 +361,21 @@ void UICNPCDialogueWidget::ShowQuest(FName QuestID)
 
 void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
 {
-    bShowingInteractionOptions = false;
-    if (!NPC || !GetGameInstance()) return;
+    if (TryShowNode(DialogueID, NodeID)) return;
+    ResetDialogue();
+    if (SelectedQuestID.IsNone()) ShowInteractionOptions();
+    else ShowQuestList();
+}
+
+bool UICNPCDialogueWidget::TryShowNode(FName DialogueID, FName NodeID)
+{
+    if (!NPC || !GetGameInstance() || DialogueID.IsNone()) return false;
     UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
     FICDialogueRow Dialogue;
     if (!Definitions || !Definitions->GetDialogue(DialogueID, Dialogue).bSuccess
         || Dialogue.NPCID != NPC->GetNPCDefinition().ID)
     {
-        if (SelectedQuestID.IsNone()) ShowInteractionOptions();
-        else ShowQuestList();
-        return;
+        return false;
     }
 
     const FName CurrentNodeID = NodeID.IsNone() ? Dialogue.EntryNodeID : NodeID;
@@ -375,18 +383,15 @@ void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
         [CurrentNodeID](const FICDialogueNode& Candidate) { return Candidate.NodeID == CurrentNodeID; });
     if (!Node)
     {
-        if (SelectedQuestID.IsNone()) ShowInteractionOptions();
-        else ShowQuestList();
-        return;
+        return false;
     }
     const FICTextLookupResult Line = UICTextLibrary::ResolveText(DialogueStringTable, Node->TextKey);
     if (!Line.bSuccess)
     {
-        if (SelectedQuestID.IsNone()) ShowInteractionOptions();
-        else ShowQuestList();
-        return;
+        return false;
     }
 
+    bShowingInteractionOptions = false;
     SelectedDialogueID = DialogueID;
     if (NodeID.IsNone())
     {
@@ -423,6 +428,7 @@ void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
         AddEntry(DialogueBackEntry, BackText);
     }
     if(!SelectedQuestID.IsNone())AddEntry(DialogueCloseEntry, CloseText);
+    return true;
 }
 
 void UICNPCDialogueWidget::HandleEntry(FName EntryID)
@@ -500,30 +506,19 @@ void UICNPCDialogueWidget::HandleEntry(FName EntryID)
 
 void UICNPCDialogueWidget::CompleteDialogue(bool IsTerminalChoice)
 {
-    if (!NPC || !GetGameInstance() || !DialogueEventID.IsValid())
-    {
-        return;
-    }
-    UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
+    if (!NPC || !GetGameInstance() || !DialogueEventID.IsValid()) return;
     UICQuestSubsystem* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>();
-    FICDialogueRow Dialogue;
-    if (!Definitions || !Quests) return;
-    if (SelectedDialogueID.IsNone())
+    if (!Quests) return;
+    if (!SelectedDialogueID.IsNone())
     {
-        const FGuid EventID=DialogueEventID;DialogueEventID.Invalidate();
-        Quests->ReportObjectiveEvent(EICQuestObjectiveType::Talk,NPC->NPCDefinitionID,1,EventID);
-        return;
+        UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
+        FICDialogueRow Dialogue;
+        if (!Definitions || !Definitions->GetDialogue(SelectedDialogueID, Dialogue).bSuccess) return;
+        const FICDialogueNode* Node = Dialogue.Nodes.FindByPredicate(
+            [this](const FICDialogueNode& Candidate) { return Candidate.NodeID == SelectedNodeID; });
+        if (!Node || (!IsTerminalChoice && (!Node->NextNodeID.IsNone() || !Node->Choices.IsEmpty()))) return;
     }
-    if (!Definitions->GetDialogue(SelectedDialogueID, Dialogue).bSuccess)
-    {
-        return;
-    }
-    const FICDialogueNode* Node = Dialogue.Nodes.FindByPredicate(
-        [this](const FICDialogueNode& Candidate) { return Candidate.NodeID == SelectedNodeID; });
-    if (!Node || (!IsTerminalChoice && (!Node->NextNodeID.IsNone() || !Node->Choices.IsEmpty())))
-    {
-        return;
-    }
+    // Invalidate before notifying gameplay: quest completion may trigger UI callbacks.
     const FGuid EventID = DialogueEventID;
     DialogueEventID.Invalidate();
     Quests->ReportObjectiveEvent(EICQuestObjectiveType::Talk, NPC->GetNPCDefinition().ID,

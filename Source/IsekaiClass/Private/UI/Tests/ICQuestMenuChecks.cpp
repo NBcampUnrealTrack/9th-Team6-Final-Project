@@ -58,9 +58,11 @@ bool FICQuestMenuCheck::RunTest(const FString&)
             TestTrue(TEXT("Journal opens the accepted sample quest"),UI->OpenQuest(ID));
             TestTrue(TEXT("A newly accepted quest starts when the HUD is empty"),State->ExportState().Quests.FindRef(ID).bStarted);
             Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,Definition.OfferNPCID,1,FGuid::NewGuid());TestFalse(TEXT("Talking to the offer NPC does not complete the objective"),State->ExportState().Quests.FindRef(ID).bCompleted);
-            Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,Definition.ObjectiveGroups[0].Objectives[0].Target.ID,1,FGuid::NewGuid());TestTrue(TEXT("Talking to the target completes the quest"),State->ExportState().Quests.FindRef(ID).bCompleted);
+            Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,Definition.ObjectiveGroups[0].Objectives[0].Target.ID,
+                1,FGuid::NewGuid(),EICLifeActivity::Gathering,NAME_None,Definition.ObjectiveGroups[0].Objectives[0].DialogueID);TestTrue(TEXT("Talking to the target completes the quest"),State->ExportState().Quests.FindRef(ID).bCompleted);
             TestEqual(TEXT("Actual gold reward is applied once"),State->ExportState().Gold,StartingGold+I*100);
-            Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,Definition.ObjectiveGroups[0].Objectives[0].Target.ID,1,FGuid::NewGuid());TestEqual(TEXT("Repeated talk does not pay twice"),State->ExportState().Gold,StartingGold+I*100);
+            Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,Definition.ObjectiveGroups[0].Objectives[0].Target.ID,
+                1,FGuid::NewGuid(),EICLifeActivity::Gathering,NAME_None,Definition.ObjectiveGroups[0].Objectives[0].DialogueID);TestEqual(TEXT("Repeated talk does not pay twice"),State->ExportState().Gold,StartingGold+I*100);
         }
         TestTrue(TEXT("Reset to the isolated journal fixture"),State->RestoreState(Data));UI->RefreshQuests();
         auto* Detail=CastChecked<UICQuestDetailWidget>(UI->GetWidgetFromName(TEXT("QuestDetail")));

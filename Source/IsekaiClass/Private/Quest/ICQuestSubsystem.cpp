@@ -334,6 +334,20 @@ bool UICQuestSubsystem::GetObjectiveProgress(const FICQuestObjectiveDefinition& 
     return true;
 }
 
+bool UICQuestSubsystem::IsObjectiveGroupComplete(const FICQuestObjectiveGroup& Group,
+    const FICQuestState& Quest, const FICWorldState& World) const
+{
+    if (Group.Objectives.IsEmpty()) return false;
+    bool bComplete = Group.Policy == EICConditionPolicy::All;
+    for (const FICQuestObjectiveDefinition& Objective : Group.Objectives)
+    {
+        const bool bObjectiveComplete = IsObjectiveComplete(Objective, Quest, World);
+        bComplete = Group.Policy == EICConditionPolicy::All
+            ? bComplete && bObjectiveComplete : bComplete || bObjectiveComplete;
+    }
+    return bComplete;
+}
+
 bool UICQuestSubsystem::AreObjectivesComplete(const FICQuestRow& Definition,
     const FICQuestState& Quest, const FICWorldState& World) const
 {
@@ -348,19 +362,7 @@ bool UICQuestSubsystem::AreObjectivesComplete(const FICQuestRow& Definition,
         {
             return false;
         }
-        bool IsGroupComplete = Group.Policy == EICConditionPolicy::All;
-        for (const FICQuestObjectiveDefinition& Objective : Group.Objectives)
-        {
-            const bool IsObjectiveReady = IsObjectiveComplete(Objective, Quest, World);
-            if (Group.Policy == EICConditionPolicy::All)
-            {
-                IsGroupComplete &= IsObjectiveReady;
-            }
-            else
-            {
-                IsGroupComplete |= IsObjectiveReady;
-            }
-        }
+        const bool IsGroupComplete = IsObjectiveGroupComplete(Group, Quest, World);
         if (Definition.ObjectiveGroupPolicy == EICConditionPolicy::All)
         {
             IsComplete &= IsGroupComplete;
@@ -894,7 +896,7 @@ int32 UICQuestSubsystem::GetNPCQuestMarker(FName NPCID) const
             if(Ready)continue;
             for (const auto& Group : Quest->ObjectiveGroups)
             {
-                if(Group.Policy==EICConditionPolicy::Any&&Group.Objectives.ContainsByPredicate([&](const auto& O){return IsObjectiveComplete(O,*Progress,World);}))continue;
+                if (IsObjectiveGroupComplete(Group, *Progress, World)) continue;
                 for (const auto& Objective : Group.Objectives)
                     if ((Objective.Target.Type == EICDefinitionType::NPC && Objective.Target.ID == NPCID)
                         ||(NPCDefinition&&!NPCDefinition->InitialAnchorID.IsNone()
@@ -908,4 +910,51 @@ int32 UICQuestSubsystem::GetNPCQuestMarker(FName NPCID) const
         if (Quest->OfferNPCID == NPCID && CanOfferQuest(ID)) Available = true;
     }
     return Available ? 1 : 0;
+}
+
+FName UICQuestSubsystem::GetNPCObjectiveDialogue(FName NPCID) const
+{
+    if (!Definitions || !State || NPCID.IsNone()) return NAME_None;
+    const FICWorldState World = State->ExportState();
+    TArray<FName> Candidates;
+    for (const auto& Entry : World.Quests)
+    {
+        const FICQuestState& Quest = Entry.Value;
+        if (Quest.bAccepted && Quest.bStarted && !Quest.bCompleted && !Quest.bAbandoned)
+            Candidates.Add(Entry.Key);
+    }
+    // Normally only one quest is started. Keep selection stable for restored data.
+    Candidates.Sort([&World](FName A, FName B)
+    {
+        const double TimeA = World.Quests.FindChecked(A).AcceptedAtGameMinute;
+        const double TimeB = World.Quests.FindChecked(B).AcceptedAtGameMinute;
+        return TimeA == TimeB ? A.LexicalLess(B) : TimeA > TimeB;
+    });
+    for (FName QuestID : Candidates)
+    {
+        FICQuestRow Definition;
+        const FICQuestState& Quest = World.Quests.FindChecked(QuestID);
+        if (!Definitions->GetQuest(QuestID, Definition).bSuccess
+            || AreObjectivesComplete(Definition, Quest, World)) continue;
+        for (const FICQuestObjectiveGroup& Group : Definition.ObjectiveGroups)
+        {
+            if (IsObjectiveGroupComplete(Group, Quest, World)) continue;
+            for (const FICQuestObjectiveDefinition& Objective : Group.Objectives)
+            {
+                if (Objective.Type != EICQuestObjectiveType::Talk
+                    || Objective.Target.Type != EICDefinitionType::NPC || Objective.Target.ID != NPCID
+                    || Objective.DialogueID.IsNone() || IsObjectiveComplete(Objective, Quest, World)) continue;
+                FICDialogueRow Dialogue;
+                if (Definitions->GetDialogue(Objective.DialogueID, Dialogue).bSuccess
+                    && Dialogue.NPCID == NPCID && !Dialogue.EntryNodeID.IsNone()
+                    && Dialogue.Nodes.ContainsByPredicate([&](const FICDialogueNode& Node)
+                        { return Node.NodeID == Dialogue.EntryNodeID; }))
+                    return Objective.DialogueID;
+                UE_LOG(LogICWorldState, Warning,
+                    TEXT("[Quest.Dialogue.Invalid] Quest=%s NPC=%s Dialogue=%s"),
+                    *QuestID.ToString(), *NPCID.ToString(), *Objective.DialogueID.ToString());
+            }
+        }
+    }
+    return NAME_None;
 }
