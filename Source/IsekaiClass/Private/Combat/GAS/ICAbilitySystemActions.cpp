@@ -11,14 +11,49 @@
 #include "Combat/Actors/ICProjectile.h"
 #include "Character/Base/ICCharacterBase.h"
 #include "Player/Character/ICPlayerCharacter.h"
+#include "Character/Animation/ICCharacterAnimationProfile.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/GameInstance.h"
 #include "Debug/ICLog.h"
+
+bool UICAbilitySystemComponent::CanAcceptMovementInput() const
+{
+    return IsAlive() && !HasMatchingGameplayTag(ICTags::Staggered)
+        && !HasMatchingGameplayTag(ICTags::Returning)
+        && !HasMatchingGameplayTag(ICTags::Dodging)
+        && !HasMatchingGameplayTag(ICTags::Attacking)
+        && !HasMatchingGameplayTag(ICTags::Casting);
+}
+
+bool UICAbilitySystemComponent::HandleMovementInput()
+{
+    // Only deliberate non-zero movement input may cancel a movement-cancellable cast.
+    if(!IsAlive() || HasMatchingGameplayTag(ICTags::Staggered)
+        || HasMatchingGameplayTag(ICTags::Returning) || HasMatchingGameplayTag(ICTags::Dodging))return false;
+    if(RunningAbility && RequestedAction==TEXT("Skill") && Skill.CancelRules.bCancelOnUserMovement)
+        CancelAction();
+    return CanAcceptMovementInput();
+}
+
+bool UICAbilitySystemComponent::CanAcceptJumpInput() const
+{
+    return CanAcceptMovementInput() && !CurrentID.IsValid();
+}
+
+void UICAbilitySystemComponent::ClearBufferedInput()
+{
+    BufferedInputAction=NAME_None;BufferedInputTarget.Reset();BufferedAttackUntil=0;
+}
+bool UICAbilitySystemComponent::CanAcceptInteractionInput() const
+{
+    return CanAcceptJumpInput() && (BufferedInputAction.IsNone() || PlaySecond()>BufferedAttackUntil);
+}
 
 FICCombatResult UICAbilitySystemComponent::RequestAction(FName Action,FName SkillID,AICCharacterBase* Target)
 {
@@ -28,8 +63,25 @@ FICCombatResult UICAbilitySystemComponent::RequestAction(FName Action,FName Skil
     {Result.Reason=ICText::Get(TEXT("Native_fd75bc5b6f2b")).ToString();return Result;}
     if(Action!=TEXT("Attack")&&Action!=TEXT("BlockStart")&&Action!=TEXT("Dodge")&&Action!=TEXT("Skill")){Result.Reason=ICText::Get(TEXT("Native_ea5b77a89d9b")).ToString();return Result;}
     if(!IsAlive()||HasMatchingGameplayTag(ICTags::Returning)||HasMatchingGameplayTag(ICTags::Staggered)){Result.Reason=ICText::Get(TEXT("Native_1c6d5b86f441")).ToString();return Result;}
-    if(Action==TEXT("Attack")&&RunningAbility&&RequestedAction==TEXT("Attack"))
-    {FICDefinitionResult R;const auto* Settings=Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;BufferedAttackUntil=PlaySecond()+(Settings?Settings->InputBufferPlaySeconds:.2);Result.bSuccess=true;Result.ActionID=CurrentID;return Result;}
+    if(!BufferedInputAction.IsNone()&&PlaySecond()>BufferedAttackUntil)ClearBufferedInput();
+    if(Action==TEXT("Attack")&&BufferedInputAction==TEXT("Dodge"))
+    {Result.Reason=ICText::Get(TEXT("Native_fd75bc5b6f2b")).ToString();return Result;}
+    // Reject a cooling-down dash before it can cancel the action already playing.
+    if(Action==TEXT("Dodge")&&PlaySecond()<DodgeReadyAt)
+    {Result.Reason=ICText::Get(TEXT("Native_1d8c24e7202d")).ToString();return Result;}
+    if(RunningAbility)
+    {
+        FICDefinitionResult BufferResult;
+        const auto* Settings=Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),BufferResult):nullptr;
+        const double Window=FMath::Max(0.,Settings?Settings->InputBufferPlaySeconds:.2);
+        const bool QueueAttack=Action==TEXT("Attack")&&(RequestedAction==TEXT("Attack")||RequestedAction==TEXT("Dodge"));
+        const bool QueueDodge=Action==TEXT("Dodge")&&RequestedAction==TEXT("Attack")&&!Skill.Montage.IsNull()&&!bCancelWindow;
+        if(Window>0&&(QueueAttack||QueueDodge))
+        {
+            BufferedInputAction=Action;BufferedInputTarget=Target;BufferedAttackUntil=PlaySecond()+Window;
+            Result.bSuccess=true;Result.ActionID=CurrentID;return Result;
+        }
+    }
     if(RunningAbility)
     {
         if(Action!=TEXT("BlockStart")&&Action!=TEXT("Dodge")){Result.Reason=ICText::Get(TEXT("Native_fd75bc5b6f2b")).ToString();return Result;}
@@ -38,6 +90,7 @@ FICCombatResult UICAbilitySystemComponent::RequestAction(FName Action,FName Skil
         if(RequestedAction==TEXT("Attack")&&!Skill.Montage.IsNull()&&!bCancelWindow){Result.Reason=ICText::Get(TEXT("Native_b9ea9c49d323")).ToString();return Result;}
         CancelAction();
     }
+    ClearBufferedInput();
     bCommitted=false;RequestedAction=Action;RequestedSkill=SkillID;TargetActor=Target;Skill=FICSkillRow();FICDefinitionResult R;
     if(Action==TEXT("Skill"))
     {const auto* Row=Definitions()?Definitions()->Find<FICSkillRow>(SkillID,R):nullptr;if(!Row){Result.Reason=R.Reason;return Result;}Skill=*Row;}
@@ -135,7 +188,37 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
     RunningAbility=Ability;CurrentID=FGuid::NewGuid();StartedAt=PlaySecond();StartLocation=Character->GetActorLocation();bCommitted=false;bCancelWindow=false;ActiveMontageInstanceID=INDEX_NONE;EmittedHits.Reset();HitReceipts.Reset();OpenTraceHits.Reset();LastTraceStart.Reset();LastTraceEnd.Reset();TraceEndsAt.Reset();
     FICCombatSettingsRow Defaults;const auto* Moves=D?D->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;if(!Moves)Moves=&Defaults;
     if(RequestedAction==TEXT("Dodge"))
-    {DodgeReadyAt=StartedAt+Moves->DodgeCooldownPlaySeconds;ActionEndsAt=StartedAt+Moves->DodgeInvulnerabilityPlaySeconds;DodgeDirection=Character->GetLastMovementInputVector().GetSafeNormal2D();if(DodgeDirection.IsNearlyZero())DodgeDirection=Character->GetActorForwardVector();SetLooseGameplayTagCount(ICTags::Dodging,1);SetLooseGameplayTagCount(ICTags::Invulnerable,1);}
+    {
+        DodgeReadyAt=StartedAt+Moves->DodgeCooldownPlaySeconds;
+        ActionEndsAt=StartedAt+Moves->DodgeInvulnerabilityPlaySeconds;
+        DodgeDirection=Character->GetLastMovementInputVector().GetSafeNormal2D();
+        bool bDirectionalDodge=false;
+        if(auto* Player=Cast<AICPlayerCharacter>(Character))
+        {
+            DodgeDirection=Player->MovementIntent.GetSafeNormal2D();
+            if(DodgeDirection.IsNearlyZero())DodgeDirection=-Character->GetActorForwardVector();
+            const FVector Local=Character->GetActorRotation().UnrotateVector(DodgeDirection);
+            const int32 Index=(FMath::RoundToInt(FMath::Atan2(Local.Y,Local.X)/(PI/4.f))+8)%8;
+            const auto* Profile=Character->GetAnimationProfile();
+            const auto* Set=Profile?Profile->FindSet(GetEquippedWeaponFamily()):nullptr;
+            if(Set&&Set->DirectionalDodges.IsValidIndex(Index)&&Set->DirectionalDodges[Index])
+            {Skill.Montage=Set->DirectionalDodges[Index];bDirectionalDodge=true;}
+        }
+        if(DodgeDirection.IsNearlyZero())DodgeDirection=Character->GetActorForwardVector();
+        SetLooseGameplayTagCount(ICTags::Dodging,1);
+        SetLooseGameplayTagCount(ICTags::Invulnerable,1);
+        if(auto* Montage=Skill.Montage.LoadSynchronous())
+            if(auto* Anim=Character->GetMesh()->GetAnimInstance())
+            {
+                // Directional dodges preserve facing. Gameplay time owns the dodge
+                // duration and invulnerability; montage blending must not end them early.
+                if(!bDirectionalDodge)Character->SetActorRotation(DodgeDirection.Rotation());
+                const float Duration=FMath::Max(.01f,float(ActionEndsAt-StartedAt));
+                Anim->Montage_Play(Montage,Montage->GetPlayLength()/Duration);
+                if(auto* Instance=Anim->GetActiveInstanceForMontage(Montage))
+                    ActiveMontageInstanceID=Instance->GetInstanceID();
+            }
+    }
     else
     {const double Rate=RequestedAction==TEXT("Attack")?FMath::Max(.01,Stat(EICStat::AttackSpeed)):1;ActionEndsAt=StartedAt+FMath::Max(.01,Skill.CastPlaySeconds+Skill.RecoveryPlaySeconds)/Rate;SetLooseGameplayTagCount(RequestedAction==TEXT("Attack")?ICTags::Attacking:ICTags::Casting,1);
      if(auto* Montage=Skill.Montage.LoadSynchronous())if(auto* Anim=Character->GetMesh()->GetAnimInstance()){Anim->Montage_Play(Montage,RequestedAction==TEXT("Attack")?Stat(EICStat::AttackSpeed):1);FOnMontageEnded Ended;const FGuid ActionGUID=CurrentID;Ended.BindWeakLambda(this,[this,ActionGUID](UAnimMontage* EndedMontage,bool Interrupted){if(CurrentID==ActionGUID&&RunningAbility)RunningAbility->Finish(Interrupted);});Anim->Montage_SetEndDelegate(Ended,Montage);if(auto* Instance=Anim->GetActiveInstanceForMontage(Montage))ActiveMontageInstanceID=Instance->GetInstanceID();if(!Skill.CastSection.IsNone())Anim->Montage_JumpToSection(Skill.CastSection,Montage);}}
@@ -148,7 +231,10 @@ bool UICAbilitySystemComponent::CommitFirstEffect()
     IC_TRACE_FUNCTION();if(bCommitted)return true;FString Reason;if(!ValidateAction(Reason))return false;
     if(RequestedAction==TEXT("Skill"))
     {if(Skill.MPCost>0&&!ChangeResource(TEXT("MP"),-Skill.MPCost))return false;ApplySkillCooldown(Skill,Skill.CooldownPlaySeconds);}
-    bCommitted=true;MarkCombat();UE_LOG(LogICCore, Verbose,TEXT("[Combat.Commit] ID=%s MP=%d CD=%.2f"),*CurrentID.ToString(),Skill.MPCost,Skill.CooldownPlaySeconds);return true;
+    if(auto* C=Cast<AICCharacterBase>(GetAvatarActor());C&&TargetActor.IsValid()&&C->IsHostileTo(TargetActor.Get()))
+        if(auto* TargetASC=TargetActor->GetICAbilitySystem();TargetASC&&TargetASC->IsAlive())
+        {MarkCombat();TargetASC->MarkCombat();}
+    bCommitted=true;UE_LOG(LogICCore, Verbose,TEXT("[Combat.Commit] ID=%s MP=%d CD=%.2f"),*CurrentID.ToString(),Skill.MPCost,Skill.CooldownPlaySeconds);return true;
 }
 FGuid UICAbilitySystemComponent::GetActionID() const { IC_TRACE_FUNCTION();return CurrentID; }
 void UICAbilitySystemComponent::SetGuarding(bool Guarding)
@@ -156,19 +242,34 @@ void UICAbilitySystemComponent::SetGuarding(bool Guarding)
 void UICAbilitySystemComponent::ClearActionTags()
 { IC_TRACE_FUNCTION();SetLooseGameplayTagCount(ICTags::Attacking,0);SetLooseGameplayTagCount(ICTags::Casting,0);SetLooseGameplayTagCount(ICTags::Dodging,0);SetLooseGameplayTagCount(ICTags::Invulnerable,0); }
 void UICAbilitySystemComponent::CancelAction()
-{ IC_TRACE_FUNCTION();if(RunningAbility)RunningAbility->Finish(true);else ClearActionTags(); }
+{ IC_TRACE_FUNCTION();ClearBufferedInput();if(RunningAbility)RunningAbility->Finish(true);else ClearActionTags(); }
 void UICAbilitySystemComponent::EndCurrentAction(bool Cancelled)
 {
     IC_TRACE_FUNCTION();if(bEnding||!CurrentID.IsValid())return;TGuardValue<bool> Guard(bEnding,true);
+    if(Cancelled)ClearBufferedInput();
     if(Cancelled&&RequestedAction==TEXT("Skill")&&!bCommitted)
         ApplySkillCooldown(Skill,FMath::Max(GetSkillCooldownRemaining(Skill.ID),Skill.BeforeFirstEffectRetryPlaySeconds));
     if(RequestedAction==TEXT("Attack")){FICDefinitionResult R;const auto* Settings=Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;ComboIndex=Cancelled?0:(ComboIndex+1)%3;ComboReadyUntil=PlaySecond()+(Settings?Settings->ComboWindowPlaySeconds:.8);}
-    if(Cancelled)if(auto* C=Cast<AICCharacterBase>(GetAvatarActor()))if(auto* Anim=C->GetMesh()->GetAnimInstance())if(auto* Montage=Skill.Montage.Get())Anim->Montage_Stop(.1f,Montage);
+    if(Cancelled||RequestedAction==TEXT("Dodge"))if(auto* C=Cast<AICCharacterBase>(GetAvatarActor()))if(auto* Anim=C->GetMesh()->GetAnimInstance())if(auto* Montage=Skill.Montage.Get())Anim->Montage_Stop(.05f,Montage);
     ClearActionTags();OpenTraceHits.Reset();ActiveMontageInstanceID=INDEX_NONE;CurrentID.Invalidate();RunningAbility=nullptr;OnStateChanged.Broadcast();
 }
 void UICAbilitySystemComponent::AdvanceAction(double Now)
 {
-    IC_TRACE_FUNCTION();if(!CurrentID.IsValid())return;auto* C=Cast<AICCharacterBase>(GetAvatarActor());if(!C){CancelAction();return;}
+    IC_TRACE_FUNCTION();
+    if(!BufferedInputAction.IsNone())
+    {
+        if(Now>BufferedAttackUntil||!IsAlive()||HasMatchingGameplayTag(ICTags::Staggered)||HasMatchingGameplayTag(ICTags::Returning))ClearBufferedInput();
+        else if(!CurrentID.IsValid()||(BufferedInputAction==TEXT("Dodge")&&RequestedAction==TEXT("Attack")&&bCancelWindow))
+        {
+            const FName Pending=BufferedInputAction;
+            auto* PendingTarget=BufferedInputTarget.Get();
+            const bool InvalidTarget=BufferedInputTarget.IsStale()||(PendingTarget&&(!PendingTarget->GetICAbilitySystem()||!PendingTarget->GetICAbilitySystem()->IsAlive()));
+            ClearBufferedInput();
+            if(!InvalidTarget)RequestAction(Pending,NAME_None,PendingTarget);
+            return;
+        }
+    }
+    if(!CurrentID.IsValid())return;auto* C=Cast<AICCharacterBase>(GetAvatarActor());if(!C){CancelAction();return;}
     if(RequestedAction==TEXT("Dodge"))
     {FICDefinitionResult R;FICCombatSettingsRow Defaults;const auto* Rules=Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;if(!Rules)Rules=&Defaults;
      const double Alpha=FMath::Clamp((Now-StartedAt)/FMath::Max(.01,Rules->DodgeInvulnerabilityPlaySeconds),0.,1.);C->SetActorLocation(StartLocation+DodgeDirection*Rules->DodgeDistanceCm*Alpha,true);}
@@ -185,8 +286,7 @@ void UICAbilitySystemComponent::AdvanceAction(double Now)
     TArray<int32> Traces=OpenTraceHits.Array();for(int32 Index:Traces){if(Now>=TraceEndsAt.FindRef(Index))OpenTraceHits.Remove(Index);else EmitHit(Index,true);}
     if(Now>=ActionEndsAt&&RunningAbility)
     {
-        const bool Buffered=RequestedAction==TEXT("Attack")&&BufferedAttackUntil>=Now;RunningAbility->Finish(false);
-        if(Buffered){BufferedAttackUntil=0;RequestAction(TEXT("Attack"),NAME_None,TargetActor.Get());}
+        RunningAbility->Finish(false);
     }
 }
 bool UICAbilitySystemComponent::NotifyCombatEvent(FGuid ID,FName Event,int32 HitIndex)

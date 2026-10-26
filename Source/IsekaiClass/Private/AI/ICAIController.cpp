@@ -64,6 +64,10 @@ void AICAIController::Tick(float DeltaSeconds)
 {
     IC_TRACE_FUNCTION();Super::Tick(DeltaSeconds);if(!bExecutionReady||bUsesAuthoredTree)return;auto* T=GetGameInstance()?GetGameInstance()->GetSubsystem<UICTimeSubsystem>():nullptr;
     if(T&&T->IsRunning()&&T->GetClock().PlaySecond>=NextDecisionAt){NextDecisionAt=T->GetClock().PlaySecond+.25;Decide();}
+    if(T&&T->IsRunning())
+        if(auto* Enemy=Cast<AICEnemyBase>(GetPawn());Enemy&&!Enemy->IsReturning()&&Enemy->GetICAbilitySystem()&&Enemy->GetICAbilitySystem()->IsAlive()&&Target.IsValid()&&Enemy->IsHostileTo(Target.Get()))
+            if(auto* TargetASC=Target->GetICAbilitySystem();TargetASC&&TargetASC->IsAlive())
+            {Enemy->GetICAbilitySystem()->MarkCombat();TargetASC->MarkCombat();}
 }
 void AICAIController::Decide()
 {

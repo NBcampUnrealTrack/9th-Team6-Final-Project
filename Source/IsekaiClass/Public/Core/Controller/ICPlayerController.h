@@ -254,7 +254,12 @@ private:
     void ApplyInputMapping();
     void RemoveInputMapping();
     void Move(const FInputActionValue& Value);
+    void StopMove(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
+    void ZoomCamera(const FInputActionValue& Value);
+    UPROPERTY(Transient) TObjectPtr<UInputAction> CameraZoomAction;
+    UPROPERTY(Transient) TObjectPtr<UInputMappingContext> CameraMappingContext;
+    bool bCameraLockOn=false;
     void CancelInputCommand(EICInputCommand Command,int32 Slot);
     void ResetHeldInput();
     bool CanHandleGameplayInput() const;

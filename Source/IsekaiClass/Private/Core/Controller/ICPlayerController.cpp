@@ -220,6 +220,7 @@ void AICPlayerController::ApplyInputMapping()
             {
                 Input->AddMappingContext(DefaultMappingContext,MappingPriority);
                 AppliedMappingContext=DefaultMappingContext;
+                if(CameraMappingContext)Input->AddMappingContext(CameraMappingContext,MappingPriority);
     UE_LOG(LogICInput, Log, TEXT("[Input.MappingApplied] Controller=%s IMC=%s Priority=%d"),*GetNameSafe(this),*GetPathNameSafe(DefaultMappingContext),MappingPriority);
             }
         }
@@ -230,7 +231,10 @@ void AICPlayerController::RemoveInputMapping()
     IC_TRACE_FUNCTION();
     if (ULocalPlayer* LocalPlayer=GetLocalPlayer())
         if (auto* Input=LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+        {
             if (AppliedMappingContext) Input->RemoveMappingContext(AppliedMappingContext);
+            if (CameraMappingContext) Input->RemoveMappingContext(CameraMappingContext);
+        }
     if(AppliedMappingContext) UE_LOG(LogICInput, Log, TEXT("[Input.MappingRemoved] Controller=%s IMC=%s"),*GetNameSafe(this),*GetPathNameSafe(AppliedMappingContext));
     AppliedMappingContext=nullptr;
 }

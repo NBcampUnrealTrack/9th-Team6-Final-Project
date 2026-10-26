@@ -126,5 +126,7 @@ public:
 private:
     UPROPERTY() TObjectPtr<UICDefinitionCatalog> Catalog;
     UPROPERTY(Transient) TArray<TObjectPtr<UDataTable>> LoadedTables;
+    // Native row types are stable during a game-instance session. Rebuild on catalog configuration.
+    TMap<const UScriptStruct*, EICDefinitionType> CachedSchemaTypes;
     UDataTable* LoadTable(const FICDefinitionBinding& Binding, FICDefinitionResult& Result) const;
 };

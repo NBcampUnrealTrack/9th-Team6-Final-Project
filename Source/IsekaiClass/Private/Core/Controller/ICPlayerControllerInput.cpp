@@ -15,6 +15,10 @@
 #include "Save/ICSaveSubsystem.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
 #include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
+#include "InputAction.h"
+#include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -26,11 +30,28 @@ void AICPlayerController::SetupInputComponent()
     Super::SetupInputComponent();
     auto* Input=Cast<UEnhancedInputComponent>(InputComponent);
     if (!Input) { UE_LOG(LogICInput,Error,TEXT("[Input.Setup.Failed] Controller=%s: EnhancedInputComponent가 필요합니다."),*GetNameSafe(this));return; }
+    if(!CameraZoomAction)
+    {
+        CameraZoomAction=NewObject<UInputAction>(this);
+        CameraZoomAction->ValueType=EInputActionValueType::Axis1D;
+        CameraMappingContext=NewObject<UInputMappingContext>(this);
+        CameraMappingContext->MapKey(CameraZoomAction,EKeys::MouseWheelAxis);
+    }
+    Input->BindAction(CameraZoomAction,ETriggerEvent::Triggered,this,&ThisClass::ZoomCamera);
+    if(IsLocalController()&&!IsMainMenuLevel())
+        if(auto* Local=GetLocalPlayer())
+            if(auto* Subsystem=Local->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+                Subsystem->AddMappingContext(CameraMappingContext,MappingPriority);
     if (MoveAction && MoveAction->ValueType==EInputActionValueType::Axis2D) Input->BindAction(MoveAction,ETriggerEvent::Triggered,this,&ThisClass::Move);
     else if(MoveAction)UE_LOG(LogICInput,Error,TEXT("[Input.Setup.Failed] MoveAction=%s: Axis2D가 필요합니다."),*GetPathNameSafe(MoveAction));
     if (LookAction && LookAction->ValueType==EInputActionValueType::Axis2D) Input->BindAction(LookAction,ETriggerEvent::Triggered,this,&ThisClass::Look);
     else if(LookAction)UE_LOG(LogICInput,Error,TEXT("[Input.Setup.Failed] LookAction=%s: Axis2D가 필요합니다."),*GetPathNameSafe(LookAction));
     if(!MoveAction||!LookAction)UE_LOG(LogICInput,Warning,TEXT("[Input.Setup.Incomplete] Move=%s Look=%s: 이동/카메라 Input Action을 확인하세요."),*GetPathNameSafe(MoveAction),*GetPathNameSafe(LookAction));
+    if(MoveAction)
+    {
+        Input->BindAction(MoveAction,ETriggerEvent::Completed,this,&ThisClass::StopMove);
+        Input->BindAction(MoveAction,ETriggerEvent::Canceled,this,&ThisClass::StopMove);
+    }
     TSet<const UInputAction*> BoundActions;
     for (const FICInputCommandBinding& Binding:CommandActions)
     {
@@ -61,10 +82,20 @@ void AICPlayerController::Move(const FInputActionValue& Value)
     if (auto* TargetCharacter=Cast<AICPlayerCharacter>(GetPawn()))
     {
         const FVector2D Axis=Value.Get<FVector2D>().GetClampedToMaxSize(1.f);
+        const FRotator InputYaw(0,GetControlRotation().Yaw,0);
+        TargetCharacter->MovementIntent=(InputYaw.Vector()*Axis.Y+FRotationMatrix(InputYaw).GetUnitAxis(EAxis::Y)*Axis.X).GetClampedToMaxSize(1.f);
+        if(Axis.IsNearlyZero())return;
+        auto* MoveASC=TargetCharacter->GetICAbilitySystem();
+        if(!MoveASC||!MoveASC->HandleMovementInput())return;
         const FRotator Yaw(0,GetControlRotation().Yaw,0);
         TargetCharacter->AddMovementInput(Yaw.Vector(),Axis.Y);
         TargetCharacter->AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y),Axis.X);
     }
+}
+
+void AICPlayerController::StopMove(const FInputActionValue& Value)
+{
+    if(auto* MoveCharacter=Cast<AICPlayerCharacter>(GetPawn()))MoveCharacter->MovementIntent=FVector::ZeroVector;
 }
 
 void AICPlayerController::Look(const FInputActionValue& Value)
@@ -74,6 +105,7 @@ void AICPlayerController::Look(const FInputActionValue& Value)
     if (const auto* TargetCharacter=Cast<AICPlayerCharacter>(GetPawn()))
     {
         const FVector2D Axis=Value.Get<FVector2D>();
+        if(!Axis.IsNearlyZero())bCameraLockOn=false;
         FRotator Rotation=GetControlRotation();
         Rotation.Yaw+=Axis.X*TargetCharacter->CameraSensitivity;
         Rotation.Pitch=FMath::Clamp(FRotator::NormalizeAxis(Rotation.Pitch)+Axis.Y*TargetCharacter->CameraSensitivity,-65.f,65.f);
@@ -81,6 +113,13 @@ void AICPlayerController::Look(const FInputActionValue& Value)
     }
 }
 
+
+void AICPlayerController::ZoomCamera(const FInputActionValue& Value)
+{
+    if(!CanHandleGameplayInput())return;
+    if(auto* CameraCharacter=Cast<AICPlayerCharacter>(GetPawn()))
+        CameraCharacter->AdjustCameraDistance(Value.Get<float>());
+}
 
 void AICPlayerController::PlayerTick(float DeltaSeconds)
 {
@@ -97,7 +136,10 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
     auto* C=Cast<AICPlayerCharacter>(GetPawn());
     auto* ASC=C?C->GetICAbilitySystem():nullptr;
     if (!ASC) return;
-    bInCombat=ASC->HasRecentCombat();
+    const bool CombatNow=ASC->HasRecentCombat();
+    if(CombatNow&&!bInCombat&&!CombatTarget.IsValid())SelectCombatTarget(false);
+    if(CombatNow)C->bSprintHeld=false;
+    if(bInCombat!=CombatNow){SetCombatState(CombatNow);bDirty=true;}
     FICDefinitionResult Result;
     FICCombatSettingsRow Defaults;
     const auto* Settings=ASC->Definitions()?ASC->Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),Result):nullptr;
@@ -122,12 +164,53 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
             else TargetOccludedAt=-1;
         }
     }
-    C->GetCharacterMovement()->MaxWalkSpeed=ASC->Stat(EICStat::MoveSpeed)*(Survival.IsExhausted()?ExhaustedMoveSpeedMultiplier:1.f);
+    C->GetCharacterMovement()->bOrientRotationToMovement=!CombatNow;
+    if(CombatNow&&CanHandleGameplayInput()&&ASC->CanAcceptMovementInput()&&!C->IsSwitchingWeapon())
+    {
+        const FVector Facing=CombatTarget.IsValid()?CombatTarget->GetActorLocation()-C->GetActorLocation():GetControlRotation().Vector();
+        if(!Facing.IsNearlyZero())C->SetActorRotation(FMath::RInterpTo(C->GetActorRotation(),FRotator(0,Facing.Rotation().Yaw,0),DeltaSeconds,12.f));
+    }
+    if(!CombatTarget.IsValid())bCameraLockOn=false;
+    if(CanHandleGameplayInput())
+    {
+        C->UpdateCameraDistance(DeltaSeconds);
+        if(bCameraLockOn&&CombatTarget.IsValid())
+        {
+            const FVector Direction=CombatTarget->GetActorLocation()-C->Camera->GetComponentLocation();
+            if(!Direction.IsNearlyZero())
+            {
+                FRotator Aim=Direction.Rotation();
+                Aim.Pitch=FMath::Clamp(FRotator::NormalizeAxis(Aim.Pitch),-65.f,65.f);
+                Aim.Roll=0;
+                SetControlRotation(FMath::RInterpTo(GetControlRotation(),Aim,DeltaSeconds,5.f));
+            }
+        }
+    }
+    C->GetCharacterMovement()->MaxWalkSpeed=ASC->Stat(EICStat::MoveSpeed)*(Survival.IsExhausted()?ExhaustedMoveSpeedMultiplier:1.f)*(C->IsSprinting()?C->SprintSpeedMultiplier:1.f);
+    if(!CanHandleGameplayInput()||!ASC->CanAcceptMovementInput())
+    {
+        C->ConsumeMovementInputVector();
+        C->GetCharacterMovement()->MaxWalkSpeed=0;
+        // Preserve vertical velocity so an airborne hit does not suspend gravity.
+        auto& Velocity=C->GetCharacterMovement()->Velocity;
+        Velocity.X=0;Velocity.Y=0;
+        C->StopJumping();
+        C->bSprintHeld=false;
+    }
 }
 
 void AICPlayerController::ResetHeldInput()
 {
     ReleaseInputCommand(EICInputCommand::Jump);
+    ReleaseInputCommand(EICInputCommand::Dodge);
+    if(auto* InputCharacter=Cast<AICPlayerCharacter>(GetPawn()))
+    {
+        InputCharacter->ConsumeMovementInputVector();
+        InputCharacter->MovementIntent=FVector::ZeroVector;
+        if(auto* InputASC=InputCharacter->GetICAbilitySystem())InputASC->ClearBufferedInput();
+        auto& Velocity=InputCharacter->GetCharacterMovement()->Velocity;
+        Velocity.X=0;Velocity.Y=0;
+    }
 }
 
 void AICPlayerController::CancelInputCommand(EICInputCommand Command,int32 Slot)
@@ -137,6 +220,8 @@ void AICPlayerController::CancelInputCommand(EICInputCommand Command,int32 Slot)
 
 void AICPlayerController::ReleaseInputCommand(EICInputCommand Command,int32 Slot)
 {
+    if (Command==EICInputCommand::Dodge || Command==EICInputCommand::SprintDodge)
+        if (auto* SprintCharacter=Cast<AICPlayerCharacter>(GetPawn())) SprintCharacter->bSprintHeld=false;
     if (Command==EICInputCommand::Jump)
         if (auto* InputCharacter=Cast<ACharacter>(GetPawn())) InputCharacter->StopJumping();
 }
@@ -210,17 +295,39 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     }
     if(TargetMenu) { SetMenu(Menu==TargetMenu?TEXT(""):TargetMenu); return; }
     if(!CanHandleGameplayInput())return;
+    if(Command==EICInputCommand::Dodge)
+    {
+        if(auto* SprintCharacter=Cast<AICPlayerCharacter>(GetPawn()))
+        {
+            auto* SprintASC=SprintCharacter->GetICAbilitySystem();
+            if(SprintASC&&SprintASC->HasRecentCombat())
+            {SprintCharacter->bSprintHeld=false;ExecuteCombatInput(TEXT("Dodge"),Slot);OnCombatRequest.Broadcast(TEXT("Dodge"),Slot);}
+            else SprintCharacter->bSprintHeld=true;
+        }
+        return;
+    }
     if(Command==EICInputCommand::QuickSlot) { if(GetInventory())BeginItem(GetInventory()->GetSnapshot().QuickSlots[Slot],Slot); return; }
-    if(Command==EICInputCommand::Jump) { if(auto* InputCharacter=Cast<ACharacter>(GetPawn()))InputCharacter->Jump(); return; }
-    if(Command==EICInputCommand::Interact) { Interact(); return; }
-    if(Command==EICInputCommand::Fishing) { RequestFishing(); return; }
+    if(Command==EICInputCommand::Jump)
+    {
+        if(auto* InputCharacter=Cast<AICPlayerCharacter>(GetPawn()))
+            if(auto* JumpASC=InputCharacter->GetICAbilitySystem();JumpASC&&JumpASC->CanAcceptJumpInput()&&!InputCharacter->IsSwitchingWeapon())
+                InputCharacter->Jump();
+        return;
+    }
+    if(Command==EICInputCommand::Interact||Command==EICInputCommand::Fishing)
+    {
+        auto* InteractionCharacter=Cast<AICPlayerCharacter>(GetPawn());
+        auto* InteractionASC=InteractionCharacter?InteractionCharacter->GetICAbilitySystem():nullptr;
+        if(!InteractionASC||!InteractionASC->CanAcceptInteractionInput()||InteractionCharacter->IsSwitchingWeapon())return;
+        if(Command==EICInputCommand::Interact)Interact();else RequestFishing();
+        return;
+    }
     if(Command==EICInputCommand::SwitchWeapon)
     { if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());PlayerPawn&&PlayerPawn->RequestCycleWeapon()) { FlushWorldState(); bDirty=true; OnCombatRequest.Broadcast(TEXT("SwitchWeapon"),0); } return; }
     FName Action=NAME_None;
     switch(Command)
     {
         case EICInputCommand::Attack:Action=TEXT("Attack");break;
-        case EICInputCommand::Dodge:Action=TEXT("Dodge");break;
         case EICInputCommand::NextTarget:Action=TEXT("NextTarget");break;
         case EICInputCommand::ClearTarget:Action=TEXT("ClearTarget");break;
         case EICInputCommand::Skill:Action=TEXT("Skill");break;
@@ -398,8 +505,8 @@ void AICPlayerController::ExecuteCombatInput(FName Action,int32 Slot)
     auto* Caster=static_cast<AICCharacterBase*>(PlayerCharacter);
     auto* ASC=Caster?Caster->GetICAbilitySystem():nullptr;
     if(!ASC)return;
-    if(Action==TEXT("ClearTarget")) { CombatTarget.Reset(); TargetOccludedAt=-1; return; }
-    if(Action==TEXT("NextTarget")) { SelectCombatTarget(true); return; }
+    if(Action==TEXT("ClearTarget")) { CombatTarget.Reset(); TargetOccludedAt=-1; bCameraLockOn=false; return; }
+    if(Action==TEXT("NextTarget")) { SelectCombatTarget(true); bCameraLockOn=CombatTarget.IsValid(); return; }
     FName SkillID;
     if(Action==TEXT("CompanionSkill"))
     {
