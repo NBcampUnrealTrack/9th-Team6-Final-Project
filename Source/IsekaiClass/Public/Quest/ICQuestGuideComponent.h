@@ -6,6 +6,8 @@
 #include "ICQuestGuideComponent.generated.h"
 
 class AICQuestGuideLight;
+class APawn;
+class UICDefinitionSubsystem;
 class UICWorldStateSubsystem;
 struct FICQuestRow;
 struct FICQuestState;
@@ -47,6 +49,17 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide", meta=(ClampMin="0.01", Units="s"))
     float FadeOutDuration = .6f;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide|Navigation", meta=(ClampMin="1", Units="cm"))
+    FVector NavigationProjectionExtent = FVector(100, 100, 200);
+
+    // Visual guidance may cross NavMesh steps without changing character movement or AI navigation.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide|Navigation")
+    bool bBridgeNavigationSteps = true;
+
+    // Horizontal gap between NavMesh boundaries. Vertical separation is unrestricted.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide|Navigation", meta=(ClampMin="1", Units="cm"))
+    float StepBridgeMaxHorizontalGap = 200.f;
+
     UFUNCTION(BlueprintPure, Category="IC|Quest Guide")
     FName GetGuidedQuestID() const { return GuidedQuestID; }
 
@@ -60,6 +73,12 @@ private:
     bool ResolveTarget(const FICQuestRow& Definition, const FICQuestState& Quest,
         const FICWorldState& World, FVector& Location, FName& TargetKey) const;
     void ResetPulse(bool bImmediate = true);
+    void StopActiveLights(bool bImmediate);
+    void SchedulePulse(float Delay);
+    bool SelectTarget(const FICWorldState& World, UICDefinitionSubsystem& Definitions,
+        FName& QuestID, FName& TargetKey, FVector& Location) const;
+    bool BuildGuidePath(APawn& Pawn, const FVector& Goal, TArray<FVector>& Points) const;
+    void SpawnPulse(APawn& Pawn, const TArray<FVector>& Points);
 
     UPROPERTY(Transient) TArray<TObjectPtr<AICQuestGuideLight>> ActiveLights;
     UPROPERTY(Transient) TObjectPtr<UICWorldStateSubsystem> State;

@@ -8,6 +8,8 @@
 #include "GameFramework/Pawn.h"
 #include "NavigationPath.h"
 #include "NavigationSystem.h"
+#include "NavMesh/RecastNavMesh.h"
+#include "ICQuestGuidePath.h"
 #include "Quest/ICQuestGuideLight.h"
 #include "Quest/ICQuestSubsystem.h"
 #include "Time/ICTimeSubsystem.h"
@@ -52,6 +54,14 @@ void UICQuestGuideComponent::EndPlay(const EEndPlayReason::Type Reason)
 void UICQuestGuideComponent::ResetPulse(bool bImmediate)
 {
     if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(PulseTimer);
+    StopActiveLights(bImmediate);
+    GuidedQuestID = NAME_None;
+    GuidedTargetKey = NAME_None;
+    NextPulseTime = 0;
+}
+
+void UICQuestGuideComponent::StopActiveLights(bool bImmediate)
+{
     for (AICQuestGuideLight* Light : ActiveLights)
     {
         if (!IsValid(Light)) continue;
@@ -63,9 +73,6 @@ void UICQuestGuideComponent::ResetPulse(bool bImmediate)
         else Light->FadeOut();
     }
     if (bImmediate) ActiveLights.Reset();
-    GuidedQuestID = NAME_None;
-    GuidedTargetKey = NAME_None;
-    NextPulseTime = 0;
 }
 
 void UICQuestGuideComponent::HandleWorldRestored()
@@ -77,8 +84,10 @@ void UICQuestGuideComponent::HandleWorldRestored()
 bool UICQuestGuideComponent::ResolveTarget(const FICQuestRow& Definition, const FICQuestState& Quest,
     const FICWorldState& World, FVector& Location, FName& TargetKey) const
 {
-    UICSpawnSubsystem* Spawn = GetWorld()->GetSubsystem<UICSpawnSubsystem>();
-    UICQuestSubsystem* Quests = GetWorld()->GetGameInstance()->GetSubsystem<UICQuestSubsystem>();
+    UWorld* Level = GetWorld();
+    UGameInstance* GI = Level ? Level->GetGameInstance() : nullptr;
+    UICSpawnSubsystem* Spawn = Level ? Level->GetSubsystem<UICSpawnSubsystem>() : nullptr;
+    UICQuestSubsystem* Quests = GI ? GI->GetSubsystem<UICQuestSubsystem>() : nullptr;
     if (!Spawn || !Quests) return false;
     auto ResolveAnchor = [Spawn, &Location](FName ID)
     {
@@ -101,23 +110,35 @@ bool UICQuestGuideComponent::ResolveTarget(const FICQuestRow& Definition, const 
     if (bReady && Definition.CompletionMode == EICQuestCompletionMode::SystemEvent) return false;
     if (bReady && Definition.CompletionMode == EICQuestCompletionMode::NPCInteraction)
     {
-        TargetKey = Definition.TurnInNPCID;
-        return ResolveNPC(Definition.TurnInNPCID) || ResolveAnchor(Definition.TurnInAnchorID);
+        if (ResolveNPC(Definition.TurnInNPCID))
+        {
+            TargetKey = Definition.TurnInNPCID;
+            return true;
+        }
+        if (ResolveAnchor(Definition.TurnInAnchorID))
+        {
+            TargetKey = Definition.TurnInAnchorID;
+            return true;
+        }
+        return false;
     }
     for (const FICQuestObjectiveGroup& Group : Definition.ObjectiveGroups)
     {
+        TArray<bool, TInlineAllocator<8>> CompletedObjectives;
         bool bSatisfied = Group.Policy == EICConditionPolicy::All;
         for (const FICQuestObjectiveDefinition& Objective : Group.Objectives)
         {
             const bool bComplete = Quests->IsObjectiveSatisfied(Objective, Quest, World);
+            CompletedObjectives.Add(bComplete);
             bSatisfied = Group.Policy == EICConditionPolicy::All ? bSatisfied && bComplete : bSatisfied || bComplete;
         }
         // Satisfying any group already satisfies an Any quest; wait for its normal completion.
         if (bSatisfied && Definition.ObjectiveGroupPolicy == EICConditionPolicy::Any) return false;
         if (bSatisfied) continue;
-        for (const FICQuestObjectiveDefinition& Objective : Group.Objectives)
+        for (int32 Index = 0; Index < Group.Objectives.Num(); ++Index)
         {
-            if (Quests->IsObjectiveSatisfied(Objective, Quest, World)) continue;
+            if (CompletedObjectives[Index]) continue;
+            const FICQuestObjectiveDefinition& Objective = Group.Objectives[Index];
             int32 Progress = 0;
             if (Objective.Type == EICQuestObjectiveType::DeliverItem
                 && Quests->GetObjectiveProgress(Objective, Quest, World, Progress)
@@ -141,6 +162,113 @@ bool UICQuestGuideComponent::ResolveTarget(const FICQuestRow& Definition, const 
     return false;
 }
 
+bool UICQuestGuideComponent::SelectTarget(const FICWorldState& Snapshot, UICDefinitionSubsystem& Definitions,
+    FName& QuestID, FName& TargetKey, FVector& Location) const
+{
+    QuestID = TargetKey = NAME_None;
+    Location = FVector::ZeroVector;
+    TArray<FName> Candidates;
+    for (const auto& Entry : Snapshot.Quests)
+    {
+        if (Entry.Value.bAccepted && !Entry.Value.bCompleted) Candidates.Add(Entry.Key);
+    }
+    Candidates.Sort([&Snapshot](FName A, FName B)
+    {
+        const double AcceptedA = Snapshot.Quests.FindChecked(A).AcceptedAtGameMinute;
+        const double AcceptedB = Snapshot.Quests.FindChecked(B).AcceptedAtGameMinute;
+        return AcceptedA == AcceptedB ? A.LexicalLess(B) : AcceptedA > AcceptedB;
+    });
+    for (FName ID : Candidates)
+    {
+        FICQuestRow Definition;
+        if (Definitions.GetQuest(ID, Definition).bSuccess
+            && ResolveTarget(Definition, Snapshot.Quests.FindChecked(ID), Snapshot, Location, TargetKey))
+        {
+            QuestID = ID;
+            break;
+        }
+    }
+    return !QuestID.IsNone();
+}
+
+bool UICQuestGuideComponent::BuildGuidePath(APawn& Pawn, const FVector& Goal, TArray<FVector>& Points) const
+{
+    Points.Reset();
+    UWorld* World = GetWorld();
+    if (!World) return false;
+    UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+    if (!Navigation)
+    {
+        UE_LOG(LogICWorldState, Verbose, TEXT("[Quest.Guide.NoNavigation] Quest=%s World=%s"),
+            *GuidedQuestID.ToString(), *World->GetName());
+        return false;
+    }
+    FNavLocation Start, End;
+    if (NavigationProjectionExtent.ContainsNaN() || NavigationProjectionExtent.GetMin() <= 0) return false;
+    const FVector Extent = NavigationProjectionExtent;
+    const FNavAgentProperties& Agent = Pawn.GetNavAgentPropertiesRef();
+    const ARecastNavMesh* Mesh = Cast<ARecastNavMesh>(Navigation->GetNavDataForProps(Agent, Pawn.GetNavAgentLocation()));
+    auto Project = [&](const FVector& Location, FNavLocation& Result)
+    {
+        if (Navigation->ProjectPointToNavigation(Location, Result, Extent, &Agent)) return true;
+        if (!bBridgeNavigationSteps || !Mesh) return false;
+        // A visual guide can originate above/below a NavMesh layer. Preserve the
+        // narrow horizontal extent so a nearby wall does not select a distant floor.
+        const FBox Bounds = Mesh->GetNavMeshBounds();
+        if (!Bounds.IsValid) return false;
+        const double Height = FMath::Max(FMath::Abs(Location.Z - Bounds.Min.Z), FMath::Abs(Location.Z - Bounds.Max.Z)) + 1.;
+        return Navigation->ProjectPointToNavigation(Location, Result, FVector(Extent.X, Extent.Y, Height), &Agent);
+    };
+    if (!Project(Pawn.GetNavAgentLocation(), Start) || !Project(Goal, End))
+    {
+        UE_LOG(LogICWorldState, Verbose, TEXT("[Quest.Guide.OffNavMesh] Quest=%s Target=%s Goal=%s"),
+            *GuidedQuestID.ToString(), *GuidedTargetKey.ToString(), *Goal.ToCompactString());
+        return false;
+    }
+    UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World, Start.Location, End.Location, &Pawn);
+    if (Path && Path->IsValid() && !Path->IsPartial() && Path->PathPoints.Num() >= 2)
+        Points = Path->PathPoints;
+    else if (bBridgeNavigationSteps && Mesh)
+        ICQuestGuidePath::FindAcrossSteps(*World, *Mesh, Start, End, StepBridgeMaxHorizontalGap,
+            GuideHeight, &Pawn, Points);
+    if (Points.Num() < 2)
+    {
+        UE_LOG(LogICWorldState, Verbose, TEXT("[Quest.Guide.NoPath] Quest=%s Target=%s"),
+            *GuidedQuestID.ToString(), *GuidedTargetKey.ToString());
+        return false;
+    }
+    return true;
+}
+
+void UICQuestGuideComponent::SpawnPulse(APawn& Pawn, const TArray<FVector>& Points)
+{
+    UWorld* World = GetWorld();
+    if (!World || Points.Num() < 2) return;
+    if (!GuideLightClass || GuideLightClass->HasAnyClassFlags(CLASS_Abstract)) return;
+    FActorSpawnParameters Parameters;
+    Parameters.Owner = &Pawn;
+    Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    // Every pulse owns its route and Niagara simulation. Older pulses continue
+    // along their original route until their own distance limit is reached.
+    AICQuestGuideLight* Light = World->SpawnActor<AICQuestGuideLight>(
+        GuideLightClass, Points[0], FRotator::ZeroRotator, Parameters);
+    if (IsValid(Light))
+    {
+        Light->TailLength = TailLength;
+        Light->FadeOutDuration = FadeOutDuration;
+        Light->PlayPath(Points, GuideDistance, GuideSpeed, GuideHeight);
+        if (IsValid(Light)) ActiveLights.Add(Light);
+    }
+}
+
+void UICQuestGuideComponent::SchedulePulse(float Delay)
+{
+    UWorld* World = GetWorld();
+    if (!World || !FMath::IsFinite(Delay) || Delay <= 0) return;
+    NextPulseTime = World->GetTimeSeconds() + Delay;
+    World->GetTimerManager().SetTimer(PulseTimer, this, &ThisClass::RefreshGuide, Delay, false);
+}
+
 void UICQuestGuideComponent::RefreshGuide()
 {
     ActiveLights.RemoveAll([](const TObjectPtr<AICQuestGuideLight>& Light) { return !IsValid(Light); });
@@ -162,30 +290,10 @@ void UICQuestGuideComponent::RefreshGuide()
         ResetPulse();
         return;
     }
-    TArray<FName> Candidates;
-    for (const auto& Entry : Snapshot.Quests)
-    {
-        if (Entry.Value.bAccepted && !Entry.Value.bCompleted) Candidates.Add(Entry.Key);
-    }
-    Candidates.Sort([&Snapshot](FName A, FName B)
-    {
-        const double AcceptedA = Snapshot.Quests.FindChecked(A).AcceptedAtGameMinute;
-        const double AcceptedB = Snapshot.Quests.FindChecked(B).AcceptedAtGameMinute;
-        return AcceptedA == AcceptedB ? A.LexicalLess(B) : AcceptedA > AcceptedB;
-    });
     FName SelectedQuest, TargetKey;
-    FVector Goal = FVector::ZeroVector;
-    for (FName ID : Candidates)
-    {
-        FICQuestRow Definition;
-        if (Definitions->GetQuest(ID, Definition).bSuccess
-            && ResolveTarget(Definition, Snapshot.Quests.FindChecked(ID), Snapshot, Goal, TargetKey))
-        {
-            SelectedQuest = ID;
-            break;
-        }
-    }
-    if (SelectedQuest.IsNone())
+    FVector Goal;
+    const bool bHasTarget = SelectTarget(Snapshot, *Definitions, SelectedQuest, TargetKey, Goal);
+    if (!bHasTarget)
     {
         // A completed quest may still have fading pulses. Do not cut that fade
         // short on the next refresh after clearing the tracked quest ID.
@@ -205,8 +313,7 @@ void UICQuestGuideComponent::RefreshGuide()
     const double Now = World->GetTimeSeconds();
     if (FVector::DistSquared(Pawn->GetActorLocation(), Goal) <= FMath::Square(FMath::Max(0.f, ArrivalRadius)))
     {
-        for (AICQuestGuideLight* Light : ActiveLights)
-            if (IsValid(Light)) Light->FadeOut();
+        StopActiveLights(false);
         World->GetTimerManager().ClearTimer(PulseTimer);
         NextPulseTime = 0;
         return;
@@ -215,51 +322,12 @@ void UICQuestGuideComponent::RefreshGuide()
     {
         // The dedicated timer preserves intervals shorter than the state poll.
         if (!World->GetTimerManager().IsTimerActive(PulseTimer))
-            World->GetTimerManager().SetTimer(PulseTimer, this, &ThisClass::RefreshGuide,
-                FMath::Max(.001f, float(NextPulseTime - Now)), false);
+            SchedulePulse(FMath::Max(.001f, float(NextPulseTime - Now)));
         return;
     }
     // Clamp both at authoring time and runtime. Invalid values must not create a busy loop.
     const float Interval = FMath::IsFinite(RepeatInterval) ? FMath::Max(.1f, RepeatInterval) : 3.f;
-    NextPulseTime = Now + Interval;
-    World->GetTimerManager().SetTimer(PulseTimer, this, &ThisClass::RefreshGuide, Interval, false);
-    UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
-    if (!Navigation)
-    {
-        UE_LOG(LogICWorldState, Verbose, TEXT("[Quest.Guide.NoNavigation] Quest=%s World=%s"),
-            *SelectedQuest.ToString(), *World->GetName());
-        return;
-    }
-    FNavLocation Start, End;
-    const FVector Extent(100, 100, 200);
-    const FNavAgentProperties& Agent = Pawn->GetNavAgentPropertiesRef();
-    if (!Navigation->ProjectPointToNavigation(Pawn->GetNavAgentLocation(), Start, Extent, &Agent)
-        || !Navigation->ProjectPointToNavigation(Goal, End, Extent, &Agent))
-    {
-        UE_LOG(LogICWorldState, Verbose, TEXT("[Quest.Guide.OffNavMesh] Quest=%s Target=%s Goal=%s"),
-            *SelectedQuest.ToString(), *TargetKey.ToString(), *Goal.ToCompactString());
-        return;
-    }
-    UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World, Start.Location, End.Location, Pawn);
-    if (!Path || !Path->IsValid() || Path->IsPartial() || Path->PathPoints.Num() < 2)
-    {
-        UE_LOG(LogICWorldState, Verbose, TEXT("[Quest.Guide.NoPath] Quest=%s Target=%s"),
-            *SelectedQuest.ToString(), *TargetKey.ToString());
-        return;
-    }
-    if (!GuideLightClass || GuideLightClass->HasAnyClassFlags(CLASS_Abstract)) return;
-    FActorSpawnParameters Parameters;
-    Parameters.Owner = Pawn;
-    Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    // Every pulse owns its route and Niagara simulation. Older pulses continue
-    // along their original route until their own distance limit is reached.
-    AICQuestGuideLight* Light = World->SpawnActor<AICQuestGuideLight>(
-        GuideLightClass, Start.Location, FRotator::ZeroRotator, Parameters);
-    if (IsValid(Light))
-    {
-        Light->TailLength = TailLength;
-        Light->FadeOutDuration = FadeOutDuration;
-        Light->PlayPath(Path->PathPoints, GuideDistance, GuideSpeed, GuideHeight);
-        if (IsValid(Light)) ActiveLights.Add(Light);
-    }
+    SchedulePulse(Interval);
+    TArray<FVector> Points;
+    if (BuildGuidePath(*Pawn, Goal, Points)) SpawnPulse(*Pawn, Points);
 }

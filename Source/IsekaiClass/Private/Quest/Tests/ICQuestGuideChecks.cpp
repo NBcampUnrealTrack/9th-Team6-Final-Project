@@ -16,6 +16,18 @@
 #include "Misc/App.h"
 #include "NiagaraRibbonRendererProperties.h"
 #include "Quest/ICQuestGuideLight.h"
+#include "Quest/ICQuestGuidePath.h"
+#include "Components/BoxComponent.h"
+
+namespace
+{
+    // Intentional integration-test fixture; production code uses Blueprint references.
+    UClass* LoadGuideFixtureClass()
+    {
+        constexpr TCHAR GuideFixtureClassPath[] = TEXT("/Game/IsekaiClass/Quest/BP_ICQuestGuideLight.BP_ICQuestGuideLight_C");
+        return LoadClass<AICQuestGuideLight>(nullptr, GuideFixtureClassPath);
+    }
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestGuidePulseCheck, "IC.Runtime.QuestGuidePulse",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -130,7 +142,7 @@ bool FICQuestGuideAssetsCheck::RunTest(const FString& Parameters)
     FICQuestRow Quest;
     TestTrue(TEXT("Runtime catalog contains the navigation quest"),
         Definitions && Definitions->GetQuest(TEXT("QST_TEST_VISIT_001"), Quest).bSuccess);
-    UClass* GuideClass = LoadClass<AICQuestGuideLight>(nullptr, TEXT("/Game/IsekaiClass/Quest/BP_ICQuestGuideLight.BP_ICQuestGuideLight_C"));
+    UClass* GuideClass = LoadGuideFixtureClass();
     AICQuestGuideLight* Defaults = GuideClass ? GuideClass->GetDefaultObject<AICQuestGuideLight>() : nullptr;
     const UNiagaraComponent* Trail = Defaults ? Cast<UNiagaraComponent>(Defaults->GetDefaultSubobjectByName(TEXT("TrailEffect"))) : nullptr;
     if (TestNotNull(TEXT("Independent trail asset exists"), Trail ? Trail->GetAsset() : nullptr))
@@ -167,7 +179,7 @@ bool FICQuestGuideParticleHistoryCheck::RunTest(const FString& Parameters)
     }
     UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
     GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-    UClass* GuideClass = LoadClass<AICQuestGuideLight>(nullptr, TEXT("/Game/IsekaiClass/Quest/BP_ICQuestGuideLight.BP_ICQuestGuideLight_C"));
+    UClass* GuideClass = LoadGuideFixtureClass();
     AICQuestGuideLight* Light = GuideClass ? World->SpawnActor<AICQuestGuideLight>(GuideClass) : nullptr;
     UNiagaraComponent* Trail = Light ? Cast<UNiagaraComponent>(Light->GetDefaultSubobjectByName(TEXT("TrailEffect"))) : nullptr;
     if (TestNotNull(TEXT("Trail component exists"), Trail))
@@ -199,7 +211,6 @@ bool FICQuestGuideParticleHistoryCheck::RunTest(const FString& Parameters)
                     {
                         const FVector3f Position = Positions.Get(Index);
                         if (Lifetimes.IsValid()) TestTrue(TEXT("User trail lifetime controls particle expiry"), FMath::IsNearlyEqual(Lifetimes.Get(Index), .5f, .01f));
-                        if (Index < 4) AddInfo(FString::Printf(TEXT("Particle %d Age=%.3f Position=%s"), Index, Ages.Get(Index), *Position.ToString()));
                         bOldPositionRemains |= Ages.Get(Index) > .15f && FMath::Abs(Position.Y) < 1.f && Position.X > 1.f && Position.X < 95.f;
                     }
                 TestTrue(TEXT("Particles emitted before the corner stay on the old segment after the head turns"), bOldPositionRemains);
@@ -209,11 +220,55 @@ bool FICQuestGuideParticleHistoryCheck::RunTest(const FString& Parameters)
                 if (CorePositions.IsValid())
                     for (int32 Index = 0; Index < Core->GetNumParticles(); ++Index)
                         TestTrue(TEXT("The core stays at the moving origin instead of branching off"), FVector3f(CorePositions.Get(Index)).IsNearlyZero(.01f));
-                AddInfo(FString::Printf(TEXT("History particles=%d Head=%s"), Emitter->GetNumParticles(), *Light->GetActorLocation().ToCompactString()));
             }
             else AddError(TEXT("Trail emitter did not create particle data."));
         }
         Light->Stop();
+    }
+    GEngine->DestroyWorldContext(World);
+    World->DestroyWorld(false);
+    return !HasAnyErrors();
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestGuideStepBridgeCheck, "IC.Runtime.QuestGuideStepBridge",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FICQuestGuideStepBridgeCheck::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    if (!TestNotNull(TEXT("Step bridge test world exists"), World)) return false;
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    TArray<FVector> Points;
+    const FVector Lower(-60, 0, 0), Upper(60, 0, 900);
+    TestTrue(TEXT("Visual bridge ignores a 900 cm step height"),
+        ICQuestGuidePath::BuildStepBridge(*World, Lower, Upper, 50, nullptr, Points));
+    TestTrue(TEXT("Ascending bridge rises beside the step before crossing"),
+        Points.Num() == 3 && Points[0].Equals(Lower) && Points[1].Equals(FVector(-60, 0, 900)) && Points.Last().Equals(Upper));
+    TestTrue(TEXT("The same step can be crossed downwards"),
+        ICQuestGuidePath::BuildStepBridge(*World, Upper, Lower, 50, nullptr, Points));
+    TestTrue(TEXT("Descending bridge crosses before descending"),
+        Points.Num() == 3 && Points[1].Equals(FVector(-60, 0, 900)) && Points.Last().Equals(Lower));
+
+    AActor* Obstacle = World->SpawnActor<AActor>();
+    if (TestNotNull(TEXT("Collision obstacle spawns"), Obstacle))
+    {
+        UBoxComponent* Box = NewObject<UBoxComponent>(Obstacle);
+        Obstacle->SetRootComponent(Box);
+        Box->SetBoxExtent(FVector(100, 100, 10));
+        Box->SetCollisionObjectType(ECC_WorldStatic);
+        Box->SetCollisionResponseToAllChannels(ECR_Block);
+        Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        Box->RegisterComponentWithWorld(World);
+        Obstacle->SetActorLocation(FVector(-60, 0, 400));
+        TestFalse(TEXT("A ceiling blocks the vertical bridge"),
+            ICQuestGuidePath::BuildStepBridge(*World, Lower, Upper, 50, nullptr, Points));
+        TestTrue(TEXT("Rejected bridges leave no partial route"), Points.IsEmpty());
+        Box->SetBoxExtent(FVector(10, 100, 100));
+        Obstacle->SetActorLocation(FVector(0, 0, 50));
+        TestFalse(TEXT("A horizontal wall is never replaced by a direct guide line"),
+            ICQuestGuidePath::BuildStepBridge(*World, FVector(-60, 0, 0), FVector(60, 0, 0), 50, nullptr, Points));
+        Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        TestTrue(TEXT("Removing the obstruction restores the bridge"),
+            ICQuestGuidePath::BuildStepBridge(*World, Lower, Upper, 50, nullptr, Points));
     }
     GEngine->DestroyWorldContext(World);
     World->DestroyWorld(false);

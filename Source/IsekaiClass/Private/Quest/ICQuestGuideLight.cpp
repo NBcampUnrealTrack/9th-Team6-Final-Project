@@ -4,7 +4,6 @@
 #include "Engine/GameInstance.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "NiagaraComponent.h"
-#include "NiagaraSystem.h"
 #include "Time/ICTimeSubsystem.h"
 
 AICQuestGuideLight::AICQuestGuideLight()
