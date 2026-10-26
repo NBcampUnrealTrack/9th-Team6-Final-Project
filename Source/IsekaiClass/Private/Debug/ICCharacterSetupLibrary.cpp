@@ -9,13 +9,99 @@
 #include "Animation/Skeleton.h"
 #include "AnimationBlueprintLibrary.h"
 #include "Combat/Animation/ICCombatAnimNotify.h"
+#include "Combat/Animation/ICWeaponAnimNotify.h"
 #include "Misc/PackageName.h"
 #include "Components/BoxComponent.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 #include "NavigationSystem.h"
 #include "NavigationData.h"
 #include "EngineUtils.h"
+#include "Core/Controller/ICPlayerController.h"
+#include "Save/ICSaveSubsystem.h"
+#include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
+#include "Debug/ICMonsterTestLayout.h"
+#include "UnrealClient.h"
+#include "Editor.h"
+#include "PlayInEditorDataTypes.h"
+#include "Settings/LevelEditorPlaySettings.h"
+#include "Engine/GameViewportClient.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWindow.h"
+#include "ImageUtils.h"
+#include "Misc/FileHelper.h"
 #endif
+
+bool UICCharacterSetupLibrary::CaptureMonsterTestHUD(UWorld* World,const FString& File)
+{
+#if WITH_EDITOR
+    auto* Viewport=World&&World->WorldType==EWorldType::PIE?World->GetGameViewport():nullptr;
+    auto Window=Viewport?Viewport->GetWindow():nullptr;
+    if(!Window.IsValid()||!FSlateApplication::IsInitialized())return false;
+    TArray<FColor> Pixels;FIntVector Size;
+    if(!FSlateApplication::Get().TakeScreenshot(Window.ToSharedRef(),Pixels,Size))return false;
+    for(auto& Pixel:Pixels)Pixel.A=255;
+    TArray64<uint8> PNG;FImageUtils::PNGCompressImageArray(Size.X,Size.Y,Pixels,PNG);
+    IFileManager::Get().MakeDirectory(*FPaths::GetPath(File),true);
+    return FFileHelper::SaveArrayToFile(PNG,*File);
+#else
+    return false;
+#endif
+}
+
+bool UICCharacterSetupLibrary::PressUIReviewKey(UWorld* World,FKey Key)
+{
+#if WITH_EDITOR
+    auto* Viewport=World&&World->WorldType==EWorldType::PIE?World->GetGameViewport():nullptr;
+    auto Window=Viewport?Viewport->GetWindow():nullptr;
+    if(!Window.IsValid()||!FSlateApplication::IsInitialized())return false;
+    auto& App=FSlateApplication::Get();
+    App.ProcessWindowActivatedEvent(FWindowActivateEvent(FWindowActivateEvent::EA_Activate,Window.ToSharedRef()));
+    const bool Handled=App.ProcessKeyDownEvent(FKeyEvent(Key,FModifierKeysState(),0,false,0,0));
+    App.ProcessKeyUpEvent(FKeyEvent(Key,FModifierKeysState(),0,false,0,0));return Handled;
+#else
+    return false;
+#endif
+}
+
+bool UICCharacterSetupLibrary::BeginMonsterTestReview()
+{
+#if WITH_EDITOR
+    if(!GEditor||GEditor->PlayWorld)return false;
+    auto* Settings=DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(),GetTransientPackage());
+    Settings->NewWindowWidth=1600;Settings->NewWindowHeight=900;
+    FRequestPlaySessionParams Session;
+    Session.WorldType=EPlaySessionWorldType::PlayInEditor;
+    Session.EditorPlaySettings=Settings;
+    GEditor->RequestPlaySession(Session);return true;
+#else
+    return false;
+#endif
+}
+
+bool UICCharacterSetupLibrary::PrepareLiveCharacterReview(UWorld* World)
+{
+#if WITH_EDITOR
+    if(!World||World->WorldType!=EWorldType::PIE)return false;
+    auto* PC=Cast<AICPlayerController>(UGameplayStatics::GetPlayerController(World,0));
+    if(!PC||PC->bCreated||PC->Menu!=TEXT("Create")||!PC->GetSaves())return false;
+    if(!PC->GetSaves()->ConfigureServices(PC->GetWorldState(),PC->GetTime(),TEXT("IC_Visual_")+FGuid::NewGuid().ToString(EGuidFormats::Digits)))return false;
+    PC->PlayerName=TEXT("VisualReview");
+    return PC->DebugCreatePlayer();
+#else
+    return false;
+#endif
+}
+
+void UICCharacterSetupLibrary::CaptureLiveCharacterReview(UWorld* World,const FString& Name)
+{
+#if WITH_EDITOR
+    if(!World||World->WorldType!=EWorldType::PIE)return;
+    const FString Folder=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("LiveCharacterReview"));
+    IFileManager::Get().MakeDirectory(*Folder,true);
+    FScreenshotRequest::RequestScreenshot(Folder/(FPaths::MakeValidFileName(Name)+TEXT(".png")),false,false);
+#endif
+}
 
 bool UICCharacterSetupLibrary::PrepareTestNavigation(UWorld* World)
 {
@@ -39,6 +125,11 @@ bool UICCharacterSetupLibrary::PrepareTestNavigation(UWorld* World)
         Volume->AddInstanceComponent(Bounds);Bounds->SetupAttachment(Volume->GetRootComponent());
         Bounds->SetCollisionEnabled(ECollisionEnabled::NoCollision);Bounds->SetCanEverAffectNavigation(false);
         Bounds->SetBoxExtent(FVector(4000,4000,500));Bounds->RegisterComponent();
+    }
+    if(TActorIterator<AICMonsterTestLayout>(World))
+    {
+        Volume->SetActorLocation(FVector(1500,5000,200));
+        Bounds->SetBoxExtent(FVector(6000,10000,500));
     }
     Bounds->UpdateBounds();Volume->PostEditChange();
     if(auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
@@ -137,6 +228,27 @@ UAnimMontage* UICCharacterSetupLibrary::CreateActionMontage(const FString& Path,
         if(Notify)Notify->Event=TEXT("AN_EffectCommit");
     }
     Asset->PostEditChange();if(!Existing)FAssetRegistryModule::AssetCreated(Asset);Asset->MarkPackageDirty();return Asset;
+#else
+    return nullptr;
+#endif
+}
+
+UAnimMontage* UICCharacterSetupLibrary::CreateWeaponTransitionMontage(const FString& Path,UAnimSequence* Sequence,bool bDraw,float VisibilityFraction)
+{
+#if WITH_EDITOR
+    auto* Montage=CreateActionMontage(Path,Sequence,false);
+    if(!Montage)return nullptr;
+    const FName TrackName=TEXT("ICWeapon");
+    if(Montage->AnimNotifyTracks.ContainsByPredicate([&](const FAnimNotifyTrack& Track){return Track.TrackName==TrackName;}))
+        UAnimationBlueprintLibrary::RemoveAnimationNotifyTrack(Montage,TrackName);
+    UAnimationBlueprintLibrary::AddAnimationNotifyTrack(Montage,TrackName);
+    auto* Notify=Cast<UICWeaponAnimNotify>(UAnimationBlueprintLibrary::AddAnimationNotifyEvent(
+        Montage,TrackName,Sequence->GetPlayLength()*FMath::Clamp(VisibilityFraction,.05f,.95f),UICWeaponAnimNotify::StaticClass()));
+    if(!Notify)return nullptr;
+    Notify->bDraw=bDraw;
+    Montage->BlendIn.SetBlendTime(.12f);Montage->BlendOut.SetBlendTime(.12f);
+    Montage->PostEditChange();Montage->MarkPackageDirty();
+    return Montage;
 #else
     return nullptr;
 #endif

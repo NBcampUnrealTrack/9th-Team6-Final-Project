@@ -61,6 +61,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "KawaiiPhysics",
+			"Enabled": true
+		},
+		{
 			"Name": "VRM4U",
 			"Enabled": true
 		}

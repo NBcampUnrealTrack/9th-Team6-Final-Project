@@ -38,7 +38,8 @@ struct ISEKAICLASS_API FICNPCRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Relationship", meta=(ClampMin="0", ClampMax="500")) int32 InitialAffinity = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") FName AppearanceResourceID;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") TSoftObjectPtr<USkeletalMesh> Mesh;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") TSoftObjectPtr<UTexture2D> Portrait;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation", meta=(DisplayName="Portrait (초상화)", ToolTip="동료 HUD에 사용할 이 NPC의 초상화입니다. 파티 슬롯과 관계없이 NPC ID에 맞는 이미지를 지정하세요."))
+    TSoftObjectPtr<UTexture2D> Portrait;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") TSoftClassPtr<UAnimInstance> AnimationClass;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") TSoftObjectPtr<UICCharacterAnimationProfile> AnimationProfile;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") FTransform MeshTransform = FTransform(FRotator(0,-90,0),FVector(0,0,-88));

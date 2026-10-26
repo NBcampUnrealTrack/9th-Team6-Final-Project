@@ -137,7 +137,7 @@ bool FICRealDefinitionAssetsCheck::RunTest(const FString& Parameters)
     auto* Catalog=GetDefault<UICDefinitionSettings>()->Catalog.LoadSynchronous();TestNotNull(TEXT("Production catalog is configured"),Catalog);if(!Catalog)return false;
     TestEqual(TEXT("Catalog resolves from DataAsset folder"),Catalog->GetPathName(),
         FString(TEXT("/Game/IsekaiClass/Data/DataAsset/DA_IC_DefinitionCatalog.DA_IC_DefinitionCatalog")));
-    TestEqual(TEXT("All native schemas registered"),Catalog->Tables.Num(),50);
+    TestEqual(TEXT("All native schemas registered"),Catalog->Tables.Num(),51);
     for(const auto& Schema:UICDefinitionLibrary::GetDefinitionSchemas())
     {
         const auto* Binding=Catalog->Tables.FindByPredicate([&](const auto& B){ IC_TRACE_FUNCTION();return B.Type==Schema.Type&&B.RowStruct==Schema.RowStruct;});

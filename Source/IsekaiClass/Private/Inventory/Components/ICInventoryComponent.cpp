@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "Time/ICTimeSubsystem.h"
 #include "GameFramework/Actor.h"
+#include "Player/Character/ICPlayerCharacter.h"
 
 UICInventoryComponent::UICInventoryComponent()
 {
@@ -247,68 +248,203 @@ bool UICInventoryComponent::Equip(int32 Index)
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.Equip.Request] Slot=%d Class=%d"),Index,CurrentClass);
     auto Next = GetSnapshot(); if (!Next.Bag.Slots.IsValidIndex(Index)) return false;
     auto& S = Next.Bag.Slots[Index]; const auto* D = Find(S.ItemID);
-    if (!D || D->Kind != EPlayerItemKind::Equipment || D->EquipSlot == EPlayerEquipSlot::None || S.bLocked) return Fail(*ICText::Get(TEXT("Native_cfa5c06f1ded")).ToString());
+    if (!D || D->Kind != EPlayerItemKind::Equipment || D->EquipSlot != EPlayerEquipSlot::Weapon || S.bLocked) return Fail(*ICText::Get(TEXT("Native_cfa5c06f1ded")).ToString());
     FICDefinitionResult Lookup;
     const auto* Gear=GetDefinitions()?GetDefinitions()->Find<FICEquipmentRow>(D->EquipmentID,Lookup):nullptr;
     if(!Gear || Gear->Slot!=D->EquipSlot)return Fail(*ICText::Get(TEXT("Native_6eec833069e7")).ToString());
-    if(Gear->Slot!=EPlayerEquipSlot::Weapon && Gear->RequiredClass!=EICCharacterClass::None && static_cast<int32>(Gear->RequiredClass)!=CurrentClass+1)
-        return Fail(*ICText::Get(TEXT("Native_5256ca0c34f2")).ToString());
-    Swap(S, Next.Equipment[static_cast<int32>(D->EquipSlot)]); return Commit(Next);
+    if (D->EquipSlot == EPlayerEquipSlot::Weapon)
+    {
+        if (const auto* Player=Cast<AICPlayerCharacter>(GetOwner());Player&&Player->IsSwitchingWeapon()) return false;
+        const int32 FamilySlot=static_cast<int32>(Gear->WeaponFamily)-1;
+        if (!Next.WeaponSlots.IsValidIndex(FamilySlot)) return false;
+        auto& Selected=Next.Equipment[static_cast<int32>(EPlayerEquipSlot::Weapon)];
+        if ((Selected.IsEmpty() && Next.WeaponSlots[FamilySlot].IsEmpty()) || GetItemWeaponFamily(Selected)==Gear->WeaponFamily) Swap(S,Selected);
+        else Swap(S,Next.WeaponSlots[FamilySlot]);
+    }
+    return Commit(Next);
+}
+
+bool UICInventoryComponent::EquipForCharacter(FName ID,int32 Index)
+{
+    if(ID==UICWorldStateSubsystem::PlayerId())return Equip(Index);
+    if(!WorldState)return false;
+    auto Character=WorldState->GetSnapshot(ID);auto Next=GetSnapshot();
+    if(Character.Kind!=EICCharacterKind::Recruitable||Character.Mode!=EICCharacterMode::Companion||Character.PartySlot<0
+        ||!Next.Bag.Slots.IsValidIndex(Index))return false;
+    auto& Item=Next.Bag.Slots[Index];const auto* Definition=Find(Item.ItemID);FICDefinitionResult R;
+    auto* D=GetDefinitions();
+    const auto* Gear=Definition&&D?D->Find<FICEquipmentRow>(Definition->EquipmentID,R):nullptr;
+    const auto* NPC=D?D->Find<FICNPCRow>(ID,R):nullptr;
+    const auto* Recruit=NPC?D->Find<FICRecruitCombatRow>(NPC->RecruitCombatID,R):nullptr;
+    const auto* Class=Recruit?D->Find<FICClassRow>(Recruit->ClassID,R):nullptr;
+    if(Item.IsEmpty()||Item.bLocked||!Definition||Definition->Kind!=EPlayerItemKind::Equipment||!Gear||!Class
+        ||Gear->Slot!=Definition->EquipSlot||Gear->Slot!=EPlayerEquipSlot::Weapon
+        ||(Gear->Slot==EPlayerEquipSlot::Weapon&&Gear->WeaponFamily!=Recruit->WeaponFamily)
+        ||(Gear->RequiredClass!=EICCharacterClass::None&&Gear->RequiredClass!=Class->CharacterClass))return false;
+    Character.Equipment.SetNum(1);Swap(Item,Character.Equipment[0]);
+    return ValidateSnapshot(Next)&&WorldState->CommitCharacterAndInventory(Character,Next);
+}
+
+bool UICInventoryComponent::UnequipForCharacter(FName ID,EPlayerEquipSlot Slot)
+{
+    if(Slot!=EPlayerEquipSlot::Weapon)return false;
+    if(ID==UICWorldStateSubsystem::PlayerId())return Unequip(Slot);
+    if(!WorldState)return false;
+    auto Character=WorldState->GetSnapshot(ID);auto Next=GetSnapshot();const int32 Index=static_cast<int32>(Slot);
+    const int32 Empty=Next.Bag.Slots.IndexOfByPredicate([](const auto& Item){return Item.IsEmpty();});
+    if(Character.Kind!=EICCharacterKind::Recruitable||Character.Mode!=EICCharacterMode::Companion||Character.PartySlot<0
+        ||!Character.Equipment.IsValidIndex(Index)||Character.Equipment[Index].IsEmpty()||Empty==INDEX_NONE)return false;
+    Next.Bag.Slots[Empty]=Character.Equipment[Index];Character.Equipment[Index]=FPlayerItemInstance();
+    return ValidateSnapshot(Next)&&WorldState->CommitCharacterAndInventory(Character,Next);
+}
+
+bool UICInventoryComponent::TrashItem(int32 Index)
+{
+    auto Next=GetSnapshot();if(!Next.Bag.Slots.IsValidIndex(Index))return false;
+    const auto Item=Next.Bag.Slots[Index];const auto* D=Find(Item.ItemID);
+    if(Item.IsEmpty()||Item.bLocked||!D||!D->bCanDiscard||D->Kind==EPlayerItemKind::Quest)return false;
+    Next.Bag.Slots[Index]=FPlayerItemInstance();
+    if(!Next.Bag.Slots.ContainsByPredicate([&](const auto& Other){return !Other.IsEmpty()&&Other.ItemID==Item.ItemID;}))
+        for(auto& Quick:Next.QuickSlots)if(Quick==Item.ItemID)Quick=NAME_None;
+    return Commit(Next);
 }
 
 EICWeaponFamily UICInventoryComponent::GetEquippedWeaponFamily() const
 {
+    return IsWeaponSheathed() ? EICWeaponFamily::None : GetSelectedWeaponFamily();
+}
+
+bool UICInventoryComponent::IsWeaponSheathed() const
+{
+    return GetSnapshot().bWeaponSheathed;
+}
+
+EICWeaponFamily UICInventoryComponent::GetSelectedWeaponFamily() const
+{
     const auto Snapshot = GetSnapshot();
     const int32 Index = static_cast<int32>(EPlayerEquipSlot::Weapon);
     if (!Snapshot.Equipment.IsValidIndex(Index) || Snapshot.Equipment[Index].IsEmpty()) return EICWeaponFamily::None;
-    const auto* Item = Find(Snapshot.Equipment[Index].ItemID);
+    return GetItemWeaponFamily(Snapshot.Equipment[Index]);
+}
+
+EICWeaponFamily UICInventoryComponent::GetItemWeaponFamily(const FPlayerItemInstance& Instance) const
+{
+    const auto* Item = Instance.IsEmpty() ? nullptr : Find(Instance.ItemID);
     FICDefinitionResult Result;
     const auto* Gear = Item && GetDefinitions() ? GetDefinitions()->Find<FICEquipmentRow>(Item->EquipmentID, Result) : nullptr;
-    return Gear ? Gear->WeaponFamily : EICWeaponFamily::None;
+    return Gear && Gear->Slot==EPlayerEquipSlot::Weapon ? Gear->WeaponFamily : EICWeaponFamily::None;
+}
+
+TArray<FPlayerItemInstance> UICInventoryComponent::GetWeaponLoadout() const
+{
+    const auto Snapshot=GetSnapshot();
+    auto Slots=Snapshot.WeaponSlots;
+    Slots.SetNum(4);
+    const int32 WeaponSlot=static_cast<int32>(EPlayerEquipSlot::Weapon);
+    if (Snapshot.Equipment.IsValidIndex(WeaponSlot))
+    {
+        const int32 SelectedSlot=static_cast<int32>(GetItemWeaponFamily(Snapshot.Equipment[WeaponSlot]))-1;
+        if (Slots.IsValidIndex(SelectedSlot)) Slots[SelectedSlot]=Snapshot.Equipment[WeaponSlot];
+    }
+    return Slots;
+}
+
+bool UICInventoryComponent::SelectLoadoutWeapon(FICInventoryState& Snapshot,int32 Slot) const
+{
+    const int32 WeaponSlot=static_cast<int32>(EPlayerEquipSlot::Weapon);
+    if (!Snapshot.WeaponSlots.IsValidIndex(Slot) || Snapshot.WeaponSlots[Slot].IsEmpty()) return false;
+    auto& Selected=Snapshot.Equipment[WeaponSlot];
+    auto Incoming=Snapshot.WeaponSlots[Slot];
+    Snapshot.WeaponSlots[Slot]=FPlayerItemInstance();
+    if (!Selected.IsEmpty())
+    {
+        const int32 Previous=static_cast<int32>(GetItemWeaponFamily(Selected))-1;
+        if (!Snapshot.WeaponSlots.IsValidIndex(Previous) || !Snapshot.WeaponSlots[Previous].IsEmpty()) return false;
+        Snapshot.WeaponSlots[Previous]=Selected;
+    }
+    Selected=Incoming;
+    return true;
 }
 
 bool UICInventoryComponent::CycleWeapon()
 {
-    const auto Snapshot = GetSnapshot();
-    const auto Current = GetEquippedWeaponFamily();
-    TArray<int32> Candidates;
-    for (int32 Index = 0; Index < Snapshot.Bag.Slots.Num(); ++Index)
+    FICInventoryState Next;
+    return BuildNextWeaponState(Next) && Commit(Next);
+}
+
+bool UICInventoryComponent::BuildNextWeaponState(FICInventoryState& Next) const
+{
+    Next = GetSnapshot();
+    const int32 WeaponSlot = static_cast<int32>(EPlayerEquipSlot::Weapon);
+    if (!Next.Equipment.IsValidIndex(WeaponSlot)) return false;
+    const int32 Current = static_cast<int32>(GetEquippedWeaponFamily());
+    int32 BestFamily = MAX_int32, BestSlot = INDEX_NONE;
+    auto Consider = [&](const FPlayerItemInstance& Instance, int32 Slot)
     {
-        const auto& Instance = Snapshot.Bag.Slots[Index];
-        const auto* Item = Instance.IsEmpty() || Instance.bLocked ? nullptr : Find(Instance.ItemID);
-        if (!Item || Item->Kind != EPlayerItemKind::Equipment || Item->EquipSlot != EPlayerEquipSlot::Weapon) continue;
-        FICDefinitionResult Result;
-        const auto* Gear = GetDefinitions() ? GetDefinitions()->Find<FICEquipmentRow>(Item->EquipmentID, Result) : nullptr;
-        if (Gear && Gear->WeaponFamily != EICWeaponFamily::None) Candidates.Add(Index);
-    }
-    if (Candidates.IsEmpty()) return Fail(*ICText::Get(TEXT("Native_92e884b0dc6b")).ToString());
-    auto Family = [&](int32 Index)
-    {
-        FICDefinitionResult Result;
-        const auto* Item = Find(Snapshot.Bag.Slots[Index].ItemID);
-        const auto* Gear = GetDefinitions()->Find<FICEquipmentRow>(Item->EquipmentID, Result);
-        return static_cast<int32>(Gear->WeaponFamily);
+        const int32 Family = static_cast<int32>(GetItemWeaponFamily(Instance));
+        if (Family > Current && Family < BestFamily)
+        { BestFamily = Family; BestSlot = Slot; }
     };
-    Candidates.Sort([&](int32 A, int32 B)
+    // Only the four equipped family slots participate. Bag contents never change.
+    Consider(Next.Equipment[WeaponSlot], INDEX_NONE);
+    for (int32 Index = 0; Index < Next.WeaponSlots.Num(); ++Index) Consider(Next.WeaponSlots[Index], Index);
+    if (BestFamily == MAX_int32)
     {
-        const int32 RankA = (Family(A) - static_cast<int32>(Current) + 4) % 4;
-        const int32 RankB = (Family(B) - static_cast<int32>(Current) + 4) % 4;
-        const int32 PriorityA = RankA == 0 ? 4 : RankA;
-        const int32 PriorityB = RankB == 0 ? 4 : RankB;
-        return PriorityA == PriorityB ? A < B : PriorityA < PriorityB;
-    });
-    return Equip(Candidates[0]);
+        if (Current == 0) return false;
+        Next.bWeaponSheathed = true;
+    }
+    else
+    {
+        if (BestSlot != INDEX_NONE && !SelectLoadoutWeapon(Next,BestSlot)) return false;
+        Next.bWeaponSheathed = false;
+    }
+    return true;
+}
+
+bool UICInventoryComponent::SetWeaponSheathed(bool bSheathed)
+{
+    auto Next = GetSnapshot();
+    if (Next.bWeaponSheathed == bSheathed) return true;
+    Next.bWeaponSheathed = bSheathed;
+    return Commit(Next);
+}
+
+bool UICInventoryComponent::SelectWeaponForTransition(FGuid InstanceID)
+{
+    if (!InstanceID.IsValid()) return false;
+    auto Next = GetSnapshot();
+    const int32 WeaponSlot = static_cast<int32>(EPlayerEquipSlot::Weapon);
+    if (!Next.Equipment.IsValidIndex(WeaponSlot)) return false;
+    if (Next.Equipment[WeaponSlot].InstanceID != InstanceID)
+    {
+        const int32 Slot = Next.WeaponSlots.IndexOfByPredicate([&](const auto& Item) { return Item.InstanceID == InstanceID; });
+        if (!SelectLoadoutWeapon(Next,Slot)) return false;
+    }
+    // Selection happens between the two montages; the draw notify reveals it.
+    Next.bWeaponSheathed = true;
+    return Commit(Next);
 }
 
 bool UICInventoryComponent::Unequip(EPlayerEquipSlot Slot)
 {
-    IC_TRACE_FUNCTION();
-    UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.Unequip.Request] EquipSlot=%d"),static_cast<int32>(Slot));
-    auto Next = GetSnapshot(); const int32 Index = static_cast<int32>(Slot);
-    if (!Next.Equipment.IsValidIndex(Index) || Next.Equipment[Index].IsEmpty()) return false;
-    const int32 Empty = Next.Bag.Slots.IndexOfByPredicate([](const auto& S) { IC_TRACE_FUNCTION(); return S.IsEmpty(); });
-    if (Empty == INDEX_NONE) return Fail(*ICText::Get(TEXT("Native_89e1471e83a4")).ToString());
-    Next.Bag.Slots[Empty] = Next.Equipment[Index]; Next.Equipment[Index] = FPlayerItemInstance(); return Commit(Next);
+    return Slot==EPlayerEquipSlot::Weapon&&UnequipWeapon(GetSelectedWeaponFamily());
+}
+
+bool UICInventoryComponent::UnequipWeapon(EICWeaponFamily Family)
+{
+    if (const auto* Player=Cast<AICPlayerCharacter>(GetOwner());Player&&Player->IsSwitchingWeapon()) return false;
+    const int32 FamilySlot=static_cast<int32>(Family)-1;
+    auto Next=GetSnapshot();
+    if (!Next.WeaponSlots.IsValidIndex(FamilySlot)) return false;
+    auto& Selected=Next.Equipment[static_cast<int32>(EPlayerEquipSlot::Weapon)];
+    const bool bSelected=GetItemWeaponFamily(Selected)==Family;
+    auto& Item=bSelected ? Selected : Next.WeaponSlots[FamilySlot];
+    if (Item.IsEmpty()) return false;
+    const int32 Empty=Next.Bag.Slots.IndexOfByPredicate([](const auto& Value){return Value.IsEmpty();});
+    if (Empty==INDEX_NONE) return Fail(*ICText::Get(TEXT("Native_89e1471e83a4")).ToString());
+    Next.Bag.Slots[Empty]=Item;Item=FPlayerItemInstance();
+    if (bSelected) Next.bWeaponSheathed=true;
+    return Commit(Next);
 }
 
 void UICInventoryComponent::SortBag()
@@ -425,6 +561,13 @@ bool UICInventoryComponent::ValidateSnapshot(const FICInventoryState& Snapshot) 
     {
         const auto& S = Snapshot.Equipment[Index];
         if (!Check(S, false) || (!S.IsEmpty() && static_cast<int32>(Find(S.ItemID)->EquipSlot) != Index)) return false;
+    }
+    const auto SelectedFamily=GetItemWeaponFamily(Snapshot.Equipment[static_cast<int32>(EPlayerEquipSlot::Weapon)]);
+    for (int32 Index=0;Index<Snapshot.WeaponSlots.Num();++Index)
+    {
+        const auto& Item=Snapshot.WeaponSlots[Index];
+        if (!Item.IsEmpty() && (!Check(Item,false) || GetItemWeaponFamily(Item)!=static_cast<EICWeaponFamily>(Index+1)
+            || SelectedFamily==static_cast<EICWeaponFamily>(Index+1))) return false;
     }
     for (const auto& C : Snapshot.Storage) for (const auto& S : C.Value.Slots) if (!Check(S, false)) return false;
     for (FName ID : Snapshot.QuickSlots) if (!ID.IsNone())

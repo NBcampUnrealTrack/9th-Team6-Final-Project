@@ -9,6 +9,7 @@
 #include "Character/Base/ICCharacterBase.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Debug/ICLog.h"
+#include "Enemy/Character/ICEnemyBase.h"
 
 FICAttackCapture UICAbilitySystemComponent::CaptureAttack(const FICCombatMagnitude& M, EICDamageType Type, bool PersonalCHA) const
 {
@@ -39,7 +40,15 @@ bool UICAbilitySystemComponent::ApplyDamage(const FICAttackCapture& Attack, UICA
     for(int32 I=0;I<Runtime.Combat.Effects.Num();++I)if(Runtime.Combat.Effects[I].RemainingShield>0)Shields.Add(I);
     Shields.Sort([this](int32 A,int32 B){IC_TRACE_FUNCTION();const auto& X=Runtime.Combat.Effects[A];const auto& Y=Runtime.Combat.Effects[B];return (X.bInfinite?DBL_MAX:X.ExpiresAtPlaySecond)<(Y.bInfinite?DBL_MAX:Y.ExpiresAtPlaySecond);});
     for(int32 I:Shields){auto& Shield=Runtime.Combat.Effects[I];const double Used=FMath::Min(Shield.RemainingShield,Damage);Shield.RemainingShield-=Used;Damage-=Used;if(Damage<=0)break;}
+    const float PreviousHP=Combat->GetHealth();
     if(Damage>0)ChangeResource(TEXT("HP"),-Damage);
+    const float AppliedDamage=PreviousHP-Combat->GetHealth();
+    if(AppliedDamage>0)
+    {
+        if(auto* Enemy=Cast<AICEnemyBase>(GetAvatarActor()))Enemy->PlayHitReaction();
+        if(auto* GI=GetWorld()?GetWorld()->GetGameInstance():nullptr)
+            if(auto* State=GI->GetSubsystem<UICWorldStateSubsystem>())State->OnCombatDamageReceived.Broadcast(GetAvatarActor(),AppliedDamage);
+    }
     MarkCombat();if(Source)Source->MarkCombat();
     if(CancelCasting&&CurrentID.IsValid()&&(RequestedAction!=TEXT("Skill")||Skill.CancelRules.bCancelOnEffectiveHit))CancelAction();
     if(!bOrdinaryStaggerImmune&&PlaySecond()>=StaggerReadyAt)

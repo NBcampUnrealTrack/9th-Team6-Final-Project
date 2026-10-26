@@ -44,6 +44,7 @@ public:
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|GAS") TSubclassOf<UGameplayEffect> SPEffectClass;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|GAS") TSubclassOf<UGameplayEffect> StatusEffectClass;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+    virtual bool GetShouldTick() const override;
     void InitializeForCharacter(AICCharacterBase* Character, bool PrimaryStats, bool PlayerSP);
     bool CanRestore(const FICCharacterState& State, FString& Reason) const;
     bool Restore(const FICCharacterState& State);
@@ -64,6 +65,8 @@ public:
     UFUNCTION(BlueprintPure, Category="IC|Weapons") FName GetCurrentWeaponSkill() const;
     UFUNCTION(BlueprintCallable, Category="IC|Weapons") bool EquipWeaponSkill(EICWeaponFamily Family, FName SkillID);
     UFUNCTION(BlueprintPure, Category="IC|Combat") double GetSkillCooldownRemaining(FName SkillID) const;
+    UFUNCTION(BlueprintPure, Category="IC|Movement") double GetMovementCooldownRemaining() const;
+    UFUNCTION(BlueprintPure, Category="IC|Movement") float GetMovementCooldownProgress() const;
     UFUNCTION(BlueprintCallable, Category="IC|Combat")
     void CancelAction();
     UFUNCTION(BlueprintCallable, Category="IC|Combat") bool NotifyCombatEvent(FGuid ActionID, FName Event, int32 HitIndex);
@@ -108,6 +111,7 @@ private:
     TSet<FString> HitReceipts;
     double StartedAt = 0, RecentCombatAt = -100, DodgeReadyAt = 0, StaggerReadyAt = 0, StaggerUntil = 0;
     double ActionEndsAt = 0;
+    double MovementCooldownDuration = 0, MovementDuration = 0, MovementDistance = 0, MovementAlpha = 0;
     int32 ComboIndex = 0;
     double ComboReadyUntil = 0, BufferedAttackUntil = 0;
     bool bCommitted = false, bReady = false, bRestoring = false, bEnding = false, bGuarding = false;

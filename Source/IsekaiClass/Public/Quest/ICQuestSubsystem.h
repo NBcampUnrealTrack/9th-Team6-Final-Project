@@ -28,17 +28,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Quest")
     bool AcceptQuest(FName QuestID);
 
-    UFUNCTION(BlueprintPure, Category="IC|Quest")
-    bool CanAbandonQuest(FName QuestID) const;
-
-    UFUNCTION(BlueprintCallable, Category="IC|Quest")
-    bool AbandonQuest(FName QuestID);
-
-    UFUNCTION(BlueprintPure, Category="IC|Quest")
-    bool CanAcceptQuest(FName QuestID) const;
-
-    bool IsObjectiveSatisfied(const FICQuestObjectiveDefinition& Objective, const FICQuestState& Quest,
-        const FICWorldState& World) const;
+    UFUNCTION(BlueprintCallable, Category="IC|Quest") bool StartQuest(FName QuestID);
+    UFUNCTION(BlueprintCallable, Category="IC|Quest") bool AbandonQuest(FName QuestID);
 
     UFUNCTION(BlueprintCallable, Category="IC|Quest")
     bool TurnInQuest(FName QuestID, FName NPCID);
@@ -48,6 +39,9 @@ public:
 
     UFUNCTION(BlueprintPure, Category="IC|Quest")
     bool AreQuestObjectivesReady(FName QuestID) const;
+
+    /** 0: none, 1: available quest, 2: current quest objective/turn-in. */
+    UFUNCTION(BlueprintPure, Category="IC|Quest") int32 GetNPCQuestMarker(FName NPCID) const;
 
     bool GetObjectiveProgress(const FICQuestObjectiveDefinition& Objective, const FICQuestState& Quest,
         const FICWorldState& World, int32& CurrentCount) const;

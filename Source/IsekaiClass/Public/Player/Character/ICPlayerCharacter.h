@@ -23,7 +23,15 @@ class ISEKAICLASS_API AICPlayerCharacter : public AICCharacterBase
     GENERATED_BODY()
 public:
     AICPlayerCharacter();
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+    virtual bool InitializeState(FName ID) override;
+    virtual void RestoreFromWorldState_Implementation(const FICWorldState& Candidate) override;
     virtual void HandleZeroHP() override;
+    UFUNCTION(BlueprintCallable, Category="IC|Weapons") bool RequestCycleWeapon();
+    UFUNCTION(BlueprintPure, Category="IC|Weapons") bool IsSwitchingWeapon() const;
+    void CancelWeaponTransition();
+    bool NotifyWeaponVisibility(int32 MontageInstanceID, bool bDraw);
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UICInventoryComponent> Inventory;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UICCraftingComponent> Crafting;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="IC|Quest Guide") TObjectPtr<UICQuestGuideComponent> QuestGuide;
@@ -34,4 +42,15 @@ public:
     UPROPERTY(BlueprintReadOnly,Category="IC|Appearance") int32 CurrentPreset=0;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Movement") float CameraSensitivity=1.0f;
     UFUNCTION(BlueprintCallable) void ApplyPreset(int32 Preset);
+private:
+    enum class EWeaponTransition : uint8 { Idle, Sheathing, Drawing };
+    EWeaponTransition WeaponTransition = EWeaponTransition::Idle;
+    FGuid PendingWeaponID, TransitionWeaponID;
+    uint32 WeaponTransitionSerial = 0;
+    int32 WeaponMontageInstanceID = INDEX_NONE;
+    UPROPERTY(Transient) TObjectPtr<UAnimMontage> WeaponTransitionMontage;
+    void StartWeaponTransition(bool bDraw);
+    void FinishWeaponTransitionPhase(bool bInterrupted);
+    bool ApplyWeaponVisibility(bool bDraw);
+    UFUNCTION() void WeaponInventoryChanged();
 };

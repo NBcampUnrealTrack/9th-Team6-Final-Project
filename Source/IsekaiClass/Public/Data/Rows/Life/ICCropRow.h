@@ -38,6 +38,8 @@ struct ISEKAICLASS_API FICCropRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crop")
     FName SeedItemID;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") TSoftClassPtr<AActor> CropActorClass;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crop")
     FName PlantingProductionID;
 

@@ -15,7 +15,9 @@ enum class EICNPCInteractionOption : uint8
     Talk ,
     Gift ,
     Trade ,
-    End
+    End,
+    Recruit,
+    Dismiss
 };
 
 USTRUCT(BlueprintType)
@@ -50,6 +52,10 @@ public:
     UFUNCTION(BlueprintCallable,Category="IC|NPC")
     void EndInteraction();
     UFUNCTION(BlueprintCallable, Category="IC|NPC") bool TryGiveGift(AICPlayerController* Requester, FName ItemID);
+    UFUNCTION(BlueprintPure, Category="IC|NPC") bool CanRecruit() const;
+    UFUNCTION(BlueprintCallable, Category="IC|NPC") bool TryRecruit(AICPlayerController* Requester);
+    UFUNCTION(BlueprintPure, Category="IC|NPC") bool CanDismiss() const;
+    UFUNCTION(BlueprintCallable, Category="IC|NPC") bool TryDismiss(AICPlayerController* Requester);
 
     UFUNCTION(BlueprintPure,Category="IC|NPC")
     FText GetInteractionText() const;
@@ -65,6 +71,8 @@ public:
 
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="IC|NPC")
     FName NPCDefinitionID;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="IC|Quest") TObjectPtr<class UWidgetComponent> QuestMarker;
 
 protected:
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|NPC|Movement",meta=(ClampMin="0"))

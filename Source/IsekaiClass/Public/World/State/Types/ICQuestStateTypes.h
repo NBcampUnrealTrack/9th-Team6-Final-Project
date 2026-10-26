@@ -8,6 +8,9 @@ struct FICQuestState
 {
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) bool bAccepted = false;
+    /** Accepted quests remain in the journal; only the started quest advances. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) bool bStarted = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) bool bAbandoned = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) bool bCompleted = false;
     // Prevent abandoned auto-accept quests from restarting, including after loading.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) bool bAbandoned = false;

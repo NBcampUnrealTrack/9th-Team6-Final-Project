@@ -28,6 +28,7 @@ public class IsekaiClass : ModuleRules
             "GameplayStateTreeModule",
             "NavigationSystem",
             "Niagara",
+            "GeometryCollectionEngine",
             "AIModule"
         });
 
@@ -39,6 +40,8 @@ public class IsekaiClass : ModuleRules
             PrivateDependencyModuleNames.Add("AnimationBlueprintLibrary");
             PrivateDependencyModuleNames.Add("RenderCore");
             PrivateDependencyModuleNames.Add("RHI");
+            PrivateDependencyModuleNames.Add("VRM4U");
+            PrivateDependencyModuleNames.AddRange(new string[] {"KawaiiPhysics", "KawaiiPhysicsEd", "AnimGraph", "BlueprintGraph", "KismetCompiler"});
         }
     }
 }

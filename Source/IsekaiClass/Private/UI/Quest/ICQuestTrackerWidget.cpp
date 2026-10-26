@@ -12,6 +12,7 @@
 void UICQuestTrackerWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+    if (IsDesignTime() || !GetGameInstance()) return;
 
     if (UICWorldStateSubsystem* State = GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>())
     {
@@ -23,7 +24,7 @@ void UICQuestTrackerWidget::NativeConstruct()
 
 void UICQuestTrackerWidget::NativeDestruct()
 {
-    if (UICWorldStateSubsystem* State = GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>())
+    if (UICWorldStateSubsystem* State = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>() : nullptr)
     {
         State->OnInventoryChanged.RemoveDynamic(this, &ThisClass::RefreshQuests);
         State->OnWorldRestored.RemoveDynamic(this, &ThisClass::RefreshQuests);
@@ -33,6 +34,7 @@ void UICQuestTrackerWidget::NativeDestruct()
 
 void UICQuestTrackerWidget::RefreshQuests()
 {
+    if (!GetGameInstance() || !QuestText) return;
     UICWorldStateSubsystem* State = GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();
     UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
     UICQuestSubsystem* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>();

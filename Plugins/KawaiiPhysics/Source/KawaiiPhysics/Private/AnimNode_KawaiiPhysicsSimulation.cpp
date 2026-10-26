@@ -799,6 +799,31 @@ void FAnimNode_KawaiiPhysics::ApplySimulateResult(FComponentSpacePoseContext& Ou
                                                   TArray<FBoneTransform>& OutBoneTransforms)
 {
 	SCOPE_CYCLE_COUNTER(STAT_KawaiiPhysics_ApplySimulateResult);
+	// Above TargetFramerate, some render frames contain no fixed physics step.
+	// The root is already at the current animation pose, while simulated child
+	// positions still belong to the previous step. Project a render-only chain
+	// from the current anchors so skinned bones cannot stretch between steps.
+	// Do not consume time or modify Verlet history here.
+	TArray<FVector, TInlineAllocator<64>> RenderLocations;
+	const bool bProjectRenderChain = bUseFixedSubsteppingCached
+		&& PreSkelCompTransformConsumeFraction <= 0.f && BoneSubdivisionCount == 0;
+	if (bProjectRenderChain)
+	{
+		for (const FKawaiiPhysicsModifyBone& Bone : ModifyBones)
+		{
+			FVector Location = Bone.PoseLocation;
+			if (Bone.HasParent())
+			{
+				const FVector ParentLocation = RenderLocations[Bone.ParentIndex];
+				const FVector PoseVector = Bone.PoseLocation - ModifyBones[Bone.ParentIndex].PoseLocation;
+				FVector Direction = (Bone.Location - ParentLocation).GetSafeNormal();
+				if (Direction.IsNearlyZero()) Direction = PoseVector.GetSafeNormal();
+				Location = ParentLocation + Direction * PoseVector.Size();
+			}
+			RenderLocations.Add(Location);
+		}
+	}
+	auto RenderLocation = [&](int32 Index) { return bProjectRenderChain ? RenderLocations[Index] : ModifyBones[Index].Location; };
 
 	for (int32 i = 0; i < ModifyBones.Num(); ++i)
 	{
@@ -826,7 +851,7 @@ void FAnimNode_KawaiiPhysics::ApplySimulateResult(FComponentSpacePoseContext& Ou
 			if (ParentBone.BoneRef.BoneIndex >= 0)
 			{
 				FVector PoseVector = Bone.PoseLocation - ParentBone.PoseLocation;
-				FVector SimulateVector = Bone.Location - ParentBone.Location;
+				FVector SimulateVector = RenderLocation(i) - RenderLocation(Bone.ParentIndex);
 
 				if (PoseVector.GetSafeNormal() == SimulateVector.GetSafeNormal())
 				{
@@ -855,7 +880,7 @@ void FAnimNode_KawaiiPhysics::ApplySimulateResult(FComponentSpacePoseContext& Ou
 		{
 			OutBoneTransforms[i].Transform.SetLocation(
 				ConvertSimulationSpaceLocation(Output, SimulationSpace, EKawaiiPhysicsSimulationSpace::ComponentSpace,
-				                               Bone.Location));
+				                               RenderLocation(i)));
 		}
 	}
 

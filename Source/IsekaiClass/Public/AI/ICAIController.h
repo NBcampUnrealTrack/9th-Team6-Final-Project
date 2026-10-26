@@ -20,6 +20,7 @@ public:
 
     void RestoreScheduleFacing();
     bool IsInteractionHeld() const { return bInteractionHold; }
+    bool TryRecoverCompanion();
 protected:
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="IC|AI") TObjectPtr<UStateTreeAIComponent> ScheduleRunner;
 private:

@@ -8,6 +8,7 @@
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Engine/GameInstance.h"
 #include "Debug/ICLog.h"
+#include "Codex/ICCodexSubsystem.h"
 
 namespace
 {
@@ -72,6 +73,9 @@ void UICAbilitySystemComponent::RebuildDerivedStats()
 
     auto* W=GetWorld()&&GetWorld()->GetGameInstance()?GetWorld()->GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr;
     FICWorldState World=W?W->ExportState():FICWorldState();TArray<FName> Synergies;TMap<EICStat,TArray<FICStatModifier>> SynergyMods;
+    if(Runtime.HasStats()&&(Runtime.Kind==EICCharacterKind::Player||(Runtime.Mode==EICCharacterMode::Companion&&Runtime.PartySlot>=0)))
+        if(auto* Codex=GetWorld()->GetGameInstance()->GetSubsystem<UICCodexSubsystem>())
+        {const int32 Pet=Codex->GetEquippedPet(Runtime.CharacterId);if(Codex->IsPetUnlocked(Pet))if(const auto* Row=Codex->FindPet(Pet))Mods.Append(Row->PetBuffs);}
     if(Definitions()&&Runtime.HasStats()&&!Runtime.IsDowned()&& (Runtime.Kind==EICCharacterKind::Player||Runtime.PartySlot>=0))
     {
         Definitions()->GetDefinitionIDs(EICDefinitionType::Synergy,Synergies);

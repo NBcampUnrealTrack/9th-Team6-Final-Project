@@ -12,6 +12,7 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
+#include "Components/CapsuleComponent.h"
 #include "Debug/ICLog.h"
 bool UICSpawnSubsystem::DoesSupportWorldType(EWorldType::Type Type) const { IC_TRACE_FUNCTION();return Type==EWorldType::Game||Type==EWorldType::PIE; }
 void UICSpawnSubsystem::OnWorldBeginPlay(UWorld& World)
@@ -38,13 +39,28 @@ AICCharacterBase* UICSpawnSubsystem::FindCharacter(FName ID) const
 bool UICSpawnSubsystem::FindSafePartyPlacement(FName ID,FTransform& Transform) const
 {
     IC_TRACE_FUNCTION();auto* Player=UGameplayStatics::GetPlayerPawn(GetWorld(),0);if(!Player)return false;
-    FCollisionQueryParams Q;Q.AddIgnoredActor(Player);if(auto* Existing=FindCharacter(ID))Q.AddIgnoredActor(Existing);
+    auto* Existing = FindCharacter(ID);
+    const auto* Capsule = Existing ? Existing->GetCapsuleComponent() : nullptr;
+    const float Radius = Capsule ? Capsule->GetScaledCapsuleRadius() : 42.f;
+    const float HalfHeight = Capsule ? Capsule->GetScaledCapsuleHalfHeight() : 90.f;
+    FCollisionQueryParams Q;Q.AddIgnoredActor(Player);if(Existing)Q.AddIgnoredActor(Existing);
+    FCollisionQueryParams Clearance;
+    if (Existing) Clearance.AddIgnoredActor(Existing);
+    auto* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+    const bool HasNavigation = Nav && Nav->GetDefaultNavDataInstance(FNavigationSystem::DontCreate);
+    // Prefer navigation, then allow clear walkable ground when the player has left the navigation bounds.
+    for (int32 Pass = 0; Pass < (HasNavigation ? 2 : 1); ++Pass)
     for(int32 I=0;I<12;++I)
     {
-        const double Angle=I*PI/6.;FVector Position=Player->GetActorLocation()+FVector(FMath::Cos(Angle),FMath::Sin(Angle),0)*(150+(I/6)*100);
-        FHitResult Floor;if(!GetWorld()->LineTraceSingleByChannel(Floor,Position+FVector(0,0,150),Position-FVector(0,0,400),ECC_Visibility,Q)||Floor.ImpactNormal.Z<.65)continue;Position=Floor.ImpactPoint+FVector(0,0,96);
-        if(GetWorld()->OverlapBlockingTestByChannel(Position,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(42,90),Q))continue;
-        if(auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))if(Nav->GetDefaultNavDataInstance(FNavigationSystem::DontCreate)) {FNavLocation Point;if(!Nav->ProjectPointToNavigation(Floor.ImpactPoint,Point,FVector(80,80,200)))continue;}
+        const double Angle=PI+I*PI/6.;FVector Position=Player->GetActorLocation()+Player->GetActorRotation().RotateVector(FVector(FMath::Cos(Angle),FMath::Sin(Angle),0))*(150+(I/6)*100);
+        if (HasNavigation && Pass == 0)
+        {
+            FNavLocation Point;
+            if (!Nav->ProjectPointToNavigation(Position, Point, FVector(80,80,200))) continue;
+            Position = Point.Location;
+        }
+        FHitResult Floor;if(!GetWorld()->LineTraceSingleByChannel(Floor,Position+FVector(0,0,150),Position-FVector(0,0,400),ECC_Visibility,Q)||Floor.ImpactNormal.Z<.65)continue;Position=Floor.ImpactPoint+FVector(0,0,HalfHeight+2);
+        if(GetWorld()->OverlapBlockingTestByChannel(Position,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(Radius,HalfHeight),Clearance))continue;
         Transform=FTransform(Player->GetActorRotation(),Position);return true;
     }
     return false;

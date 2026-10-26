@@ -45,8 +45,20 @@ public:
     UFUNCTION(BlueprintCallable) bool ToggleLock(int32 Index);
     UFUNCTION(BlueprintCallable) bool Discard(int32 Index);
     UFUNCTION(BlueprintCallable) bool Equip(int32 Index);
+    UFUNCTION(BlueprintCallable) bool EquipForCharacter(FName CharacterID, int32 BagIndex);
+    UFUNCTION(BlueprintCallable) bool UnequipForCharacter(FName CharacterID, EPlayerEquipSlot Slot);
+    /** Permanently removes the selected stack. Quest and locked items are protected. */
+    UFUNCTION(BlueprintCallable) bool TrashItem(int32 BagIndex);
     UFUNCTION(BlueprintCallable, Category="IC|Weapons") bool CycleWeapon();
     UFUNCTION(BlueprintPure, Category="IC|Weapons") EICWeaponFamily GetEquippedWeaponFamily() const;
+    UFUNCTION(BlueprintPure, Category="IC|Weapons") EICWeaponFamily GetSelectedWeaponFamily() const;
+    UFUNCTION(BlueprintPure, Category="IC|Weapons") bool IsWeaponSheathed() const;
+    /** Sword, bow, magic staff, healing wand. Includes the currently held weapon. */
+    UFUNCTION(BlueprintPure, Category="IC|Weapons") TArray<FPlayerItemInstance> GetWeaponLoadout() const;
+    UFUNCTION(BlueprintCallable, Category="IC|Weapons") bool UnequipWeapon(EICWeaponFamily Family);
+    bool BuildNextWeaponState(FICInventoryState& Next) const;
+    bool SelectWeaponForTransition(FGuid InstanceID);
+    bool SetWeaponSheathed(bool bSheathed);
     UFUNCTION(BlueprintCallable) bool Unequip(EPlayerEquipSlot Slot);
     UFUNCTION(BlueprintCallable) bool EnhanceEquipment(int32 BagIndex,UPARAM(ref) int32& Gold);
     UFUNCTION(BlueprintPure) FPlayerEquipmentStats GetEquipmentStats() const;
@@ -70,6 +82,8 @@ private:
     int32 Insert(FPlayerContainer& Container, FName ID, int32 Count, const FPlayerItemInstance* Original = nullptr) const;
     bool Remove(FPlayerContainer& Container, FName ID, int32 Count) const;
     bool RollRandomOptions(FPlayerItemInstance& Item,const FICItemRow& Definition) const;
+    EICWeaponFamily GetItemWeaponFamily(const FPlayerItemInstance& Item) const;
+    bool SelectLoadoutWeapon(FICInventoryState& Snapshot, int32 Slot) const;
     bool Fail(const TCHAR* Text);
     friend class UICProductionSubsystem;
     friend class FICRewardService;

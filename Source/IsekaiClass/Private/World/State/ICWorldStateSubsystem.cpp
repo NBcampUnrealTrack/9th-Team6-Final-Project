@@ -11,6 +11,7 @@
 #include "Data/Rows/World/ICAnchorRow.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Engine/GameInstance.h"
+#include "Save/Compatibility/ICSaveDataMigration.h"
 
 namespace
 {
@@ -144,7 +145,7 @@ bool UICWorldStateSubsystem::EnsureCharacter(FName ID, EICCharacterKind Kind)
         C.MP=C.MaxMP=Rules->BaseMaxMP+Rules->MPPerINT*(C.MainStats.INT-1);C.SP=0;C.MaxSP=1;
         C.UnlockedSkillIDs.Add(Base->UniqueSkillID);C.AttackDisposition=Base->InitialAttackDisposition;
         C.LowHPDisposition=Base->InitialLowHPDisposition;C.TargetPriority=Base->InitialTargetPriority;C.bAutoSkillsEnabled=Base->bInitiallyAutoSkillEnabled;
-        const FName GearIDs[]={Base->InitialEquipment.WeaponID,Base->InitialEquipment.ClothesID,Base->InitialEquipment.RingID,Base->InitialEquipment.NecklaceID};
+        const FName GearIDs[]={Base->InitialEquipment.WeaponID};
         UICInventoryComponent* Staging=NewObject<UICInventoryComponent>(GetTransientPackage());
         Staging->BeginStaging(Definitions,static_cast<int32>(Class->CharacterClass)-1);
         for(FName GearID:GearIDs)if(!GearID.IsNone())
@@ -229,10 +230,10 @@ bool UICWorldStateSubsystem::ValidateInventoryShape(const FICInventoryState& I, 
 {
     IC_TRACE_FUNCTION();
     if (I.Bag.Slots.Num() < 20 || I.Bag.Slots.Num() > 100 || (I.Bag.Slots.Num() - 20) % 10 != 0
-        || I.Equipment.Num() != 4 || I.QuickSlots.Num() != 4) return false;
+        || I.Equipment.Num() != 1 || I.WeaponSlots.Num() != 4 || I.QuickSlots.Num() != 4) return false;
     TSet<FGuid> Local;
     TSet<FGuid>& IDs = ExistingIDs ? *ExistingIDs : Local;
-    if (!ValidItems(I.Bag.Slots, IDs) || !ValidItems(I.QuestItems, IDs) || !ValidItems(I.Equipment, IDs)) return false;
+    if (!ValidItems(I.Bag.Slots, IDs) || !ValidItems(I.QuestItems, IDs) || !ValidItems(I.Equipment, IDs) || !ValidItems(I.WeaponSlots, IDs)) return false;
     for (const auto& Container : I.Storage)
     {
         const int32 Slots=Container.Value.Slots.Num();
@@ -261,7 +262,7 @@ bool UICWorldStateSubsystem::ValidateState(const FICWorldState& Candidate)
     for (const auto& Entry : Candidate.Characters)
     {
         const auto& C = Entry.Value;
-        if (Entry.Key != C.CharacterId || !ValidCharacter(C)) return false;
+        if (Entry.Key != C.CharacterId || !ValidCharacter(C) || C.Equipment.Num()>1) return false;
         if (C.CharacterId == PlayerId() && !C.Equipment.IsEmpty()) return false;
         if (!C.HasStats() && (!C.Equipment.IsEmpty() || !C.Debuffs.IsEmpty())) return false;
         if (!ValidItems(C.Equipment, IDs)) return false;
@@ -274,6 +275,8 @@ bool UICWorldStateSubsystem::ValidateState(const FICWorldState& Candidate)
     for (const auto& Q : Candidate.Quests)
     {
         if (Q.Key.IsNone() || (Q.Value.bCompleted && !Q.Value.bAccepted)) return false;
+        if ((Q.Value.bStarted && (!Q.Value.bAccepted || Q.Value.bCompleted || Q.Value.bAbandoned))
+            || (Q.Value.bAbandoned && Q.Value.bAccepted)) return false;
         for (const auto& O : Q.Value.Objectives) if (O.Key.IsNone() || O.Value < 0) return false;
     }
     for (const auto& Entry : Candidate.MonsterKilledAt) if (Entry.Key.IsNone() || !FMath::IsFinite(Entry.Value) || Entry.Value < 0) return false;
@@ -297,8 +300,9 @@ bool UICWorldStateSubsystem::CommitInventoryState(const FICInventoryState& Inven
     IC_TRACE_FUNCTION();
     UE_LOG(LogICWorldState, Verbose, TEXT("[State.Inventory.Request] BagSlots=%d Containers=%d"),Inventory.Bag.Slots.Num(),Inventory.Storage.Num());
     FICWorldState Next = State; Next.Inventory = Inventory;
+    RecordAcquiredItems(Next);
     if (!ValidateState(Next)) return false;
-    State.Inventory = Inventory;
+    State = MoveTemp(Next);
     OnInventoryChanged.Broadcast();
     return true;
 }
@@ -316,6 +320,7 @@ bool UICWorldStateSubsystem::CommitCharacterAndInventory(const FICCharacterState
     IC_TRACE_FUNCTION();
     UE_LOG(LogICWorldState, Verbose, TEXT("[State.CharacterInventory.Request] ID=%s"),*Character.CharacterId.ToString());
     FICWorldState Next = State; Next.Characters.Add(Character.CharacterId, Character); Next.Inventory = Inventory;
+    RecordAcquiredItems(Next);
     if (!ValidateState(Next)) return false;
     State = MoveTemp(Next);
     OnCharacterChanged.Broadcast(Character.CharacterId); OnInventoryChanged.Broadcast();
@@ -327,13 +332,34 @@ bool UICWorldStateSubsystem::CommitGameplayTransaction(const FICWorldState& Cand
     IC_TRACE_FUNCTION();
     if(!TransactionID.IsValid() || State.CompletedTransactionIDs.Contains(TransactionID)){UE_LOG(LogICWorldState, Verbose, TEXT("[State.Transaction.Rejected] Transaction=%s: 무효 또는 이미 처리된 거래"),*TransactionID.ToString());return false;}
     FICWorldState Next=Candidate;Next.CompletedTransactionIDs.Add(TransactionID);
+    RecordAcquiredItems(Next);
     if(!ValidateState(Next)){UE_LOG(LogICWorldState, Verbose, TEXT("[State.Transaction.Rejected] Transaction=%s: 후보 상태 검증 실패, 원본 유지"),*TransactionID.ToString());return false;}
+    bool MonsterReward=false;
+    FName RewardMonsterID;int32 ReceivedEssence=0;
+    for(const auto& Pair:Next.SpawnSlots)if(Pair.Value.IncarnationID==TransactionID&&Pair.Value.bDefeated&&!Pair.Value.bRewardPending)
+    {
+        MonsterReward=true;RewardMonsterID=Pair.Value.MonsterID;
+        auto* Definitions=GetGameInstance()?GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;FICDefinitionResult R;
+        const auto* Monster=Definitions?Definitions->Find<FICMonsterRow>(RewardMonsterID,R):nullptr;
+        if(Monster&&Monster->PetCodexIndex>=0)ReceivedEssence=Next.Codex.PetEssence.FindRef(Monster->PetCodexIndex)-State.Codex.PetEssence.FindRef(Monster->PetCodexIndex);
+        break;
+    }
+    const int32 ReceivedGold=Next.Gold-State.Gold;
+    TArray<FICItemAmount> ReceivedItems;
+    if(MonsterReward)
+    {
+        TMap<FName,int32> Counts;
+        for(const auto& Item:Next.Inventory.Bag.Slots)if(!Item.IsEmpty())Counts.FindOrAdd(Item.ItemID)+=Item.Count;
+        for(const auto& Item:State.Inventory.Bag.Slots)if(!Item.IsEmpty())Counts.FindOrAdd(Item.ItemID)-=Item.Count;
+        for(const auto& Pair:Counts)if(Pair.Value>0){auto& Item=ReceivedItems.AddDefaulted_GetRef();Item.ItemID=Pair.Key;Item.Count=Pair.Value;}
+    }
     State=MoveTemp(Next);
     UE_LOG(LogICWorldState, Verbose, TEXT("[State.Transaction.Committed] Transaction=%s Gold=%d Characters=%d Jobs=%d Drops=%d"),*TransactionID.ToString(),State.Gold,State.Characters.Num(),State.ProductionJobs.Num(),State.Drops.Num());
 
     TArray<FName> CharacterIDs;State.Characters.GetKeys(CharacterIDs);
     for(FName ID:CharacterIDs)OnCharacterChanged.Broadcast(ID);
     OnInventoryChanged.Broadcast();OnPlayerGoldChanged.Broadcast();OnDropsChanged.Broadcast();
+    if(MonsterReward&&(ReceivedGold>0||!ReceivedItems.IsEmpty()||ReceivedEssence>0))OnMonsterRewardReceived.Broadcast(ReceivedGold,ReceivedItems,RewardMonsterID,ReceivedEssence);
     return true;
 }
 
@@ -389,14 +415,23 @@ bool UICWorldStateSubsystem::CanRestoreState(const FICWorldState& Candidate) con
 bool UICWorldStateSubsystem::RestoreState(const FICWorldState& Candidate)
 {
     IC_TRACE_FUNCTION();
-    if (!CanRestoreState(Candidate)){UE_LOG(LogICWorldState, Verbose, TEXT("[State.Restore.Rejected] Characters=%d Jobs=%d Gold=%d: 규격/활성 참여자 검사 실패"),Candidate.Characters.Num(),Candidate.ProductionJobs.Num(),Candidate.Gold);return false;}
-    State = Candidate;
+    FICWorldState Normalized=Candidate;ICSaveDataMigration::NormalizeWeaponOnly(Normalized);
+    if (!CanRestoreState(Normalized)){UE_LOG(LogICWorldState, Verbose, TEXT("[State.Restore.Rejected] Characters=%d Jobs=%d Gold=%d: 규격/활성 참여자 검사 실패"),Candidate.Characters.Num(),Candidate.ProductionJobs.Num(),Candidate.Gold);return false;}
+    State = MoveTemp(Normalized);
+    RecordAcquiredItems(State);
     UE_LOG(LogICWorldState, Log, TEXT("[State.Restored] PlayerCreated=%d Characters=%d Jobs=%d Quests=%d Gold=%d"),State.bPlayerCreated,State.Characters.Num(),State.ProductionJobs.Num(),State.Quests.Num(),State.Gold);
     for (const auto& Entry : Participants)
         if (Entry.Value.IsValid()) IICStateParticipant::Execute_RestoreFromWorldState(Entry.Value.Get(), State);
     OnWorldRestored.Broadcast();
     OnInventoryChanged.Broadcast();
     return true;
+}
+
+void UICWorldStateSubsystem::RecordAcquiredItems(FICWorldState& World)
+{
+    auto Add=[&](const TArray<FPlayerItemInstance>& Items){for(const auto& Item:Items)if(!Item.IsEmpty())World.Codex.AcquiredItemIDs.Add(Item.ItemID);};
+    Add(World.Inventory.Bag.Slots);Add(World.Inventory.QuestItems);Add(World.Inventory.Equipment);Add(World.Inventory.WeaponSlots);
+    if(const auto* Home=World.Inventory.Storage.Find(TEXT("PlayerHome")))Add(Home->Slots);
 }
 
 bool UICWorldStateSubsystem::ApplyWorldProgress(const FICWorldState& Candidate)
