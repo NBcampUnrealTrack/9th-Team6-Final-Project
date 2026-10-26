@@ -6,6 +6,7 @@
 class UCameraComponent;
 class UICInventoryComponent;
 class UICCraftingComponent;
+class UICQuestGuideComponent;
 class USpringArmComponent;
 class USkeletalMesh;
 USTRUCT(BlueprintType)
@@ -33,6 +34,7 @@ public:
     bool NotifyWeaponVisibility(int32 MontageInstanceID, bool bDraw);
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UICInventoryComponent> Inventory;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UICCraftingComponent> Crafting;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="IC|Quest Guide") TObjectPtr<UICQuestGuideComponent> QuestGuide;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<USpringArmComponent> CameraArm;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UCameraComponent> Camera;
 

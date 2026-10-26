@@ -153,12 +153,28 @@ bool UICQuestSubsystem::AcceptQuest(FName QuestID)
         {
             return false;
         }
+        // Keep quest items on abandon; only replenish missing grants on reacceptance.
+        const FICQuestState* Previous = Candidate.Quests.Find(QuestID);
+        TMap<FName, int32> GrantCounts;
         for (const FICItemAmount& Item : Definition.AcceptanceQuestItems)
         {
+            if (Item.Count <= 0 || GrantCounts.FindRef(Item.ItemID) > MAX_int32 - Item.Count)
+            {
+                return false;
+            }
+            GrantCounts.FindOrAdd(Item.ItemID) += Item.Count;
+        }
+        for (const auto& Grant : GrantCounts)
+        {
             FICItemRow ItemDefinition;
-            if (!Definitions->GetItem(Item.ItemID, ItemDefinition).bSuccess
-                || ItemDefinition.Kind != EPlayerItemKind::Quest
-                || !Staging->AddItem(Item.ItemID, Item.Count, false))
+            if (!Definitions->GetItem(Grant.Key, ItemDefinition).bSuccess
+                || ItemDefinition.Kind != EPlayerItemKind::Quest)
+            {
+                return false;
+            }
+            const int32 Count = Previous && Previous->bAbandoned
+                ? FMath::Max(0, Grant.Value - CountOwnedItem(Candidate.Inventory, Grant.Key)) : Grant.Value;
+            if (Count > 0 && !Staging->AddItem(Grant.Key, Count, false))
             {
                 return false;
             }
