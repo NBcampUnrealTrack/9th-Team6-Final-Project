@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "Engine/EngineTypes.h"
 #include "Character/Base/ICCharacterBase.h"
 #include "Data/Rows/NPC/ICNPCRow.h"
 #include "ICNPCBase.generated.h"
@@ -29,6 +30,7 @@ struct ISEKAICLASS_API FICNPCInteractionOption
     UPROPERTY(BlueprintReadOnly, Category="IC|NPC") FName ServiceID;
     UPROPERTY(BlueprintReadOnly, Category="IC|NPC") bool bEnabled = true;
 };
+
 UCLASS(Blueprintable)
 class ISEKAICLASS_API AICNPCBase : public AICCharacterBase
 {
@@ -36,6 +38,7 @@ class ISEKAICLASS_API AICNPCBase : public AICCharacterBase
 public:
     AICNPCBase();
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void HandleZeroHP() override;
     virtual void RestoreFromWorldState_Implementation(const FICWorldState& Candidate) override;
     bool InitializeNPC(FName ID);
@@ -80,6 +83,7 @@ protected:
     virtual void StoredCharacterChanged(FName ID) override;
 
 private:
+    UFUNCTION() void HandleTimeJumped(double FromGameMinute, double ToGameMinute);
     FICNPCRow Definition;
     bool bInitialized=false,bInteracting=false;
     FTimerHandle DefeatTimer;

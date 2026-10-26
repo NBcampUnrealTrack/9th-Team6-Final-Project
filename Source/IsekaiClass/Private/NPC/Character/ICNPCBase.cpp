@@ -16,6 +16,7 @@
 #include "Core/Controller/ICPlayerController.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Data/Rows/NPC/ICGiftPreferenceRow.h"
+#include "NPC/Schedule/ICNPCScheduleLibrary.h"
 #include "Components/WidgetComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "UI/Quest/ICNPCQuestMarkerWidget.h"
@@ -39,6 +40,13 @@ AICNPCBase::AICNPCBase()
     Movement->AvoidanceWeight=.5f;
 }
 void AICNPCBase::BeginPlay() { IC_TRACE_FUNCTION();Super::BeginPlay();if(!bInitialized&&!NPCDefinitionID.IsNone())InitializeNPC(NPCDefinitionID); }
+void AICNPCBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    IC_TRACE_FUNCTION();
+    if (auto* Time = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICTimeSubsystem>() : nullptr)
+        Time->OnTimeJumped.RemoveDynamic(this, &ThisClass::HandleTimeJumped);
+    Super::EndPlay(EndPlayReason);
+}
 bool AICNPCBase::InitializeNPC(FName ID)
 {
     if (bInitialized) return NPCDefinitionID == ID;
@@ -71,7 +79,47 @@ bool AICNPCBase::InitializeNPC(FName ID)
         QuestMarker->SetWidgetClass(MarkerClass);QuestMarker->InitWidget();
         if(auto* Marker=Cast<UICNPCQuestMarkerWidget>(QuestMarker->GetWidget()))Marker->SetNPC(this);
     }
+    if (auto* Time = GetGameInstance()->GetSubsystem<UICTimeSubsystem>())
+        Time->OnTimeJumped.AddUniqueDynamic(this, &ThisClass::HandleTimeJumped);
     RefreshExecution();return true;
+}
+void AICNPCBase::HandleTimeJumped(double FromGameMinute, double ToGameMinute)
+{
+    IC_TRACE_FUNCTION();
+    if (!bInitialized || !WorldState()) return;
+    const FICCharacterState Previous = WorldState()->GetSnapshot(CharacterID);
+    if (Previous.IsDowned() || Previous.Mode != EICCharacterMode::Scheduled) return;
+
+    auto* Definitions = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>() : nullptr;
+    auto* Spawns = GetWorld() ? GetWorld()->GetSubsystem<UICSpawnSubsystem>() : nullptr;
+    if (!Definitions || !Spawns) return;
+
+    FICDefinitionResult Result;
+    const FICScheduleRow* Schedule = Definitions->Find<FICScheduleRow>(Definition.ScheduleID, Result);
+    if (!Schedule) return;
+    const FICNPCScheduleResolution Current = UICNPCScheduleLibrary::ResolveSchedule(*Schedule, ToGameMinute);
+    if (!Current.bFound || Current.DestinationAnchorID.IsNone()) return;
+
+    FTransform Destination;
+    if (!Spawns->ResolveLoadedAnchor(Current.DestinationAnchorID, Destination))
+    {
+        UE_LOG(LogICWorldState, Warning, TEXT("[NPC.TimeJumpAnchorUnavailable] NPC=%s Anchor=%s From=%.2f To=%.2f"),
+            *CharacterID.ToString(), *Current.DestinationAnchorID.ToString(), FromGameMinute, ToGameMinute);
+        return;
+    }
+
+    if (Previous.CurrentAnchorID != Current.DestinationAnchorID)
+    {
+        FICCharacterState Updated = Previous;
+        Updated.CurrentAnchorID = Current.DestinationAnchorID;
+        Updated.Position = Destination.GetLocation();
+        Updated.Rotation = Destination.Rotator();
+        if (!WorldState()->SetCharacterState(Updated)) return;
+    }
+    SetActorLocationAndRotation(Destination.GetLocation(), Destination.Rotator(), false, nullptr, ETeleportType::TeleportPhysics);
+    if (auto* AI = Cast<AICAIController>(GetController())) AI->RestoreScheduleFacing();
+    UE_LOG(LogICWorldState, Verbose, TEXT("[NPC.TimeJumpRelocated] NPC=%s Anchor=%s From=%.2f To=%.2f"),
+        *CharacterID.ToString(), *Current.DestinationAnchorID.ToString(), FromGameMinute, ToGameMinute);
 }
 void AICNPCBase::RefreshExecution()
 {
@@ -100,8 +148,12 @@ void AICNPCBase::RestoreFromWorldState_Implementation(const FICWorldState& Candi
 { IC_TRACE_FUNCTION();Super::RestoreFromWorldState_Implementation(Candidate);RefreshExecution(); }
 TArray<FName> AICNPCBase::GetAvailableServices() const
 {
-    IC_TRACE_FUNCTION();if(!WorldState()||WorldState()->GetSnapshot(CharacterID).Mode!=EICCharacterMode::Scheduled)return {};
-    auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();auto* T=GetGameInstance()->GetSubsystem<UICTimeSubsystem>();FICDefinitionResult R;
+    IC_TRACE_FUNCTION();
+    if (!WorldState()) return {};
+    const FICCharacterState State = WorldState()->GetSnapshot(CharacterID);
+    if (State.Mode == EICCharacterMode::Companion && !State.IsDowned()) return Definition.ServiceIDs;
+    if (State.Mode != EICCharacterMode::Scheduled || State.IsDowned()) return {};
+    auto* D=GetGameInstance()?GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;auto* T=GetGameInstance()?GetGameInstance()->GetSubsystem<UICTimeSubsystem>():nullptr;FICDefinitionResult R;
     const auto* Schedule=D?D->Find<FICScheduleRow>(Definition.ScheduleID,R):nullptr;if(!Schedule||!T)return {};
     const int32 Minute=int32(FMath::FloorToDouble(T->GetClock().GameMinute))%1440;
     for(const auto& Segment:Schedule->Segments)if(Minute>=Segment.StartGameMinute&&Minute<Segment.EndGameMinute&&Segment.Activity==EICScheduleActivity::Work)return Segment.ServiceIDs;
@@ -110,7 +162,8 @@ TArray<FName> AICNPCBase::GetAvailableServices() const
 bool AICNPCBase::TryInteract(AICPlayerController* Requester)
 {
     IC_TRACE_FUNCTION();
-    if(!bInitialized||!Requester||bInteracting||!WorldState())return false;
+    if(!bInitialized||!Requester||!Requester->GetPawn()||bInteracting||!WorldState()
+        || FVector::DistSquared(Requester->GetPawn()->GetActorLocation(),GetActorLocation())>FMath::Square(350.f))return false;
     const auto State=WorldState()->GetSnapshot(CharacterID);
     if(State.IsDowned()||(State.Mode!=EICCharacterMode::Scheduled&&!CanDismiss()))
     {UE_LOG(LogICInteraction,Verbose,TEXT("[NPC.InteractRejected] NPC=%s Mode=%d Downed=%d"),*CharacterID.ToString(),static_cast<int32>(State.Mode),State.IsDowned()?1:0);return false;}
