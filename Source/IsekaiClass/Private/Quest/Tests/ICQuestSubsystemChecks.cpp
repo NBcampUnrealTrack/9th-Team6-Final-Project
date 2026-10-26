@@ -358,4 +358,30 @@ bool FICQuestSingleRunCheck::RunTest(const FString&)
     TestFalse(TEXT("Protected quest cannot be abandoned"),F.Quests->AbandonQuest(TEXT("QST_RING_998")));
     return !HasAnyErrors();
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestReacceptGrantCheck, "IC.Runtime.QuestReacceptGrant",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FICQuestReacceptGrantCheck::RunTest(const FString& Parameters)
+{
+    FICQuestFixture F;
+    FICQuestRow Definition;
+    F.Definitions->GetQuest(TEXT("QST_DELIVER_998"), Definition);
+    Definition.ID = TEXT("QST_REACCEPT_998");
+    Definition.IsAutoAccept = false;
+    Definition.bAllowAbandon = true;
+    Definition.RewardID = NAME_None;
+    Definition.ObjectiveGroups[0].Objectives[0].RequiredCount = 100;
+    FICItemAmount Grant;
+    Grant.ItemID = TEXT("ITM_QST_998");
+    Grant.Count = 1;
+    Definition.AcceptanceQuestItems = {Grant, Grant};
+    F.Catalog->Tables.Last().Table.LoadSynchronous()->AddRow(Definition.ID, Definition);
+    TestTrue(TEXT("First acceptance grants the configured quest items"), F.Quests->AcceptQuest(Definition.ID));
+    TestEqual(TEXT("Duplicate grant rows aggregate to two items"), F.Inventory->CountItem(Grant.ItemID), 2);
+    TestTrue(TEXT("Granted quest can be abandoned"), F.Quests->AbandonQuest(Definition.ID));
+    TestEqual(TEXT("Abandon preserves the quest items"), F.Inventory->CountItem(Grant.ItemID), 2);
+    TestTrue(TEXT("Abandoned quest can be accepted again"), F.Quests->AcceptQuest(Definition.ID));
+    TestEqual(TEXT("Reacceptance does not duplicate retained quest items"), F.Inventory->CountItem(Grant.ItemID), 2);
+    return !HasAnyErrors();
+}
 #endif

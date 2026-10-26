@@ -136,12 +136,27 @@ bool FICQuestGuideAssetsCheck::RunTest(const FString& Parameters)
     UGameInstance* GI = NewObject<UGameInstance>(GEngine);
     GI->InitializeStandalone();
     UICDefinitionSubsystem* Definitions = GI->GetSubsystem<UICDefinitionSubsystem>();
-    FICAnchorRow Goal;
-    TestTrue(TEXT("Runtime catalog contains the quest navigation goal, not only its CSV"),
-        Definitions && Definitions->GetAnchor(TEXT("ANC_QUEST_NAV_GOAL"), Goal).bSuccess);
     FICQuestRow Quest;
-    TestTrue(TEXT("Runtime catalog contains the navigation quest"),
-        Definitions && Definitions->GetQuest(TEXT("QST_TEST_VISIT_001"), Quest).bSuccess);
+    if (TestTrue(TEXT("Runtime catalog contains the navigation quest"),
+        Definitions && Definitions->GetQuest(TEXT("QST_TEST_VISIT_001"), Quest).bSuccess))
+    {
+        // Follow the configured destination; merged content may relocate the test quest.
+        bool bHasVisitGoal = false;
+        for (const FICQuestObjectiveGroup& Group : Quest.ObjectiveGroups)
+        {
+            for (const FICQuestObjectiveDefinition& Objective : Group.Objectives)
+            {
+                if (Objective.Type != EICQuestObjectiveType::Visit) continue;
+                const FName AnchorID = !Objective.GuidanceAnchorID.IsNone()
+                    ? Objective.GuidanceAnchorID : Objective.Target.ID;
+                FICAnchorRow Goal;
+                TestTrue(TEXT("Configured visit destination exists in the runtime catalog"),
+                    !AnchorID.IsNone() && Definitions->GetAnchor(AnchorID, Goal).bSuccess);
+                bHasVisitGoal = true;
+            }
+        }
+        TestTrue(TEXT("Navigation fixture contains a visit destination"), bHasVisitGoal);
+    }
     UClass* GuideClass = LoadGuideFixtureClass();
     AICQuestGuideLight* Defaults = GuideClass ? GuideClass->GetDefaultObject<AICQuestGuideLight>() : nullptr;
     const UNiagaraComponent* Trail = Defaults ? Cast<UNiagaraComponent>(Defaults->GetDefaultSubobjectByName(TEXT("TrailEffect"))) : nullptr;

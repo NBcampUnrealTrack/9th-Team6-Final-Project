@@ -170,7 +170,8 @@ bool UICQuestGuideComponent::SelectTarget(const FICWorldState& Snapshot, UICDefi
     TArray<FName> Candidates;
     for (const auto& Entry : Snapshot.Quests)
     {
-        if (Entry.Value.bAccepted && !Entry.Value.bCompleted) Candidates.Add(Entry.Key);
+        if (Entry.Value.bAccepted && Entry.Value.bStarted && !Entry.Value.bCompleted && !Entry.Value.bAbandoned)
+            Candidates.Add(Entry.Key);
     }
     Candidates.Sort([&Snapshot](FName A, FName B)
     {
