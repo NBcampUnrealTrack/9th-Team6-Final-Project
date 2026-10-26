@@ -12,13 +12,16 @@ class ISEKAICLASS_API UICGameplayWidget : public UUserWidget
 public:
     UFUNCTION(BlueprintPure, Category = "IC|UI") AICPlayerController* GetICPlayerController() const;
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshCurrentScreen();
+    UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshSkillCooldown();
     UFUNCTION(BlueprintImplementableEvent, Category = "IC|UI") void OnRefreshGameplayUI();
 
 protected:
     virtual void NativeOnInitialized() override;
+    virtual void NativeTick(const FGeometry& Geometry, float DeltaSeconds) override;
     virtual FReply NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event) override;
 
 private:
+    void EnsureSkillCooldown();
     UFUNCTION() void Back();
     UFUNCTION() void Resume();
     UFUNCTION() void Save();
