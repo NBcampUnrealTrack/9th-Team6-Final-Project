@@ -153,28 +153,53 @@ bool UICQuestSubsystem::AcceptQuest(FName QuestID)
         {
             return false;
         }
+        // Keep quest items on abandon; only replenish missing grants on reacceptance.
+        const FICQuestState* Previous = Candidate.Quests.Find(QuestID);
+        TMap<FName, int32> GrantCounts;
         for (const FICItemAmount& Item : Definition.AcceptanceQuestItems)
         {
+            if (Item.Count <= 0 || GrantCounts.FindRef(Item.ItemID) > MAX_int32 - Item.Count)
+            {
+                return false;
+            }
+            GrantCounts.FindOrAdd(Item.ItemID) += Item.Count;
+        }
+        for (const auto& Grant : GrantCounts)
+        {
             FICItemRow ItemDefinition;
-            if (!Definitions->GetItem(Item.ItemID, ItemDefinition).bSuccess
-                || ItemDefinition.Kind != EPlayerItemKind::Quest
-                || !Staging->AddItem(Item.ItemID, Item.Count, false))
+            if (!Definitions->GetItem(Grant.Key, ItemDefinition).bSuccess
+                || ItemDefinition.Kind != EPlayerItemKind::Quest)
+            {
+                return false;
+            }
+            const int32 Count = Previous && Previous->bAbandoned
+                ? FMath::Max(0, Grant.Value - CountOwnedItem(Candidate.Inventory, Grant.Key)) : Grant.Value;
+            if (Count > 0 && !Staging->AddItem(Grant.Key, Count, false))
             {
                 return false;
             }
         }
         Candidate.Inventory = Staging->GetSnapshot();
     }
+    bool HasRunningQuest = false;
+    for (const auto& Pair : Candidate.Quests)
+        if (Pair.Value.bAccepted && Pair.Value.bStarted && !Pair.Value.bCompleted && !Pair.Value.bAbandoned)
+        { HasRunningQuest = true; break; }
     FICQuestState& Quest = Candidate.Quests.FindOrAdd(QuestID);
     Quest.bAccepted = true;
+    Quest.bStarted = !HasRunningQuest;
+    Quest.bAbandoned = false;
     Quest.bCompleted = false;
     Quest.bRewardClaimed = false;
     Quest.RewardTransactionID.Invalidate();
     Quest.Objectives.Reset();
     Quest.AcceptedAtGameMinute = Time->GetClock().GameMinute;
-    if (!State->CommitGameplayTransaction(Candidate, FGuid::NewGuid()))
     {
-        return false;
+        // Acceptance and automatic tracking are one transaction. Existing progress stays intact.
+        TGuardValue<bool> Guard(IsProcessing, true);
+        if (!State->CommitGameplayTransaction(Candidate, FGuid::NewGuid())) return false;
+        InventoryBaseline = State->GetInventorySnapshot();
+        IsBaselineReady = true;
     }
     UE_LOG(LogICWorldState, Log, TEXT("[Quest.Accepted] Quest=%s"), *QuestID.ToString());
     if (!IsProcessing)
@@ -182,6 +207,36 @@ bool UICQuestSubsystem::AcceptQuest(FName QuestID)
         EvaluateQuests();
     }
     return true;
+}
+
+bool UICQuestSubsystem::StartQuest(FName QuestID)
+{
+    if(!Definitions||!State||!Time||IsProcessing)return false;
+    FICQuestRow Definition;auto Candidate=State->ExportState();
+    auto* Selected=Candidate.Quests.Find(QuestID);
+    if(!Selected||!Selected->bAccepted||Selected->bCompleted||!Definitions->GetQuest(QuestID,Definition).bSuccess)return false;
+    if(Selected->bStarted)return true; // Starting the same quest never erases its progress.
+    for(auto& Pair:Candidate.Quests)if(Pair.Value.bStarted&&!Pair.Value.bCompleted)
+    {Pair.Value.bStarted=false;Pair.Value.Objectives.Reset();Pair.Value.AcceptedAtGameMinute=0;}
+    Selected=Candidate.Quests.Find(QuestID);Selected->bStarted=true;Selected->Objectives.Reset();
+    Selected->AcceptedAtGameMinute=Time->GetClock().GameMinute;
+    {
+        TGuardValue<bool> Guard(IsProcessing,true);
+        if(!State->CommitGameplayTransaction(Candidate,FGuid::NewGuid()))return false;
+        InventoryBaseline=State->GetInventorySnapshot();IsBaselineReady=true;
+    }
+    EvaluateQuests();return true;
+}
+
+bool UICQuestSubsystem::AbandonQuest(FName QuestID)
+{
+    if(!Definitions||!State||IsProcessing)return false;
+    FICQuestRow Definition;auto Candidate=State->ExportState();auto* Quest=Candidate.Quests.Find(QuestID);
+    if(!Quest||!Quest->bAccepted||Quest->bCompleted||!Definitions->GetQuest(QuestID,Definition).bSuccess||!Definition.bAllowAbandon)return false;
+    Quest->bAccepted=false;Quest->bStarted=false;Quest->bAbandoned=true;Quest->Objectives.Reset();Quest->AcceptedAtGameMinute=0;
+    TGuardValue<bool> Guard(IsProcessing,true);
+    if(!State->CommitGameplayTransaction(Candidate,FGuid::NewGuid()))return false;
+    InventoryBaseline=State->GetInventorySnapshot();IsBaselineReady=true;return true;
 }
 
 bool UICQuestSubsystem::IsObjectiveComplete(const FICQuestObjectiveDefinition& Objective,
@@ -322,7 +377,7 @@ bool UICQuestSubsystem::PrepareDeliveryObjectives(const FICQuestRow& Definition,
     FICWorldState& World) const
 {
     FICQuestState* Quest = World.Quests.Find(Definition.ID);
-    if (!Quest || !Quest->bAccepted || Quest->bCompleted)
+    if (!Quest || !Quest->bAccepted || !Quest->bStarted || Quest->bCompleted)
     {
         return false;
     }
@@ -416,7 +471,7 @@ bool UICQuestSubsystem::CompleteQuest(FName QuestID, const FICQuestRow& Definiti
     }
     FICWorldState Candidate = PreparedWorld ? *PreparedWorld : State->ExportState();
     FICQuestState* Quest = Candidate.Quests.Find(QuestID);
-    if (!Quest || !Quest->bAccepted || Quest->bCompleted
+    if (!Quest || !Quest->bAccepted || !Quest->bStarted || Quest->bCompleted
         || (!IsForced && !AreObjectivesComplete(Definition, *Quest, Candidate)))
     {
         return false;
@@ -441,6 +496,7 @@ bool UICQuestSubsystem::CompleteQuest(FName QuestID, const FICQuestRow& Definiti
     Quest = Candidate.Quests.Find(QuestID);
     const FGuid TransactionID = FGuid::NewGuid();
     Quest->bCompleted = true;
+    Quest->bStarted = false;
     Quest->bRewardClaimed = IsRewardApplied;
     Quest->RewardTransactionID = IsRewardApplied ? TransactionID : FGuid();
     Quest->CompletionCount++;
@@ -465,7 +521,7 @@ int32 UICQuestSubsystem::ForceCompleteActiveQuests()
     int32 CompletedCount = 0;
     for (const auto& Entry : World.Quests)
     {
-        if (!Entry.Value.bAccepted || Entry.Value.bCompleted)
+        if (!Entry.Value.bAccepted || !Entry.Value.bStarted || Entry.Value.bCompleted)
         {
             continue;
         }
@@ -545,7 +601,7 @@ bool UICQuestSubsystem::DeliverItem(FName QuestID, FName ObjectiveID)
     }
     FICWorldState Candidate = State->ExportState();
     FICQuestState* Quest = Candidate.Quests.Find(QuestID);
-    if (!Quest || !Quest->bAccepted || Quest->bCompleted)
+    if (!Quest || !Quest->bAccepted || !Quest->bStarted || Quest->bCompleted)
     {
         return false;
     }
@@ -599,7 +655,7 @@ bool UICQuestSubsystem::ReportObjectiveEvent(EICQuestObjectiveType Type, FName T
     for (FName QuestID : QuestIDs)
     {
         FICQuestState* Quest = Candidate.Quests.Find(QuestID);
-        if (!Quest || !Quest->bAccepted || Quest->bCompleted)
+        if (!Quest || !Quest->bAccepted || !Quest->bStarted || Quest->bCompleted)
         {
             continue;
         }
@@ -695,7 +751,7 @@ void UICQuestSubsystem::HandleInventoryChanged()
     for (FName QuestID : QuestIDs)
     {
         FICQuestState* Quest = Candidate.Quests.Find(QuestID);
-        if (!Quest || !Quest->bAccepted || Quest->bCompleted)
+        if (!Quest || !Quest->bAccepted || !Quest->bStarted || Quest->bCompleted)
         {
             continue;
         }
@@ -791,7 +847,7 @@ void UICQuestSubsystem::EvaluateQuests()
             }
             FICWorldState World = State->ExportState();
             const FICQuestState* Quest = World.Quests.Find(QuestID);
-            if ((!Quest || !Quest->bAccepted) && Definition.IsAutoAccept && CanAccept(Definition, World))
+            if ((!Quest || (!Quest->bAccepted&&!Quest->bAbandoned)) && Definition.IsAutoAccept && CanAccept(Definition, World))
             {
                 if (AcceptQuest(QuestID))
                 {
@@ -800,7 +856,7 @@ void UICQuestSubsystem::EvaluateQuests()
                     Quest = World.Quests.Find(QuestID);
                 }
             }
-            if (Quest && Quest->bAccepted && !Quest->bCompleted
+            if (Quest && Quest->bAccepted && Quest->bStarted && !Quest->bCompleted
                 && Definition.CompletionMode == EICQuestCompletionMode::SystemEvent
                 && AreObjectivesComplete(Definition, *Quest, World)
                 && CompleteQuest(QuestID, Definition))
@@ -816,4 +872,40 @@ void UICQuestSubsystem::EvaluateQuests()
     IsProcessing = false;
     InventoryBaseline = State->GetInventorySnapshot();
     IsBaselineReady = true;
+}
+
+int32 UICQuestSubsystem::GetNPCQuestMarker(FName NPCID) const
+{
+    if (!Definitions || !State || NPCID.IsNone()) return 0;
+    const auto World = State->ExportState();
+    if(const auto* NPC=World.Characters.Find(NPCID);NPC&&NPC->IsDowned())return 0;
+    FICDefinitionResult NPCResult;const auto* NPCDefinition=Definitions->Find<FICNPCRow>(NPCID,NPCResult);
+    TArray<FName> IDs; Definitions->GetDefinitionIDs(EICDefinitionType::Quest, IDs);
+    bool Available = false;
+    for (FName ID : IDs)
+    {
+        FICDefinitionResult Result; const auto* Quest = Definitions->Find<FICQuestRow>(ID, Result);
+        if (!Quest) continue;
+        const auto* Progress = World.Quests.Find(ID);
+        if (Progress && Progress->bAccepted && Progress->bStarted && !Progress->bCompleted && !Progress->bAbandoned)
+        {
+            const bool Ready=AreQuestObjectivesReady(ID);
+            if (Quest->TurnInNPCID == NPCID && Ready) return 2;
+            if(Ready)continue;
+            for (const auto& Group : Quest->ObjectiveGroups)
+            {
+                if(Group.Policy==EICConditionPolicy::Any&&Group.Objectives.ContainsByPredicate([&](const auto& O){return IsObjectiveComplete(O,*Progress,World);}))continue;
+                for (const auto& Objective : Group.Objectives)
+                    if ((Objective.Target.Type == EICDefinitionType::NPC && Objective.Target.ID == NPCID)
+                        ||(NPCDefinition&&!NPCDefinition->InitialAnchorID.IsNone()
+                            &&(Objective.GuidanceAnchorID==NPCDefinition->InitialAnchorID
+                                ||(Objective.Target.Type==EICDefinitionType::Anchor&&Objective.Target.ID==NPCDefinition->InitialAnchorID))))
+                    {
+                        if (!IsObjectiveComplete(Objective, *Progress, World)) return 2;
+                    }
+            }
+        }
+        if (Quest->OfferNPCID == NPCID && CanOfferQuest(ID)) Available = true;
+    }
+    return Available ? 1 : 0;
 }

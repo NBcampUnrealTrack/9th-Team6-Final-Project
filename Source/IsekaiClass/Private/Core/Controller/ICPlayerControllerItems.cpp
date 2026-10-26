@@ -132,8 +132,11 @@ void AICPlayerController::ConfirmTarget(FName Target)
 void AICPlayerController::PlayerDied()
 {
     IC_TRACE_FUNCTION();
+    if(bDead)return;
     UE_LOG(LogICCore, Log, TEXT("[Player.Died] Controller=%s"),*GetNameSafe(this));
-    bDead=true;SetMenu(TEXT("Load"));ShowLocalized(ICText::Get(TEXT("Native_2a469f1dc6da")));
+    bDead=true;bExitAfterSave=false;bQuitAfterWrite=false;
+    LoadReturnMenu=SaveReturnMenu=TEXT("Death");
+    SetMenu(TEXT("Death"));ShowLocalized(ICText::Get(TEXT("Native_2a469f1dc6da")));
 }
 void AICPlayerController::OpenContainer(FName ID,bool Home,bool Access)
 {

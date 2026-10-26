@@ -16,11 +16,20 @@
 #include "Core/Controller/ICPlayerController.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Data/Rows/NPC/ICGiftPreferenceRow.h"
+#include "Components/WidgetComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "UI/Quest/ICNPCQuestMarkerWidget.h"
 AICNPCBase::AICNPCBase()
 {
     IC_TRACE_FUNCTION();
     AIControllerClass=AICAIController::StaticClass();
     AutoPossessAI=EAutoPossessAI::Disabled;
+    QuestMarker=CreateDefaultSubobject<UWidgetComponent>(TEXT("QuestMarker"));
+    QuestMarker->SetupAttachment(GetCapsuleComponent());
+    QuestMarker->SetWidgetSpace(EWidgetSpace::Screen);
+    QuestMarker->SetDrawSize(FVector2D(70,80));
+    QuestMarker->SetRelativeLocation(FVector(0,0,125));
+    QuestMarker->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     auto* Movement=GetCharacterMovement();
     Movement->MaxWalkSpeed=ScheduleMoveSpeed;
@@ -40,7 +49,7 @@ bool AICNPCBase::InitializeNPC(FName ID)
 
 
     auto State=WorldState()->GetSnapshot(ID);const FName AnchorID=!State.CurrentAnchorID.IsNone()?State.CurrentAnchorID:NPC->InitialAnchorID;
-    if(!AnchorID.IsNone())if(auto* Spawns=GetWorld()->GetSubsystem<UICSpawnSubsystem>())
+    if(State.Mode==EICCharacterMode::Scheduled&&!AnchorID.IsNone())if(auto* Spawns=GetWorld()->GetSubsystem<UICSpawnSubsystem>())
     {
         FTransform AnchorTransform;
         if(Spawns->ResolveLoadedAnchor(AnchorID,AnchorTransform))
@@ -55,14 +64,22 @@ bool AICNPCBase::InitializeNPC(FName ID)
     if(auto* CharacterMesh=Definition.Mesh.LoadSynchronous()){GetMesh()->SetSkeletalMesh(CharacterMesh);GetMesh()->SetRelativeTransform(Definition.MeshTransform);}
     if(auto* Anim=Definition.AnimationClass.LoadSynchronous())GetMesh()->SetAnimInstanceClass(Anim);
     RefreshWeaponAppearance();
-    bInitialized=true;RefreshExecution();return true;
+    bInitialized=true;
+    if(auto* MarkerClass=LoadClass<UICNPCQuestMarkerWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_NPCQuestMarker.WBP_IC_NPCQuestMarker_C")))
+    {
+        QuestMarker->SetRelativeLocation(FVector(0,0,GetCapsuleComponent()->GetScaledCapsuleHalfHeight()+40));
+        QuestMarker->SetWidgetClass(MarkerClass);QuestMarker->InitWidget();
+        if(auto* Marker=Cast<UICNPCQuestMarkerWidget>(QuestMarker->GetWidget()))Marker->SetNPC(this);
+    }
+    RefreshExecution();return true;
 }
 void AICNPCBase::RefreshExecution()
 {
     IC_TRACE_FUNCTION();if(!bInitialized||!WorldState())return;const auto S=WorldState()->GetSnapshot(CharacterID);
     if(S.IsDowned()){if(auto* AI=Cast<AICAIController>(GetController()))AI->StopExecution();return;}
     GetWorldTimerManager().ClearTimer(DefeatTimer);SetActorEnableCollision(true);
-    if(!GetController())SpawnDefaultController();if(auto* AI=Cast<AICAIController>(GetController()))AI->StartExecution(Cast<UStateTree>(Definition.ScheduleStateTree.LoadSynchronous()),nullptr);
+    if(!GetController())SpawnDefaultController();if(auto* AI=Cast<AICAIController>(GetController()))AI->StartExecution(
+        S.Mode==EICCharacterMode::Companion?nullptr:Cast<UStateTree>(Definition.ScheduleStateTree.LoadSynchronous()),nullptr);
 }
 void AICNPCBase::HandleZeroHP()
 {
@@ -95,7 +112,7 @@ bool AICNPCBase::TryInteract(AICPlayerController* Requester)
     IC_TRACE_FUNCTION();
     if(!bInitialized||!Requester||bInteracting||!WorldState())return false;
     const auto State=WorldState()->GetSnapshot(CharacterID);
-    if(State.IsDowned()||State.Mode!=EICCharacterMode::Scheduled)
+    if(State.IsDowned()||(State.Mode!=EICCharacterMode::Scheduled&&!CanDismiss()))
     {UE_LOG(LogICInteraction,Verbose,TEXT("[NPC.InteractRejected] NPC=%s Mode=%d Downed=%d"),*CharacterID.ToString(),static_cast<int32>(State.Mode),State.IsDowned()?1:0);return false;}
     const TArray<FName> Services=GetAvailableServices();
     const FName ServiceID=Services.Num()>0?Services[0]:NAME_None;
@@ -119,28 +136,92 @@ void AICNPCBase::EndInteraction()
 }
 bool AICNPCBase::TryGiveGift(AICPlayerController* Requester, FName ItemID)
 {
-    if (!Requester || !WorldState() || !Requester->GetPawn()
-        || FVector::DistSquared(Requester->GetPawn()->GetActorLocation(),GetActorLocation())>FMath::Square(350.f)) return false;
+    auto Fail=[Requester](const FText& Message){if(Requester)Requester->ShowLocalized(Message);return false;};
+    if (!Requester || Requester->GetWorld()!=GetWorld() || !WorldState() || !Requester->GetPawn()
+        || FVector::DistSquared(Requester->GetPawn()->GetActorLocation(),GetActorLocation())>FMath::Square(350.f))
+        return Fail(NSLOCTEXT("ICGift","TooFar","NPC 가까이에서 선물해 주세요."));
+    if(ItemID.IsNone())return Fail(NSLOCTEXT("ICGift","ChooseItem","선물할 아이템을 선택해 주세요."));
     auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult Result;
     const auto* Preference=D->Find<FICGiftPreferenceRow>(Definition.GiftPreferenceID,Result);
-    if (!Preference) return false;
-    if (ItemID.IsNone()) for(const auto& Entry:Preference->Items) if(Entry.Preference==EICGiftPreference::Preferred){ItemID=Entry.ItemID;break;}
+    if (!Preference)return Fail(NSLOCTEXT("ICGift","Unavailable","이 NPC에게는 선물할 수 없습니다."));
     const auto* Item=D->Find<FICItemRow>(ItemID,Result);
-    if(!Item || !Item->bCanGift || !WorldState()->FlushParticipants())return false;
+    if(!Item||!Item->bCanGift||Item->Kind==EPlayerItemKind::Quest||Item->Tab==EPlayerItemTab::Quest)
+        return Fail(NSLOCTEXT("ICGift","ItemUnavailable","선물할 수 없는 아이템입니다."));
+    if(!WorldState()->FlushParticipants())return Fail(NSLOCTEXT("ICGift","StateChanged","아이템 상태가 변경되었습니다. 다시 선택해 주세요."));
     auto Next=WorldState()->ExportState();auto* NPC=Next.Characters.Find(CharacterID);
-    if(!NPC || NPC->Mode!=EICCharacterMode::Scheduled || NPC->IsDowned() || NPC->Affinity>=500)return false;
+    if(!NPC||(NPC->Mode!=EICCharacterMode::Scheduled&&NPC->Mode!=EICCharacterMode::Companion)||NPC->IsDowned())
+        return Fail(NSLOCTEXT("ICGift","NPCUnavailable","지금은 선물을 받을 수 없습니다."));
     const auto* Entry=Preference->Items.FindByPredicate([ItemID](const auto& E){return E.ItemID==ItemID;});
-    const int32 Delta=Entry&&Entry->Preference==EICGiftPreference::Preferred?Preference->PreferredAffinityDelta:0;
-    if(Delta<=0)return false;
+    const auto Kind=Entry?Entry->Preference:EICGiftPreference::Neutral;
+    const int32 Delta=Kind==EICGiftPreference::Preferred?Preference->PreferredAffinityDelta
+        :Kind==EICGiftPreference::Disliked?Preference->DislikedAffinityDelta:Preference->NeutralAffinityDelta;
+    if(Delta>0&&NPC->Affinity>=500)return Fail(NSLOCTEXT("ICGift","MaxAffinity","호감도가 이미 최대입니다."));
     auto* Slot=Next.Inventory.Bag.Slots.FindByPredicate([ItemID](const auto& S){return S.ItemID==ItemID&&!S.IsEmpty()&&!S.bLocked;});
-    if(!Slot){Requester->Show(*ICText::Get(TEXT("Native_1b92f3386b82")).ToString());return false;}
+    if(!Slot)return Fail(NSLOCTEXT("ICGift","MissingItem","선물할 아이템이 없거나 잠겨 있습니다."));
     if(--Slot->Count==0)*Slot=FPlayerItemInstance();
-    NPC->Affinity=FMath::Clamp(NPC->Affinity+Delta,0,500);
-    if(NPC->Affinity>=100)if(const auto* Combat=D->Find<FICRecruitCombatRow>(Definition.RecruitCombatID,Result))
+    const int32 PreviousAffinity=NPC->Affinity;
+    NPC->Affinity=static_cast<int32>(FMath::Clamp<int64>(int64(NPC->Affinity)+Delta,0,500));
+    const int32 ActualDelta=NPC->Affinity-PreviousAffinity;
+    if(Delta>0&&NPC->Affinity>=100)if(const auto* Combat=D->Find<FICRecruitCombatRow>(Definition.RecruitCombatID,Result))
         if(auto* Player=Next.Characters.Find(UICWorldStateSubsystem::PlayerId()))Player->UnlockedSkillIDs.Add(Combat->UniqueSkillID);
-    if(!WorldState()->CommitGameplayTransaction(Next,FGuid::NewGuid()))return false;
-    Requester->ShowLocalized(ICText::FormatText(TEXT("Native_70097e9476da"),Delta));return true;
+    if(!WorldState()->CommitGameplayTransaction(Next,FGuid::NewGuid()))return Fail(NSLOCTEXT("ICGift","CommitFailed","선물을 전달하지 못했습니다. 다시 시도해 주세요."));
+    const FText Name=Item->DisplayName.IsEmpty()?FText::FromName(ItemID):Item->DisplayName;
+    FNumberFormattingOptions Signed;Signed.SetAlwaysSign(true);
+    Requester->ShowLocalized(ActualDelta==0?FText::Format(NSLOCTEXT("ICGift","Given","{0} 1개를 선물했습니다."),Name)
+        :FText::Format(NSLOCTEXT("ICGift","GivenAffinity","{0} 1개를 선물했습니다. 호감도 {1}"),Name,FText::AsNumber(ActualDelta,&Signed)));
+    return true;
 }
+bool AICNPCBase::CanRecruit() const
+{
+    const auto* State = WorldState();
+    const auto* Character = State ? State->GetStoredCharacter(CharacterID) : nullptr;
+    return bInitialized && Definition.Type == EICNPCType::Recruitable && Definition.bRecruitable && Character
+        && Character->Kind == EICCharacterKind::Recruitable && Character->Affinity >= 300
+        && Character->Mode == EICCharacterMode::Scheduled && Character->PartySlot == INDEX_NONE
+        && !Character->IsDowned();
+}
+
+bool AICNPCBase::TryRecruit(AICPlayerController* Requester)
+{
+    if (!Requester || Requester->GetWorld() != GetWorld() || !bInteracting) return false;
+    if (!CanRecruit())
+    {
+        Requester->ShowLocalized(NSLOCTEXT("ICNPC", "RecruitUnavailable", "현재는 동료로 영입할 수 없습니다."));
+        return false;
+    }
+    auto* State = WorldState();
+    bool Occupied[3] = {false, false, false};
+    for (const auto& Pair : State->ExportState().Characters)
+        if (Pair.Value.PartySlot >= 0 && Pair.Value.PartySlot < UE_ARRAY_COUNT(Occupied))
+            Occupied[Pair.Value.PartySlot] = true;
+    for (int32 Index = 0; Index < UE_ARRAY_COUNT(Occupied); ++Index)
+        if (!Occupied[Index] && State->SetPartySlot(CharacterID, Index))
+        {
+            EndInteraction();
+            Requester->ShowLocalized(NSLOCTEXT("ICNPC", "Recruited", "동료가 되었습니다."));
+            return true;
+        }
+    Requester->ShowLocalized(NSLOCTEXT("ICNPC", "PartyFull", "동료는 최대 3명까지 함께할 수 있습니다."));
+    return false;
+}
+
+bool AICNPCBase::CanDismiss() const
+{
+    const auto* State = WorldState();
+    const auto* Character = State ? State->GetStoredCharacter(CharacterID) : nullptr;
+    return bInitialized && Character && Character->Kind == EICCharacterKind::Recruitable
+        && Character->Mode == EICCharacterMode::Companion && Character->PartySlot >= 0 && !Character->IsDowned();
+}
+
+bool AICNPCBase::TryDismiss(AICPlayerController* Requester)
+{
+    if (!Requester || Requester->GetWorld() != GetWorld() || !bInteracting || !CanDismiss()) return false;
+    if (!WorldState()->SetPartySlot(CharacterID, INDEX_NONE)) return false;
+    EndInteraction();
+    Requester->ShowLocalized(NSLOCTEXT("ICNPC", "Dismissed", "동료를 해제했습니다."));
+    return true;
+}
+
 FText AICNPCBase::GetInteractionText() const
 {
     IC_TRACE_FUNCTION();
@@ -152,6 +233,8 @@ TArray<FICNPCInteractionOption> AICNPCBase::GetInteractionOptions() const
     TArray<FICNPCInteractionOption> Options;
     auto Add=[&Options](EICNPCInteractionOption Kind,const FText& Label,FName ServiceID,bool bEnabled)
     { FICNPCInteractionOption Option;Option.Option=Kind;Option.Label=Label;Option.ServiceID=ServiceID;Option.bEnabled=bEnabled;Options.Add(Option); };
+    if (CanDismiss()) Add(EICNPCInteractionOption::Dismiss, NSLOCTEXT("ICNPC", "Dismiss", "동료 해제하기"), NAME_None, true);
+    else if (CanRecruit()) Add(EICNPCInteractionOption::Recruit, NSLOCTEXT("ICNPC", "Recruit", "동료 영입하기"), NAME_None, true);
     Add(EICNPCInteractionOption::Talk,ICText::Get(TEXT("NPC_Talk")),NAME_None,true);
     Add(EICNPCInteractionOption::Gift,ICText::Get(TEXT("NPC_Gift")),NAME_None,true);
 

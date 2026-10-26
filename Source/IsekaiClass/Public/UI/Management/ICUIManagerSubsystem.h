@@ -45,5 +45,6 @@ private:
     TWeakObjectPtr<APlayerController> MenuController;
     TWeakObjectPtr<UUserWidget> MenuFocus;
     bool bMenuOpen = false;
+    bool bKeyboardNavigationRegistered = false;
     void RefreshContext();
 };

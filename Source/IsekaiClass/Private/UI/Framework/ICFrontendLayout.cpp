@@ -1,4 +1,5 @@
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Gameplay/ICGameplayLayout.h"
 #include "UI/Framework/ICDisplayPolicy.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
@@ -10,6 +11,9 @@
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/ProgressBar.h"
+#include "Components/Slider.h"
+#include "Components/CheckBox.h"
+#include "Components/ComboBoxString.h"
 #include "Components/SafeZone.h"
 #include "Components/ScaleBox.h"
 #include "Components/ScaleBoxSlot.h"
@@ -77,10 +81,10 @@ static UButton* Button(UWidgetTree* Tree, FName Name, const TCHAR* Key,bool With
     if(WithCaption)Widget->AddChild(Label(Tree, FName(*(Name.ToString() + TEXT("_Text"))), Text(Key)));
     return Widget;
 }
-static UVerticalBox* Card(UWidgetTree* Tree, bool Modal = false, float Width = 680.f)
+static UVerticalBox* Card(UWidgetTree* Tree, float Width = 680.f)
 {
     auto* Background = Tree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("Background"));
-    Background->SetBrushColor(FLinearColor(.018f, .026f, .045f, Modal ? .96f : 1.f));
+    Background->SetBrushColor(FLinearColor(.018f, .026f, .045f, 1.f));
     Background->SetPadding(FMargin(24));
     Tree->RootWidget = Background;
     auto* Safe = Tree->ConstructWidget<USafeZone>(USafeZone::StaticClass(), TEXT("SafeZone"));
@@ -191,9 +195,56 @@ void Build(UWidgetTree* Tree, FName Kind)
 {
     if (!Tree || Tree->RootWidget)
         return;
+    if (ICGameplayLayout::Build(Tree, Kind))
+        return;
     if(Kind==TEXT("SaveLoad")||Kind==TEXT("SaveConfirm")||Kind==TEXT("SaveSlot"))
     {
         BuildSave(Tree,Kind);return;
+    }
+    if(Kind==TEXT("Settings"))
+    {
+        auto* Box=Card(Tree,680.f);
+        Row(Box,Label(Tree,TEXT("TXT_SettingsTitle"),Text(TEXT("Native_c14a567ea996")),32),24);
+        Row(Box,Label(Tree,TEXT("TXT_Sensitivity"),Text(TEXT("Native_2201a1d33fe0"))),8);
+        auto* Sensitivity=Tree->ConstructWidget<USlider>(USlider::StaticClass(),TEXT("SLIDER_Sensitivity"));
+        Sensitivity->SetMinValue(.1f);Sensitivity->SetMaxValue(3.f);Sensitivity->SetStepSize(.1f);Sensitivity->SetValue(1.f);
+        Row(Box,Sensitivity,24);
+        Row(Box,Label(Tree,TEXT("TXT_Fullscreen"),Text(TEXT("Native_7c68cb9a9188"))),8);
+        Row(Box,Tree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(),TEXT("CHECK_Fullscreen")),24);
+        Row(Box,Label(Tree,TEXT("TXT_Quality"),Text(TEXT("Native_1e65f19be778"))),8);
+        auto* Quality=Tree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass(),TEXT("COMBO_Quality"));
+        // ComboBoxString exposes its font only at construction time.
+        PRAGMA_DISABLE_DEPRECATION_WARNINGS
+        Quality->Font=Font(20);
+        PRAGMA_ENABLE_DEPRECATION_WARNINGS
+        for(const TCHAR* Key:{TEXT("Native_437ac8ceeb09"),TEXT("Native_c7e54fe95951"),TEXT("Native_962636f483b3"),TEXT("Native_791384293309")})
+            Quality->AddOption(Text(Key).ToString());
+        Quality->SetSelectedIndex(2);Row(Box,Quality,28);
+        Row(Box,Button(Tree,TEXT("BTN_Apply"),TEXT("Native_e01dd02f527f")),12);
+        Row(Box,Button(Tree,TEXT("BTN_Close"),TEXT("Native_94b7dba15907")),20);
+        Row(Box,Label(Tree,TEXT("TXT_SettingsHint"),NSLOCTEXT("ICSettings","KeyboardHint","W / S  이동     A / D  변경     Enter  선택     ESC  닫기"),16),0);
+        return;
+    }
+    if(Kind==TEXT("Death"))
+    {
+        auto* Background=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("DeathBackground"));
+        Background->SetBrushColor(FLinearColor::Black);Background->SetPadding(FMargin(0));Tree->RootWidget=Background;
+        auto* Canvas=Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("DeathCanvas"));Background->SetContent(Canvas);
+        auto* Width=Tree->ConstructWidget<USizeBox>(USizeBox::StaticClass(),TEXT("DeathContent"));Width->SetWidthOverride(440);
+        auto* Placement=Canvas->AddChildToCanvas(Width);Placement->SetAnchors(FAnchors(.5f,.5f));Placement->SetAlignment({.5f,.5f});Placement->SetAutoSize(true);
+        auto* Content=Tree->ConstructWidget<UVerticalBox>();Width->SetContent(Content);
+        auto* Title=Label(Tree,TEXT("TXT_Death"),NSLOCTEXT("ICDeath","Title","사망하였습니다."),46);
+        Title->SetJustification(ETextJustify::Center);Title->SetColorAndOpacity(FLinearColor::White);Row(Content,Title,48);
+        const TCHAR* Keys[]={TEXT("Load"),TEXT("ToTitle"),TEXT("Quit")};
+        const TCHAR* Names[]={TEXT("BTN_Load"),TEXT("BTN_MainMenu"),TEXT("BTN_Quit")};
+        const FText Labels[]={NSLOCTEXT("ICDeath","Load","불러오기"),NSLOCTEXT("ICDeath","MainMenu","메인메뉴"),NSLOCTEXT("ICDeath","Quit","그만하기")};
+        for(int32 Index=0;Index<3;++Index)
+        {
+            auto* Action=Button(Tree,Names[Index],Keys[Index]);
+            auto* Caption=CastChecked<UTextBlock>(Action->GetContent());Caption->SetText(Labels[Index]);Caption->SetJustification(ETextJustify::Center);Caption->SetFont(Font(24));
+            auto* Height=Tree->ConstructWidget<USizeBox>();Height->SetHeightOverride(68);Height->SetContent(Action);Row(Content,Height,Index==2?0:16);
+        }
+        return;
     }
     if (Kind == TEXT("Root"))
     {
@@ -218,60 +269,7 @@ void Build(UWidgetTree* Tree, FName Kind)
                                                                         TEXT("Layer_Loading")));
         return;
     }
-    if (Kind == TEXT("HUD"))
-    {
-        auto* Root = Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("HUDCanvas"));
-        Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-        Tree->RootWidget = Root;
-        auto* Status = Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("Status"));
-        auto* StatusSlot = Root->AddChildToCanvas(Status);
-        StatusSlot->SetOffsets(FMargin(32, 28, 330, 220));
-        Row(Status, Label(Tree, TEXT("TXT_Player"), Text(TEXT("Title")), 24));
-        const TCHAR* Names[] = {TEXT("HP"), TEXT("MP"), TEXT("SP")};
-        const FLinearColor Colors[] = {FLinearColor(.7f, .13f, .12f), FLinearColor(.15f, .4f, .8f),
-                                       FLinearColor(.65f, .55f, .16f)};
-        for (int32 I = 0; I < 3; ++I)
-        {
-            Row(Status, Label(Tree, FName(*FString::Printf(TEXT("TXT_%s"), Names[I])), FText::FromString(Names[I]), 16),
-                3);
-            auto* Bar = Tree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(),
-                                                            FName(*FString::Printf(TEXT("BAR_%s"), Names[I])));
-            Bar->SetFillColorAndOpacity(Colors[I]);
-            Row(Status, Bar, 10);
-        }
-        auto* HintSlot = Root->AddChildToCanvas(Label(Tree, TEXT("TXT_Hint"), FText::GetEmpty(), 24));
-        HintSlot->SetAnchors(FAnchors(.5f, .76f));
-        HintSlot->SetAlignment(FVector2D(.5f, .5f));
-        HintSlot->SetOffsets(FMargin(0, 0, 700, 70));
-        auto* FooterSlot = Root->AddChildToCanvas(Label(Tree, TEXT("TXT_Controls"), Text(TEXT("Controls")), 16));
-        FooterSlot->SetAnchors(FAnchors(0, 1, 1, 1));
-        FooterSlot->SetOffsets(FMargin(32, -64, 32, 50));
-        auto* NoticeSlot = Root->AddChildToCanvas(Label(Tree, TEXT("TXT_Notice"), FText::GetEmpty(), 18));
-        NoticeSlot->SetAnchors(FAnchors(.5f, .9f));
-        NoticeSlot->SetAlignment(FVector2D(.5f, .5f));
-        NoticeSlot->SetOffsets(FMargin(0, 0, 850, 80));
-        auto* Menu = Tree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("MenuPanel"));
-        Menu->SetBrushColor(FLinearColor(.02f, .03f, .05f, .98f));
-        Menu->SetPadding(FMargin(28));
-        auto* MenuSlot = Root->AddChildToCanvas(Menu);
-        MenuSlot->SetAnchors(FAnchors(.5f, .5f));
-        MenuSlot->SetAlignment(FVector2D(.5f, .5f));
-        MenuSlot->SetOffsets(FMargin(0, 0, 680, 650));
-        auto* MenuBox = Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("MenuBox"));
-        Menu->SetContent(MenuBox);
-        Row(MenuBox, Label(Tree, TEXT("TXT_Menu"), Text(TEXT("Menu")), 28));
-        auto* Scroll = Tree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("MenuScroll"));
-        Scroll->AddChild(Label(Tree, TEXT("TXT_MenuBody"), FText::GetEmpty(), 17));
-        auto* ScrollSlot = MenuBox->AddChildToVerticalBox(Scroll);
-        ScrollSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-        for (const auto* Key : {TEXT("Party"), TEXT("Inventory"), TEXT("Quest"), TEXT("Codex"),
-                                TEXT("Settings"), TEXT("Resume"), TEXT("Save"), TEXT("Load"),
-                                TEXT("GameSettings"), TEXT("Quit")})
-            Row(MenuBox, Button(Tree, FName(*FString::Printf(TEXT("BTN_%s"), Key)), Key), 8);
-        Menu->SetVisibility(ESlateVisibility::Collapsed);
-        return;
-    }
-    auto* Box = Card(Tree, Kind == TEXT("Confirm"), Kind == TEXT("Questions") ? 1080.f : 680.f);
+    auto* Box = Card(Tree, Kind == TEXT("Questions") ? 1080.f : 680.f);
     if (Kind == TEXT("Mainmenu"))
     {
         auto* Title = Label(Tree, TEXT("TXT_Title"), Text(TEXT("Title")), 46);
@@ -311,13 +309,6 @@ void Build(UWidgetTree* Tree, FName Kind)
         }
         Row(Box, Label(Tree, TEXT("TXT_Error"), FText::GetEmpty(), 16), 14);
         Row(Box, Button(Tree, TEXT("BTN_Next"), TEXT("SetName")), 0);
-    }
-    else if (Kind == TEXT("Confirm"))
-    {
-        Row(Box, Label(Tree, TEXT("TXT_Title"), Text(TEXT("ConfirmTitle")), 28), 22);
-        Row(Box, Label(Tree, TEXT("TXT_Message"), FText::GetEmpty(), 20), 24);
-        Row(Box, Button(Tree, TEXT("BTN_Accept"), TEXT("Begin")), 12);
-        Row(Box, Button(Tree, TEXT("BTN_Cancel"), TEXT("Back")), 0);
     }
     else if (Kind == TEXT("Loading"))
     {

@@ -21,21 +21,23 @@ void UICDefinitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
     if (!Catalog) UE_LOG(LogICData, Error, TEXT("[Definition.Initialize] 필수 카탈로그를 로드하지 못했습니다. Project Settings의 Definition Catalog 경로=%s"), *GetDefault<UICDefinitionSettings>()->Catalog.ToSoftObjectPath().ToString());
 }
 void UICDefinitionSubsystem::Deinitialize()
-{ IC_TRACE_FUNCTION(); UE_LOG(LogICData, Log, TEXT("[Definition.Deinitialize] 캐시 테이블=%d"),LoadedTables.Num()); LoadedTables.Reset(); CachedSchemaTypes.Reset(); Catalog=nullptr; Super::Deinitialize(); }
+{ IC_TRACE_FUNCTION(); UE_LOG(LogICData, Log, TEXT("[Definition.Deinitialize] 캐시 테이블=%d"),LoadedTables.Num()); LoadedTables.Reset(); Catalog=nullptr; Super::Deinitialize(); }
 void UICDefinitionSubsystem::ConfigureCatalog(UICDefinitionCatalog* InCatalog)
+{ IC_TRACE_FUNCTION(); LoadedTables.Reset(); NativeSchemaTypes.Reset(); CacheNativeSchemas(); Catalog=InCatalog; UE_LOG(LogICData, Verbose, TEXT("[Definition.Configure] Catalog=%s Tables=%d StringTables=%d"),*GetPathNameSafe(Catalog),Catalog?Catalog->Tables.Num():0,Catalog?Catalog->StringTables.Num():0); }
+
+void UICDefinitionSubsystem::CacheNativeSchemas() const
 {
-    IC_TRACE_FUNCTION(); LoadedTables.Reset(); CachedSchemaTypes.Reset(); Catalog=InCatalog;
-    for(const auto& Schema:UICDefinitionLibrary::GetDefinitionSchemas())
-        CachedSchemaTypes.Add(Schema.RowStruct.Get(),Schema.Type);
-    UE_LOG(LogICData, Verbose, TEXT("[Definition.Configure] Catalog=%s Tables=%d StringTables=%d"),*GetPathNameSafe(Catalog),Catalog?Catalog->Tables.Num():0,Catalog?Catalog->StringTables.Num():0);
+    if(!NativeSchemaTypes.IsEmpty())return;
+    for(const auto& Schema:UICDefinitionLibrary::GetDefinitionSchemas())NativeSchemaTypes.Add(Schema.RowStruct,Schema.Type);
 }
 
 UDataTable* UICDefinitionSubsystem::LoadTable(const FICDefinitionBinding& Binding, FICDefinitionResult& Result) const
 {
     IC_TRACE_FUNCTION();
     Result.Table=Binding.Table.ToSoftObjectPath().ToString();
-    const auto* SchemaType=CachedSchemaTypes.Find(Binding.RowStruct.Get());
-    if(!Binding.RowStruct || !SchemaType || *SchemaType!=Binding.Type)
+    CacheNativeSchemas();
+    const auto* NativeType=NativeSchemaTypes.Find(Binding.RowStruct);
+    if(!NativeType || *NativeType!=Binding.Type)
     { Failure(Result,EICDefinitionFailure::WrongRowStruct,TEXT("RowStruct"),TEXT("Catalog type and native row schema do not agree."));return nullptr; }
     UDataTable* Table=Binding.Table.LoadSynchronous();
     if(!Table) {Failure(Result,EICDefinitionFailure::TableLoadFailed,TEXT("Table"),TEXT("Registered DataTable could not be loaded."));return nullptr;}
@@ -49,16 +51,17 @@ const FICDefinitionRow* UICDefinitionSubsystem::FindRow(FName ID,const UScriptSt
 {
     IC_TRACE_FUNCTION();
     Result=FICDefinitionResult(); Result.ID=Result.Row=ID;
-    const auto* SchemaType=CachedSchemaTypes.Find(ExpectedStruct);
-    if(!SchemaType) {Failure(Result,EICDefinitionFailure::WrongRowStruct,TEXT("RowStruct"),TEXT("Expected a registered IC native row struct."));return nullptr;}
-    Result.Type=*SchemaType;
+    CacheNativeSchemas();
+    const auto* NativeType=NativeSchemaTypes.Find(ExpectedStruct);
+    if(!NativeType) {Failure(Result,EICDefinitionFailure::WrongRowStruct,TEXT("RowStruct"),TEXT("Expected a registered IC native row struct."));return nullptr;}
+    Result.Type=*NativeType;
     if(!UICDefinitionLibrary::IsDefinitionIDValid(ID)) {Failure(Result,EICDefinitionFailure::InvalidID,TEXT("ID"),TEXT("ID must contain uppercase letters, digits or underscores (maximum 40)."));return nullptr;}
     if(!Catalog) {Failure(Result,EICDefinitionFailure::CatalogUnavailable,TEXT("Catalog"),TEXT("Definition catalog is not configured or could not be loaded."));return nullptr;}
     const FICDefinitionRow* Found=nullptr; FString FoundTable; bool bRegistered=false;
 
     for(const auto& Binding:Catalog->Tables)
     {
-        if(Binding.Type!=*SchemaType)continue;
+        if(Binding.Type!=*NativeType)continue;
         bRegistered |= Binding.RowStruct==ExpectedStruct;
         UDataTable* Table=LoadTable(Binding,Result);if(!Table)return nullptr;
         const uint8* const* Bytes=Table->GetRowMap().Find(ID);if(!Bytes)continue;

@@ -1,6 +1,10 @@
 #include "UI/Dialogue/ICNPCDialogueWidget.h"
 
 #include "UI/Dialogue/ICDialogueEntryWidget.h"
+#include "UI/Dialogue/ICNPCGiftWidget.h"
+#include "UI/Management/ICUIManagerSubsystem.h"
+#include "Engine/LocalPlayer.h"
+#include "UI/Dialogue/ICAffinityHeartsWidget.h"
 #include "NPC/Character/ICNPCBase.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -13,6 +17,8 @@
 #include "InputCoreTypes.h"
 
 static const FName DialogueQuestsEntry(TEXT("IC.Dialogue.Quests"));
+static const FName DialogueRecruitEntry(TEXT("IC.Dialogue.Recruit"));
+static const FName DialogueDismissEntry(TEXT("IC.Dialogue.Dismiss"));
 static const FName DialogueTalkEntry(TEXT("IC.Dialogue.Talk"));
 static const FName DialogueGiftEntry(TEXT("IC.Dialogue.Gift"));
 static const FName DialogueTradeEntry(TEXT("IC.Dialogue.Trade"));
@@ -27,6 +33,13 @@ void UICNPCDialogueWidget::NativeConstruct()
 {
     Super::NativeConstruct();
     SetIsFocusable(true);
+    BoundState = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>() : nullptr;
+    if (BoundState)
+    {
+        BoundState->OnCharacterChanged.AddUniqueDynamic(this, &ThisClass::CharacterChanged);
+        BoundState->OnWorldRestored.AddUniqueDynamic(this, &ThisClass::RefreshAffinity);
+    }
+    RefreshAffinity();
 }
 
 void UICNPCDialogueWidget::OpenForNPC(AICNPCBase* InNPC)
@@ -37,28 +50,42 @@ void UICNPCDialogueWidget::OpenForNPC(AICNPCBase* InNPC)
     const FICNPCRow& Definition = NPC->GetNPCDefinition();
     const FICTextLookupResult Name = UICTextLibrary::ResolveText(NPCStringTable, Definition.NameKey);
     SpeakerText->SetText(Name.bSuccess ? Name.Text : FText::FromName(Definition.ID));
+    RefreshAffinity();
 
-    ShowInteractionOptions();
+    SelectedQuestID=NAME_None;
+    ShowInitialDialogue();
 }
 
 void UICNPCDialogueWidget::ShowInteractionOptions()
 {
+    if (bUpdatingOptions) return;
+    TGuardValue<bool> Guard(bUpdatingOptions, true);
+    bShowingInteractionOptions = true;
+    bRecruitEntryShown = false;
+    bDismissEntryShown = false;
     SelectedQuestID = NAME_None;
     SelectedDialogueID = NAME_None;
     SelectedNodeID = NAME_None;
-    Entries->ClearChildren();
+    ClearEntries();
     DialogueText->SetText(FText::GetEmpty());
     if (!NPC) return;
 
+    const auto Options = NPC->GetInteractionOptions();
+    for (const auto& Option : Options)
+        if (Option.Option == EICNPCInteractionOption::Recruit || Option.Option == EICNPCInteractionOption::Dismiss)
+        {
+            const bool Dismiss = Option.Option == EICNPCInteractionOption::Dismiss;
+            AddEntry(Dismiss ? DialogueDismissEntry : DialogueRecruitEntry, Option.Label, Option.bEnabled);
+            bDismissEntryShown = Dismiss;
+            bRecruitEntryShown = !Dismiss;
+        }
     AddEntry(DialogueQuestsEntry, QuestsText);
-    for (const FICNPCInteractionOption& Option : NPC->GetInteractionOptions())
+    for (const FICNPCInteractionOption& Option : Options)
     {
         FName EntryID;
         switch (Option.Option)
         {
-        case EICNPCInteractionOption::Talk: EntryID = DialogueTalkEntry; break;
         case EICNPCInteractionOption::Gift: EntryID = DialogueGiftEntry; break;
-        case EICNPCInteractionOption::Trade: EntryID = DialogueTradeEntry; break;
         case EICNPCInteractionOption::End: EntryID = DialogueCloseEntry; break;
         default: continue;
         }
@@ -85,17 +112,48 @@ void UICNPCDialogueWidget::ShowInitialDialogue()
             return;
         }
     }
-    ShowInteractionOptions();
+    bShowingInteractionOptions=false;
+    SelectedDialogueID=NAME_None;SelectedNodeID=NAME_None;DialogueEventID=FGuid::NewGuid();
+    ClearEntries();
+    DialogueText->SetText(NSLOCTEXT("ICDialogue","Greeting","안녕하세요. 무슨 일로 오셨나요?"));
+    AddEntry(DialogueOptionsEntry,NextText);
 }
 
 void UICNPCDialogueWidget::NativeDestruct()
 {
+    if(GiftPicker)
+    {
+        auto* Closing=GiftPicker.Get();GiftPicker=nullptr;
+        Closing->OnClosed.RemoveDynamic(this,&ThisClass::GiftPickerClosed);Closing->ClosePicker();
+    }
+    if (BoundState)
+    {
+        BoundState->OnCharacterChanged.RemoveDynamic(this, &ThisClass::CharacterChanged);
+        BoundState->OnWorldRestored.RemoveDynamic(this, &ThisClass::RefreshAffinity);
+        BoundState = nullptr;
+    }
     if (NPC) NPC->EndInteraction();
+    NPC = nullptr;
     if (AICPlayerController* Controller = Cast<AICPlayerController>(GetOwningPlayer()))
     {
         Controller->bInDialogue = false;
     }
     Super::NativeDestruct();
+}
+
+void UICNPCDialogueWidget::CharacterChanged(FName CharacterID)
+{
+    if (IsValid(NPC) && NPC->GetNPCDefinition().ID == CharacterID) RefreshAffinity();
+}
+
+void UICNPCDialogueWidget::RefreshAffinity()
+{
+    auto* State = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>() : nullptr;
+    const auto* Character = State && IsValid(NPC) ? State->GetStoredCharacter(NPC->GetNPCDefinition().ID) : nullptr;
+    if (AffinityHearts) AffinityHearts->SetAffinity(Character ? Character->Affinity : 0);
+    if (bShowingInteractionOptions && !bUpdatingOptions && IsValid(NPC)
+        && (bRecruitEntryShown != NPC->CanRecruit() || bDismissEntryShown != NPC->CanDismiss()))
+        ShowInteractionOptions();
 }
 
 void UICNPCDialogueWidget::AddEntry(FName EntryID, const FText& Label, bool IsEnabled)
@@ -105,14 +163,97 @@ void UICNPCDialogueWidget::AddEntry(FName EntryID, const FText& Label, bool IsEn
     if (!Entry) return;
     Entry->SetEntry(EntryID, Label, IsEnabled);
     Entry->OnEntryPressed.AddUniqueDynamic(this, &ThisClass::HandleEntry);
+    Entry->OnEntryFocused.AddUniqueDynamic(this, &ThisClass::HandleEntryFocused);
     Entries->AddChildToVerticalBox(Entry);
+    if(!SelectedEntry.IsValid()&&Entry->CanSelectEntry())SelectEntry(Entry);
+}
+
+void UICNPCDialogueWidget::ShowGiftPicker()
+{
+    auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
+    if(GiftPicker||!IsValid(NPC)||!PC||!GetOwningLocalPlayer())return;
+    auto* Class=LoadClass<UICNPCGiftWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_NPCGiftPicker.WBP_IC_NPCGiftPicker_C"));
+    GiftPicker=Class?CreateWidget<UICNPCGiftWidget>(PC,Class):nullptr;
+    if(!GiftPicker)return;
+    GiftPicker->OnClosed.AddUniqueDynamic(this,&ThisClass::GiftPickerClosed);
+    GiftPicker->OpenForNPC(NPC);
+    if(!GetOwningLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>()->OpenScreen(GiftPicker,true,200))
+    {GiftPicker->OnClosed.RemoveDynamic(this,&ThisClass::GiftPickerClosed);GiftPicker=nullptr;}
+}
+
+void UICNPCDialogueWidget::GiftPickerClosed(const FText& Message)
+{
+    if(GiftPicker)GiftPicker->OnClosed.RemoveDynamic(this,&ThisClass::GiftPickerClosed);
+    GiftPicker=nullptr;
+    if(!IsValid(NPC))return;
+    ShowInteractionOptions();
+    if(!Message.IsEmpty())DialogueText->SetText(Message);
+    for(auto* Child:Entries->GetAllChildren())
+        if(auto* Entry=Cast<UICDialogueEntryWidget>(Child);Entry&&Entry->GetEntryID()==DialogueGiftEntry)
+        {SelectEntry(Entry);break;}
+}
+
+void UICNPCDialogueWidget::ClearEntries()
+{
+    SelectedEntry.Reset();bEntryFocusPending=false;
+    if(Entries)
+    {
+        // Slate can deliver delayed focus events after a row has been removed.
+        for(auto* Child:Entries->GetAllChildren())
+            if(auto* Entry=Cast<UICDialogueEntryWidget>(Child))
+            {
+                Entry->OnEntryFocused.RemoveDynamic(this,&ThisClass::HandleEntryFocused);
+                Entry->OnEntryPressed.RemoveDynamic(this,&ThisClass::HandleEntry);
+            }
+        Entries->ClearChildren();
+    }
+}
+
+void UICNPCDialogueWidget::SelectEntry(UICDialogueEntryWidget* Entry,bool RequestFocus)
+{
+    if(!Entry||Entry->GetParent()!=Entries||!Entry->CanSelectEntry())return;
+    SelectedEntry=Entry;
+    for(auto* Child:Entries->GetAllChildren())
+        if(auto* Option=Cast<UICDialogueEntryWidget>(Child))Option->SetSelected(Option==Entry);
+    bEntryFocusPending=RequestFocus;
+}
+
+void UICNPCDialogueWidget::HandleEntryFocused(FName EntryID)
+{
+    for(auto* Child:Entries->GetAllChildren())
+        if(auto* Entry=Cast<UICDialogueEntryWidget>(Child);Entry&&Entry->GetEntryID()==EntryID)
+        {SelectEntry(Entry,false);return;}
+}
+
+void UICNPCDialogueWidget::MoveSelection(int32 Direction)
+{
+    TArray<UICDialogueEntryWidget*> Options;
+    for(auto* Child:Entries->GetAllChildren())
+        if(auto* Entry=Cast<UICDialogueEntryWidget>(Child);Entry&&Entry->CanSelectEntry())Options.Add(Entry);
+    if(Options.IsEmpty())return;
+    const int32 Current=Options.IndexOfByKey(SelectedEntry.Get());
+    const int32 Next=Current==INDEX_NONE?0:(Current+Direction+Options.Num())%Options.Num();
+    SelectEntry(Options[Next]);
+}
+
+void UICNPCDialogueWidget::NativeTick(const FGeometry& Geometry,float DeltaSeconds)
+{
+    Super::NativeTick(Geometry,DeltaSeconds);
+    if(GiftPicker)return;
+    // New choices join Slate after they are built. Focus them once their path exists.
+    if(bEntryFocusPending&&SelectedEntry.IsValid())
+    {
+        auto* Entry=SelectedEntry.Get();Entry->FocusEntry();
+        bEntryFocusPending=!Entry->HasEntryFocus();
+    }
 }
 
 void UICNPCDialogueWidget::ShowQuestList()
 {
+    bShowingInteractionOptions = false;
     SelectedQuestID = NAME_None;
     SelectedDialogueID = NAME_None;
-    Entries->ClearChildren();
+    ClearEntries();
     DialogueText->SetText(QuestPromptText);
     if (!NPC || !GetGameInstance()) return;
 
@@ -160,6 +301,7 @@ void UICNPCDialogueWidget::AddQuestEntries()
 
 void UICNPCDialogueWidget::ShowQuest(FName QuestID)
 {
+    bShowingInteractionOptions = false;
     if (!NPC || !GetGameInstance()) return;
     UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
     UICQuestSubsystem* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>();
@@ -193,7 +335,7 @@ void UICNPCDialogueWidget::ShowQuest(FName QuestID)
     {
         SelectedDialogueID = NAME_None;
         SelectedNodeID = NAME_None;
-        Entries->ClearChildren();
+        ClearEntries();
         const FICTextLookupResult Description = UICTextLibrary::ResolveText(QuestStringTable, Quest.DescriptionKey);
         DialogueText->SetText(Description.bSuccess ? Description.Text : FText::FromName(QuestID));
         if (IsActive)
@@ -216,6 +358,7 @@ void UICNPCDialogueWidget::ShowQuest(FName QuestID)
 
 void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
 {
+    bShowingInteractionOptions = false;
     if (!NPC || !GetGameInstance()) return;
     UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
     FICDialogueRow Dialogue;
@@ -251,7 +394,7 @@ void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
     }
     SelectedNodeID = CurrentNodeID;
     DialogueText->SetText(Line.Text);
-    Entries->ClearChildren();
+    ClearEntries();
     for (const FICDialogueChoice& Choice : Node->Choices)
     {
         const FICTextLookupResult Label = UICTextLibrary::ResolveText(DialogueStringTable, Choice.TextKey);
@@ -261,7 +404,7 @@ void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
 
     if (SelectedQuestID.IsNone())
     {
-        AddEntry(DialogueOptionsEntry, BackText);
+        if(Node->NextNodeID.IsNone()&&Node->Choices.IsEmpty())AddEntry(DialogueOptionsEntry, NextText);
     }
     else
     {
@@ -279,15 +422,32 @@ void UICNPCDialogueWidget::ShowNode(FName DialogueID, FName NodeID)
         }
         AddEntry(DialogueBackEntry, BackText);
     }
-    AddEntry(DialogueCloseEntry, CloseText);
+    if(!SelectedQuestID.IsNone())AddEntry(DialogueCloseEntry, CloseText);
 }
 
 void UICNPCDialogueWidget::HandleEntry(FName EntryID)
 {
+    if (EntryID == DialogueDismissEntry)
+    {
+        auto* Controller = Cast<AICPlayerController>(GetOwningPlayer());
+        if (IsValid(NPC) && NPC->TryDismiss(Controller)) CloseDialogue();
+        else ShowInteractionOptions();
+        return;
+    }
+    if (EntryID == DialogueRecruitEntry)
+    {
+        auto* Controller = Cast<AICPlayerController>(GetOwningPlayer());
+        if (IsValid(NPC) && NPC->TryRecruit(Controller)) CloseDialogue();
+        else
+        {
+            ShowInteractionOptions();
+            if (Controller) DialogueText->SetText(Controller->NoticeDisplayText);
+        }
+        return;
+    }
     if(EntryID==DialogueGiftEntry)
     {
-        if(NPC)NPC->TryGiveGift(Cast<AICPlayerController>(GetOwningPlayer()),NAME_None);
-        ShowInteractionOptions();return;
+        ShowGiftPicker();return;
     }
     if (EntryID == DialogueCloseEntry || EntryID == DialogueOptionsEntry
         || EntryID == DialogueQuestsEntry || EntryID == DialogueBackEntry)
@@ -347,7 +507,14 @@ void UICNPCDialogueWidget::CompleteDialogue(bool IsTerminalChoice)
     UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
     UICQuestSubsystem* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>();
     FICDialogueRow Dialogue;
-    if (!Definitions || !Quests || !Definitions->GetDialogue(SelectedDialogueID, Dialogue).bSuccess)
+    if (!Definitions || !Quests) return;
+    if (SelectedDialogueID.IsNone())
+    {
+        const FGuid EventID=DialogueEventID;DialogueEventID.Invalidate();
+        Quests->ReportObjectiveEvent(EICQuestObjectiveType::Talk,NPC->NPCDefinitionID,1,EventID);
+        return;
+    }
+    if (!Definitions->GetDialogue(SelectedDialogueID, Dialogue).bSuccess)
     {
         return;
     }
@@ -374,7 +541,21 @@ void UICNPCDialogueWidget::CloseDialogue()
 
 FReply UICNPCDialogueWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
 {
-    if (KeyEvent.GetKey() == EKeys::Escape)
+    const FKey Key=KeyEvent.GetKey();
+    if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up)
+    {MoveSelection(-1);return FReply::Handled();}
+    if(Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down)
+    {MoveSelection(1);return FReply::Handled();}
+    if(Key==EKeys::Enter||Key==EKeys::Virtual_Accept||Key==EKeys::Gamepad_FaceButton_Bottom)
+    {
+        if(!KeyEvent.IsRepeat())
+        {
+            if(!SelectedEntry.IsValid()||!SelectedEntry->CanSelectEntry())MoveSelection(1);
+            if(SelectedEntry.IsValid())SelectedEntry->ActivateEntry();
+        }
+        return FReply::Handled();
+    }
+    if (Key == EKeys::Escape)
     {
         CloseDialogue();
         return FReply::Handled();

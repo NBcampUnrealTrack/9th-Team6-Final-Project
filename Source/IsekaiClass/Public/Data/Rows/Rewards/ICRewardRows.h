@@ -60,4 +60,6 @@ struct ISEKAICLASS_API FICDropTableRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 MinimumGold = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 MaximumGold = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bApplyPlayerLUKToGold = true;
+    /** Collect into the bag on defeat; any amount that cannot fit remains a world drop. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bAutoCollectItems = false;
 };

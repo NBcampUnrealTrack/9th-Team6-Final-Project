@@ -91,6 +91,8 @@ struct ISEKAICLASS_API FICCombatSettingsRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeInvulnerabilityPlaySeconds = 0.25;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeDistanceCm = 300;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeCooldownPlaySeconds = 3;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.01")) double DashDurationPlaySeconds = 0.25;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DashDistanceCm = 500;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double HitStaggerPlaySeconds = 0.2;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double HitStaggerIntervalPlaySeconds = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double CanceledCastRetryPlaySeconds = 1;

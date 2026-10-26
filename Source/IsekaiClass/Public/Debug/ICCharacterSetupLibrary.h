@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "InputCoreTypes.h"
 #include "ICCharacterSetupLibrary.generated.h"
 class UAnimSequence;
 class UAnimMontage;
@@ -37,5 +38,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool CalibrateImportedNPC(USkeletalMesh* Mesh, UICCharacterAnimationProfile* Profile);
     /** Start a PIE-only visual review with an isolated save namespace. */
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool PrepareLiveCharacterReview(UWorld* World);
+    UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool BeginMonsterTestReview();
+    UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool CaptureMonsterTestHUD(UWorld* World,const FString& File);
+    UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool PressUIReviewKey(UWorld* World,FKey Key);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static void CaptureLiveCharacterReview(UWorld* World, const FString& Name);
 };

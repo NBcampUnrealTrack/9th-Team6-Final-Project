@@ -10,15 +10,28 @@
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Framework/ICUIRootWidget.h"
+#include "UI/Framework/ICDisplayPolicy.h"
+#include "Widgets/Layout/SBorder.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SScaleBox.h"
+#include "Styling/CoreStyle.h"
 #include "Components/TextBlock.h"
 #include "Components/EditableTextBox.h"
 #include "Components/Button.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "UI/Dialogue/ICAffinityHeartsWidget.h"
+#include "UI/Gameplay/ICCombatFeedbackWidget.h"
+#include "UI/Gameplay/ICMovementCooldownWidget.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Core/Flow/ICGameFlowSubsystem.h"
 #include "Slate/WidgetRenderer.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "ImageUtils.h"
 #include "Misc/FileHelper.h"
 #include "Framework/Application/SlateApplication.h"
+#include "RenderingThread.h"
 #include "Engine/Blueprint.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "EdGraph/EdGraph.h"
@@ -141,8 +154,16 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
         }
     }
     FWidgetRenderer Renderer(true);
-    auto* Target=Renderer.DrawWidget(Preview->TakeWidget(),FVector2D(Width,Height));
+    TSharedRef<SWidget> Surface=Preview->TakeWidget();
+    if(BP->GetFName()==TEXT("WBP_GameHUD")||BP->GetFName()==TEXT("WBP_IC_GameMenu"))
+        Surface=SNew(SBorder).Padding(0).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+            .BorderBackgroundColor(FLinearColor(.055f,.075f,.10f))
+            [SNew(SScaleBox).Stretch(EStretch::ScaleToFit)
+            [SNew(SBox).WidthOverride(ICDisplayPolicy::DesignWidth).HeightOverride(ICDisplayPolicy::DesignHeight)[Surface]]];
+    auto* Target=Renderer.DrawWidget(Surface,FVector2D(Width,Height));
     if(!Target)return false;
+    Renderer.DrawWidget(Target,Surface,FVector2D(Width,Height),.1f);
+    FlushRenderingCommands();
     TArray<FColor> Pixels;FReadSurfaceDataFlags Flags(RCM_UNorm);Flags.SetLinearToGamma(false);
     if(!Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels,Flags))return false;
     TArray64<uint8> PNG;FImageUtils::PNGCompressImageArray(Width,Height,Pixels,PNG);
@@ -163,6 +184,87 @@ bool UICBlueprintMaintenanceLibrary::BuildFrontendWidget(UBlueprint* Blueprint,F
     for(auto It=Widget->WidgetVariableNameToGuidMap.CreateIterator();It;++It)if(!Names.Contains(It.Key()))It.RemoveCurrent();
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Widget);
     return Widget->WidgetTree->RootWidget!=nullptr;
+#else
+    return false;
+#endif
+}
+
+bool UICBlueprintMaintenanceLibrary::AddDialogueAffinityHearts(UBlueprint* Blueprint)
+{
+#if WITH_EDITOR
+    auto* BP = Cast<UWidgetBlueprint>(Blueprint);
+    if (!BP || !BP->WidgetTree) return false;
+    auto* Tree = BP->WidgetTree.Get();
+    if (Tree->FindWidget(TEXT("AffinityHearts"))) return true;
+    auto* Speaker = Cast<UTextBlock>(Tree->FindWidget(TEXT("SpeakerText")));
+    auto* HeartsClass = LoadClass<UICAffinityHeartsWidget>(nullptr,
+        TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_AffinityHearts.WBP_IC_AffinityHearts_C"));
+    if (!Speaker || !Speaker->GetParent() || !HeartsClass) return false;
+    BP->Modify();
+    Tree->Modify();
+    auto* Parent = Speaker->GetParent();
+    Parent->Modify();
+    const int32 Index = Parent->GetChildIndex(Speaker);
+    auto* PreviousSlot = Speaker->Slot.Get();
+    auto* Header = Tree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("SpeakerHeader"));
+    Speaker->RemoveFromParent();
+    Parent->InsertChildAt(Index, Header, PreviousSlot);
+    auto* NameSlot = Header->AddChildToHorizontalBox(Speaker);
+    NameSlot->SetPadding(FMargin(0, 0, 16, 0));
+    NameSlot->SetVerticalAlignment(VAlign_Center);
+    auto* Hearts = Tree->ConstructWidget<UICAffinityHeartsWidget>(HeartsClass, TEXT("AffinityHearts"));
+    Hearts->SetVisibility(ESlateVisibility::HitTestInvisible);
+    Header->AddChildToHorizontalBox(Hearts)->SetVerticalAlignment(VAlign_Center);
+    for (UWidget* Child : {static_cast<UWidget*>(Header), static_cast<UWidget*>(Hearts)})
+    {
+        Child->bIsVariable = true;
+        BP->WidgetVariableNameToGuidMap.FindOrAdd(Child->GetFName(), FGuid::NewGuid());
+    }
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool UICBlueprintMaintenanceLibrary::AddCombatFeedbackHUD(UBlueprint* Blueprint)
+{
+#if WITH_EDITOR
+    auto* BP=Cast<UWidgetBlueprint>(Blueprint);
+    auto* Tree=BP?BP->WidgetTree.Get():nullptr;
+    auto* Canvas=Tree?Cast<UCanvasPanel>(Tree->RootWidget):nullptr;
+    auto* Class=LoadClass<UICCombatFeedbackWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_CombatFeedback.WBP_IC_CombatFeedback_C"));
+    if(!Canvas||!Class)return false;
+    if(Tree->FindWidget(TEXT("HUD_CombatFeedback")))return true;
+    BP->Modify();Tree->Modify();
+    auto* Feedback=Tree->ConstructWidget<UICCombatFeedbackWidget>(Class,TEXT("HUD_CombatFeedback"));
+    Feedback->SetVisibility(ESlateVisibility::HitTestInvisible);Feedback->bIsVariable=true;
+    auto* Placement=Canvas->AddChildToCanvas(Feedback);Placement->SetAnchors(FAnchors(0,0,1,1));Placement->SetOffsets(FMargin(0));Placement->SetZOrder(5);
+    BP->WidgetVariableNameToGuidMap.FindOrAdd(Feedback->GetFName(),FGuid::NewGuid());
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);return true;
+#else
+    return false;
+#endif
+}
+
+bool UICBlueprintMaintenanceLibrary::AddMovementCooldownHUD(UBlueprint* Blueprint)
+{
+#if WITH_EDITOR
+    auto* BP=Cast<UWidgetBlueprint>(Blueprint);
+    auto* Tree=BP?BP->WidgetTree.Get():nullptr;
+    auto* Canvas=Tree?Cast<UCanvasPanel>(Tree->RootWidget):nullptr;
+    auto* Class=LoadClass<UICMovementCooldownWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_MovementCooldown.WBP_IC_MovementCooldown_C"));
+    if(!Canvas||!Class)return false;
+    BP->Modify();Tree->Modify();
+    auto* Cooldown=Cast<UICMovementCooldownWidget>(Tree->FindWidget(TEXT("HUD_MovementCooldown")));
+    if(!Cooldown)Cooldown=Tree->ConstructWidget<UICMovementCooldownWidget>(Class,TEXT("HUD_MovementCooldown"));
+    Cooldown->SetVisibility(ESlateVisibility::HitTestInvisible);Cooldown->bIsVariable=true;
+    auto* Placement=Cast<UCanvasPanelSlot>(Cooldown->Slot);
+    if(!Placement)Placement=Canvas->AddChildToCanvas(Cooldown);
+    Placement->SetAnchors(FAnchors(0,0));Placement->SetAlignment({.5f,.5f});
+    Placement->SetPosition({0,0});Placement->SetSize(FVector2D(UICRadialCooldownBar::Diameter));
+    BP->WidgetVariableNameToGuidMap.FindOrAdd(Cooldown->GetFName(),FGuid::NewGuid());
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);return true;
 #else
     return false;
 #endif

@@ -100,6 +100,7 @@ bool UICSaveGame::UpgradeFromVersion2()
         }
     }
     SaveVersion = CurrentVersion;
+    ICSaveDataMigration::NormalizeWeaponOnly(WorldState);
     UE_LOG(LogICSave, Log, TEXT("[Save.Upgraded] FromVersion=2 ToVersion=%d Characters=%d Quests=%d"),SaveVersion,WorldState.Characters.Num(),WorldState.Quests.Num());
     return UICWorldStateSubsystem::ValidateState(WorldState) && UICWorldStateSubsystem::ValidateStateClock(WorldState, Clock);
 }

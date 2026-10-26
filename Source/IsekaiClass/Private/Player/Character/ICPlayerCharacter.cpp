@@ -9,6 +9,7 @@
 #include "Player/Character/ICPlayerAppearance.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Life/Crafting/ICCraftingComponent.h"
+#include "Quest/ICQuestGuideComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -48,6 +49,7 @@ AICPlayerCharacter::AICPlayerCharacter()
     CharacterID=UICWorldStateSubsystem::PlayerId();bUsePrimaryStats=true;bUsePlayerSP=true;
     Inventory=CreateDefaultSubobject<UICInventoryComponent>(TEXT("Inventory"));
     Crafting=CreateDefaultSubobject<UICCraftingComponent>(TEXT("Crafting"));
+    QuestGuide=CreateDefaultSubobject<UICQuestGuideComponent>(TEXT("QuestGuide"));
     CameraArm=CreateDefaultSubobject<UICCameraSpringArm>(TEXT("CameraArm"));
     CameraArm->SetupAttachment(RootComponent);
     CameraArm->TargetArmLength=420;

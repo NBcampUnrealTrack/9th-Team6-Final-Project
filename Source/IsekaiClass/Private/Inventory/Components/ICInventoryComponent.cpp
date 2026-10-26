@@ -248,12 +248,10 @@ bool UICInventoryComponent::Equip(int32 Index)
     UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.Equip.Request] Slot=%d Class=%d"),Index,CurrentClass);
     auto Next = GetSnapshot(); if (!Next.Bag.Slots.IsValidIndex(Index)) return false;
     auto& S = Next.Bag.Slots[Index]; const auto* D = Find(S.ItemID);
-    if (!D || D->Kind != EPlayerItemKind::Equipment || D->EquipSlot == EPlayerEquipSlot::None || S.bLocked) return Fail(*ICText::Get(TEXT("Native_cfa5c06f1ded")).ToString());
+    if (!D || D->Kind != EPlayerItemKind::Equipment || D->EquipSlot != EPlayerEquipSlot::Weapon || S.bLocked) return Fail(*ICText::Get(TEXT("Native_cfa5c06f1ded")).ToString());
     FICDefinitionResult Lookup;
     const auto* Gear=GetDefinitions()?GetDefinitions()->Find<FICEquipmentRow>(D->EquipmentID,Lookup):nullptr;
     if(!Gear || Gear->Slot!=D->EquipSlot)return Fail(*ICText::Get(TEXT("Native_6eec833069e7")).ToString());
-    if(Gear->Slot!=EPlayerEquipSlot::Weapon && Gear->RequiredClass!=EICCharacterClass::None && static_cast<int32>(Gear->RequiredClass)!=CurrentClass+1)
-        return Fail(*ICText::Get(TEXT("Native_5256ca0c34f2")).ToString());
     if (D->EquipSlot == EPlayerEquipSlot::Weapon)
     {
         if (const auto* Player=Cast<AICPlayerCharacter>(GetOwner());Player&&Player->IsSwitchingWeapon()) return false;
@@ -263,7 +261,51 @@ bool UICInventoryComponent::Equip(int32 Index)
         if ((Selected.IsEmpty() && Next.WeaponSlots[FamilySlot].IsEmpty()) || GetItemWeaponFamily(Selected)==Gear->WeaponFamily) Swap(S,Selected);
         else Swap(S,Next.WeaponSlots[FamilySlot]);
     }
-    else Swap(S, Next.Equipment[static_cast<int32>(D->EquipSlot)]);
+    return Commit(Next);
+}
+
+bool UICInventoryComponent::EquipForCharacter(FName ID,int32 Index)
+{
+    if(ID==UICWorldStateSubsystem::PlayerId())return Equip(Index);
+    if(!WorldState)return false;
+    auto Character=WorldState->GetSnapshot(ID);auto Next=GetSnapshot();
+    if(Character.Kind!=EICCharacterKind::Recruitable||Character.Mode!=EICCharacterMode::Companion||Character.PartySlot<0
+        ||!Next.Bag.Slots.IsValidIndex(Index))return false;
+    auto& Item=Next.Bag.Slots[Index];const auto* Definition=Find(Item.ItemID);FICDefinitionResult R;
+    auto* D=GetDefinitions();
+    const auto* Gear=Definition&&D?D->Find<FICEquipmentRow>(Definition->EquipmentID,R):nullptr;
+    const auto* NPC=D?D->Find<FICNPCRow>(ID,R):nullptr;
+    const auto* Recruit=NPC?D->Find<FICRecruitCombatRow>(NPC->RecruitCombatID,R):nullptr;
+    const auto* Class=Recruit?D->Find<FICClassRow>(Recruit->ClassID,R):nullptr;
+    if(Item.IsEmpty()||Item.bLocked||!Definition||Definition->Kind!=EPlayerItemKind::Equipment||!Gear||!Class
+        ||Gear->Slot!=Definition->EquipSlot||Gear->Slot!=EPlayerEquipSlot::Weapon
+        ||(Gear->Slot==EPlayerEquipSlot::Weapon&&Gear->WeaponFamily!=Recruit->WeaponFamily)
+        ||(Gear->RequiredClass!=EICCharacterClass::None&&Gear->RequiredClass!=Class->CharacterClass))return false;
+    Character.Equipment.SetNum(1);Swap(Item,Character.Equipment[0]);
+    return ValidateSnapshot(Next)&&WorldState->CommitCharacterAndInventory(Character,Next);
+}
+
+bool UICInventoryComponent::UnequipForCharacter(FName ID,EPlayerEquipSlot Slot)
+{
+    if(Slot!=EPlayerEquipSlot::Weapon)return false;
+    if(ID==UICWorldStateSubsystem::PlayerId())return Unequip(Slot);
+    if(!WorldState)return false;
+    auto Character=WorldState->GetSnapshot(ID);auto Next=GetSnapshot();const int32 Index=static_cast<int32>(Slot);
+    const int32 Empty=Next.Bag.Slots.IndexOfByPredicate([](const auto& Item){return Item.IsEmpty();});
+    if(Character.Kind!=EICCharacterKind::Recruitable||Character.Mode!=EICCharacterMode::Companion||Character.PartySlot<0
+        ||!Character.Equipment.IsValidIndex(Index)||Character.Equipment[Index].IsEmpty()||Empty==INDEX_NONE)return false;
+    Next.Bag.Slots[Empty]=Character.Equipment[Index];Character.Equipment[Index]=FPlayerItemInstance();
+    return ValidateSnapshot(Next)&&WorldState->CommitCharacterAndInventory(Character,Next);
+}
+
+bool UICInventoryComponent::TrashItem(int32 Index)
+{
+    auto Next=GetSnapshot();if(!Next.Bag.Slots.IsValidIndex(Index))return false;
+    const auto Item=Next.Bag.Slots[Index];const auto* D=Find(Item.ItemID);
+    if(Item.IsEmpty()||Item.bLocked||!D||!D->bCanDiscard||D->Kind==EPlayerItemKind::Quest)return false;
+    Next.Bag.Slots[Index]=FPlayerItemInstance();
+    if(!Next.Bag.Slots.ContainsByPredicate([&](const auto& Other){return !Other.IsEmpty()&&Other.ItemID==Item.ItemID;}))
+        for(auto& Quick:Next.QuickSlots)if(Quick==Item.ItemID)Quick=NAME_None;
     return Commit(Next);
 }
 
@@ -385,14 +427,7 @@ bool UICInventoryComponent::SelectWeaponForTransition(FGuid InstanceID)
 
 bool UICInventoryComponent::Unequip(EPlayerEquipSlot Slot)
 {
-    if (Slot==EPlayerEquipSlot::Weapon) return UnequipWeapon(GetSelectedWeaponFamily());
-    IC_TRACE_FUNCTION();
-    UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.Unequip.Request] EquipSlot=%d"),static_cast<int32>(Slot));
-    auto Next = GetSnapshot(); const int32 Index = static_cast<int32>(Slot);
-    if (!Next.Equipment.IsValidIndex(Index) || Next.Equipment[Index].IsEmpty()) return false;
-    const int32 Empty = Next.Bag.Slots.IndexOfByPredicate([](const auto& S) { IC_TRACE_FUNCTION(); return S.IsEmpty(); });
-    if (Empty == INDEX_NONE) return Fail(*ICText::Get(TEXT("Native_89e1471e83a4")).ToString());
-    Next.Bag.Slots[Empty] = Next.Equipment[Index]; Next.Equipment[Index] = FPlayerItemInstance(); return Commit(Next);
+    return Slot==EPlayerEquipSlot::Weapon&&UnequipWeapon(GetSelectedWeaponFamily());
 }
 
 bool UICInventoryComponent::UnequipWeapon(EICWeaponFamily Family)

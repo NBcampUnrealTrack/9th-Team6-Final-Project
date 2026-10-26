@@ -7,7 +7,8 @@ class USlider;
 class UCheckBox;
 class UComboBoxString;
 
-UCLASS()
+/** Runtime behavior for WBP_IC_Settings; the Widget Blueprint owns the layout. */
+UCLASS(Blueprintable)
 class ISEKAICLASS_API UICSettingsWidget : public UUserWidget
 {
     GENERATED_BODY()

@@ -9,7 +9,8 @@
 UENUM(BlueprintType)
 enum class EPlayerItemKind : uint8 { Consumable , Material , Equipment , Quest , Expansion  };
 UENUM(BlueprintType)
-enum class EPlayerEquipSlot : uint8 { Weapon , Clothes , Ring , Necklace , None  };
+// Keep None's saved numeric value; retired slots are no longer authorable.
+enum class EPlayerEquipSlot : uint8 { Weapon=0, None=4 };
 UENUM(BlueprintType)
 enum class EPlayerItemTab : uint8 { Normal , Quest  };
 UENUM(BlueprintType)

@@ -20,8 +20,64 @@
 #include "Save/ICSaveSubsystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
+#include "Debug/ICMonsterTestLayout.h"
 #include "UnrealClient.h"
+#include "Editor.h"
+#include "PlayInEditorDataTypes.h"
+#include "Settings/LevelEditorPlaySettings.h"
+#include "Engine/GameViewportClient.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWindow.h"
+#include "ImageUtils.h"
+#include "Misc/FileHelper.h"
 #endif
+
+bool UICCharacterSetupLibrary::CaptureMonsterTestHUD(UWorld* World,const FString& File)
+{
+#if WITH_EDITOR
+    auto* Viewport=World&&World->WorldType==EWorldType::PIE?World->GetGameViewport():nullptr;
+    auto Window=Viewport?Viewport->GetWindow():nullptr;
+    if(!Window.IsValid()||!FSlateApplication::IsInitialized())return false;
+    TArray<FColor> Pixels;FIntVector Size;
+    if(!FSlateApplication::Get().TakeScreenshot(Window.ToSharedRef(),Pixels,Size))return false;
+    for(auto& Pixel:Pixels)Pixel.A=255;
+    TArray64<uint8> PNG;FImageUtils::PNGCompressImageArray(Size.X,Size.Y,Pixels,PNG);
+    IFileManager::Get().MakeDirectory(*FPaths::GetPath(File),true);
+    return FFileHelper::SaveArrayToFile(PNG,*File);
+#else
+    return false;
+#endif
+}
+
+bool UICCharacterSetupLibrary::PressUIReviewKey(UWorld* World,FKey Key)
+{
+#if WITH_EDITOR
+    auto* Viewport=World&&World->WorldType==EWorldType::PIE?World->GetGameViewport():nullptr;
+    auto Window=Viewport?Viewport->GetWindow():nullptr;
+    if(!Window.IsValid()||!FSlateApplication::IsInitialized())return false;
+    auto& App=FSlateApplication::Get();
+    App.ProcessWindowActivatedEvent(FWindowActivateEvent(FWindowActivateEvent::EA_Activate,Window.ToSharedRef()));
+    const bool Handled=App.ProcessKeyDownEvent(FKeyEvent(Key,FModifierKeysState(),0,false,0,0));
+    App.ProcessKeyUpEvent(FKeyEvent(Key,FModifierKeysState(),0,false,0,0));return Handled;
+#else
+    return false;
+#endif
+}
+
+bool UICCharacterSetupLibrary::BeginMonsterTestReview()
+{
+#if WITH_EDITOR
+    if(!GEditor||GEditor->PlayWorld)return false;
+    auto* Settings=DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(),GetTransientPackage());
+    Settings->NewWindowWidth=1600;Settings->NewWindowHeight=900;
+    FRequestPlaySessionParams Session;
+    Session.WorldType=EPlaySessionWorldType::PlayInEditor;
+    Session.EditorPlaySettings=Settings;
+    GEditor->RequestPlaySession(Session);return true;
+#else
+    return false;
+#endif
+}
 
 bool UICCharacterSetupLibrary::PrepareLiveCharacterReview(UWorld* World)
 {
@@ -69,6 +125,11 @@ bool UICCharacterSetupLibrary::PrepareTestNavigation(UWorld* World)
         Volume->AddInstanceComponent(Bounds);Bounds->SetupAttachment(Volume->GetRootComponent());
         Bounds->SetCollisionEnabled(ECollisionEnabled::NoCollision);Bounds->SetCanEverAffectNavigation(false);
         Bounds->SetBoxExtent(FVector(4000,4000,500));Bounds->RegisterComponent();
+    }
+    if(TActorIterator<AICMonsterTestLayout>(World))
+    {
+        Volume->SetActorLocation(FVector(1500,5000,200));
+        Bounds->SetBoxExtent(FVector(6000,10000,500));
     }
     Bounds->UpdateBounds();Volume->PostEditChange();
     if(auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))

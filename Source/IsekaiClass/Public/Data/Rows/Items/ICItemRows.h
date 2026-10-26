@@ -10,6 +10,8 @@ UENUM(BlueprintType)
 enum class EICItemTarget : uint8 { None , PlayerOnly , LivingParty , DownedCompanion , NonCompanionRecruit  };
 UENUM(BlueprintType)
 enum class EICItemEffect : uint8 { None , Recovery , GrowthBook , Revival , Dispel , Expansion  };
+UENUM(BlueprintType)
+enum class EICCodexProductCategory : uint8 { Automatic, Gathering, Farming, Fishing, Mining, Ranching };
 
 
 USTRUCT(BlueprintType)
@@ -17,6 +19,8 @@ struct ISEKAICLASS_API FICItemRow : public FPlayerItemDefinition
 {
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSoftObjectPtr<UTexture2D> Icon;
+    /** Automatic reads resource/crop/fish/production DT yields. Explicit categories cover future items. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Codex") EICCodexProductCategory CodexProductCategory=EICCodexProductCategory::Automatic;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") TSoftObjectPtr<UStaticMesh> WorldMesh;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") FVector WorldMeshScale = FVector(.25f);
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EICItemTarget UseTarget = EICItemTarget::None;

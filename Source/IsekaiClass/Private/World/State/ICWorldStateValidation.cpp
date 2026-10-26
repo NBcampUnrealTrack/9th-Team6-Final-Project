@@ -63,7 +63,8 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
     for (const auto& Pair : S.Quests)
     {
         const auto& Q = Pair.Value;
-        if (Q.CompletionCount < 0 || !TimeValid(Q.AcceptedAtGameMinute) || !TimeValid(Q.CompletedAtGameMinute)
+        if ((Q.bAbandoned && (Q.bAccepted || Q.bCompleted))
+            || Q.CompletionCount < 0 || !TimeValid(Q.AcceptedAtGameMinute) || !TimeValid(Q.CompletedAtGameMinute)
             || (Q.bRewardClaimed && (!Q.bCompleted || !Q.RewardTransactionID.IsValid() || !S.CompletedTransactionIDs.Contains(Q.RewardTransactionID)))) return Fail(TEXT("Quests.") + Pair.Key.ToString());
     }
     TMap<FGuid, const FPlayerItemInstance*> BagItems;
@@ -145,6 +146,13 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
         InstalledContainers.Add(Installation.ContainerID);
     }
     if (!NamesValid(S.DiscoveredRegionIDs) || !NamesValid(S.DiscoveredAnchorIDs) || !NamesValid(S.CodexEntryIDs) || !NamesValid(S.UnlockedRecipeIDs)) return Fail(TEXT("WorldProgress.IDs"));
+    if(!NamesValid(S.Codex.AcquiredItemIDs))return Fail(TEXT("Codex.AcquiredItemIDs"));
+    for(const auto& Pair:S.Codex.PetEssence)if(Pair.Key<0||Pair.Key>=55||Pair.Value<0)return Fail(TEXT("Codex.PetEssence"));
+    for(const auto& Pair:S.Codex.CharacterPets)
+    {
+        const auto* Character=S.Characters.Find(Pair.Key);
+        if(!Character||!Character->HasStats()||Pair.Value<0||Pair.Value>=55||S.Codex.PetEssence.FindRef(Pair.Value)<100)return Fail(TEXT("Codex.CharacterPets"));
+    }
     for (const auto& Pair : S.ProgressionStages) if (Pair.Key.IsNone() || Pair.Value < 0) return Fail(TEXT("ProgressionStages"));
     for (const auto& Pair : S.Flags) if (Pair.Key.IsNone()) return Fail(TEXT("Flags"));
     if (!GuidsValid(S.CompletedTransactionIDs) || !GuidsValid(S.ProcessedEventIDs)) return Fail(TEXT("TransactionLedger"));

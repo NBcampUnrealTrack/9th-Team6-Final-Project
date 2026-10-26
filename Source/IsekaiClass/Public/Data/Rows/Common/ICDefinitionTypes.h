@@ -12,7 +12,7 @@ enum class EICDefinitionType : uint8
     Synergy , Monster , BossPattern , Region , Anchor , Spawner , Warp , Home , Item , Equipment ,
     Enhancement , Option , OptionPool , Reward , DropTable , Schedule , GiftPreference ,
     Dialogue , Service , Shop , Recipe , Production , Resource , Crop , Fish , FishingPoint ,
-    Quest , Progression , Ending , Codex , Landmark , Map , Hint , ResourceReference , IDRegistry
+    Quest , Progression , Ending , Codex , Landmark , Map , Hint , ResourceReference , IDRegistry , Ranching
 };
 
 UENUM(BlueprintType)

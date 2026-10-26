@@ -19,6 +19,7 @@
 #include "Data/Rows/Life/ICFishRow.h"
 #include "Data/Rows/Life/ICFishingPointRow.h"
 #include "Data/Rows/Life/ICResourceRow.h"
+#include "Data/Rows/Life/ICRanchingRow.h"
 #include "Data/Rows/NPC/ICDialogueRow.h"
 #include "Data/Rows/NPC/ICGiftPreferenceRow.h"
 #include "Data/Rows/NPC/ICScheduleRow.h"
@@ -126,7 +127,8 @@ public:
 private:
     UPROPERTY() TObjectPtr<UICDefinitionCatalog> Catalog;
     UPROPERTY(Transient) TArray<TObjectPtr<UDataTable>> LoadedTables;
-    // Native row types are stable during a game-instance session. Rebuild on catalog configuration.
-    TMap<const UScriptStruct*, EICDefinitionType> CachedSchemaTypes;
+    // Native schema types never change during a play session. Rows and bindings still validate on every lookup.
+    mutable TMap<const UScriptStruct*, EICDefinitionType> NativeSchemaTypes;
+    void CacheNativeSchemas() const;
     UDataTable* LoadTable(const FICDefinitionBinding& Binding, FICDefinitionResult& Result) const;
 };

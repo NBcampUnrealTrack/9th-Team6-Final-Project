@@ -14,7 +14,7 @@ class AICDroppedItem;
 class UICCraftingComponent;
 class UICInventoryComponent;
 class UICGameplayWidget;
-class UICQuestWidget;
+class UICDeathWidget;
 class UICQuestTrackerWidget;
 class UICNPCDialogueWidget;
 class UICMainMenuWidget;
@@ -64,7 +64,6 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
     TSubclassOf<UICCharacterCreateWidget> CharacterCreateWidgetClass;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|UI") TSubclassOf<UICGameplayWidget> GameplayWidgetClass;
-    UPROPERTY(EditDefaultsOnly, Category="IC|UI") TSoftClassPtr<UICQuestWidget> QuestWidgetClass;
     UPROPERTY(EditDefaultsOnly, Category="IC|UI") TSoftClassPtr<UICQuestTrackerWidget> QuestTrackerWidgetClass;
     UPROPERTY(EditDefaultsOnly, Category="IC|UI") TSubclassOf<UICNPCDialogueWidget> DialogueWidgetClass;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input") TObjectPtr<UInputMappingContext> DefaultMappingContext;
@@ -150,7 +149,7 @@ public:
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") int32 PendingPartyKey=INDEX_NONE;
     bool bDirty=true;
     UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") TObjectPtr<UICGameplayWidget> Screen;
-    UPROPERTY(Transient) TObjectPtr<UICQuestWidget> QuestScreen;
+    UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") TObjectPtr<UICDeathWidget> DeathScreen;
     UPROPERTY(Transient) TObjectPtr<UICQuestTrackerWidget> QuestTrackerScreen;
     UPROPERTY(Transient) TObjectPtr<UICNPCDialogueWidget> DialogueScreen;
     UPROPERTY(Transient) TObjectPtr<UICSettingsWidget> SettingsScreen;
@@ -205,6 +204,7 @@ public:
     virtual bool CanRestoreWorldState_Implementation(const FICWorldState& Candidate) const override;
     virtual void RestoreFromWorldState_Implementation(const FICWorldState& Candidate) override;
 private:
+    friend class UICGatheringSubsystem;
     TSoftObjectPtr<UWorld> SessionGameplayMap;
     UPROPERTY(Transient) TObjectPtr<UICSaveLoadWidget> SessionSaveLoadScreen;
     bool LoadSelectedSessionSlot();
