@@ -2,6 +2,8 @@
 #include "UI/Quest/ICQuestDisplay.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "Quest/ICQuestSubsystem.h"
+#include "Quest/ICQuestGuideComponent.h"
+#include "GameFramework/Pawn.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Data/Text/ICTextLibrary.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -138,11 +140,26 @@ bool UICQuestDetailWidget::BuildLayout(UWidgetTree* T)
     auto* Actions=T->ConstructWidget<UHorizontalBox>();QuestMenuRow(Column,Actions,10);
     auto* Abandon=Actions->AddChildToHorizontalBox(QuestMenuButton(T,TEXT("BTN_Abandon"),NSLOCTEXT("ICQuestMenu","Abandon","포기")));Abandon->SetSize(FSlateChildSize(ESlateSizeRule::Fill));Abandon->SetPadding(FMargin(0,0,8,0));
     Actions->AddChildToHorizontalBox(QuestMenuButton(T,TEXT("BTN_Start"),NSLOCTEXT("ICQuestMenu","Start","시작하기")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    QuestMenuRow(Column,QuestMenuButton(T,TEXT("BTN_ToggleGuide"),NSLOCTEXT("ICQuestMenu","StopGuide","경로 안내 중지")),10);
     QuestMenuRow(Column,QuestMenuButton(T,TEXT("BTN_Back"),NSLOCTEXT("ICQuestMenu","Back","뒤로가기")),0);return true;
 }
 void UICQuestDetailWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    // Existing Widget Blueprints also gain the new action without rebuilding their layout.
+    if (!GetWidgetFromName(TEXT("BTN_ToggleGuide")))
+    {
+        auto* BackButton = GetWidgetFromName(TEXT("BTN_Back"));
+        auto* Column = BackButton ? Cast<UVerticalBox>(BackButton->GetParent()) : nullptr;
+        if (Column)
+        {
+            auto* Button = QuestMenuButton(WidgetTree,TEXT("BTN_ToggleGuide"),FText::GetEmpty());
+            auto* ButtonSlot = Cast<UVerticalBoxSlot>(Column->InsertChildAt(Column->GetChildIndex(BackButton),Button));
+            if (ButtonSlot) ButtonSlot->SetPadding(FMargin(0,0,0,10));
+        }
+    }
+    if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_ToggleGuide"))))
+        Button->OnClicked.AddUniqueDynamic(this,&ThisClass::ToggleGuide);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Start")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Start);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Abandon")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Abandon);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Back")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Back);
@@ -166,16 +183,35 @@ void UICQuestDetailWidget::Present(FName ID)
     }
     QuestMenuSetText(this,TEXT("ObjectivesHeading"),Definition.ObjectiveGroupPolicy==EICConditionPolicy::Any?NSLOCTEXT("ICQuestMenu","AnyGroup","목표 (그룹 중 하나 달성)"):NSLOCTEXT("ICQuestMenu","Objectives","목표"));
     QuestMenuSetText(this,TEXT("TXT_Objectives"),FText::Join(FText::FromString(TEXT("\n")),Lines));QuestMenuSetText(this,TEXT("TXT_Rewards"),RewardText(Definition,D));
+    if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_ToggleGuide"))))
+    {
+        const auto* Pawn = GetOwningPlayerPawn();
+        const auto* Guide = Pawn ? Pawn->FindComponentByClass<UICQuestGuideComponent>() : nullptr;
+        const bool bEnabled = Guide && Guide->IsQuestGuideEnabled(ID);
+        Button->SetIsEnabled(Guide && Quest.bAccepted && Quest.bStarted && !Quest.bCompleted && !Quest.bAbandoned);
+        if (auto* Caption = Cast<UTextBlock>(Button->GetContent()))
+            Caption->SetText(bEnabled ? NSLOCTEXT("ICQuestMenu","StopGuide","경로 안내 중지")
+                                     : NSLOCTEXT("ICQuestMenu","StartGuide","경로 안내 시작"));
+    }
     GetWidgetFromName(TEXT("BTN_Start"))->SetIsEnabled(Quest.bAccepted&&!Quest.bStarted&&!Quest.bCompleted);
     GetWidgetFromName(TEXT("BTN_Abandon"))->SetIsEnabled(Quest.bAccepted&&!Quest.bCompleted&&Definition.bAllowAbandon);
 }
 void UICQuestDetailWidget::HighlightAction(int32 Index)
 {
-    const TCHAR* Names[]={TEXT("BTN_Abandon"),TEXT("BTN_Start"),TEXT("BTN_Back")};
-    for(int32 I=0;I<3;++I)CastChecked<UButton>(GetWidgetFromName(Names[I]))->SetBackgroundColor(I==Index?QuestGlowColor:QuestButtonColor);
+    const TCHAR* Names[]={TEXT("BTN_Abandon"),TEXT("BTN_Start"),TEXT("BTN_ToggleGuide"),TEXT("BTN_Back")};
+    for(int32 I=0;I<4;++I)if(auto* Button=Cast<UButton>(GetWidgetFromName(Names[I])))Button->SetBackgroundColor(I==Index?QuestGlowColor:QuestButtonColor);
 }
 void UICQuestDetailWidget::Scroll(float Delta)
 {auto* W=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("DetailScroll")));W->SetScrollOffset(FMath::Clamp(W->GetScrollOffset()+Delta,0.f,W->GetScrollOffsetOfEnd()));}
+void UICQuestDetailWidget::ToggleGuide()
+{
+    auto* Pawn = GetOwningPlayerPawn();
+    auto* Guide = Pawn ? Pawn->FindComponentByClass<UICQuestGuideComponent>() : nullptr;
+    const auto* Button = GetWidgetFromName(TEXT("BTN_ToggleGuide"));
+    if (!Guide || !Button || !Button->GetIsEnabled()) return;
+    Guide->SetQuestGuideEnabled(QuestID,!Guide->IsQuestGuideEnabled(QuestID));
+    Present(QuestID);
+}
 void UICQuestDetailWidget::Start(){OnStart.Broadcast();}
 void UICQuestDetailWidget::Abandon(){OnAbandon.Broadcast();}
 void UICQuestDetailWidget::Back(){OnBack.Broadcast();}
@@ -278,7 +314,7 @@ FText UICQuestMenuWidget::NavigationHint() const
 {
     if(!bShowingDetails)return NSLOCTEXT("ICQuestMenu","ListHint","W / S  퀘스트 선택     Enter / D  상세 보기     A  상단 탭     ESC  닫기");
     if(bReadingDetails)return NSLOCTEXT("ICQuestMenu","ReadHint","W / S  설명 스크롤     D / Enter  버튼 이동     A / ESC  목록으로");
-    return NSLOCTEXT("ICQuestMenu","DetailHint","A / D  포기 / 시작하기     S  뒤로가기     W  설명 읽기     Enter  선택     ESC  목록으로");
+    return NSLOCTEXT("ICQuestMenu","DetailHint","A / D  포기 / 시작하기     W / S  경로 안내 / 뒤로가기     Enter  실행     ESC  목록으로");
 }
 bool UICQuestMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
 {
@@ -297,12 +333,12 @@ bool UICQuestMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
     if(Back){if(!Repeat)BackToList();return true;}
     if(bReadingDetails)
     {if(Up||Down)Detail->Scroll(Down?72:-72);else if(Right||Accept)bReadingDetails=false;else if(Left)BackToList();else return false;}
-    else if(Up){if(ActionIndex==2)ActionIndex=1;else bReadingDetails=true;}
-    else if(Down)ActionIndex=2;
-    else if(Left||Right)ActionIndex=Right?1:0;
+    else if(Up){if(ActionIndex>=2)--ActionIndex;else bReadingDetails=true;}
+    else if(Down)ActionIndex=FMath::Min(3,FMath::Max(2,ActionIndex+1));
+    else if(Left||Right){if(ActionIndex<2)ActionIndex=Right?1:0;}
     else if(Accept&&!Repeat)
     {
-        const TCHAR* Names[]={TEXT("BTN_Abandon"),TEXT("BTN_Start"),TEXT("BTN_Back")};auto* B=CastChecked<UButton>(Detail->GetWidgetFromName(Names[ActionIndex]));if(B->GetIsEnabled())B->OnClicked.Broadcast();
+        const TCHAR* Names[]={TEXT("BTN_Abandon"),TEXT("BTN_Start"),TEXT("BTN_ToggleGuide"),TEXT("BTN_Back")};auto* B=CastChecked<UButton>(Detail->GetWidgetFromName(Names[ActionIndex]));if(B->GetIsEnabled())B->OnClicked.Broadcast();
     }
     else if(!Accept)return false;
     RefreshSelection();return true;

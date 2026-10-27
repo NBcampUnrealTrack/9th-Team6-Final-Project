@@ -5,6 +5,7 @@
 #include "UI/Gameplay/ICGameMenuWidget.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
 #include "Quest/ICQuestSubsystem.h"
+#include "Quest/ICQuestGuideComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Save/ICSaveGame.h"
@@ -90,8 +91,24 @@ bool FICQuestMenuCheck::RunTest(const FString&)
         TestFalse(TEXT("Detail description is present"),Label(TEXT("TXT_Description")).IsEmpty());TestFalse(TEXT("Objectives are present"),Label(TEXT("TXT_Objectives")).IsEmpty());TestFalse(TEXT("Rewards section exists even when empty"),Label(TEXT("TXT_Rewards")).IsEmpty());
         Menu->HandleMenuKey(EKeys::Enter);TestTrue(TEXT("Keyboard Start activates selected quest"),State->ExportState().Quests[Talk].bStarted);
         TestTrue(TEXT("HUD displays the started quest"),TrackerText().Contains(TEXT("상인과 대화")));TestFalse(TEXT("HUD excludes waiting quests"),TrackerText().Contains(TEXT("재료 수집")));
+        auto* Guide=Player->FindComponentByClass<UICQuestGuideComponent>();
+        auto* GuideButton=Cast<UButton>(Detail->GetWidgetFromName(TEXT("BTN_ToggleGuide")));
+        if(TestNotNull(TEXT("Player has quest guidance"),Guide)&&TestNotNull(TEXT("Existing detail Blueprint gains guide toggle"),GuideButton))
+        {
+            TestTrue(TEXT("Running quest enables guide toggle"),GuideButton->GetIsEnabled());
+            const auto Before=State->ExportState().Quests.FindRef(Talk);
+            Menu->HandleMenuKey(EKeys::S);Menu->HandleMenuKey(EKeys::Enter);
+            TestFalse(TEXT("Keyboard stops guidance"),Guide->IsQuestGuideEnabled(Talk));
+            TestEqual(TEXT("Stopped guidance offers restart"),CastChecked<UTextBlock>(GuideButton->GetContent())->GetText().ToString(),FString(TEXT("경로 안내 시작")));
+            TestTrue(TEXT("Stopping guidance preserves running quest"),State->ExportState().Quests.FindRef(Talk).bStarted);
+            TestTrue(TEXT("Stopping guidance preserves objective progress"),State->ExportState().Quests.FindRef(Talk).Objectives.OrderIndependentCompareEqual(Before.Objectives));
+            GuideButton->OnClicked.Broadcast();
+            TestTrue(TEXT("Same button resumes guidance"),Guide->IsQuestGuideEnabled(Talk));
+            TestEqual(TEXT("Resumed guidance offers stop"),CastChecked<UTextBlock>(GuideButton->GetContent())->GetText().ToString(),FString(TEXT("경로 안내 중지")));
+            Menu->HandleMenuKey(EKeys::W);
+        }
         Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,TEXT("NPC_R01_101"),1,FGuid::NewGuid());
-        Menu->HandleMenuKey(EKeys::S);Menu->HandleMenuKey(EKeys::Enter);TestFalse(TEXT("Bottom Back returns to list"),UI->bShowingDetails);TestEqual(TEXT("Back preserves the selected quest"),UI->SelectedQuest,Talk);
+        Menu->HandleMenuKey(EKeys::S);Menu->HandleMenuKey(EKeys::S);Menu->HandleMenuKey(EKeys::Enter);TestFalse(TEXT("Bottom Back returns to list"),UI->bShowingDetails);TestEqual(TEXT("Back preserves the selected quest"),UI->SelectedQuest,Talk);
         Menu->HandleMenuKey(EKeys::W);Menu->HandleMenuKey(EKeys::Enter);Menu->HandleMenuKey(EKeys::Enter);
         auto Current=State->ExportState();TestTrue(TEXT("Switch leaves old quest accepted but stopped"),Current.Quests[Talk].bAccepted&&!Current.Quests[Talk].bStarted);
         TestEqual(TEXT("Switch resets old progress"),Current.Quests[Talk].Objectives.Num(),0);TestTrue(TEXT("New quest starts"),Current.Quests[Collect].bStarted);
