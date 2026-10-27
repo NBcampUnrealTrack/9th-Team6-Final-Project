@@ -10,6 +10,7 @@
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Life/Crafting/ICCraftingComponent.h"
 #include "Quest/ICQuestGuideComponent.h"
+#include "World/Warp/ICPartyWarpComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -50,6 +51,7 @@ AICPlayerCharacter::AICPlayerCharacter()
     Inventory=CreateDefaultSubobject<UICInventoryComponent>(TEXT("Inventory"));
     Crafting=CreateDefaultSubobject<UICCraftingComponent>(TEXT("Crafting"));
     QuestGuide=CreateDefaultSubobject<UICQuestGuideComponent>(TEXT("QuestGuide"));
+    PartyWarp=CreateDefaultSubobject<UICPartyWarpComponent>(TEXT("PartyWarp"));
     CameraArm=CreateDefaultSubobject<UICCameraSpringArm>(TEXT("CameraArm"));
     CameraArm->SetupAttachment(RootComponent);
     CameraArm->TargetArmLength=420;

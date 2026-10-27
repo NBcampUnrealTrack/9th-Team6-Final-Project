@@ -84,6 +84,8 @@ private:
 
     void ShowInteractionOptions();
     void ShowInitialDialogue();
+    void ResetDialogue();
+    bool TryShowNode(FName DialogueID, FName NodeID = NAME_None);
     void ShowGiftPicker();
     UFUNCTION() void GiftPickerClosed(const FText& Message);
     void ShowQuestList();
