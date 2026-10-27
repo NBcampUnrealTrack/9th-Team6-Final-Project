@@ -14,7 +14,7 @@ public:
     virtual void Tick(float DeltaSeconds) override;
     virtual void OnUnPossess() override;
     bool StartExecution(UStateTree* Tree,UBehaviorTree* Behavior);
-    void StopExecution();
+    virtual void StopExecution();
 
     void SetInteractionHold(bool bHold,AActor* FaceTarget);
 
