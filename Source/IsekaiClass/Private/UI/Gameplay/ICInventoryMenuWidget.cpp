@@ -30,7 +30,7 @@ namespace
 {
 const FLinearColor Gold(1,.74f,.3f), InventoryButtonColor(.16f,.21f,.3f);
 FName Indexed(const TCHAR* Prefix,int32 I){return FName(*FString::Printf(TEXT("%s%d"),Prefix,I));}
-UTextBlock* Label(UWidgetTree* T,FName Name,FText Text,int32 Size=16)
+UTextBlock* InventoryLabel(UWidgetTree* T,FName Name,FText Text,int32 Size=16)
 {
     auto* W=T->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),Name);W->SetText(Text);
     W->SetFont(ICFrontendLayout::Font(Size,Size>=24));W->SetColorAndOpacity(FLinearColor(.92f,.94f,.98f));
@@ -40,16 +40,16 @@ USizeBox* Size(UWidgetTree* T,UWidget* Child,float W=0,float H=0)
 {
     auto* Box=T->ConstructWidget<USizeBox>();if(W>0)Box->SetWidthOverride(W);if(H>0)Box->SetHeightOverride(H);Box->SetContent(Child);return Box;
 }
-void Row(UVerticalBox* Box,UWidget* Child,float Gap=6)
+void InventoryRow(UVerticalBox* Box,UWidget* Child,float Gap=6)
 {Box->AddChildToVerticalBox(Child)->SetPadding(FMargin(0,0,0,Gap));}
-UButton* Button(UWidgetTree* T,FName Name,FText Text,bool WithCaption=true)
+UButton* InventoryButton(UWidgetTree* T,FName Name,FText Text,bool WithCaption=true)
 {
     auto* B=T->ConstructWidget<UButton>(UButton::StaticClass(),Name);auto Style=B->GetStyle();
     for(auto* Brush:{&Style.Normal,&Style.Hovered,&Style.Pressed})
     {Brush->DrawAs=ESlateBrushDrawType::Box;Brush->Margin=FMargin(0);Brush->TintColor=FLinearColor::White;}
     B->SetStyle(Style);B->SetBackgroundColor(InventoryButtonColor);
     if(!WithCaption)return B;
-    auto* Caption=Label(T,FName(*(Name.ToString()+TEXT("_Text"))),Text);Caption->SetJustification(ETextJustify::Center);
+    auto* Caption=InventoryLabel(T,FName(*(Name.ToString()+TEXT("_Text"))),Text);Caption->SetJustification(ETextJustify::Center);
     auto* S=Cast<UButtonSlot>(B->SetContent(Caption));S->SetPadding(FMargin(10,7));return B;
 }
 UClass* WidgetClass(const TCHAR* Asset,UClass* Fallback)
@@ -63,15 +63,15 @@ void Caption(UUserWidget* W,const TCHAR* Name,FText Text)
 
 bool UICInventorySlotWidget::BuildLayout(UWidgetTree* T)
 {
-    auto* B=Button(T,TEXT("BTN_Select"),FText::GetEmpty(),false);T->RootWidget=Size(T,B,72,92);
+    auto* B=InventoryButton(T,TEXT("BTN_Select"),FText::GetEmpty(),false);T->RootWidget=Size(T,B,72,92);
     auto* Column=T->ConstructWidget<UVerticalBox>();B->SetContent(Column);CastChecked<UButtonSlot>(Column->Slot)->SetPadding(FMargin(3));
-    auto* Overlay=T->ConstructWidget<UOverlay>();Row(Column,Size(T,Overlay,64,64),3);
+    auto* Overlay=T->ConstructWidget<UOverlay>();InventoryRow(Column,Size(T,Overlay,64,64),3);
     auto* Image=T->ConstructWidget<UImage>(UImage::StaticClass(),TEXT("IMG_Icon"));Image->SetVisibility(ESlateVisibility::Hidden);
     auto* IS=Overlay->AddChildToOverlay(Image);IS->SetHorizontalAlignment(HAlign_Fill);IS->SetVerticalAlignment(VAlign_Fill);
-    auto* Count=Label(T,TEXT("TXT_Count"),FText::GetEmpty(),14);Count->SetShadowOffset(FVector2D(1,1));Count->SetShadowColorAndOpacity(FLinearColor::Black);
+    auto* Count=InventoryLabel(T,TEXT("TXT_Count"),FText::GetEmpty(),14);Count->SetShadowOffset(FVector2D(1,1));Count->SetShadowColorAndOpacity(FLinearColor::Black);
     auto* CS=Overlay->AddChildToOverlay(Count);CS->SetHorizontalAlignment(HAlign_Right);CS->SetVerticalAlignment(VAlign_Bottom);
-    auto* Name=Label(T,TEXT("TXT_Name"),FText::GetEmpty(),12);Name->SetJustification(ETextJustify::Center);Name->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
-    Row(Column,Size(T,Name,64,18),0);return true;
+    auto* Name=InventoryLabel(T,TEXT("TXT_Name"),FText::GetEmpty(),12);Name->SetJustification(ETextJustify::Center);Name->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
+    InventoryRow(Column,Size(T,Name,64,18),0);return true;
 }
 void UICInventorySlotWidget::NativeOnInitialized()
 {
@@ -94,11 +94,11 @@ bool UICItemConfirmWidget::BuildLayout(UWidgetTree* T)
     Shade->SetHorizontalAlignment(HAlign_Center);Shade->SetVerticalAlignment(VAlign_Center);
     auto* Panel=T->ConstructWidget<UBorder>();Panel->SetBrushColor(FLinearColor(.07f,.09f,.13f));Panel->SetPadding(FMargin(24));Shade->SetContent(Size(T,Panel,550));
     auto* Column=T->ConstructWidget<UVerticalBox>();Panel->SetContent(Column);
-    auto* Message=Label(T,TEXT("TXT_Message"),FText::GetEmpty(),20);Message->SetAutoWrapText(true);Message->SetJustification(ETextJustify::Center);Row(Column,Message,24);
-    auto* Actions=T->ConstructWidget<UHorizontalBox>();Row(Column,Actions,0);
+    auto* Message=InventoryLabel(T,TEXT("TXT_Message"),FText::GetEmpty(),20);Message->SetAutoWrapText(true);Message->SetJustification(ETextJustify::Center);InventoryRow(Column,Message,24);
+    auto* Actions=T->ConstructWidget<UHorizontalBox>();InventoryRow(Column,Actions,0);
     for(const auto* Key:{TEXT("Accept"),TEXT("Cancel")})
     {
-        auto* B=Button(T,FName(*(FString(TEXT("BTN_"))+Key)),Key==FString(TEXT("Accept"))?NSLOCTEXT("ICInventory","Accept","수락"):NSLOCTEXT("ICInventory","Cancel","취소"));
+        auto* B=InventoryButton(T,FName(*(FString(TEXT("BTN_"))+Key)),Key==FString(TEXT("Accept"))?NSLOCTEXT("ICInventory","Accept","수락"):NSLOCTEXT("ICInventory","Cancel","취소"));
         auto* S=Actions->AddChildToHorizontalBox(B);S->SetSize(FSlateChildSize(ESlateSizeRule::Fill));S->SetPadding(FMargin(4,0));
     }
     return true;
@@ -132,16 +132,16 @@ bool UICInventoryItemPopupWidget::BuildLayout(UWidgetTree* T)
     auto* Shade=T->ConstructWidget<UBorder>();Shade->SetBrushColor(FLinearColor(0,0,0,.88f));Shade->SetPadding(FMargin(18));T->RootWidget=Shade;
     Shade->SetHorizontalAlignment(HAlign_Center);Shade->SetVerticalAlignment(VAlign_Center);
     auto* Frame=T->ConstructWidget<UBorder>();Frame->SetPadding(FMargin(24));Frame->SetBrushColor(FLinearColor(.055f,.08f,.12f));Shade->SetContent(Size(T,Frame,620));
-    auto* Column=T->ConstructWidget<UVerticalBox>();Frame->SetContent(Column);auto* Header=T->ConstructWidget<UHorizontalBox>();Row(Column,Header,18);
+    auto* Column=T->ConstructWidget<UVerticalBox>();Frame->SetContent(Column);auto* Header=T->ConstructWidget<UHorizontalBox>();InventoryRow(Column,Header,18);
     auto* Image=T->ConstructWidget<UImage>(UImage::StaticClass(),TEXT("IMG_Item"));Header->AddChildToHorizontalBox(Size(T,Image,88,88))->SetPadding(FMargin(0,0,18,0));
-    auto* Name=Label(T,TEXT("TXT_Name"),FText::GetEmpty(),25);Name->SetAutoWrapText(true);auto* NamePlacement=Header->AddChildToHorizontalBox(Name);NamePlacement->SetSize(FSlateChildSize(ESlateSizeRule::Fill));NamePlacement->SetVerticalAlignment(VAlign_Center);
-    auto* Scroll=T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("DescriptionScroll"));auto* Limit=T->ConstructWidget<USizeBox>();Limit->SetMaxDesiredHeight(180);Limit->SetContent(Scroll);Row(Column,Limit,14);
-    auto* Description=Label(T,TEXT("TXT_Description"),FText::GetEmpty(),18);Description->SetAutoWrapText(true);Scroll->AddChild(Description);
-    auto* Message=Label(T,TEXT("TXT_Message"),FText::GetEmpty(),15);Message->SetAutoWrapText(true);Message->SetColorAndOpacity(Gold);Row(Column,Message,12);
-    auto* Actions=T->ConstructWidget<UHorizontalBox>();Row(Column,Actions,0);
+    auto* Name=InventoryLabel(T,TEXT("TXT_Name"),FText::GetEmpty(),25);Name->SetAutoWrapText(true);auto* NamePlacement=Header->AddChildToHorizontalBox(Name);NamePlacement->SetSize(FSlateChildSize(ESlateSizeRule::Fill));NamePlacement->SetVerticalAlignment(VAlign_Center);
+    auto* Scroll=T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("DescriptionScroll"));auto* Limit=T->ConstructWidget<USizeBox>();Limit->SetMaxDesiredHeight(180);Limit->SetContent(Scroll);InventoryRow(Column,Limit,14);
+    auto* Description=InventoryLabel(T,TEXT("TXT_Description"),FText::GetEmpty(),18);Description->SetAutoWrapText(true);Scroll->AddChild(Description);
+    auto* Message=InventoryLabel(T,TEXT("TXT_Message"),FText::GetEmpty(),15);Message->SetAutoWrapText(true);Message->SetColorAndOpacity(Gold);InventoryRow(Column,Message,12);
+    auto* Actions=T->ConstructWidget<UHorizontalBox>();InventoryRow(Column,Actions,0);
     const TCHAR* Keys[]={TEXT("BTN_Equip"),TEXT("BTN_Quick"),TEXT("BTN_Trash"),TEXT("BTN_Back")};
     const TCHAR* Names[]={TEXT("장비 착용"),TEXT("퀵슬롯 설정"),TEXT("휴지통"),TEXT("뒤로가기")};
-    for(int32 I=0;I<4;++I){auto* Placement=Actions->AddChildToHorizontalBox(Button(T,Keys[I],FText::FromString(Names[I])));Placement->SetSize(FSlateChildSize(ESlateSizeRule::Fill));Placement->SetPadding(FMargin(3,0));}return true;
+    for(int32 I=0;I<4;++I){auto* Placement=Actions->AddChildToHorizontalBox(InventoryButton(T,Keys[I],FText::FromString(Names[I])));Placement->SetSize(FSlateChildSize(ESlateSizeRule::Fill));Placement->SetPadding(FMargin(3,0));}return true;
 }
 void UICInventoryItemPopupWidget::NativeOnInitialized()
 {
@@ -191,30 +191,30 @@ bool UICInventoryMenuWidget::BuildLayout(UWidgetTree* T)
         auto* S=Roster->AddChildToVerticalBox(Size(T,P,80,80));S->SetHorizontalAlignment(HAlign_Center);S->SetPadding(FMargin(0,0,0,8));
     }
     auto* Gear=T->ConstructWidget<UVerticalBox>();auto* GS=Top->AddChildToHorizontalBox(Size(T,Gear,300));GS->SetPadding(FMargin(0,0,24,0));
-    Row(Gear,Label(T,TEXT("TXT_CharacterName"),FText::GetEmpty(),24),8);
-    Row(Gear,Label(T,TEXT("TXT_WeaponHeading"),NSLOCTEXT("ICInventory","Weapons","무기")),4);
-    auto* Weapons=T->ConstructWidget<UGridPanel>();Row(Gear,Weapons,8);
+    InventoryRow(Gear,InventoryLabel(T,TEXT("TXT_CharacterName"),FText::GetEmpty(),24),8);
+    InventoryRow(Gear,InventoryLabel(T,TEXT("TXT_WeaponHeading"),NSLOCTEXT("ICInventory","Weapons","무기")),4);
+    auto* Weapons=T->ConstructWidget<UGridPanel>();InventoryRow(Gear,Weapons,8);
     auto* CellClass=WidgetClass(TEXT("WBP_IC_InventorySlot"),UICInventorySlotWidget::StaticClass());
     const TCHAR* Families[]={TEXT("검"),TEXT("활"),TEXT("지팡이"),TEXT("완드")};
     for(int32 I=0;I<4;++I)
     {
         auto* W=T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),Indexed(TEXT("WeaponFrame"),I));
-        Row(W,Label(T,Indexed(TEXT("WeaponLabel"),I),FText::FromString(Families[I]),14),2);
-        Row(W,T->ConstructWidget<UICInventorySlotWidget>(CellClass,Indexed(TEXT("Equipment"),I)),0);
+        InventoryRow(W,InventoryLabel(T,Indexed(TEXT("WeaponLabel"),I),FText::FromString(Families[I]),14),2);
+        InventoryRow(W,T->ConstructWidget<UICInventorySlotWidget>(CellClass,Indexed(TEXT("Equipment"),I)),0);
         Weapons->AddChildToGrid(W,0,I)->SetPadding(FMargin(0,0,3,6));
     }
-    auto* Hint=Label(T,TEXT("TXT_QuickPrompt"),NSLOCTEXT("ICInventory","QuickSlots","퀵슬롯"),16);Hint->SetAutoWrapText(true);Row(Gear,Hint,8);
-    auto* QuickSlots=T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("QuickSlotsRow"));Row(Gear,QuickSlots,8);
+    auto* Hint=InventoryLabel(T,TEXT("TXT_QuickPrompt"),NSLOCTEXT("ICInventory","QuickSlots","퀵슬롯"),16);Hint->SetAutoWrapText(true);InventoryRow(Gear,Hint,8);
+    auto* QuickSlots=T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("QuickSlotsRow"));InventoryRow(Gear,QuickSlots,8);
     for(int32 I=0;I<4;++I){auto* Cell=T->ConstructWidget<UICInventorySlotWidget>(CellClass,Indexed(TEXT("QuickSlot"),I));QuickSlots->AddChildToHorizontalBox(Cell)->SetPadding(FMargin(0,0,3,0));}
-    Row(Gear,Button(T,TEXT("BTN_CancelQuick"),NSLOCTEXT("ICInventory","Cancel","취소")),0);
+    InventoryRow(Gear,InventoryButton(T,TEXT("BTN_CancelQuick"),NSLOCTEXT("ICInventory","Cancel","취소")),0);
     auto* Bag=T->ConstructWidget<UVerticalBox>();Top->AddChildToHorizontalBox(Bag)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    auto* Tabs=T->ConstructWidget<UHorizontalBox>();Row(Bag,Tabs,8);
-    Tabs->AddChildToHorizontalBox(Button(T,TEXT("TAB_Normal"),NSLOCTEXT("ICInventory","Normal","일반")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    Tabs->AddChildToHorizontalBox(Button(T,TEXT("TAB_Quest"),NSLOCTEXT("ICInventory","Quest","퀘스트")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    auto* Tabs=T->ConstructWidget<UHorizontalBox>();InventoryRow(Bag,Tabs,8);
+    Tabs->AddChildToHorizontalBox(InventoryButton(T,TEXT("TAB_Normal"),NSLOCTEXT("ICInventory","Normal","일반")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    Tabs->AddChildToHorizontalBox(InventoryButton(T,TEXT("TAB_Quest"),NSLOCTEXT("ICInventory","Quest","퀘스트")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     auto* Scroll=T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("ItemScroll"));Scroll->SetScrollBarVisibility(ESlateVisibility::Visible);
     Scroll->AddChild(T->ConstructWidget<UGridPanel>(UGridPanel::StaticClass(),TEXT("ItemGrid")));
     Bag->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    Row(Bag,Size(T,Label(T,TEXT("TXT_SelectedItem"),FText::GetEmpty(),15),0,22),5);
+    InventoryRow(Bag,Size(T,InventoryLabel(T,TEXT("TXT_SelectedItem"),FText::GetEmpty(),15),0,22),5);
     auto* Detail=T->ConstructWidget<UICInventoryItemPopupWidget>(WidgetClass(TEXT("WBP_IC_InventoryItemPopup"),UICInventoryItemPopupWidget::StaticClass()),TEXT("ItemPopup"));
     Detail->SetVisibility(ESlateVisibility::Collapsed);auto* DetailPlacement=Root->AddChildToOverlay(Detail);DetailPlacement->SetHorizontalAlignment(HAlign_Fill);DetailPlacement->SetVerticalAlignment(VAlign_Fill);
     auto* Confirm=T->ConstructWidget<UICItemConfirmWidget>(WidgetClass(TEXT("WBP_IC_ItemConfirm"),UICItemConfirmWidget::StaticClass()),TEXT("ItemConfirm"));

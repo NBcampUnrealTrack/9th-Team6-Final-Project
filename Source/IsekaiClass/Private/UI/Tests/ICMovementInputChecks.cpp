@@ -98,7 +98,10 @@ bool FICMovementInputCheck::RunTest(const FString& Parameters)
     Refresh();if(Widget)TestEqual(TEXT("Ready ring is complete"),Widget->Progress,1.f);
     if(Ring)TestEqual(TEXT("Ready characters show no ring"),Ring->GetVisibility(),ESlateVisibility::Hidden);
     Key(EKeys::LeftShift,true);
-    TestTrue(TEXT("Shift starts a dash out of combat"),ASC->GetActionID().IsValid());
+    TestTrue(TEXT("Shift holds sprint out of combat"),Player->bSprintHeld);
+    TestFalse(TEXT("Sprinting starts no dash ability or cooldown"),ASC->GetActionID().IsValid());
+    Key(EKeys::LeftShift,false);TestFalse(TEXT("Releasing Shift ends sprint intent"),Player->bSprintHeld);
+    TestTrue(TEXT("The dash ability remains available"),ASC->RequestAction(TEXT("Dash"),NAME_None,nullptr).bSuccess);
     TestFalse(TEXT("Dash grants no combat invulnerability"),ASC->HasMatchingGameplayTag(ICTags::Invulnerable));
     TestEqual(TEXT("Dash starts the existing 3-second cooldown"),ASC->GetMovementCooldownRemaining(),3.);
     const FGuid DashID=ASC->GetActionID();Key(EKeys::LeftShift,false);Key(EKeys::LeftShift,true);
@@ -121,12 +124,12 @@ bool FICMovementInputCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Rejected retry preserves dodge invulnerability"),ASC->HasMatchingGameplayTag(ICTags::Invulnerable));Key(EKeys::RightShift,false);
     Refresh();if(Ring)TestEqual(TEXT("Dodge reveals the ring again without a label"),Ring->GetVisibility(),ESlateVisibility::HitTestInvisible);
     const FVector DodgeStart=Player->GetActorLocation();Step(.25);
-    TestTrue(TEXT("Dodge uses its separate 300cm distance"),FMath::IsNearlyEqual(Player->GetActorLocation().X-DodgeStart.X,300.,.1));
+    TestTrue(TEXT("No-input combat dodge moves 300cm backward"),FMath::IsNearlyEqual(Player->GetActorLocation().X-DodgeStart.X,-300.,.1));
     TestFalse(TEXT("Dodge immunity ends with the action"),ASC->HasMatchingGameplayTag(ICTags::Invulnerable));
     TestFalse(TEXT("Dash and dodge share one cooldown"),ASC->RequestAction(TEXT("Dash"),NAME_None,nullptr).bSuccess);
     ASC->ResetExecutionForLoad();Refresh();if(Widget)TestTrue(TEXT("Loading resets transient movement cooldown UI"),Widget->bReady&&Widget->Progress==1.f);
 
-    Player->SetActorLocation({0,0,100});auto* Wall=World->SpawnActor<AActor>();
+    Player->SetActorLocation({0,0,100});Player->SetActorRotation(FRotator::ZeroRotator);auto* Wall=World->SpawnActor<AActor>();
     auto* Box=NewObject<UBoxComponent>(Wall);Wall->SetRootComponent(Box);Wall->AddInstanceComponent(Box);
     Box->SetBoxExtent({10,500,500});Box->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     Box->SetCollisionObjectType(ECC_WorldStatic);Box->SetCollisionResponseToAllChannels(ECR_Block);Box->RegisterComponent();Wall->SetActorLocation({200,0,100});

@@ -25,6 +25,7 @@
 #include "Components/TextRenderComponent.h"
 #include "EngineUtils.h"
 #include "Engine/GameInstance.h"
+#include "Settings/ICGameUserSettings.h"
 
 void AICPlayerController::SetupInputComponent()
 {
@@ -110,8 +111,9 @@ void AICPlayerController::Look(const FInputActionValue& Value)
         const FVector2D Axis=Value.Get<FVector2D>();
         if(!Axis.IsNearlyZero())bCameraLockOn=false;
         FRotator Rotation=GetControlRotation();
-        Rotation.Yaw+=Axis.X*TargetCharacter->CameraSensitivity;
-        Rotation.Pitch=FMath::Clamp(FRotator::NormalizeAxis(Rotation.Pitch)+Axis.Y*TargetCharacter->CameraSensitivity,-65.f,65.f);
+        const auto* Preferences=UICGameUserSettings::Get();
+        Rotation.Yaw+=Axis.X*TargetCharacter->CameraSensitivity*(Preferences->bInvertCameraX?-1.f:1.f);
+        Rotation.Pitch=FMath::Clamp(FRotator::NormalizeAxis(Rotation.Pitch)+Axis.Y*TargetCharacter->CameraSensitivity*(Preferences->bInvertCameraY?-1.f:1.f),-65.f,65.f);
         SetControlRotation(Rotation);
     }
 }
@@ -140,7 +142,7 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
     auto* ASC=C?C->GetICAbilitySystem():nullptr;
     if (!ASC) return;
     const bool CombatNow=ASC->HasRecentCombat();
-    if(CombatNow&&!bInCombat&&!CombatTarget.IsValid())SelectCombatTarget(false);
+    if(CombatNow&&!bInCombat&&!CombatTarget.IsValid()&&UICGameUserSettings::Get()->bAutoSelectTarget)SelectCombatTarget(false);
     if(CombatNow)C->bSprintHeld=false;
     if(bInCombat!=CombatNow){SetCombatState(CombatNow);bDirty=true;}
     FICDefinitionResult Result;
@@ -151,7 +153,7 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
     {
         auto* Selected=CombatTarget.Get();
         auto* SelectedASC=Selected->GetICAbilitySystem();
-        if (!SelectedASC || !SelectedASC->IsAlive() || FVector::DistSquared(C->GetActorLocation(),Selected->GetActorLocation())>FMath::Square(Settings->LockOnMaintainDistanceCm))
+        if (!SelectedASC || !SelectedASC->IsAlive() || FVector::DistSquared(C->GetActorLocation(),Selected->GetActorLocation())>FMath::Square(FMath::Max(Settings->LockOnMaintainDistanceCm,ASC->GetNormalAttackRangeCm()+200.)))
         { CombatTarget.Reset(); TargetOccludedAt=-1; }
         else
         {
@@ -167,10 +169,13 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
             else TargetOccludedAt=-1;
         }
     }
-    C->GetCharacterMovement()->bOrientRotationToMovement=!CombatNow;
-    if(CombatNow&&CanHandleGameplayInput()&&ASC->CanAcceptMovementInput()&&!C->IsSwitchingWeapon())
+    const bool CombatFacing=CombatNow&&UICGameUserSettings::Get()->bCombatFacing;
+    C->GetCharacterMovement()->bOrientRotationToMovement=!CombatFacing;
+    if(CombatFacing&&CanHandleGameplayInput()&&ASC->CanAcceptMovementInput()&&!C->IsSwitchingWeapon())
     {
-        const FVector Facing=CombatTarget.IsValid()?CombatTarget->GetActorLocation()-C->GetActorLocation():GetControlRotation().Vector();
+        const auto Family=ASC->GetEquippedWeaponFamily();
+        const bool Ranged=Family==EICWeaponFamily::Bow||Family==EICWeaponFamily::Staff||Family==EICWeaponFamily::Wand;
+        const FVector Facing=CombatTarget.IsValid()&&!Ranged?CombatTarget->GetActorLocation()-C->GetActorLocation():GetControlRotation().Vector();
         if(!Facing.IsNearlyZero())C->SetActorRotation(FMath::RInterpTo(C->GetActorRotation(),FRotator(0,Facing.Rotation().Yaw,0),DeltaSeconds,12.f));
     }
     if(!CombatTarget.IsValid())bCameraLockOn=false;
@@ -489,7 +494,7 @@ void AICPlayerController::SelectCombatTarget(bool Next)
         auto* Target=*It;
         auto* TargetASC=Target->GetICAbilitySystem();
         const double Distance=FVector::DistSquared(PlayerCharacter->GetActorLocation(),Target->GetActorLocation());
-        if(!PlayerCharacter->IsHostileTo(Target)||!TargetASC||!TargetASC->IsAlive()||Distance>FMath::Square(Settings->LockOnDistanceCm))continue;
+        if(!PlayerCharacter->IsHostileTo(Target)||!TargetASC||!TargetASC->IsAlive()||Distance>FMath::Square(FMath::Max(Settings->LockOnDistanceCm,ASC->GetNormalAttackRangeCm())))continue;
         const double Facing=FVector::DotProduct(CameraRotation.Vector(),(Target->GetActorLocation()-CameraLocation).GetSafeNormal());
         if(Facing<=0)continue;
         FHitResult Hit;
@@ -559,7 +564,7 @@ void AICPlayerController::ExecuteCombatInput(FName Action,int32 Slot)
         if(Skill->TargetRules.Target==EICCombatTarget::Self)
         { const auto Cast=ASC->RequestAction(Action,SkillID,Caster); if(!Cast.bSuccess)Show(Cast.Reason); return; }
     }
-    if(!CombatTarget.IsValid())SelectCombatTarget(false);
+    if(!CombatTarget.IsValid()&&(Action!=TEXT("Attack")||UICGameUserSettings::Get()->bAutoSelectTarget))SelectCombatTarget(false);
     const auto Result=ASC->RequestAction(Action,SkillID,CombatTarget.Get());
     if(!Result.bSuccess)Show(Result.Reason);
 }

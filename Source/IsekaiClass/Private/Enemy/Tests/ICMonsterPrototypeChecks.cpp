@@ -144,7 +144,10 @@ bool FICMonsterPrototypeCheck::RunTest(const FString& Parameters)
         const float EnemyHP=EnemyASC->Capture().HP;
         auto PlayerAttack=PlayerASC->RequestAction(TEXT("Attack"),NAME_None,Enemy);
         TestTrue(TEXT("Player's actual equipped sword activates GAS attack"),PlayerAttack.bSuccess);
-        Step(.3);Enemy->Tick(.01f);
+        const auto* SwordClass=D->Find<FICClassRow>(TEXT("CLS_WARRIOR_001"),R);
+        if(TestNotNull(TEXT("Authored sword combo definition"),SwordClass))
+            Step(SwordClass->NormalAttackStages[0].Hit.StartOffsetPlaySeconds/FMath::Max(.01,PlayerASC->Stat(EICStat::AttackSpeed))+.05);
+        Enemy->Tick(.01f);
         TestTrue(TEXT("Player attack damages monster"),EnemyASC->Capture().HP<EnemyHP);
         auto* Bar=Cast<UICMonsterHealthWidget>(Enemy->HealthBar->GetUserWidgetObject());
         if(Bar){Bar->RefreshHealth();auto* HP=CastChecked<UProgressBar>(Bar->GetWidgetFromName(TEXT("BAR_MonsterHP")));TestTrue(TEXT("Head bar reflects damage"),HP->GetPercent()<1);}

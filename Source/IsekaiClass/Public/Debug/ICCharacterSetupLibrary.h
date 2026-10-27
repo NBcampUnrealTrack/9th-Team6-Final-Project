@@ -21,6 +21,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static UBlendSpace1D* CreateLocomotion(const FString& Path, UAnimSequence* Idle, UAnimSequence* Walk, UAnimSequence* Run);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static UBlendSpace* CreateCombatLocomotion(const FString& Path,UAnimSequence* Idle,const TArray<UAnimSequence*>& Directions);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static UAnimMontage* CreateActionMontage(const FString& Path, UAnimSequence* Sequence, bool bCombatNotify);
+    UFUNCTION(BlueprintCallable, Category="IC|Editor") static UAnimMontage* CreateNormalAttackMontage(const FString& Path,UAnimSequence* Sequence,float HitTime,bool bProjectile);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static UAnimMontage* CreateWeaponTransitionMontage(const FString& Path, UAnimSequence* Sequence, bool bDraw, float VisibilityFraction=0.55f);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool PrepareTestNavigation(UWorld* World);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static FString CaptureUIAspectSamples();

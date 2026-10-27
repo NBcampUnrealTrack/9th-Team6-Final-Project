@@ -12,6 +12,7 @@
 #include "Engine/GameInstance.h"
 #include "Data/Text/ICTextLibrary.h"
 #include "Internationalization/StringTable.h"
+#include "Settings/ICGameUserSettings.h"
 
 void UICDamageNumberWidget::SetDamage(float Value)
 {
@@ -105,6 +106,7 @@ void UICCombatFeedbackWidget::ClearEntries()
 }
 void UICCombatFeedbackWidget::ShowDamage(AActor* Victim,float Amount)
 {
+    if(!UICGameUserSettings::Get()->bDamageNumbers)return;
     auto* Canvas=Cast<UCanvasPanel>(GetWidgetFromName(TEXT("FeedbackCanvas")));
     if(!Canvas||!IsValid(Victim)||Amount<=0||!GetOwningPlayer())return;
     const bool Player=Victim==GetOwningPlayerPawn();
