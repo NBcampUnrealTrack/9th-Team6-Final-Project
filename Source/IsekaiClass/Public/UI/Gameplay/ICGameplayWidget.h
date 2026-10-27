@@ -23,7 +23,6 @@ protected:
     virtual FReply NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event) override;
 
 private:
-    void EnsureSkillCooldown();
     UFUNCTION() void Back();
     UFUNCTION() void Resume();
     UFUNCTION() void Save();
