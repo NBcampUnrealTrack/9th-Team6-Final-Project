@@ -22,15 +22,17 @@ namespace
         int32 Parent = INDEX_NONE;
         TArray<FVector> Connection;
         bool bClosed = false;
+        bool bStepBridge = false;
     };
 
     FVector Flat(const FVector& P) { return FVector(P.X, P.Y, 0); }
 
     // Find points on the two boundary edges, preserving their original elevations.
     bool ClosestBoundary(const TArray<FNavigationPortalEdge>& A,
-        const TArray<FNavigationPortalEdge>& B, float MaxGap, int32 Sample, FVector& From, FVector& To)
+        const TArray<FNavigationPortalEdge>& B, float MaxGap, int32 Sample,
+        const FVector& Approach, const FVector& Goal, FVector& From, FVector& To)
     {
-        double Best = FMath::Square(double(MaxGap));
+        double Best = TNumericLimits<double>::Max();
         bool bFound = false;
         for (const FNavigationPortalEdge& EA : A)
         {
@@ -39,7 +41,26 @@ namespace
                 const FVector A0 = Flat(EA.Left), A1 = Flat(EA.Right);
                 const FVector B0 = Flat(EB.Left), B1 = Flat(EB.Right);
                 FVector PA, PB;
-                if (Sample == 1)
+                if (Sample == 3)
+                {
+                    // Intersect the destination direction with this ledge in XY.
+                    const FVector Direction = Flat(Goal - Approach);
+                    const FVector Edge = A1 - A0;
+                    const double Cross = Direction.X * Edge.Y - Direction.Y * Edge.X;
+                    if (FMath::Abs(Cross) <= UE_SMALL_NUMBER) continue;
+                    const FVector Delta = A0 - Flat(Approach);
+                    const double T = (Delta.X * Edge.Y - Delta.Y * Edge.X) / Cross;
+                    const double U = (Delta.X * Direction.Y - Delta.Y * Direction.X) / Cross;
+                    if (T < 0 || U < 0 || U > 1) continue;
+                    PA = A0 + Edge * U;
+                    PB = FMath::ClosestPointOnSegment(PA, B0, B1);
+                }
+                else if (Sample == 4)
+                {
+                    PA = FMath::ClosestPointOnSegment(Flat(Goal), A0, A1);
+                    PB = FMath::ClosestPointOnSegment(PA, B0, B1);
+                }
+                else if (Sample == 1)
                 {
                     PA = (A0 + A1) * .5;
                     PB = FMath::ClosestPointOnSegment(PA, B0, B1);
@@ -51,15 +72,21 @@ namespace
                 }
                 else FMath::SegmentDistToSegmentSafe(A0, A1, B0, B1, PA, PB);
                 const double Distance = FVector::DistSquared(PA, PB);
-                if (Distance > Best) continue;
+                if (Distance > FMath::Square(double(MaxGap))) continue;
                 const FVector DA = A1 - A0, DB = B1 - B0;
                 const double TA = DA.SizeSquared() > UE_SMALL_NUMBER
                     ? FMath::Clamp(FVector::DotProduct(PA - A0, DA) / DA.SizeSquared(), 0., 1.) : 0.;
                 const double TB = DB.SizeSquared() > UE_SMALL_NUMBER
                     ? FMath::Clamp(FVector::DotProduct(PB - B0, DB) / DB.SizeSquared(), 0., 1.) : 0.;
-                From = FMath::Lerp(EA.Left, EA.Right, TA);
-                To = FMath::Lerp(EB.Left, EB.Right, TB);
-                Best = Distance;
+                const FVector CandidateFrom = FMath::Lerp(EA.Left, EA.Right, TA);
+                const FVector CandidateTo = FMath::Lerp(EB.Left, EB.Right, TB);
+                const double Score = FVector::Distance(Approach, CandidateFrom)
+                    + FMath::Abs(CandidateFrom.Z - CandidateTo.Z) + FVector::Dist2D(CandidateFrom, CandidateTo)
+                    + FVector::Distance(CandidateTo, Goal);
+                if (Score >= Best) continue;
+                From = CandidateFrom;
+                To = CandidateTo;
+                Best = Score;
                 bFound = true;
             }
         }
@@ -147,22 +174,45 @@ bool FindAcrossSteps(UWorld& World, const ARecastNavMesh& Mesh,
                 if (!Nodes.IsValidIndex(Index) || Nodes[Index].Parent == INDEX_NONE) return false;
                 Route.Add(Index);
             }
-            Points.Add(Start.Location);
+            // String-pull each connected corridor separately. Step bridge points
+            // remain fixed, so simplification cannot cut across a gap or wall.
+            TArray<FVector> Result;
+            TArray<NavNodeRef> Corridor{Start.NodeRef};
+            FVector SegmentStart = Start.Location;
+            auto AppendPoint = [&Result](const FVector& Point)
+            {
+                if (Result.IsEmpty() || !Result.Last().Equals(Point, .1)) Result.Add(Point);
+            };
+            auto AppendCorridor = [&](const FVector& End)
+            {
+                TArray<FNavPathPoint> StraightPath;
+                if (!Mesh.FindStraightPath(SegmentStart, End, Corridor, StraightPath)
+                    || StraightPath.IsEmpty()) return false;
+                for (const FNavPathPoint& Point : StraightPath) AppendPoint(Point.Location);
+                return true;
+            };
             for (int32 Index = Route.Num() - 1; Index >= 0; --Index)
             {
-                for (const FVector& Point : Nodes[Route[Index]].Connection)
-                    if (!Points.Last().Equals(Point, .1)) Points.Add(Point);
-                if (!Points.Last().Equals(Nodes[Route[Index]].Center, .1))
-                    Points.Add(Nodes[Route[Index]].Center);
+                const FSearchNode& Node = Nodes[Route[Index]];
+                if (Node.bStepBridge)
+                {
+                    if (Node.Connection.Num() < 2 || !AppendCorridor(Node.Connection[0])) return false;
+                    for (const FVector& Point : Node.Connection) AppendPoint(Point);
+                    SegmentStart = Node.Connection.Last();
+                    Corridor.Reset();
+                }
+                Corridor.Add(Node.Ref);
             }
-            return Points.Num() >= 2;
+            if (!AppendCorridor(Goal.Location) || Result.Num() < 2) return false;
+            Points = MoveTemp(Result);
+            return true;
         }
         Nodes[Current].bClosed = true;
         // Copy values before AddNode can reallocate Nodes.
         const FVector Center = Nodes[Current].Center;
         const NavNodeRef Ref = Nodes[Current].Ref;
         const double Cost = Nodes[Current].Cost;
-        auto Relax = [&](NavNodeRef NextRef, const TArray<FVector>& Connection)
+        auto Relax = [&](NavNodeRef NextRef, const TArray<FVector>& Connection, bool bStepBridge = false)
         {
             const int32 Next = AddNode(NextRef);
             if (Next == INDEX_NONE || Nodes[Next].bClosed) return;
@@ -179,6 +229,7 @@ bool FindAcrossSteps(UWorld& World, const ARecastNavMesh& Mesh,
                 Nodes[Next].Cost = NewCost;
                 Nodes[Next].Parent = Current;
                 Nodes[Next].Connection = Connection;
+                Nodes[Next].bStepBridge = bStepBridge;
             }
         };
         TArray<FNavigationPortalEdge> Neighbors;
@@ -205,19 +256,29 @@ bool FindAcrossSteps(UWorld& World, const ARecastNavMesh& Mesh,
             if (const int32* Known = Indices.Find(Poly.Ref); Known && Nodes[*Known].bClosed) continue;
             TArray<FNavigationPortalEdge> OtherWalls;
             Mesh.GetPolyWallSegments(Poly.Ref, Mesh.GetDefaultQueryFilter(), Owner, OtherWalls);
-            // Prefer the middle of a ledge; its corners may touch a side wall.
-            for (int32 Sample : {1, 0, 2})
+            TArray<FVector> BestBridge;
+            double BestBridgeScore = TNumericLimits<double>::Max();
+            // Compare destination-facing crossings with midpoint/corner fallbacks.
+            for (int32 Sample : {3, 4, 1, 0, 2})
             {
                 FVector From, To;
-                if (!ClosestBoundary(Walls, OtherWalls, MaxHorizontalGap, Sample, From, To)) continue;
+                if (!ClosestBoundary(Walls, OtherWalls, MaxHorizontalGap, Sample, Center, Goal.Location, From, To)) continue;
                 if (++CollisionChecks > MaxCollisionChecks) break;
                 TArray<FVector> Bridge;
                 if (BuildStepBridge(World, From, To, VisualHeight, Owner, Bridge))
                 {
-                    Relax(Poly.Ref, Bridge);
-                    break;
+                    double Score = FVector::Distance(Center, Bridge[0])
+                        + FVector::Distance(Bridge.Last(), Goal.Location);
+                    for (int32 Index = 1; Index < Bridge.Num(); ++Index)
+                        Score += FVector::Distance(Bridge[Index - 1], Bridge[Index]);
+                    if (Score < BestBridgeScore)
+                    {
+                        BestBridgeScore = Score;
+                        BestBridge = MoveTemp(Bridge);
+                    }
                 }
             }
+            if (!BestBridge.IsEmpty()) Relax(Poly.Ref, BestBridge, true);
             if (CollisionChecks >= MaxCollisionChecks) break;
         }
     }

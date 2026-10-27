@@ -45,6 +45,7 @@ private:
     UFUNCTION() void Start();
     UFUNCTION() void Abandon();
     UFUNCTION() void Back();
+    UFUNCTION() void ToggleGuide();
 };
 
 UCLASS(Blueprintable)
@@ -57,7 +58,7 @@ public:
     UPROPERTY(BlueprintReadOnly) FName SelectedQuest;
     UPROPERTY(BlueprintReadOnly) bool bShowingDetails=false;
     UPROPERTY(BlueprintReadOnly) bool bReadingDetails=false;
-    /** 0 abandon, 1 start, 2 back. */
+    /** 0 abandon, 1 start, 2 guide toggle, 3 back. */
     UPROPERTY(BlueprintReadOnly) int32 ActionIndex=1;
     UFUNCTION(BlueprintCallable) void RefreshQuests();
     UFUNCTION(BlueprintCallable) bool SelectQuest(int32 Index);

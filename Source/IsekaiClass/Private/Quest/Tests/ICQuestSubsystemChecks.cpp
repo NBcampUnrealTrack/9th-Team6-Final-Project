@@ -384,4 +384,72 @@ bool FICQuestReacceptGrantCheck::RunTest(const FString& Parameters)
     TestEqual(TEXT("Reacceptance does not duplicate retained quest items"), F.Inventory->CountItem(Grant.ItemID), 2);
     return !HasAnyErrors();
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestObjectiveDialogueCheck, "IC.Runtime.QuestObjectiveDialogue",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FICQuestObjectiveDialogueCheck::RunTest(const FString& Parameters)
+{
+    FICQuestFixture Fixture;
+    FICQuestRow Quest;
+    Quest.ID = TEXT("QST_TALK_998");
+    Quest.CompletionMode = EICQuestCompletionMode::NPCInteraction;
+    Quest.TurnInNPCID = TEXT("NPC_R01_998");
+    FICQuestObjectiveDefinition Objective;
+    Objective.ObjectiveID = TEXT("OBJ_TALK");
+    Objective.Type = EICQuestObjectiveType::Talk;
+    Objective.Target.Type = EICDefinitionType::NPC;
+    Objective.Target.ID = Quest.TurnInNPCID;
+    Objective.DialogueID = TEXT("DLG_TALK_998");
+    FICQuestObjectiveGroup Group;
+    Group.Objectives.Add(Objective);
+    Quest.ObjectiveGroups.Add(Group);
+    Fixture.Catalog->Tables.RemoveAll([](const FICDefinitionBinding& Binding)
+        { return Binding.Type == EICDefinitionType::Quest; });
+    Fixture.AddTable<FICQuestRow>(EICDefinitionType::Quest, {Quest});
+    FICDialogueRow Dialogue;
+    Dialogue.ID = Objective.DialogueID;
+    Dialogue.NPCID = Objective.Target.ID;
+    Dialogue.EntryNodeID = TEXT("START");
+    FICDialogueNode Node;
+    Node.NodeID = Dialogue.EntryNodeID;
+    Node.TextKey = TEXT("DLG_TALK_998.START");
+    Dialogue.Nodes.Add(Node);
+    Fixture.AddTable<FICDialogueRow>(EICDefinitionType::Dialogue, {Dialogue});
+    Fixture.Definitions->ConfigureCatalog(Fixture.Catalog);
+
+    FICWorldState World = Fixture.State->ExportState();
+    World.Quests.Reset();
+    FICQuestState& Progress = World.Quests.Add(Quest.ID);
+    Progress.bAccepted = true;
+    Fixture.State->RestoreState(World);
+    TestTrue(TEXT("Accepted but unstarted quest uses ordinary dialogue"),
+        Fixture.Quests->GetNPCObjectiveDialogue(Dialogue.NPCID).IsNone());
+    Progress.bStarted = true;
+    Fixture.State->RestoreState(World);
+    TestEqual(TEXT("Started objective selects its dedicated dialogue"),
+        Fixture.Quests->GetNPCObjectiveDialogue(Dialogue.NPCID), Dialogue.ID);
+    TestTrue(TEXT("Other NPCs use ordinary dialogue"),
+        Fixture.Quests->GetNPCObjectiveDialogue(TEXT("NPC_R01_997")).IsNone());
+    TestFalse(TEXT("A generic conversation cannot satisfy the dedicated objective"),
+        Fixture.Quests->ReportObjectiveEvent(EICQuestObjectiveType::Talk, Dialogue.NPCID, 1, FGuid::NewGuid()));
+    TestFalse(TEXT("Another dialogue cannot satisfy it"),
+        Fixture.Quests->ReportObjectiveEvent(EICQuestObjectiveType::Talk, Dialogue.NPCID, 1,
+            FGuid::NewGuid(), EICLifeActivity::Gathering, NAME_None, TEXT("DLG_OTHER_998")));
+    TestEqual(TEXT("Selection alone does not advance the objective"),
+        Fixture.State->ExportState().Quests.FindChecked(Quest.ID).Objectives.FindRef(Objective.ObjectiveID), 0);
+    TestTrue(TEXT("Completing the selected dialogue advances the objective"),
+        Fixture.Quests->ReportObjectiveEvent(EICQuestObjectiveType::Talk, Dialogue.NPCID, 1,
+            FGuid::NewGuid(), EICLifeActivity::Gathering, NAME_None, Dialogue.ID));
+    TestTrue(TEXT("Satisfied objective no longer overrides ordinary dialogue"),
+        Fixture.Quests->GetNPCObjectiveDialogue(Dialogue.NPCID).IsNone());
+    Progress.bAbandoned = true;
+    Fixture.State->RestoreState(World);
+    TestTrue(TEXT("Abandoned quest cannot select its dialogue"),
+        Fixture.Quests->GetNPCObjectiveDialogue(Dialogue.NPCID).IsNone());
+    Progress.bAbandoned = false;
+    Progress.bCompleted = true;
+    Fixture.State->RestoreState(World);
+    TestTrue(TEXT("Completed quest cannot select its dialogue"),
+        Fixture.Quests->GetNPCObjectiveDialogue(Dialogue.NPCID).IsNone());
+    return !HasAnyErrors();
+}
 #endif
