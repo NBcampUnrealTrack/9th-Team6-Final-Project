@@ -24,13 +24,21 @@ bool UICShopSubsystem::ResolveService(FName ServiceID,const FICServiceRow*& Serv
     const auto* Row=D->Find<FICServiceRow>(ServiceID,R);
     if(!Row){Reason=ICText::Get(TEXT("Native_53bfe3e8be69")).ToString();return false;}
     if(Row->Type!=EICServiceType::Shop){Reason=ICText::Get(TEXT("Native_d2152eb47db0")).ToString();return false;}
+    const auto NPC=S->GetSnapshot(Row->NPCID);
+    if(NPC.IsDowned()){Reason=ICText::Get(TEXT("Native_cf1fbb44a8a2")).ToString();return false;}
+    // A recruited merchant keeps its service available with the party.  The shop's
+    // physical work-anchor and schedule only apply while the NPC is on duty.
+    if (NPC.Mode == EICCharacterMode::Companion)
+    {
+        Service=Row;
+        return true;
+    }
+    if(NPC.Mode!=EICCharacterMode::Scheduled){Reason=ICText::Get(TEXT("Native_cf1fbb44a8a2")).ToString();return false;}
     const int32 Minute=int32(FMath::FloorToDouble(T->GetClock().GameMinute))%1440;
 
     bool bOpen=Row->OpeningHours.IsEmpty();
     for(const auto& Hours:Row->OpeningHours)if(Minute>=Hours.OpenGameMinute&&Minute<Hours.CloseGameMinute)bOpen=true;
     if(!bOpen){Reason=ICText::Get(TEXT("Native_d91cd776aeb6")).ToString();return false;}
-    const auto NPC=S->GetSnapshot(Row->NPCID);
-    if(NPC.IsDowned()||NPC.Mode!=EICCharacterMode::Scheduled){Reason=ICText::Get(TEXT("Native_cf1fbb44a8a2")).ToString();return false;}
     if(!Row->WorkAnchorID.IsNone()&&NPC.CurrentAnchorID!=Row->WorkAnchorID){Reason=ICText::Get(TEXT("Native_ae293ed2d69e")).ToString();return false;}
     const auto* NPCRow=D->Find<FICNPCRow>(Row->NPCID,R);
     const auto* Schedule=NPCRow?D->Find<FICScheduleRow>(NPCRow->ScheduleID,R):nullptr;

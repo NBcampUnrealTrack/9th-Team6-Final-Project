@@ -9,6 +9,8 @@
 #include "Quest/ICQuestSubsystem.h"
 #include "EngineUtils.h"
 #include "Engine/GameInstance.h"
+#include "NPC/LifeObject/ICLifeObjectSubsystem.h"
+#include "HAL/IConsoleManager.h"
 
 void UICDebugCheatManager::ICCreateTestPlayer()
 {
@@ -161,5 +163,50 @@ void UICDebugCheatManager::ICShopSell(FName ServiceID, FName ItemID, int32 Count
     FString Reason;
     const bool bOk = Shop->Sell(PC, ServiceID, ItemID, Count, Reason);
     PC->Show(bOk ? FString::Printf(TEXT("판매 완료. 보유 골드 %d"), PC->Gold) : FString::Printf(TEXT("판매 실패: %s"), *Reason));
+#endif
+}
+
+void UICDebugCheatManager::ICLifeObjectDump()
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    auto* PC = Cast<AICPlayerController>(GetOuterAPlayerController());
+    if (UICLifeObjectSubsystem* Life = UICLifeObjectSubsystem::Get(GetOuterAPlayerController()))
+    {
+        Life->DumpToLog();
+        if (PC) PC->Show(FString::Printf(TEXT("생활 오브젝트 %d개 상태를 Output Log(LogICLifeObject)에 출력했습니다."), Life->GetObjectCount()));
+    }
+    else if (PC) PC->Show(TEXT("생활 오브젝트 서브시스템이 없습니다."));
+#endif
+}
+
+void UICDebugCheatManager::ICLifeObjectDebug(int32 bEnabled)
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    if (IConsoleVariable* Variable = IConsoleManager::Get().FindConsoleVariable(TEXT("ic.LifeObject.Debug")))
+        Variable->Set(bEnabled != 0 ? 1 : 0, ECVF_SetByConsole);
+#endif
+}
+
+void UICDebugCheatManager::ICDestroyNearestNPC()
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    auto* PC = Cast<AICPlayerController>(GetOuterAPlayerController());
+    const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+    if (!Pawn) return;
+    AICNPCBase* Nearest = nullptr;
+    double Best = TNumericLimits<double>::Max();
+    for (TActorIterator<AICNPCBase> It(Pawn->GetWorld()); It; ++It)
+    {
+        if (It->IsActorBeingDestroyed()) continue;
+        const double Distance = FVector::DistSquared(It->GetActorLocation(), Pawn->GetActorLocation());
+        if (Distance < Best) { Best = Distance; Nearest = *It; }
+    }
+    if (!Nearest) { PC->Show(TEXT("주변에 NPC가 없습니다.")); return; }
+    UE_LOG(LogICLifeObject, Log, TEXT("[Cheat.DestroyNPC] NPC=%s"), *Nearest->GetCharacterID().ToString());
+    PC->Show(FString::Printf(TEXT("%s 제거. ICLifeObjectDump로 점유가 남지 않았는지 확인하세요."), *Nearest->GetCharacterID().ToString()));
+    Nearest->Destroy();
 #endif
 }
