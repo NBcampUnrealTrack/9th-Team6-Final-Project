@@ -9,6 +9,7 @@
 #include "Combat/GAS/ICGameplayTags.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Combat/Actors/ICProjectile.h"
+#include "Combat/Actors/ICAttackEffect.h"
 #include "Character/Base/ICCharacterBase.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Character/Animation/ICCharacterAnimationProfile.h"
@@ -22,6 +23,66 @@
 #include "Engine/GameInstance.h"
 #include "Debug/ICLog.h"
 #include "Enemy/Character/ICEnemyBase.h"
+#include "Settings/ICGameUserSettings.h"
+#include "Camera/CameraComponent.h"
+
+namespace
+{
+// Resolve a fresh camera ray at release time, so moving the mouse during a
+// combo still aims at the current screen centre rather than the selected enemy.
+void ICPlayerAttackView(const AICPlayerCharacter* Player,FVector& Location,FRotator& Rotation)
+{
+    if(Player->GetController())Player->GetController()->GetPlayerViewPoint(Location,Rotation);
+    else if(Player->Camera){Location=Player->Camera->GetComponentLocation();Rotation=Player->Camera->GetComponentRotation();}
+    else {Location=Player->GetActorLocation();Rotation=Player->GetActorRotation();}
+}
+void ICPlayerScreenCentreShot(AICPlayerCharacter* Player,double Range,FVector& Origin,FVector& Direction)
+{
+    FVector ViewLocation;FRotator ViewRotation;ICPlayerAttackView(Player,ViewLocation,ViewRotation);
+    const FVector Forward=ViewRotation.Vector();
+    Origin=Player->GetActorLocation()+FVector(0,0,30)+Forward*35;
+    // Both magic jobs cast with the free left palm; the bow's left grip is
+    // its arrow rest, not the tip of either bow limb.
+    for(FName Hand:{FName(TEXT("weapon_l")),FName(TEXT("J_Bip_L_Hand")),FName(TEXT("hand_l"))})
+        if(Player->GetMesh()->DoesSocketExist(Hand)){Origin=Player->GetMesh()->GetSocketLocation(Hand)+Forward*8;break;}
+    const double Near=FMath::Max(0.,FVector::DotProduct(Origin-ViewLocation,Forward));
+    const FVector RayStart=ViewLocation+Forward*Near;
+    FVector AimPoint=RayStart+Forward*FMath::Max(50.,Range);
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(ICScreenCentreAim),true);Query.AddIgnoredActor(Player);
+    if(Player->EquippedWeaponActor)Query.AddIgnoredActor(Player->EquippedWeaponActor);
+    for(TActorIterator<AICCharacterBase> It(Player->GetWorld());It;++It)
+        if(!Player->IsHostileTo(*It))Query.AddIgnoredActor(*It);
+    for(TActorIterator<AICProjectile> It(Player->GetWorld());It;++It)Query.AddIgnoredActor(*It);
+    if(UICGameUserSettings::Get()->bProjectileAimAssist)
+    {
+        FHitResult Hit,PawnHit;
+        bool Blocked=Player->GetWorld()->LineTraceSingleByChannel(Hit,RayStart,AimPoint,ECC_Visibility,Query);
+        // Character capsules commonly ignore Visibility. Pick the closest pawn
+        // as well, while preserving any nearer wall from the visibility trace.
+        const FCollisionObjectQueryParams Pawns(ECC_Pawn);
+        if(Player->GetWorld()->LineTraceSingleByObjectType(PawnHit,RayStart,AimPoint,Pawns,Query)&&(!Blocked||PawnHit.Distance<Hit.Distance))
+        {Hit=PawnHit;Blocked=true;}
+        if(Blocked)AimPoint=Hit.ImpactPoint;
+    }
+    // Never turn a shot backwards if the hand extends through the camera ray.
+    if(FVector::DotProduct(AimPoint-Origin,Forward)<10)AimPoint+=Forward*(10-FVector::DotProduct(AimPoint-Origin,Forward));
+    Direction=(AimPoint-Origin).GetSafeNormal();
+}
+}
+
+double UICAbilitySystemComponent::GetNormalAttackRangeCm() const
+{
+    auto* D=Definitions();if(!D)return 0;
+    FICDefinitionResult Result;TArray<FName> IDs;D->GetDefinitionIDs(EICDefinitionType::Class,IDs);
+    for(FName ID:IDs)if(const auto* Class=D->Find<FICClassRow>(ID,Result);Class&&Class->WeaponFamily==GetEquippedWeaponFamily())
+    {
+        double Range=0;
+        for(const auto& Stage:Class->NormalAttackStages)
+        {const auto& Hit=Stage.Hit;Range=FMath::Max(Range,Hit.Shape==EICHitShape::Projectile?(Hit.ProjectileMaxDistanceCm>0?Hit.ProjectileMaxDistanceCm:Hit.ProjectileSpeedCmPerSecond*Hit.ProjectileLifetimePlaySeconds):Hit.RadiusCm);}
+        return Range;
+    }
+    return 0;
+}
 
 bool UICAbilitySystemComponent::CanAcceptMovementInput() const
 {
@@ -80,7 +141,9 @@ FICCombatResult UICAbilitySystemComponent::RequestAction(FName Action,FName Skil
         const bool QueueDodge=Action==TEXT("Dodge")&&RequestedAction==TEXT("Attack")&&!Skill.Montage.IsNull()&&!bCancelWindow;
         if(Window>0&&(QueueAttack||QueueDodge))
         {
-            BufferedInputAction=Action;BufferedInputTarget=Target;BufferedAttackUntil=PlaySecond()+Window;
+            BufferedInputAction=Action;BufferedInputTarget=Target;
+            // One extra click queues the next combo stage through the current recovery.
+            BufferedAttackUntil=QueueAttack&&RequestedAction==TEXT("Attack")?FMath::Max(PlaySecond()+Window,ActionEndsAt+Window):PlaySecond()+Window;
             Result.bSuccess=true;Result.ActionID=CurrentID;return Result;
         }
     }
@@ -178,15 +241,34 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
             else if(const auto* NPC=D->Find<FICNPCRow>(Runtime.CharacterId,R))if(C->ID==NPC->ClassID)Class=C;
         }
         if(!Class||Class->NormalAttackStages.Num()!=3){UE_LOG(LogICData, Warning, TEXT("[Combat.MissingClass] ID=%s"),*Runtime.CharacterId.ToString());return false;}
-        if(PlaySecond()>ComboReadyUntil)ComboIndex=0;const auto& Stage=Class->NormalAttackStages[ComboIndex];
+        const auto Family=GetEquippedWeaponFamily();
+        if(PlaySecond()>ComboReadyUntil||ComboWeaponFamily!=Family)ComboIndex=0;
+        ComboWeaponFamily=Family;const auto& Stage=Class->NormalAttackStages[ComboIndex];
         Skill.Hits={Stage.Hit};Skill.Montage=Stage.Montage;Skill.CastSection=Stage.MontageSection;
+        const auto* Profile=Character->GetAnimationProfile();
+        const auto* Set=Profile?Profile->FindSet(Family):nullptr;
+        if(Set&&Set->AttackCombo.IsValidIndex(ComboIndex)&&Set->AttackCombo[ComboIndex])
+        {Skill.Montage=Set->AttackCombo[ComboIndex];Skill.CastSection=NAME_None;}
+        AttackCancelStart=Stage.GuardDodgeCancelStartPlaySeconds;
+        AttackCancelEnd=Stage.GuardDodgeCancelEndPlaySeconds;
         Skill.RecoveryPlaySeconds=FMath::Max(.3,Stage.Hit.StartOffsetPlaySeconds+Stage.Hit.TraceDurationPlaySeconds+.2);Skill.FirstEffectOffsetPlaySeconds=Stage.Hit.StartOffsetPlaySeconds;
-
+        FVector Facing=TargetActor.IsValid()?TargetActor->GetActorLocation()-Character->GetActorLocation():Character->GetActorForwardVector();
+        if(const auto* Player=Cast<AICPlayerCharacter>(Character))
+        {FVector ViewLocation;FRotator ViewRotation;ICPlayerAttackView(Player,ViewLocation,ViewRotation);Facing=ViewRotation.Vector();}
+        if(!Facing.IsNearlyZero())Character->SetActorRotation(FRotator(0,Facing.Rotation().Yaw,0));
+        Character->GetCharacterMovement()->StopMovementImmediately();
     }
     if(RequestedAction==TEXT("Attack")&&!Primary){FICSkillHitDefinition Hit;Hit.Shape=EICHitShape::Direct;Hit.StartOffsetPlaySeconds=.2;Skill.Hits={Hit};Skill.CastPlaySeconds=.2;Skill.RecoveryPlaySeconds=.6;}
     // Authored skill/stage montages take priority; character profiles supply the fallback.
     if (Skill.Montage.IsNull())
         if (auto* Montage = Character->ResolveActionMontage(RequestedAction)) { Skill.Montage = Montage; Skill.CastSection = NAME_None; }
+    if(RequestedAction==TEXT("Attack"))if(const auto* Montage=Skill.Montage.LoadSynchronous())
+    {
+        // Recovery lasts for the chosen animation instead of cutting every attack off at .5s.
+        const int32 Section=Montage->GetSectionIndex(Skill.CastSection);
+        const double Length=Section!=INDEX_NONE?Montage->GetSectionLength(Section):Montage->GetPlayLength();
+        Skill.CastPlaySeconds=0;Skill.RecoveryPlaySeconds=FMath::Max(Length,Skill.FirstEffectOffsetPlaySeconds+.05);
+    }
     RunningAbility=Ability;CurrentID=FGuid::NewGuid();StartedAt=PlaySecond();StartLocation=Character->GetActorLocation();bCommitted=false;bCancelWindow=false;ActiveMontageInstanceID=INDEX_NONE;EmittedHits.Reset();HitReceipts.Reset();OpenTraceHits.Reset();LastTraceStart.Reset();LastTraceEnd.Reset();TraceEndsAt.Reset();
     FICCombatSettingsRow Defaults;const auto* Moves=D?D->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;if(!Moves)Moves=&Defaults;
     if(RequestedAction==TEXT("Dodge")||RequestedAction==TEXT("Dash"))
@@ -267,13 +349,19 @@ void UICAbilitySystemComponent::AdvanceAction(double Now)
     if(!BufferedInputAction.IsNone())
     {
         if(Now>BufferedAttackUntil||!IsAlive()||HasMatchingGameplayTag(ICTags::Staggered)||HasMatchingGameplayTag(ICTags::Returning))ClearBufferedInput();
-        else if(!CurrentID.IsValid()||(BufferedInputAction==TEXT("Dodge")&&RequestedAction==TEXT("Attack")&&bCancelWindow))
+        else if(!CurrentID.IsValid()||(BufferedInputAction==TEXT("Dodge")&&RequestedAction==TEXT("Attack")&&bCancelWindow)
+            ||(BufferedInputAction==TEXT("Attack")&&RequestedAction==TEXT("Attack")&&bCancelWindow&&!EmittedHits.IsEmpty()))
         {
             const FName Pending=BufferedInputAction;
             auto* PendingTarget=BufferedInputTarget.Get();
             const bool InvalidTarget=BufferedInputTarget.IsStale()||(PendingTarget&&(!PendingTarget->GetICAbilitySystem()||!PendingTarget->GetICAbilitySystem()->IsAlive()));
             ClearBufferedInput();
-            if(!InvalidTarget)RequestAction(Pending,NAME_None,PendingTarget);
+            if(!InvalidTarget)
+            {
+                // Blend into the next strike after release, before returning to idle.
+                if(Pending==TEXT("Attack")&&RequestedAction==TEXT("Attack")&&RunningAbility)RunningAbility->Finish(false);
+                RequestAction(Pending,NAME_None,PendingTarget);
+            }
             return;
         }
     }
@@ -288,6 +376,8 @@ void UICAbilitySystemComponent::AdvanceAction(double Now)
     }
     else
     {
+        if(RequestedAction==TEXT("Attack")&&Primary&&AttackCancelEnd>AttackCancelStart)
+        {const double Elapsed=(Now-StartedAt)*FMath::Max(.01,Stat(EICStat::AttackSpeed));bCancelWindow=Elapsed>=AttackCancelStart&&Elapsed<=AttackCancelEnd;}
         if(RequestedAction==TEXT("Skill")&&!bCommitted){FString Failure;if(!ValidateAction(Failure)){CancelAction();return;}}
         if(RequestedAction==TEXT("Skill")&&!bCommitted&&Skill.CancelRules.bCancelOnUserMovement&&FVector::DistSquared(StartLocation,C->GetActorLocation())>25){CancelAction();return;}
         if(RequestedAction==TEXT("Skill")&&!bCommitted&&Now>=StartedAt+Skill.FirstEffectOffsetPlaySeconds&&Skill.FirstEffectEvent==EICFirstEffectEvent::EffectCommit)
@@ -338,10 +428,25 @@ bool UICAbilitySystemComponent::EmitHit(int32 Index,bool ContinueTrace)
     {
         if(!CommitFirstEffect())return false;UClass* Type=Hit->ProjectileClass.IsNull()?AICProjectile::StaticClass():Hit->ProjectileClass.LoadSynchronous();if(!Type||!Type->IsChildOf(AICProjectile::StaticClass()))return false;
         FVector Origin=C->EquippedWeaponActor?C->EquippedWeaponActor->GetMuzzleLocation():C->GetMesh()->DoesSocketExist(TEXT("muzzle"))?C->GetMesh()->GetSocketLocation(TEXT("muzzle")):C->GetActorLocation()+C->GetActorForwardVector()*50;
-        FVector Direction=TargetActor.IsValid()?TargetActor->GetActorLocation()-Origin:C->GetActorForwardVector();
-        FHitResult Wall;FCollisionQueryParams Q;Q.AddIgnoredActor(C);if(GetWorld()->LineTraceSingleByChannel(Wall,C->GetActorLocation(),Origin,ECC_Visibility,Q))return true;
+        FVector Direction=C->GetActorForwardVector();
+        if(auto* Player=Cast<AICPlayerCharacter>(C);Player&&RequestedAction==TEXT("Attack"))
+        {
+            const double Range=Hit->ProjectileMaxDistanceCm>0?Hit->ProjectileMaxDistanceCm:Hit->ProjectileSpeedCmPerSecond*Hit->ProjectileLifetimePlaySeconds;
+            ICPlayerScreenCentreShot(Player,Range,Origin,Direction);
+        }
+        else if(TargetActor.IsValid()&&TargetActor->GetICAbilitySystem()&&TargetActor->GetICAbilitySystem()->IsAlive())
+        {
+            const FVector Aim=TargetActor->GetActorLocation()-Origin;
+            if(FVector::DotProduct(Aim.GetSafeNormal2D(),Direction)>0)Direction=FVector(Direction.X,Direction.Y,Aim.Z/FMath::Max(1.,Aim.Size2D())).GetSafeNormal();
+        }
+        FHitResult Wall;FCollisionQueryParams Q;Q.AddIgnoredActor(C);if(C->EquippedWeaponActor)Q.AddIgnoredActor(C->EquippedWeaponActor);if(GetWorld()->LineTraceSingleByChannel(Wall,C->GetActorLocation(),Origin,ECC_Visibility,Q))return true;
         auto* P=GetWorld()->SpawnActorDeferred<AICProjectile>(Type,FTransform(Direction.Rotation(),Origin),C,C,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
         if(!P)return false;P->InitializeShot(this,*Effect,*Hit,CaptureAttack(Effect->Magnitude,Effect->DamageType,RequestedAction!=TEXT("Attack")),Direction,Skill.Presentation);P->FinishSpawning(FTransform(Direction.Rotation(),Origin));return true;
+    }
+    if(!ContinueTrace&&RequestedAction==TEXT("Attack")&&Primary&&Hit->Shape==EICHitShape::Cone)
+    {
+        const double Reach=GetEquippedWeaponFamily()==EICWeaponFamily::Sword&&C->EquippedWeaponActor?FMath::Max(50.f,C->EquippedWeaponActor->GetMeleeReachCm()):Hit->RadiusCm;
+        AICAttackEffect::SpawnSlash(C,Reach,Hit->ConeAngleDegrees,ComboIndex);
     }
     TArray<AICCharacterBase*> Targets;
     if(Hit->Shape==EICHitShape::Direct){if(TargetActor.IsValid())Targets.Add(TargetActor.Get());else if(Skill.TargetRules.Target==EICCombatTarget::Self)Targets.Add(C);}

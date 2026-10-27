@@ -24,6 +24,13 @@
 #include "Combat/GAS/Abilities/ICGameplayAbility.h"
 #include "Combat/GAS/Effects/ICGameplayEffects.h"
 #include "Combat/GAS/Cues/ICCombatCueNotify.h"
+#include "Combat/Actors/ICProjectile.h"
+#include "Combat/Actors/ICWeaponActor.h"
+#include "Camera/CameraComponent.h"
+#include "Settings/ICGameUserSettings.h"
+#include "GameFramework/ProjectileMovementComponent.h"
+#include "Components/BoxComponent.h"
+#include "EngineUtils.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Combat/GAS/Simulation/ICCombatSimulation.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -495,6 +502,202 @@ bool FICInputTargetCheck::RunTest(const FString& Parameters)
     TestFalse(TEXT("Confirm leaves target selection"),PC->HasTargetSelection());
     TestTrue(TEXT("Confirmed support skill starts a real GAS action"),F.ASC->GetActionID().IsValid());
     F.ASC->CancelAction();PC->Destroy();
+    return !HasAnyErrors();
+}
+
+namespace
+{
+void ConfigureNormalAttackWeapons(FGASFixture& F)
+{
+    ConfigureInputWeapons(F);
+    UDataTable* Classes=nullptr;UDataTable* Items=nullptr;UDataTable* Equipment=nullptr;
+    for(const auto& Binding:F.Catalog->Tables)
+    {
+        if(Binding.RowStruct==FICClassRow::StaticStruct())Classes=Binding.Table.LoadSynchronous();
+        if(Binding.RowStruct==FICItemRow::StaticStruct())Items=Binding.Table.LoadSynchronous();
+        if(Binding.RowStruct==FICEquipmentRow::StaticStruct())Equipment=Binding.Table.LoadSynchronous();
+    }
+    auto* Authored=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Character/DT_IC_Class.DT_IC_Class"));
+    check(Authored);Classes->EmptyTable();TArray<FICClassRow*> Rows;Authored->GetAllRows(TEXT("Combo test"),Rows);
+    for(const auto* Row:Rows)Classes->AddRow(Row->ID,*Row);
+    for(int32 I=0;I<2;++I)
+    {
+        auto Item=*Items->FindRow<FICItemRow>(TEXT("ITM_INPUT_998"),TEXT("Combo"));
+        Item.ID=I==0?TEXT("ITM_INPUT_996"):TEXT("ITM_INPUT_995");Item.ItemID=Item.ID;Item.EquipmentID=I==0?TEXT("EQP_INPUT_996"):TEXT("EQP_INPUT_995");
+        auto Gear=*Equipment->FindRow<FICEquipmentRow>(TEXT("EQP_INPUT_998"),TEXT("Combo"));
+        Gear.ID=Item.EquipmentID;Gear.ItemID=Item.ID;Gear.RequiredClass=EICCharacterClass::None;Gear.WeaponFamily=I==0?EICWeaponFamily::Staff:EICWeaponFamily::Wand;
+        Items->AddRow(Item.ID,Item);Equipment->AddRow(Gear.ID,Gear);
+    }
+    F.Definitions->ConfigureCatalog(F.Catalog);
+    for(const FName ID:{FName(TEXT("ITM_INPUT_996")),FName(TEXT("ITM_INPUT_995"))})
+    {check(F.Player->Inventory->AddItem(ID,1,false));check(F.Player->Inventory->Equip(0));}
+}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICNormalComboCheck,"IC.Combat.NormalAttack.ComboAnimations",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICNormalComboCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureNormalAttackWeapons(F);
+    for(const FString Suffix:{FString(TEXT("M")),FString(TEXT("F"))})
+    {
+        const FString Gender=Suffix==TEXT("M")?TEXT("Male"):TEXT("Female");
+        auto* Mesh=LoadObject<USkeletalMesh>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Player/SamplePlayer/%s/SK_Player_%s"),*Gender,*Suffix));
+        auto* Profile=LoadObject<UICCharacterAnimationProfile>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Animation/Player/Main%s/DA_ANIM_PLAYER_%s"),*Gender,*Suffix));
+        if(!TestNotNull(TEXT("Player combo profile"),Profile)||!TestNotNull(TEXT("Player mesh"),Mesh))return false;
+        F.Player->AnimationProfile=Profile;F.Player->GetMesh()->SetSkeletalMesh(Mesh);F.Player->GetMesh()->SetAnimInstanceClass(UICCharacterAnimInstance::StaticClass());
+        for(const auto Family:{EICWeaponFamily::Sword,EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::Wand})
+        {
+            F.ASC->CancelAction();F.Step(1.);
+            for(int32 I=0;I<6&&F.ASC->GetEquippedWeaponFamily()!=Family;++I)F.Player->Inventory->CycleWeapon();
+            const auto* Set=Profile->FindSet(Family);
+            if(!TestEqual(TEXT("Each family has exactly three attacks"),Set->AttackCombo.Num(),3))return false;
+            if(Family==EICWeaponFamily::Staff)
+            {
+                const auto* Healer=Profile->FindSet(EICWeaponFamily::Wand);
+                if(!Healer||Healer->AttackCombo.Num()!=3)return false;
+                for(int32 I=0;I<3;++I)
+                    TestEqual(TEXT("Mage uses the healer's matching combo action"),
+                        Set->AttackCombo[I]->SlotAnimTracks[0].AnimTrack.AnimSegments[0].GetAnimReference().Get(),
+                        Healer->AttackCombo[I]->SlotAnimTracks[0].AnimTrack.AnimSegments[0].GetAnimReference().Get());
+            }
+            auto* Anim=F.Player->GetMesh()->GetAnimInstance();
+            auto Advance=[&](double Seconds)
+            {
+                for(double Elapsed=0;Elapsed<Seconds;Elapsed+=.01)
+                {F.Step(.01);F.Player->GetMesh()->TickAnimation(.01,false);F.Player->GetMesh()->RefreshBoneTransforms();F.Player->GetMesh()->ConditionallyDispatchQueuedAnimEvents();}
+            };
+            TestTrue(TEXT("First normal attack starts without a target"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr).bSuccess);
+            for(int32 Stage=0;Stage<3;++Stage)
+            {
+                TestTrue(*FString::Printf(TEXT("%s %d uses its own montage"),*Gender,Stage+1),Anim->Montage_IsPlaying(Set->AttackCombo[Stage]));
+                if(Stage<2)TestTrue(TEXT("Early extra click queues the next combo stage"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr).bSuccess);
+                const FGuid Current=F.ASC->GetActionID();
+                for(int32 Frame=0;Frame<600&&F.ASC->GetActionID()==Current;++Frame)Advance(.01);
+                if(Stage<2){Advance(.02);TestTrue(TEXT("Queued attack advances after recovery"),F.ASC->GetActionID().IsValid());}
+            }
+            Advance(1.);
+            TestTrue(TEXT("Combo restarts after the connection timeout"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr).bSuccess);
+            TestTrue(TEXT("Timeout returns to stage one"),Anim->Montage_IsPlaying(Set->AttackCombo[0]));
+            F.ASC->CancelAction();
+        }
+    }
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICNormalRangedCheck,"IC.Combat.NormalAttack.RangedTravelAndDamage",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICNormalRangedCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureNormalAttackWeapons(F);
+    for(const auto Family:{EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::Wand})
+    {
+        for(int32 I=0;I<6&&F.ASC->GetEquippedWeaponFamily()!=Family;++I)F.Player->Inventory->CycleWeapon();
+        TestEqual(TEXT("Job-specific attack range"),F.ASC->GetNormalAttackRangeCm(),Family==EICWeaponFamily::Bow?3000.:1800.);
+        auto* Enemy=F.World->SpawnActor<AICEnemyBase>(FVector(1000,0,0),FRotator::ZeroRotator);
+        if(!TestNotNull(TEXT("Ranged target"),Enemy))return false;
+        Enemy->Tags.Add(TEXT("IC.Enemy"));Enemy->EnableCombat(false,false);
+        auto* Target=Enemy->GetICAbilitySystem();Target->SetCombatBase(1000,0,1,1,0,0,1,0,1);
+        FICCharacterState EnemyState;EnemyState.CharacterId=TEXT("RANGED_TARGET");EnemyState.Kind=EICCharacterKind::Background;
+        EnemyState.MaxHP=EnemyState.HP=1000;EnemyState.MaxMP=EnemyState.MP=0;EnemyState.Position=Enemy->GetActorLocation();
+        TestTrue(TEXT("Ranged target has a live combat state"),Target->Restore(EnemyState));
+        const float Before=Target->Capture().HP;
+        const auto Action=F.ASC->RequestAction(TEXT("Attack"),NAME_None,Enemy);
+        TestTrue(TEXT("Ranged attack starts at ten metres"),Action.bSuccess);
+        TestTrue(TEXT("Release event spawns projectile"),F.ASC->NotifyCombatEvent(Action.ActionID,TEXT("AN_ProjectileFire"),0));
+        TestFalse(TEXT("Timer/notify cannot double fire"),F.ASC->NotifyCombatEvent(Action.ActionID,TEXT("AN_ProjectileFire"),0));
+        AICProjectile* Shot=nullptr;for(TActorIterator<AICProjectile> It(F.World);It;++It)if(!It->IsActorBeingDestroyed())Shot=*It;
+        if(!TestNotNull(TEXT("Visible normal attack projectile"),Shot))return false;
+        auto* Movement=Shot->FindComponentByClass<UProjectileMovementComponent>();
+        for(int32 I=0;I<100&&!Shot->IsActorBeingDestroyed();++I)
+        {F.Time->AdvanceClock(.01,false);Shot->Tick(.01);if(!Shot->IsActorBeingDestroyed())Movement->TickComponent(.01,LEVELTICK_All,nullptr);}
+        TestTrue(TEXT("Projectile damages a distant enemy"),Target->Capture().HP<Before);
+        TestTrue(TEXT("Single-target projectile stops on impact"),Shot->IsActorBeingDestroyed());
+        F.ASC->CancelAction();Enemy->Destroy();F.Step(1.);
+        const auto Free=F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr);
+        F.ASC->NotifyCombatEvent(Free.ActionID,TEXT("AN_ProjectileFire"),0);
+        Shot=nullptr;for(TActorIterator<AICProjectile> It(F.World);It;++It)if(!It->IsActorBeingDestroyed())Shot=*It;
+        if(!TestNotNull(TEXT("Free aiming also fires"),Shot))return false;
+        Movement=Shot->FindComponentByClass<UProjectileMovementComponent>();const FVector Origin=Shot->GetActorLocation();
+        // A deliberately slow frame must never allow a hit beyond authored range.
+        Shot->Tick(3.f);Movement->TickComponent(3.f,LEVELTICK_All,nullptr);
+        TestTrue(TEXT("Slow frame respects projectile distance"),FVector::Distance(Origin,Shot->GetActorLocation())<=F.ASC->GetNormalAttackRangeCm()+.1);
+        Shot->Destroy();F.ASC->CancelAction();F.Step(1.);
+        auto* Obstacle=F.World->SpawnActor<AActor>(FVector(500,0,0),FRotator::ZeroRotator);
+        auto* Box=NewObject<UBoxComponent>(Obstacle);Obstacle->SetRootComponent(Box);Obstacle->AddInstanceComponent(Box);
+        Box->SetBoxExtent(FVector(20,200,200));Box->SetCollisionProfileName(TEXT("BlockAll"));Box->RegisterComponent();Obstacle->SetActorLocation(FVector(500,0,0));
+        const auto Blocked=F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr);
+        F.ASC->NotifyCombatEvent(Blocked.ActionID,TEXT("AN_ProjectileFire"),0);
+        Shot=nullptr;for(TActorIterator<AICProjectile> It(F.World);It;++It)if(!It->IsActorBeingDestroyed())Shot=*It;
+        if(!TestNotNull(TEXT("Shot toward obstacle"),Shot))return false;
+        Movement=Shot->FindComponentByClass<UProjectileMovementComponent>();
+        for(int32 I=0;I<90&&!Shot->IsActorBeingDestroyed();++I)
+        {Shot->Tick(.01);if(!Shot->IsActorBeingDestroyed())Movement->TickComponent(.01,LEVELTICK_All,nullptr);}
+        TestTrue(TEXT("World collision stops the projectile"),Shot->IsActorBeingDestroyed());
+        TestTrue(TEXT("Projectile never passes through obstacle"),Shot->GetActorLocation().X<500);
+        Shot->Destroy();Obstacle->Destroy();F.ASC->CancelAction();F.Step(1.);
+    }
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICNormalCameraAimCheck,"IC.Combat.NormalAttack.ScreenCentreAndHands",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICNormalCameraAimCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureNormalAttackWeapons(F);
+    TGuardValue<bool> AimCorrection(UICGameUserSettings::Get()->bProjectileAimAssist,true);
+    F.Player->Camera->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+    const FVector ViewLocation(-350,100,150),AimCentre(1000,-250,400);
+    auto* Target=F.World->SpawnActor<AICEnemyBase>(AimCentre,FRotator::ZeroRotator);
+    auto* Selected=F.World->SpawnActor<AICEnemyBase>(FVector(500,600,0),FRotator::ZeroRotator);
+    for(auto* Enemy:{Target,Selected})
+    {
+        Enemy->Tags.Add(TEXT("IC.Enemy"));Enemy->EnableCombat(false,false);
+        Enemy->GetICAbilitySystem()->SetCombatBase(10000,0,1,1,0,0,1,0,1);
+        FICCharacterState EnemyState;EnemyState.CharacterId=Enemy->GetFName();EnemyState.Kind=EICCharacterKind::Background;
+        EnemyState.MaxHP=EnemyState.HP=10000;EnemyState.MaxMP=EnemyState.MP=0;EnemyState.Position=Enemy->GetActorLocation();
+        TestTrue(TEXT("Aim target has a live combat state"),Enemy->GetICAbilitySystem()->Restore(EnemyState));
+    }
+    const float SelectedBefore=Selected->GetICAbilitySystem()->Capture().HP;
+    for(const FString Suffix:{FString(TEXT("M")),FString(TEXT("F"))})
+    {
+        const FString Gender=Suffix==TEXT("M")?TEXT("Male"):TEXT("Female");
+        auto* Mesh=LoadObject<USkeletalMesh>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Player/SamplePlayer/%s/SK_Player_%s"),*Gender,*Suffix));
+        auto* Profile=LoadObject<UICCharacterAnimationProfile>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Animation/Player/Main%s/DA_ANIM_PLAYER_%s"),*Gender,*Suffix));
+        if(!TestNotNull(TEXT("Player hand skeleton"),Mesh)||!TestNotNull(TEXT("Player combo profile"),Profile))return false;
+        F.Player->AnimationProfile=Profile;F.Player->GetMesh()->SetSkeletalMesh(Mesh);
+        F.Player->GetMesh()->SetAnimInstanceClass(UICCharacterAnimInstance::StaticClass());
+        F.Player->GetMesh()->RefreshBoneTransforms();
+        TestTrue(TEXT("Player mesh has an actual left-palm socket"),F.Player->GetMesh()->DoesSocketExist(TEXT("weapon_l")));
+        for(const auto Family:{EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::Wand})
+        {
+            for(int32 I=0;I<6&&F.ASC->GetEquippedWeaponFamily()!=Family;++I)F.Player->Inventory->CycleWeapon();
+            // A distant weapon tip must not become the source of spell or arrow.
+            auto* Weapon=F.World->SpawnActor<AICWeaponActor>();Weapon->SetActorLocation(FVector(0,0,800));
+            F.Player->EquippedWeaponActor=Weapon;
+            F.Player->Camera->SetWorldLocationAndRotation(ViewLocation,FRotator::ZeroRotator);
+            const float Before=Target->GetICAbilitySystem()->Capture().HP;
+            const auto Action=F.ASC->RequestAction(TEXT("Attack"),NAME_None,Selected);
+            TestTrue(TEXT("Normal attack accepts an off-centre selected target"),Action.bSuccess);
+            TestTrue(TEXT("Body faces the camera instead of the off-centre enemy"),FMath::Abs(F.Player->GetActorRotation().Yaw)<.1);
+            F.Player->Camera->SetWorldRotation((AimCentre-ViewLocation).Rotation());
+            TestTrue(TEXT("Release after moving the camera"),F.ASC->NotifyCombatEvent(Action.ActionID,TEXT("AN_ProjectileFire"),0));
+            AICProjectile* Shot=nullptr;for(TActorIterator<AICProjectile> It(F.World);It;++It)if(!It->IsActorBeingDestroyed())Shot=*It;
+            if(!TestNotNull(TEXT("The normal attack produces a shot"),Shot))return false;
+            auto* Movement=Shot->FindComponentByClass<UProjectileMovementComponent>();
+            const FVector Palm=F.Player->GetMesh()->GetSocketLocation(TEXT("weapon_l"));
+            AddInfo(FString::Printf(TEXT("Aim %s/%d: Camera=%s Forward=%s Source=%s Velocity=%s Target=%s Controller=%s"),*Gender,int32(Family),
+                *F.Player->Camera->GetComponentLocation().ToString(),*F.Player->Camera->GetForwardVector().ToString(),
+                *Shot->GetActorLocation().ToString(),*Movement->Velocity.ToString(),*Target->GetActorLocation().ToString(),*GetNameSafe(F.Player->GetController())));
+            TestTrue(TEXT("Projectile starts within 9cm of the animated hand"),FVector::Distance(Shot->GetActorLocation(),Palm)<9);
+            TestTrue(TEXT("Projectile does not start at the weapon tip"),FVector::Distance(Shot->GetActorLocation(),Weapon->GetMuzzleLocation())>300);
+            TestTrue(TEXT("Shot converges on the elevated screen-centre target"),FVector::DotProduct(Movement->Velocity.GetSafeNormal(),(AimCentre-Shot->GetActorLocation()).GetSafeNormal())>.999);
+            for(int32 I=0;I<120&&!Shot->IsActorBeingDestroyed();++I)
+            {Shot->Tick(.01f);if(!Shot->IsActorBeingDestroyed())Movement->TickComponent(.01f,LEVELTICK_All,nullptr);}
+            TestTrue(TEXT("The enemy under the crosshair takes damage"),Target->GetICAbilitySystem()->Capture().HP<Before);
+            TestEqual(TEXT("Off-centre selected enemy is not auto-hit"),Selected->GetICAbilitySystem()->Capture().HP,SelectedBefore);
+            Shot->Destroy();F.ASC->CancelAction();F.Step(1.);
+            F.Player->EquippedWeaponActor=nullptr;Weapon->Destroy();
+        }
+    }
+    Target->Destroy();Selected->Destroy();
     return !HasAnyErrors();
 }
 #endif

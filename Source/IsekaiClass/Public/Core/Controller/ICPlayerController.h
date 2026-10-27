@@ -85,6 +85,7 @@ public:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void SetupInputComponent() override;
     virtual void FlushPressedKeys() override;
+    void RefreshUserInputMapping();
     virtual void PlayerTick(float DeltaSeconds) override;
     virtual void OnPossess(APawn* InPawn) override;
     virtual void OnUnPossess() override;
@@ -266,4 +267,5 @@ private:
     bool bGameplayInitialized=false;
     UPROPERTY(Transient) TObjectPtr<UICInventoryComponent> BoundInventory;
     UPROPERTY(Transient) TObjectPtr<UInputMappingContext> AppliedMappingContext;
+    UPROPERTY(Transient) TObjectPtr<UInputMappingContext> UserMappingContext;
 };

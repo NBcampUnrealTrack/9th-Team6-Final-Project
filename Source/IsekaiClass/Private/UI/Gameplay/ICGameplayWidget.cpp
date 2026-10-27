@@ -27,6 +27,7 @@
 #include "Components/SizeBox.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "Rendering/DrawElementTypes.h"
 
 AICPlayerController* UICGameplayWidget::GetICPlayerController() const
 {
@@ -150,6 +151,24 @@ void UICGameplayWidget::NativeTick(const FGeometry& Geometry, float DeltaSeconds
 {
     Super::NativeTick(Geometry, DeltaSeconds);
     RefreshSkillCooldown();
+}
+
+int32 UICGameplayWidget::NativePaint(const FPaintArgs& Args,const FGeometry& Geometry,const FSlateRect& Culling,
+    FSlateWindowElementList& Elements,int32 Layer,const FWidgetStyle& Style,bool ParentEnabled) const
+{
+    const int32 Top=Super::NativePaint(Args,Geometry,Culling,Elements,Layer,Style,ParentEnabled);
+    const auto* PC=GetICPlayerController();const auto* Inventory=PC?PC->GetInventory():nullptr;
+    if(!PC||!PC->bCreated||PC->IsDead()||!PC->Menu.IsEmpty()||PC->IsPaused()||!PC->GetPawn()||!Inventory)return Top;
+    const auto Family=Inventory->GetEquippedWeaponFamily();
+    if(Family!=EICWeaponFamily::Bow&&Family!=EICWeaponFamily::Staff&&Family!=EICWeaponFamily::Wand)return Top;
+    const FVector2D Centre=Geometry.GetLocalSize()*.5;
+    for(FVector2D Axis:{FVector2D(1,0),FVector2D(-1,0),FVector2D(0,1),FVector2D(0,-1)})
+    {
+        const TArray<FVector2D> Points{Centre+Axis*3,Centre+Axis*9};
+        FSlateDrawElement::MakeLines(Elements,Top+1,Geometry.ToPaintGeometry(),Points,ESlateDrawEffect::None,FLinearColor(0,0,0,.85f),true,3);
+        FSlateDrawElement::MakeLines(Elements,Top+2,Geometry.ToPaintGeometry(),Points,ESlateDrawEffect::None,FLinearColor(1,1,1,.9f),true,1);
+    }
+    return Top+2;
 }
 
 void UICGameplayWidget::RefreshSkillCooldown()

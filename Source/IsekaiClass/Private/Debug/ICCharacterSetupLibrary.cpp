@@ -260,6 +260,22 @@ UAnimMontage* UICCharacterSetupLibrary::CreateActionMontage(const FString& Path,
 #endif
 }
 
+UAnimMontage* UICCharacterSetupLibrary::CreateNormalAttackMontage(const FString& Path,UAnimSequence* Sequence,float HitTime,bool bProjectile)
+{
+#if WITH_EDITOR
+    auto* Montage=CreateActionMontage(Path,Sequence,false);if(!Montage)return nullptr;
+    const FName TrackName=TEXT("ICNormalAttack");
+    if(Montage->AnimNotifyTracks.ContainsByPredicate([&](const FAnimNotifyTrack& Track){return Track.TrackName==TrackName;}))
+        UAnimationBlueprintLibrary::RemoveAnimationNotifyTrack(Montage,TrackName);
+    UAnimationBlueprintLibrary::AddAnimationNotifyTrack(Montage,TrackName);
+    auto* Notify=Cast<UICCombatAnimNotify>(UAnimationBlueprintLibrary::AddAnimationNotifyEvent(Montage,TrackName,FMath::Clamp(HitTime,0.f,Sequence->GetPlayLength()-.01f),UICCombatAnimNotify::StaticClass()));
+    if(!Notify)return nullptr;Notify->Event=bProjectile?TEXT("AN_ProjectileFire"):TEXT("AN_HitStart");Notify->HitIndex=0;
+    Montage->BlendIn.SetBlendTime(.06f);Montage->BlendOut.SetBlendTime(.08f);
+    Montage->PostEditChange();Montage->MarkPackageDirty();return Montage;
+#else
+    return nullptr;
+#endif
+}
 UAnimMontage* UICCharacterSetupLibrary::CreateWeaponTransitionMontage(const FString& Path,UAnimSequence* Sequence,bool bDraw,float VisibilityFraction)
 {
 #if WITH_EDITOR

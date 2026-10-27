@@ -1,6 +1,7 @@
 #include "UI/Framework/ICFrontendLayout.h"
 #include "UI/Gameplay/ICGameplayLayout.h"
 #include "UI/Framework/ICDisplayPolicy.h"
+#include "UI/Settings/ICSettingsLayout.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
@@ -203,26 +204,7 @@ void Build(UWidgetTree* Tree, FName Kind)
     }
     if(Kind==TEXT("Settings"))
     {
-        auto* Box=Card(Tree,680.f);
-        Row(Box,Label(Tree,TEXT("TXT_SettingsTitle"),Text(TEXT("Native_c14a567ea996")),32),24);
-        Row(Box,Label(Tree,TEXT("TXT_Sensitivity"),Text(TEXT("Native_2201a1d33fe0"))),8);
-        auto* Sensitivity=Tree->ConstructWidget<USlider>(USlider::StaticClass(),TEXT("SLIDER_Sensitivity"));
-        Sensitivity->SetMinValue(.1f);Sensitivity->SetMaxValue(3.f);Sensitivity->SetStepSize(.1f);Sensitivity->SetValue(1.f);
-        Row(Box,Sensitivity,24);
-        Row(Box,Label(Tree,TEXT("TXT_Fullscreen"),Text(TEXT("Native_7c68cb9a9188"))),8);
-        Row(Box,Tree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(),TEXT("CHECK_Fullscreen")),24);
-        Row(Box,Label(Tree,TEXT("TXT_Quality"),Text(TEXT("Native_1e65f19be778"))),8);
-        auto* Quality=Tree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass(),TEXT("COMBO_Quality"));
-        // ComboBoxString exposes its font only at construction time.
-        PRAGMA_DISABLE_DEPRECATION_WARNINGS
-        Quality->Font=Font(20);
-        PRAGMA_ENABLE_DEPRECATION_WARNINGS
-        for(const TCHAR* Key:{TEXT("Native_437ac8ceeb09"),TEXT("Native_c7e54fe95951"),TEXT("Native_962636f483b3"),TEXT("Native_791384293309")})
-            Quality->AddOption(Text(Key).ToString());
-        Quality->SetSelectedIndex(2);Row(Box,Quality,28);
-        Row(Box,Button(Tree,TEXT("BTN_Apply"),TEXT("Native_e01dd02f527f")),12);
-        Row(Box,Button(Tree,TEXT("BTN_Close"),TEXT("Native_94b7dba15907")),20);
-        Row(Box,Label(Tree,TEXT("TXT_SettingsHint"),NSLOCTEXT("ICSettings","KeyboardHint","W / S  이동     A / D  변경     Enter  선택     ESC  닫기"),16),0);
+        ICSettingsLayout::Build(Tree);
         return;
     }
     if(Kind==TEXT("Death"))
