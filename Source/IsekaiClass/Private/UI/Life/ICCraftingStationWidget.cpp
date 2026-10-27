@@ -51,6 +51,8 @@ UICCraftingStationWidget::UICCraftingStationWidget(const FObjectInitializer& Ini
 void UICCraftingStationWidget::BuildLayout(UWidgetTree* T)
 {
     using namespace ICCraftingLayout;
+    // Resolve our helper explicitly when UI sources share a Unity translation unit.
+    using ICCraftingLayout::Add;
     auto* Root=T->ConstructWidget<UOverlay>();T->RootWidget=Root;
     auto* Shade=T->ConstructWidget<UBorder>();Shade->SetBrushColor(FLinearColor(0,0,0,.65f));auto* ShadeSlot=Root->AddChildToOverlay(Shade);ShadeSlot->SetHorizontalAlignment(HAlign_Fill);ShadeSlot->SetVerticalAlignment(VAlign_Fill);
     auto* Size=T->ConstructWidget<USizeBox>();Size->SetWidthOverride(720);Size->SetHeightOverride(620);

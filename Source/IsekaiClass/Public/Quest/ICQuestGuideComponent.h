@@ -63,6 +63,12 @@ public:
     UFUNCTION(BlueprintPure, Category="IC|Quest Guide")
     FName GetGuidedQuestID() const { return GuidedQuestID; }
 
+    UFUNCTION(BlueprintPure, Category="IC|Quest Guide")
+    bool IsQuestGuideEnabled(FName QuestID) const { return bGuideEnabled && !PausedQuestIDs.Contains(QuestID); }
+
+    UFUNCTION(BlueprintCallable, Category="IC|Quest Guide")
+    void SetQuestGuideEnabled(FName QuestID, bool bEnabled);
+
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
@@ -86,5 +92,6 @@ private:
     FTimerHandle PulseTimer;
     FName GuidedQuestID;
     FName GuidedTargetKey;
+    UPROPERTY(Transient) TSet<FName> PausedQuestIDs;
     double NextPulseTime = 0;
 };

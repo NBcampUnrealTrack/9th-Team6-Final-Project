@@ -14,6 +14,7 @@
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Time/ICTimeSubsystem.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
+#include "UI/Gameplay/ICCharacterStatusWidget.h"
 #include "UI/Gameplay/ICMovementCooldownWidget.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -140,11 +141,11 @@ bool FICMovementInputCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Half fill advances to 6 o'clock"),UICRadialCooldownBar::ClockwisePoint(.5).Equals({0,1},.001));
     auto* HUD=PC->GameplayWidgetClass?CreateWidget<UICGameplayWidget>(PC,PC->GameplayWidgetClass):nullptr;
     TestNotNull(TEXT("HUD includes the separate movement cooldown WBP"),HUD?Cast<UICMovementCooldownWidget>(HUD->GetWidgetFromName(TEXT("HUD_MovementCooldown"))):nullptr);
-    auto* SkillPanel=HUD?HUD->GetWidgetFromName(TEXT("HUD_SkillCooldown")):nullptr;
-    auto* SkillRing=HUD?Cast<UICRadialCooldownBar>(HUD->GetWidgetFromName(TEXT("RING_SkillCooldown"))):nullptr;
-    auto* SkillSeconds=HUD?Cast<UTextBlock>(HUD->GetWidgetFromName(TEXT("TXT_SkillCooldown"))):nullptr;
-    TestNotNull(TEXT("HUD includes the Q skill cooldown panel"),SkillPanel);
-    TestNotNull(TEXT("Q skill cooldown uses the reusable ring"),SkillRing);
+    auto* PlayerStatus=HUD?Cast<UICCharacterStatusWidget>(HUD->GetWidgetFromName(TEXT("HUD_PlayerStatus"))):nullptr;
+    auto* Portrait=PlayerStatus?Cast<UImage>(PlayerStatus->GetWidgetFromName(TEXT("IMG_Portrait"))):nullptr;
+    auto* SkillSeconds=PlayerStatus?Cast<UTextBlock>(PlayerStatus->GetWidgetFromName(TEXT("TXT_SkillCooldown"))):nullptr;
+    auto* SkillKey=PlayerStatus?PlayerStatus->GetWidgetFromName(TEXT("TXT_SkillKey")):nullptr;
+    TestNotNull(TEXT("HUD reuses the player portrait for Q cooldown"),Portrait);
     if(ASC->GetCurrentWeaponSkill().IsNone())
     {
         TestTrue(TEXT("Add a sword before testing its Q skill"),Player->Inventory->AddItem(TEXT("EQP_WPN_SWORD_001"),1,false));
@@ -153,19 +154,19 @@ bool FICMovementInputCheck::RunTest(const FString& Parameters)
         TestTrue(TEXT("Equip the sword before testing its Q skill"),Sword!=INDEX_NONE&&Player->Inventory->Equip(Sword));
     }
     if(HUD)HUD->RefreshSkillCooldown();
-    TestEqual(TEXT("Ready Q skill is visible"),SkillPanel?SkillPanel->GetVisibility():ESlateVisibility::Collapsed,ESlateVisibility::HitTestInvisible);
+    TestEqual(TEXT("Ready Q skill shows its key on the portrait"),SkillKey?SkillKey->GetVisibility():ESlateVisibility::Collapsed,ESlateVisibility::HitTestInvisible);
     TestEqual(TEXT("Ready Q skill hides its countdown"),SkillSeconds?SkillSeconds->GetVisibility():ESlateVisibility::Visible,ESlateVisibility::Hidden);
+    TestTrue(TEXT("Ready Q skill keeps the portrait fully bright"),Portrait&&Portrait->GetColorAndOpacity().Equals(FLinearColor::White));
     const FName SkillID=ASC->GetCurrentWeaponSkill();
     ASC->CancelAction();
     const auto SkillAction=ASC->RequestAction(TEXT("Skill"),SkillID,nullptr);
     TestTrue(TEXT("Q starts its equipped weapon skill"),SkillAction.bSuccess);
     TestTrue(TEXT("Q effect starts its configured cooldown"),ASC->NotifyCombatEvent(SkillAction.ActionID,TEXT("AN_EffectCommit"),0));
     if(HUD)HUD->RefreshSkillCooldown();
-    TestEqual(TEXT("Active Q cooldown reveals the ring"),SkillRing?SkillRing->GetVisibility():ESlateVisibility::Hidden,ESlateVisibility::HitTestInvisible);
     TestEqual(TEXT("Active Q cooldown shows whole remaining seconds"),SkillSeconds?SkillSeconds->GetText().ToString():FString(),FString(TEXT("20")));
-    TestTrue(TEXT("Used Q ring starts empty"),SkillRing&&FMath::IsNearlyZero(SkillRing->Progress));
+    TestTrue(TEXT("Used Q skill darkens only the portrait"),Portrait&&FMath::IsNearlyEqual(Portrait->GetColorAndOpacity().R,.3f));
     ASC->CancelAction();Step(10);if(HUD)HUD->RefreshSkillCooldown();
-    TestTrue(TEXT("Half of Q cooldown fills half of the ring"),SkillRing&&FMath::IsNearlyEqual(SkillRing->Progress,.5f));
+    TestTrue(TEXT("Half of Q cooldown restores half of the portrait brightness"),Portrait&&FMath::IsNearlyEqual(Portrait->GetColorAndOpacity().R,.65f));
     TestEqual(TEXT("Q countdown follows play time"),SkillSeconds?SkillSeconds->GetText().ToString():FString(),FString(TEXT("10")));
     if(Widget)Widget->ReleaseSlateResources(true);Player->ReleaseForLoad();GI->Shutdown();GEngine->DestroyWorldContext(World);World->DestroyWorld(false);
     return !HasAnyErrors();

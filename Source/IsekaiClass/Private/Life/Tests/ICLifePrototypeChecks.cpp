@@ -127,7 +127,10 @@ bool FICNPCQuestMarkerCheck::RunTest(const FString&)
     TestEqual(TEXT("New target receives the question"),Q->GetNPCQuestMarker(TEXT("NPC_R01_003")),2);
     TestTrue(TEXT("Loading quest state restores"),State->RestoreState(Saved));
     TestEqual(TEXT("Load restores the question on the correct NPC"),Q->GetNPCQuestMarker(TEXT("NPC_R01_002")),2);
-    Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,TEXT("NPC_R01_002"),1,FGuid::NewGuid());
+    FICQuestRow TalkQuest;
+    GI->GetSubsystem<UICDefinitionSubsystem>()->GetQuest(TEXT("QST_NPC_TALK_001"), TalkQuest);
+    Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,TEXT("NPC_R01_002"),1,FGuid::NewGuid(),
+        EICLifeActivity::Gathering,NAME_None,TalkQuest.ObjectiveGroups[0].Objectives[0].DialogueID);
     TestEqual(TEXT("Completion removes question and reveals that NPC's available quest"),Q->GetNPCQuestMarker(TEXT("NPC_R01_002")),1);
     TestTrue(TEXT("Accept another quest for abandon"),Q->AcceptQuest(TEXT("QST_NPC_TALK_002")));
     TestTrue(TEXT("Start another quest for abandon"),Q->StartQuest(TEXT("QST_NPC_TALK_002")));

@@ -24,6 +24,12 @@ public:
     UFUNCTION(Exec) void ICShopOffers(FName ServiceID);
     UFUNCTION(Exec) void ICShopBuy(FName ServiceID, FName ItemID, int32 Count);
     UFUNCTION(Exec) void ICShopSell(FName ServiceID, FName ItemID, int32 Count);
+    /** 모든 생활 오브젝트의 슬롯 점유 상태와 사용 NPC ID를 Output Log에 출력한다. */
+    UFUNCTION(Exec) void ICLifeObjectDump();
+    /** 1이면 생활 오브젝트 머리 위에 점유 상태를 표시한다(ic.LifeObject.Debug와 같음). */
+    UFUNCTION(Exec) void ICLifeObjectDebug(int32 bEnabled);
+    /** 가장 가까운 NPC 액터를 제거한다(제거 후 점유가 남지 않는지 확인용). */
+    UFUNCTION(Exec) void ICDestroyNearestNPC();
 private:
     TWeakObjectPtr<class AICNPCBase> DebugInteractingNPC;
 };

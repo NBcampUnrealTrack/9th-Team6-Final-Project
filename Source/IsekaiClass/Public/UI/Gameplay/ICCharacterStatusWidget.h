@@ -20,7 +20,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Status", meta=(ClampMin="0", ClampMax="1")) float MPPercent = 1.f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Status", meta=(ClampMin="0", ClampMax="1")) float SPPercent = 1.f;
     UFUNCTION(BlueprintCallable, Category="Status") void RefreshPresentation();
+    UFUNCTION(BlueprintCallable, Category="Status") void UpdateSkillCooldown(bool bHasSkill, float Progress, double RemainingSeconds);
     void UpdateVitals(const FICCharacterState& State);
 protected:
     virtual void NativePreConstruct() override;
+private:
+    void EnsureSkillCooldownOverlay();
 };

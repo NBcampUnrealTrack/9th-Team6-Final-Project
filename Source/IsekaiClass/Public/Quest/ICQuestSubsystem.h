@@ -43,6 +43,10 @@ public:
     /** 0: none, 1: available quest, 2: current quest objective/turn-in. */
     UFUNCTION(BlueprintPure, Category="IC|Quest") int32 GetNPCQuestMarker(FName NPCID) const;
 
+    /** Dedicated dialogue for an unfinished Talk objective in a started quest, or None. */
+    UFUNCTION(BlueprintPure, Category="IC|Quest")
+    FName GetNPCObjectiveDialogue(FName NPCID) const;
+
     /** Shared objective predicate for gameplay and quest guidance. */
     bool IsObjectiveSatisfied(const FICQuestObjectiveDefinition& Objective, const FICQuestState& Quest,
         const FICWorldState& World) const { return IsObjectiveComplete(Objective, Quest, World); }
@@ -87,6 +91,8 @@ private:
     void EvaluateQuests();
     bool CanAccept(const FICQuestRow& Definition, const FICWorldState& World) const;
     bool IsObjectiveComplete(const FICQuestObjectiveDefinition& Objective, const FICQuestState& Quest,
+        const FICWorldState& World) const;
+    bool IsObjectiveGroupComplete(const FICQuestObjectiveGroup& Group, const FICQuestState& Quest,
         const FICWorldState& World) const;
     bool AreObjectivesComplete(const FICQuestRow& Definition, const FICQuestState& Quest,
         const FICWorldState& World) const;
