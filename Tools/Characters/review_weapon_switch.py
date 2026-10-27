@@ -72,6 +72,10 @@ def grant_loadout():
 
 
 def begin_click():
+    STATE["previous_family"] = STATE["inventory"].get_equipped_weapon_family()
+    STATE["expected_family"] = [u.ICWeaponFamily.NONE, u.ICWeaponFamily.SWORD,
+                                u.ICWeaponFamily.BOW, u.ICWeaponFamily.STAFF,
+                                u.ICWeaponFamily.WAND][STATE["click"] % (STATE["count"] + 1)]
     STATE["pc"].handle_input_command(u.ICInputCommand.SWITCH_WEAPON, 0)
     check(STATE["player"].is_switching_weapon(), "Right click did not start a weapon montage")
     check(not STATE["player"].request_cycle_weapon(), "Repeated right click was not blocked")
@@ -124,14 +128,18 @@ def tick(delta):
             begin_click()
         elif STATE["phase"] == "switching":
             away = STATE["inventory"].is_weapon_sheathed()
+            if STATE["previous_family"] != u.ICWeaponFamily.NONE and STATE["expected_family"] != u.ICWeaponFamily.NONE:
+                check(not away, "Occupied slots passed through an empty-hand frame")
             if away != STATE["previous_away"]:
                 STATE["events"] += 1
                 sample(f'{STATE["preset"]}_{STATE["count"]}_{STATE["click"]}_notify{STATE["events"]}')
                 STATE["previous_away"] = away
             check(now - STATE["click_started"] < 10, "A montage left weapon switching stuck")
             if not STATE["player"].is_switching_weapon():
+                check(STATE["inventory"].get_equipped_weapon_family() == STATE["expected_family"],
+                      "One right click did not reach the next equipped family")
                 sample(f'{STATE["preset"]}_{STATE["count"]}_{STATE["click"]}_done')
-                if STATE["click"] < STATE["count"] + 1:
+                if STATE["click"] < 2 * (STATE["count"] + 1):
                     STATE["click"] += 1
                     begin_click()
                 else:

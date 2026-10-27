@@ -1,0 +1,155 @@
+IsekaiClass 개발용 치트 명령어
+기준: UICDebugCheatManager / 2026-10-27
+
+사용 방법
+- 에디터에서 Play(PIE)를 실행한 뒤 게임 화면을 클릭한다.
+- 콘솔 키 ` / ~ (키보드 숫자 1 왼쪽 키)를 눌러 아래 명령을 입력한다.
+- <아이템ID>, <수량> 같은 표시는 설명용이므로 실제 값으로 바꿔 입력한다.
+- 플레이어를 생성한 뒤 사용한다. 아직 생성 전이면 ICCreateTestPlayer를 사용할 수 있다.
+- 프로젝트에 구현된 IC 치트 14종을 정리한 문서이며, 개발 빌드에서 동작한다.
+
+
+1. 자주 쓰는 지급 명령
+
+ICGiveStarterWeapons
+  초보자 검, 초보자 활, 초보자 마법스태프, 초보자 치유완드를 각 1개씩 가방에 지급한다.
+  가방 빈칸 4칸이 필요하며 공간이 부족하면 4종 모두 지급하지 않는다.
+  자동 장착은 하지 않으므로 장비 화면에서 각 무기 슬롯에 장착한다.
+  반복 입력하면 매번 새 무기 4개를 지급한다.
+
+ICGiveGold
+  보유 골드에 10,000G를 추가한다. 금액 인수는 입력하지 않는다.
+  반복 입력하면 10,000G씩 추가된다.
+  기본 뽑기 비용이 1,000G이므로 한 번 지급받으면 10회 뽑을 수 있다.
+
+ICGiveItem <아이템ID> <수량>
+  지정한 아이템을 지정 수량만큼 지급한다.
+  아이템 이름 대신 DT_IC_Item에 등록된 ItemID를 입력한다.
+  예: ICGiveItem ITM_R01_PLANT_01 10
+      들꽃 줄기 10개 지급.
+  예: ICGiveItem ITM_R01_CROP_01 10
+      밀 10개 지급.
+  예: ICGiveItem ITM_R01_CHICKEN_MEAT 5
+      닭고기 5개 지급.
+  예: ICGiveItem ITM_BOOK_001 1
+      초급 근력의 서 1개 지급.
+  예: ICGiveItem EQP_WPN_SWORD_001 1
+      초보자 검 1개 지급.
+
+
+2. 게임시간 이동
+
+ICAddGameHours <시간>
+  현재 게임 달력에서 입력한 시간만큼 앞으로 이동한다.
+  예: ICAddGameHours 2
+      2시간 경과. 채집물과 수확 후 작물의 재생성 확인에 사용.
+  예: ICAddGameHours 24
+      하루 경과. 작물의 다음 성장 단계 확인에 사용.
+  예: ICAddGameHours 0.5
+      30분 경과.
+  예: ICAddGameHours 96
+      4일 경과. 현재 5단계 작물의 첫 단계에서 최종 단계까지 확인할 때 사용.
+  0 이상의 값만 입력할 수 있으며 소수도 가능하다. 시간을 되돌리지는 않는다.
+
+ICAddGameMinutes <분>
+  같은 게임 달력을 분 단위로 앞으로 이동하는 기존 명령이다.
+  예: ICAddGameMinutes 30
+      30분 경과. ICAddGameHours 0.5와 같다.
+  예: ICAddGameMinutes 120
+      2시간 경과. ICAddGameHours 2와 같다.
+
+시간 명령의 적용 범위
+  작물 성장, 채집 재생성, 게임시간 기준 NPC 일정에 반영된다.
+  실제 플레이시간을 건너뛰는 명령은 아니므로 제작 진행 게이지,
+  전투 쿨다운, 플레이시간 기준 몬스터 재생은 이 명령으로 완료되지 않는다.
+
+
+3. 플레이어 생성과 이동
+
+ICCreateTestPlayer
+  플레이어 생성 전 테스트 플레이어 생성과 최초 자동 저장을 요청한다.
+  현재 선택된 외형·직업 등의 생성 설정을 사용하며, 이름이 비어 있으면 NPC_Test를 사용한다.
+  이미 플레이어를 생성했다면 중복 생성하지 않는다.
+
+ICTeleport <X> <Y> <Z>
+  현재 플레이어를 입력한 월드 좌표로 순간이동시킨다. 다른 맵으로 이동하지는 않는다.
+  예: ICTeleport 1400 -3800 100
+      L_TestMap의 뽑기 기계 근처로 이동.
+  예: ICTeleport 2000 -2850 100
+      L_TestMap의 제작대 근처로 이동.
+  좌표 단위는 Unreal 기본 단위인 cm이다.
+
+
+4. NPC와 퀘스트
+
+ICSetAffinity <NPC_ID> <값>
+  지정한 NPC의 원본 호감도를 0~100 사이의 값으로 설정한다.
+  입력한 만큼 더하는 명령이 아니라 해당 값으로 바꾸는 명령이다.
+  예: ICSetAffinity NPC_R01_101 100
+      해당 NPC의 호감도를 100으로 설정.
+  동료 가능 NPC와 주민 NPC에 사용하며, 배경 NPC와 플레이어는 변경 대상이 아니다.
+
+ICCompleteActiveQuests
+  수락 후 시작한 진행 중 퀘스트들을 강제 완료한다.
+  아직 시작하지 않은 퀘스트와 이미 완료한 퀘스트는 대상에서 제외한다.
+  완료 처리한 퀘스트 수를 표시한다.
+
+ICInteractNearestNPC
+  플레이어로부터 500cm 이내에 있는 가장 가까운 NPC와 상호작용을 시도한다.
+  NPC ID, 제공 서비스와 상호작용 선택지를 표시한다.
+  해당 NPC의 상호작용 조건에 따라 거절될 수 있다.
+
+ICEndNPCInteraction
+  ICInteractNearestNPC로 시작한 개발용 NPC 상호작용을 종료한다.
+
+
+5. 상점 테스트
+
+ICShopOffers <서비스ID>
+  해당 상점의 판매 아이템, 정가, 할인 적용 가격과 매입 가격을 조회한다.
+  예: ICShopOffers SRV_MERCHANT_SHOP
+  상세 목록은 Output Log의 Cheat.ShopOffers에서도 확인할 수 있다.
+
+ICShopBuy <서비스ID> <아이템ID> <수량>
+  해당 상점에서 아이템을 구매한다. 실제 보유 골드를 사용한다.
+  예: ICShopBuy SRV_MERCHANT_SHOP ITM_R01_SEED_01 3
+      상인에게 밀 씨앗 3개 구매.
+  상점 취급 품목, 골드, 가방 공간 등의 구매 조건을 검사한다.
+
+ICShopSell <서비스ID> <아이템ID> <수량>
+  가방에 보유한 아이템을 해당 상점에 판매하고 판매대금을 받는다.
+  예: ICShopSell SRV_MERCHANT_SHOP ITM_R01_PLANT_01 3
+      들꽃 줄기 3개 판매.
+  판매 가능한 아이템과 보유 수량 등의 판매 조건을 검사한다.
+
+상점 명령의 서비스ID는 DT_IC_Service의 서비스 ID를 사용한다.
+현재 상인 예시는 SRV_MERCHANT_SHOP이며, DT_IC_Shop의 행 이름 SHOP_MERCHANT_001과 다르다.
+실제 상점의 서비스 이용 조건이 적용된다.
+
+
+바로 복사해서 쓰는 테스트 순서
+
+플레이어 생성 후 무기와 골드 지급:
+ICGiveStarterWeapons
+ICGiveGold
+
+수확/채집 후 2시간 재생성 확인:
+ICAddGameHours 2
+
+작물 한 단계 성장 확인:
+ICAddGameHours 24
+
+뽑기 확인:
+ICGiveGold
+ICTeleport 1400 -3800 100
+  이동 후 뽑기 기계에 접근하여 F로 상호작용한다.
+
+
+커밋 메시지에 넣을 치트 설명
+
+- ICGiveStarterWeapons: 초보자 검·활·마법스태프·치유완드를 각 1개씩 지급
+- ICGiveGold: 보유 골드에 10,000G 추가
+- ICAddGameHours <시간>: 게임시간을 시간 단위로 이동 (2시간, 24시간, 0.5시간 등)
+- ICAddGameMinutes <분>: 기존 분 단위 게임시간 이동 유지
+- ICGiveItem <아이템ID> <수량>: 지정 아이템 지급 유지
+- 전체 치트의 용도·입력 예시를 정리한 텍스트 문서 추가

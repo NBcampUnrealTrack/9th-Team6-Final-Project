@@ -35,7 +35,7 @@ bool FICPlanRulesCheck::RunTest(const FString& Parameters)
     TestEqual(TEXT("Stage 3 shared storage capacity"),Inventory->GetSnapshot().Storage.FindChecked(TEXT("PlayerHome")).Slots.Num(),120);
     TestFalse(TEXT("Stage 4 rejected"),Inventory->SetHomeStorageStage(4));
     auto Legacy=Inventory->GetSnapshot();auto& Slots=Legacy.Storage.FindChecked(TEXT("PlayerHome")).Slots;
-    Slots.SetNum(160);FPlayerItemInstance Gift;Gift.ItemID=TEXT("ITEM_P0_01");Gift.Count=1;Gift.InstanceID=FGuid::NewGuid();Slots[130]=Gift;
+    Slots.SetNum(160);FPlayerItemInstance Gift;Gift.ItemID=TEXT("ITM_R01_FOOD_15");Gift.Count=1;Gift.InstanceID=FGuid::NewGuid();Slots[130]=Gift;
     if(!TestTrue(TEXT("Old 160-slot inventory remains loadable"),Inventory->ApplySnapshot(Legacy)))return false;
     if(!TestTrue(TEXT("Old overflow item can be withdrawn"),Inventory->Transfer(TEXT("PlayerHome"),130,false)))return false;
     Legacy=Inventory->GetSnapshot();
@@ -47,8 +47,8 @@ bool FICPlanRulesCheck::RunTest(const FString& Parameters)
     FICDefinitionResult Result;
     const auto* Rules=Definitions->Find<FICInventorySettingsRow>(TEXT("CFG_INVENTORY_001"),Result);
     if(TestNotNull(TEXT("Actual inventory DT resolves"),Rules))TestEqual(TEXT("Actual drop lifetime is ten PlayClock minutes"),Rules->DropLifetimePlaySeconds,600.);
-    const auto* Recipe=Definitions->Find<FICRecipeRow>(TEXT("RCP_HERO_GIFT"),Result);
-    if(TestNotNull(TEXT("Hero recipe resolves"),Recipe))TestTrue(TEXT("Hero needs exactly two pork"),Recipe->Ingredients.Num()==1&&Recipe->Ingredients[0].ItemID==TEXT("ITM_MAT_PORK")&&Recipe->Ingredients[0].Count==2);
+    const auto* Recipe=Definitions->Find<FICRecipeRow>(TEXT("RCP_R01_COOK_19"),Result);
+    if(TestNotNull(TEXT("Chicken recipe resolves"),Recipe))TestTrue(TEXT("Roast chicken needs two real chicken meat"),Recipe->Ingredients.Num()==1&&Recipe->Ingredients[0].ItemID==TEXT("ITM_R01_CHICKEN_MEAT")&&Recipe->Ingredients[0].Count==2);
     return !HasAnyErrors();
 }
 #endif

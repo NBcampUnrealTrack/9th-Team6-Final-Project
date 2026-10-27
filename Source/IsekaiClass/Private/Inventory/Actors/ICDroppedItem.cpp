@@ -9,13 +9,17 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/GameInstance.h"
+#include "Engine/StaticMesh.h"
 
 AICDroppedItem::AICDroppedItem()
 {
     IC_TRACE_FUNCTION();
     PrimaryActorTick.bCanEverTick=true;PrimaryActorTick.TickInterval=.25f;
     Mesh=CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));RootComponent=Mesh;
+    Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube")));
+    Mesh->SetRelativeScale3D(FVector(.25f));
     Mesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
+    Mesh->SetCollisionResponseToChannel(ECC_Pawn,ECR_Ignore);
     Label=CreateDefaultSubobject<UTextRenderComponent>(TEXT("Label"));Label->SetupAttachment(Mesh);
     Label->SetRelativeLocation(FVector(0,0,140));Label->SetHorizontalAlignment(EHTA_Center);Label->SetWorldSize(28.f);
 }
@@ -23,11 +27,14 @@ void AICDroppedItem::Initialize(const FICDropState& Record)
 {
     IC_TRACE_FUNCTION();
     RecordID=Record.ID;DropID=FName(*Record.ID.ToString(EGuidFormats::Digits));Item=Record.Contents.IsEmpty()?FPlayerItemInstance():Record.Contents[0];
-    FString Name=Item.ItemID.ToString();
+    FText Name=FText::FromName(Item.ItemID);
+    UStaticMesh* DisplayMesh=LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube"));
+    FVector DisplayScale(.25f);
     if(auto* GI=GetGameInstance())if(auto* Definitions=GI->GetSubsystem<UICDefinitionSubsystem>())
     {FICDefinitionResult Result;if(const auto* Row=Definitions->Find<FICItemRow>(Item.ItemID,Result))
-    {Name=Row->GetLabel().ToString();if(auto* Asset=Row->WorldMesh.LoadSynchronous()){Mesh->SetStaticMesh(Asset);Mesh->SetRelativeScale3D(Row->WorldMeshScale);}}}
-    Label->SetText(FText::FromString(FString::Printf(TEXT("%s ×%d"),*Name,Item.Count)));
+    {Name=Row->GetLabel();if(auto* Asset=Row->WorldMesh.LoadSynchronous())DisplayMesh=Asset;DisplayScale=Row->WorldMeshScale;}}
+    Mesh->SetStaticMesh(DisplayMesh);Mesh->SetRelativeScale3D(DisplayScale);
+    Label->SetText(FText::Format(NSLOCTEXT("ICInventory","DropLabel","{0} ×{1}"),Name,FText::AsNumber(Item.Count)));
     UE_LOG(LogICInventory, VeryVerbose, TEXT("[Drop.Display] Actor=%s Drop=%s Item=%s Count=%d"),*GetNameSafe(this),*RecordID.ToString(),*Item.ItemID.ToString(),Item.Count);
 }
 void AICDroppedItem::Tick(float DeltaSeconds)

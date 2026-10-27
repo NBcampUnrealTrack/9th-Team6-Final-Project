@@ -49,7 +49,7 @@ void UICRewardNoticeWidget::SetReward(int32 Gold,const TArray<FICItemAmount>& It
         FICDefinitionResult R;const auto* Definition=D?D->Find<FICItemRow>(Item.ItemID,R):nullptr;
         const FText Name=Definition&&!Definition->DisplayName.IsEmpty()?Definition->DisplayName:FText::FromName(Item.ItemID);
         if(!Lines.IsEmpty())Lines+=TEXT("\n");
-        Lines+=FText::Format(NSLOCTEXT("ICCombat","ItemReceived","+ {0} {1}개"),Name,FText::AsNumber(Item.Count)).ToString();
+        Lines+=FText::Format(NSLOCTEXT("ICCombat","ItemReceived","+ {0} {1}개 획득"),Name,FText::AsNumber(Item.Count)).ToString();
     }
     if(auto* Text=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Essence"))))
     {
@@ -110,7 +110,7 @@ void UICCombatFeedbackWidget::ShowDamage(AActor* Victim,float Amount)
     auto* Canvas=Cast<UCanvasPanel>(GetWidgetFromName(TEXT("FeedbackCanvas")));
     if(!Canvas||!IsValid(Victim)||Amount<=0||!GetOwningPlayer())return;
     const bool Player=Victim==GetOwningPlayerPawn();
-    if(!Player&&!Victim->IsA<AICEnemyBase>())return;
+    if(!Player&&!Victim->ActorHasTag(TEXT("IC.Enemy")))return;
     auto* Class=(Player?PlayerDamageClass:MonsterDamageClass).LoadSynchronous();
     auto* Number=Class?CreateWidget<UICDamageNumberWidget>(GetOwningPlayer(),Class):nullptr;
     if(!Number)return;

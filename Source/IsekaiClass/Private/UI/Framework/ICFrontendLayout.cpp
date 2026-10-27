@@ -2,6 +2,7 @@
 #include "UI/Gameplay/ICGameplayLayout.h"
 #include "UI/Framework/ICDisplayPolicy.h"
 #include "UI/Settings/ICSettingsLayout.h"
+#include "UI/Life/ICCraftingStationWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
@@ -194,6 +195,7 @@ static void BuildSave(UWidgetTree* Tree,FName Kind)
 }
 void Build(UWidgetTree* Tree, FName Kind)
 {
+    if(Kind==TEXT("CraftingStation")){UICCraftingStationWidget::BuildLayout(Tree);return;}
     if (!Tree || Tree->RootWidget)
         return;
     if (ICGameplayLayout::Build(Tree, Kind))

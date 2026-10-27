@@ -111,7 +111,7 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
         const auto& Crop = Pair.Value;
         if (Pair.Key.IsNone() || Crop.CropID.IsNone() || !S.Characters.Contains(Crop.OwnerCharacterID)
             || !TimeValid(Crop.PlantedAtGameMinute) || !TimeValid(Crop.HarvestableAtGameMinute)
-            || Crop.HarvestableAtGameMinute < Crop.PlantedAtGameMinute) return Fail(TEXT("Crops.") + Pair.Key.ToString());
+            || !TimeValid(Crop.RegrowthAtGameMinute) || Crop.HarvestableAtGameMinute < FMath::Max(Crop.PlantedAtGameMinute,Crop.RegrowthAtGameMinute)) return Fail(TEXT("Crops.") + Pair.Key.ToString());
     }
     TSet<FString> SpawnKeys;
     for (const auto& Pair : S.SpawnSlots)

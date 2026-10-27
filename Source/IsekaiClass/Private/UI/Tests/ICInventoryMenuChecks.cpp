@@ -120,7 +120,7 @@ bool FICInventoryMenuCheck::RunTest(const FString&)
         TestFalse(TEXT("Quest tab cannot bind quest cells"),UI->BeginQuickSlot());TestFalse(TEXT("Quest tab cannot trash quest cells"),UI->BeginTrash());
         TestTrue(TEXT("Quest item detail opens"),UI->OpenItem(0));auto* Detail=CastChecked<UICInventoryItemPopupWidget>(UI->GetWidgetFromName(TEXT("ItemPopup")));
         TestFalse(TEXT("Quest item popup protects trash action"),Detail->GetWidgetFromName(TEXT("BTN_Trash"))->GetIsEnabled());Menu->HandleMenuKey(EKeys::Escape);TestFalse(TEXT("ESC returns to item list"),UI->bDetailOpen);
-        UI->SelectItemTab(EPlayerItemTab::Normal);Inv->AddItem(TEXT("ITM_MAT_002"),2,false);UI->SelectItem(BagIndex(TEXT("ITM_MAT_002")));UI->OpenItem(UI->SelectedItem);
+        UI->SelectItemTab(EPlayerItemTab::Normal);Inv->AddItem(TEXT("ITM_R01_CROP_01"),2,false);UI->SelectItem(BagIndex(TEXT("ITM_R01_CROP_01")));UI->OpenItem(UI->SelectedItem);
         TestFalse(TEXT("Material popup has no equip action"),Detail->GetWidgetFromName(TEXT("BTN_Equip"))->IsVisible());TestFalse(TEXT("Material popup has no quick-slot action"),Detail->GetWidgetFromName(TEXT("BTN_Quick"))->IsVisible());
         TestTrue(TEXT("Material popup retains trash and back"),Detail->GetWidgetFromName(TEXT("BTN_Trash"))->IsVisible()&&Detail->GetWidgetFromName(TEXT("BTN_Back"))->IsVisible());UI->CloseItem();
         Inv->AddItem(Weapons[0],1,false);SelectBag(Weapons[0]);UI->OpenItem(UI->SelectedItem);TestTrue(TEXT("Weapon popup offers equip"),Detail->GetWidgetFromName(TEXT("BTN_Equip"))->IsVisible());TestFalse(TEXT("Weapon popup hides quick slots"),Detail->GetWidgetFromName(TEXT("BTN_Quick"))->IsVisible());

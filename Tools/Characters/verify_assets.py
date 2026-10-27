@@ -44,8 +44,8 @@ def run():
         mesh=u.load_asset(f'{GAME}/Player/SamplePlayer/{folder}/SK_Player_{suffix}')
         verify_profile(profile,mesh,4,'PLAYER_'+suffix)
     check(gifts['GIFT_R01_COMMON']['PreferredAffinityDelta']==20,'Preferred gift +20')
-    check(items['ITEM_P0_01']['bCanGift'],'Common item can be gifted')
-    check(items['ITEM_P0_01']['StackLimit']==99,'Common item stack size')
+    check(items['ITM_R01_FOOD_15']['bCanGift'],'Common item can be gifted')
+    check(items['ITM_R01_FOOD_15']['StackLimit']==99,'Common item stack size')
     for row in equipment.values():
         if row['WeaponFamily']!='None':check(row['WeaponActorClass'] not in ['', 'None'],row['Name']+' weapon Blueprint reference')
     result={'checks':checks,'passed':sum(c['pass'] for c in checks),'failed':sum(not c['pass'] for c in checks)}

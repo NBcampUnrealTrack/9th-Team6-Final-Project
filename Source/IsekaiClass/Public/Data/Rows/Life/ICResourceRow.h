@@ -29,8 +29,12 @@ struct ISEKAICLASS_API FICResourceRow : public FICDefinitionRow
     TArray<FICItemAmount> Yields;
 
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Resource", meta=(ClampMin="0.0", Units="s"))
+    UPROPERTY(meta=(DeprecatedProperty,DeprecationMessage="Use RegenerationGameMinutes."))
     double RegenerationPlaySeconds = 300.0;
+
+    /** Respawn uses the game calendar, including sleep and time skips. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Resource", meta=(ClampMin="0.0", Units="min"))
+    double RegenerationGameMinutes = 120.0;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation")
     TSoftClassPtr<AActor> ResourceActorClass;
@@ -40,4 +44,8 @@ struct ISEKAICLASS_API FICResourceRow : public FICDefinitionRow
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation")
     TSoftObjectPtr<UStaticMesh> DepletedMesh;
+
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Presentation") FTransform VisualTransform;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Presentation") TSoftObjectPtr<class UGeometryCollection> OreCollection;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Presentation") TSoftObjectPtr<class UMaterialInterface> MaterialOverride;
 };

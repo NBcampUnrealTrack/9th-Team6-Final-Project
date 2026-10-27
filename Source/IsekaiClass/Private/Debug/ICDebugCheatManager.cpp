@@ -46,6 +46,74 @@ void UICDebugCheatManager::ICGiveItem(FName ItemId, int32 Count)
 #endif
 }
 
+void UICDebugCheatManager::ICAddGameHours(double Hours)
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    auto* PC = Cast<AICPlayerController>(GetOuterAPlayerController());
+    if (!PC) return;
+    const double Minutes = Hours * 60.;
+    auto* Time = PC->GetTime();
+    if (!FMath::IsFinite(Hours) || Hours < 0 || !FMath::IsFinite(Minutes)
+        || !Time || !Time->JumpGameMinutes(Minutes))
+    {
+        PC->ShowLocalized(NSLOCTEXT("ICCheat", "InvalidGameHours", "0 이상의 유효한 시간을 입력하세요. 예: ICAddGameHours 2"));
+        return;
+    }
+    UE_LOG(LogICTime, Log, TEXT("[Cheat.TimeHours] Hours=%.2f Minutes=%.2f GameMinute=%.2f"), Hours, Minutes, Time->GetClock().GameMinute);
+    PC->ShowLocalized(FText::Format(NSLOCTEXT("ICCheat", "GameHoursAdded", "게임시간 {0}시간 경과"), FText::AsNumber(Hours)));
+#endif
+}
+
+void UICDebugCheatManager::ICGiveStarterWeapons()
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    auto* PC = Cast<AICPlayerController>(GetOuterAPlayerController());
+    if (!PC) return;
+    auto* Inventory = PC->GetInventory();
+    auto* State = PC->GetWorldState();
+    if (!Inventory || !Inventory->GetDefinitions() || !State || !State->ExportState().bPlayerCreated)
+    {
+        PC->ShowLocalized(NSLOCTEXT("ICCheat", "PlayerNotReady", "플레이어를 생성한 뒤 사용하세요."));
+        return;
+    }
+    auto* Staging = NewObject<UICInventoryComponent>(this);
+    Staging->BeginStaging(Inventory->GetDefinitions(), Inventory->CurrentClass);
+    if (!Staging->ApplySnapshot(Inventory->GetSnapshot())) return;
+    TArray<FICItemAmount> Weapons;
+    for (const auto* ID : {TEXT("EQP_WPN_SWORD_001"), TEXT("EQP_WPN_BOW_001"), TEXT("EQP_WPN_STAFF_001"), TEXT("EQP_WPN_WAND_001")})
+    {
+        if (!Staging->AddItem(ID, 1, false))
+        {
+            PC->ShowLocalized(NSLOCTEXT("ICCheat", "StarterWeaponsNoRoom", "초보 무기 4종을 넣을 가방 공간이 부족하거나 아이템 정의를 확인할 수 없습니다."));
+            return;
+        }
+        auto& Weapon = Weapons.AddDefaulted_GetRef(); Weapon.ItemID = ID; Weapon.Count = 1;
+    }
+    if (!Inventory->ApplySnapshot(Staging->GetSnapshot())) return;
+    State->OnItemsReceived.Broadcast(Weapons);
+    UE_LOG(LogICInventory, Log, TEXT("[Cheat.GiveStarterWeapons] Sword=1 Bow=1 Staff=1 Wand=1"));
+    PC->ShowLocalized(NSLOCTEXT("ICCheat", "StarterWeaponsGranted", "초보 무기 4종 지급 완료 · 검, 활, 마법스태프, 치유완드 각 1개"));
+#endif
+}
+
+void UICDebugCheatManager::ICGiveGold()
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    auto* PC=Cast<AICPlayerController>(GetOuterAPlayerController());if(!PC)return;
+    auto* State=PC->GetWorldState();
+    if(!State||!State->ExportState().bPlayerCreated)
+    {PC->ShowLocalized(NSLOCTEXT("ICCheat","PlayerNotReady","플레이어를 생성한 뒤 사용하세요."));return;}
+    const int64 Total=static_cast<int64>(State->ExportState().Gold)+10000;
+    if(Total>MAX_int32||!PC->SetGold(static_cast<int32>(Total)))
+    {PC->ShowLocalized(NSLOCTEXT("ICCheat","GoldLimit","보유 골드 한도를 초과하여 지급할 수 없습니다."));return;}
+    PC->ShowLocalized(NSLOCTEXT("ICCheat","GoldGranted","10,000G 지급 완료"));
+    UE_LOG(LogICInventory,Log,TEXT("[Cheat.GiveGold] Added=10000 Total=%d"),PC->Gold);
+#endif
+}
+
 void UICDebugCheatManager::ICSetAffinity(FName NpcId, int32 Value)
 {
     IC_TRACE_FUNCTION();

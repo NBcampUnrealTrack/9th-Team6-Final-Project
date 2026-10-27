@@ -1,2 +1,2 @@
 ---,ServiceID,Entries,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
-SHOP_MERCHANT_001,"SRV_MERCHANT_SHOP","((ItemID=""ITM_MAT_001"",DisplayOrder=0),(ItemID=""ITM_MAT_002"",DisplayOrder=1))","SHOP_MERCHANT_001","SHOP_MERCHANT_001.NAME","","(GameplayTags=)","1","False","False"
+SHOP_MERCHANT_001,SRV_MERCHANT_SHOP,"((ItemID=""ITM_R01_SEED_01"",DisplayOrder=0),(ItemID=""ITM_R01_SEED_02"",DisplayOrder=1),(ItemID=""ITM_R01_SEED_03"",DisplayOrder=2),(ItemID=""ITM_R01_SEED_04"",DisplayOrder=3),(ItemID=""ITM_R01_SEED_05"",DisplayOrder=4))",SHOP_MERCHANT_001,SHOP_MERCHANT_001.NAME,,(GameplayTags=),1,False,False

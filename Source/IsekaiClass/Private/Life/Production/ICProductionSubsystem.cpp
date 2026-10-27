@@ -44,8 +44,8 @@ bool UICProductionSubsystem::StartRecipe(FName RecipeID,FName WorkAnchorID,UICIn
     if(!Recipe->UnlockConditions.IsEmpty()||!Production->StartConditions.IsEmpty())
         return Fail(*ICText::Get(TEXT("Native_adde31bc12cb")).ToString());
     if(!Production->WorkAnchorIDs.IsEmpty()&&!Production->WorkAnchorIDs.Contains(WorkAnchorID))return Fail(*ICText::Get(TEXT("Native_fb46dc569135")).ToString());
-    if(Production->DurationPlaySeconds!=Recipe->WorkDurationPlaySeconds || Production->SPCost!=Recipe->SPCost)
-        return Fail(*ICText::Get(TEXT("Native_73708968b76d")).ToString());
+    // Recipe DT owns the duration and SP cost of recipe jobs. Production rows
+    // also serve other life activities and must not override these settings.
     if(!FMath::IsFinite(Recipe->WorkDurationPlaySeconds)||Recipe->WorkDurationPlaySeconds<0||!FMath::IsFinite(Recipe->SPCost)||Recipe->SPCost<0)
         return Fail(*ICText::Get(TEXT("Native_8420321993ee")).ToString());
     if(!State->FlushParticipants())return Fail(*ICText::Get(TEXT("Native_ed7cb0d52fdb")).ToString());
@@ -137,6 +137,7 @@ bool UICProductionSubsystem::CompleteJob(FGuid JobID,UICInventoryComponent* Inve
         Quests->ReportObjectiveEvent(EICQuestObjectiveType::Craft, Job->RecipeID, 1, JobID,
             Production->Activity, Recipe->Results[0].ItemID);
     }
+    State->OnItemsReceived.Broadcast(Recipe->Results);
     OnProductionChanged.Broadcast(JobID,ICText::Get(TEXT("Production_Complete")).ToString());return true;
 }
 

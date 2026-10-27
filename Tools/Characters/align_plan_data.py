@@ -62,43 +62,14 @@ choices = {}
 for index, npc in enumerate((2, 4, 1, 3), 1):
     choices[f'Q4_{index}'] = {'NPCID': f'NPC_R01_{npc:03}', 'SkillID': f'SKL_NPC_R01_{npc:03}', 'bTestReward': 'False'}
 for index in range(1, 5):
-    choices[f'Q3_{index}'] = {'NPCID': 'NPC_R01_008' if index == 1 else 'None', 'RecipeID': 'RCP_HERO_GIFT' if index == 1 else 'RCP_GREEN_JUICE', 'CodexID': 'CDX_NPC_R01_008' if index == 1 else 'None', 'bTestReward': 'True'}
+    choices[f'Q3_{index}'] = {'NPCID': 'NPC_R01_008' if index == 1 else 'None', 'RecipeID': 'RCP_R01_COOK_19' if index == 1 else 'RCP_R01_COOK_15', 'CodexID': 'CDX_NPC_R01_008' if index == 1 else 'None', 'bTestReward': 'True'}
 update('Settings/DT_IC_CreationOptions.csv', choices)
 
-fields, items = read('Items/DT_IC_Item.csv')
-gift = next(row for row in items if row['ID'] == 'ITEM_P0_01')
-gift.update(DisplayName=f'LOCTABLE("{TABLE}", "ITEM_P0_01.NAME")', DescriptionKey='ITEM_P0_01.DESCRIPTION', bTestOnly='False')
-for key in ('ITM_MAT_PORK', 'ITM_MAT_GREEN_HERB', 'ITEM_HERO_GIFT'):
-    row = named(gift, key)
-    row['bCanGift'] = 'True' if key == 'ITEM_HERO_GIFT' else 'False'
-    upsert(items, row)
-# Old books stay resolvable for saves; the native item-use service rejects CHA growth.
-for row in items:
-    if row['GrowthStat'] == 'Charisma':
-        row.update(bDeprecated='False', bTestOnly='False')
-write('Items/DT_IC_Item.csv', fields, items)
-
-fields, recipes = read('Recipes/DT_IC_Recipe.csv')
-template = recipes[0]
-fields_p, productions = read('Life/DT_IC_Production.csv')
-production_template = productions[0]
-for key, material, count, result in (
-    ('HERO_GIFT', 'ITM_MAT_PORK', 2, 'ITEM_HERO_GIFT'),
-    ('GREEN_JUICE', 'ITM_MAT_GREEN_HERB', 1, 'ITEM_P0_01'),
-):
-    recipe = named(template, 'RCP_' + key)
-    recipe.update(ProductionID='PRD_' + key, Ingredients=f'((ItemID="{material}",Count={count}))', Results=f'((ItemID="{result}",Count=1))', bUnlockedByDefault='False')
-    upsert(recipes, recipe)
-    production = named(production_template, 'PRD_' + key)
-    production.update(Materials=f'((Item=(ItemID="{material}",Count={count}),ConsumptionTiming=ConsumeOnSuccess))', Results=recipe['Results'])
-    upsert(productions, production)
-write('Recipes/DT_IC_Recipe.csv', fields, recipes)
-write('Life/DT_IC_Production.csv', fields_p, productions)
-
 fields, prefs = read('NPC/DT_IC_GiftPreference.csv')
-hero = named(prefs[0], 'GIFT_R01_HERO')
-# Keep the original common +20 gift valid for every R01 NPC, including the hero.
-hero['Items'] = '((ItemID="ITEM_P0_01",Preference=Preferred),(ItemID="ITEM_HERO_GIFT",Preference=Preferred))'
+common = next(row for row in prefs if row['ID'] == 'GIFT_R01_COMMON')
+common['Items'] = '((ItemID="ITM_R01_FOOD_15",Preference=Preferred))'
+hero = named(common, 'GIFT_R01_HERO')
+hero['Items'] = '((ItemID="ITM_R01_FOOD_15",Preference=Preferred),(ItemID="ITM_R01_FOOD_19",Preference=Preferred))'
 upsert(prefs, hero)
 write('NPC/DT_IC_GiftPreference.csv', fields, prefs)
 fields, npcs = read('NPC/DT_IC_NPC.csv')
@@ -107,16 +78,8 @@ hero_npc['GiftPreferenceID'] = 'GIFT_R01_HERO'
 write('NPC/DT_IC_NPC.csv', fields, npcs)
 
 strings = {
-    'ITEM_P0_01': ('Item_P0_01 · 녹즙 (테스트)', '초록약초 1개로 만드는 공통 선호 선물. 호감도 +20. 임시 네모 외형.'),
-    'ITEM_HERO_GIFT': ('용사 선물 (테스트)', '돼지고기 2개로 만드는 R01_08의 선호 선물. 호감도 +20. 임시 네모 외형.'),
-    'ITM_MAT_PORK': ('돼지고기', '용사 선물 테스트 재료.'),
-    'ITM_MAT_GREEN_HERB': ('초록약초', '녹즙 테스트 재료.'),
-    'RCP_HERO_GIFT': ('용사 레시피 (테스트)', '돼지고기 2개 → 용사 선물 1개.'),
-    'RCP_GREEN_JUICE': ('녹즙 레시피 (테스트)', '초록약초 1개 → 녹즙 1개.'),
-    'PRD_HERO_GIFT': ('용사 선물 요리', '용사 선물 테스트 생산.'),
-    'PRD_GREEN_JUICE': ('녹즙 요리', '녹즙 테스트 생산.'),
-    'GIFT_R01_HERO': ('R01_08 선호 선물', '용사 선물과 공통 녹즙을 선호한다.'),
-    'CDX_NPC_R01_008': ('R01_08 · 용사', '지역 1 용사 배경의 인물. 마법사. 선호 선물: 용사 선물(돼지고기 2개).'),
+    'GIFT_R01_HERO': ('R01_08 선호 선물', '유채나물과 닭고기 구이를 선호합니다.'),
+    'CDX_NPC_R01_008': ('R01_08 · 용사', '지역 1의 용사. 선호 선물은 유채나물과 닭고기 구이입니다.'),
 }
 fields, codex = read('Presentation/DT_IC_Codex.csv')
 entry = dict.fromkeys(fields, '')
@@ -143,10 +106,10 @@ updates = {
     'Create_ReadyProgress': '5 / 5 · 시작 준비',
     'Menu_Dead': '쓰러졌습니다', 'Menu_Confirm': '확인', 'Menu_Exit': '게임 종료', 'Menu_Pause': '일시 정지',
     'Save_GameClock': '이세계 {0}일차 {1} {2}:{3}', 'AM': '오전', 'PM': '오후',
-    'Q3_1_Result': 'R01_08(용사)의 정보와 용사 레시피를 받습니다. 테스트 재료: 돼지고기 2개.',
-    'Q3_2_Result': '해당 지역 NPC는 준비 중입니다. 테스트용 녹즙 레시피를 받습니다. 초록약초 1개가 필요합니다.',
-    'Q3_3_Result': '해당 지역 NPC는 준비 중입니다. 테스트용 녹즙 레시피를 받습니다. 초록약초 1개가 필요합니다.',
-    'Q3_4_Result': '해당 지역 NPC는 준비 중입니다. 테스트용 녹즙 레시피를 받습니다. 초록약초 1개가 필요합니다.',
+    'Q3_1_Result': 'R01_08의 정보와 닭고기 구이 레시피를 받습니다. 재료: 닭고기 2개.',
+    'Q3_2_Result': '유채나물 레시피를 받습니다. 재료: 유채 2개.',
+    'Q3_3_Result': '유채나물 레시피를 받습니다. 재료: 유채 2개.',
+    'Q3_4_Result': '유채나물 레시피를 받습니다. 재료: 유채 2개.',
 }
 for index, npc in enumerate((2, 4, 1, 3), 1):
     updates[f'Q4_{index}_Result'] = f'R01_{npc:02}의 호감도 +300, 고유 기술과 해당 계열의 초보 무기를 받습니다.'
