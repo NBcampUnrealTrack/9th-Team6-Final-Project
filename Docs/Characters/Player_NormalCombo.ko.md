@@ -26,3 +26,7 @@
 화면 중앙 조준 변경 후 기본 빌드와 관련 프로젝트 테스트 22개가 통과했다(`Saved/CentreAimTests.log`). 투사체의 초기 속도를 월드 좌표로 적용해 생성 시 회전이 중복되는 문제를 수정했고, 거리 계산 뒤 이동하도록 틱 순서도 정리했다. 최종 실제 PIE의 24개 콤보 캡처에서 중앙으로 향하는 투사체와 손 발사를 확인했으며 틱 순환 경고는 없다.
 
 `Tools/Characters/review_player_combo.py`로 실제 장착 무기를 사용하는 격리 PIE에서도 남녀·4직업·3타를 모두 재생했다. 각 타의 활성 몽타주와 화면에 나온 베기/투사체를 확인한 24개 캡처 및 결과는 `Saved/PlayerComboLiveReview`에 저장된다.
+
+검 부채꼴 판정은 타격 시작 한 프레임에 그치지 않고 `DT_IC_Class.NormalAttackStages[].Hit.TraceDurationPlaySeconds` 동안 유지한다(현재 0.15초, 공격 속도에 따라 조절). 이 시간 안에 범위에 들어온 적도 맞으며, 같은 적에게는 각 타당 한 번만 데미지를 적용한다. 예약한 다음 일반 공격은 이 판정 시간이 끝난 뒤 연결된다. 회피·가드 등 명시적인 취소 동작의 규칙은 그대로 적용한다.
+
+`IC.Combat.NormalAttack.SwordComboDamage`는 남녀의 실제 검과 콤보 모션으로 1·2·3타의 HP 감소를 검증한다. 3타에서는 다음 공격을 미리 예약하고 적을 타격 시작 직후 범위 안으로 이동시켜 누락을 재현한다. `IC.Combat.NormalAttack.SwordHitWindow`는 판정 유지 시간 안/밖의 진입과 중복 데미지 방지를 검증한다. 실제 테스트맵 거리별 데미지 측정 도구는 `Tools/Combat/review_sword_combo_damage.py`다.

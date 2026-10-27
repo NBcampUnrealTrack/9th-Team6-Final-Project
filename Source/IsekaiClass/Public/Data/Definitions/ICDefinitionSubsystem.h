@@ -20,6 +20,7 @@
 #include "Data/Rows/Life/ICFishingPointRow.h"
 #include "Data/Rows/Life/ICResourceRow.h"
 #include "Data/Rows/Life/ICRanchingRow.h"
+#include "Data/Rows/Life/ICGachaMachineRow.h"
 #include "Data/Rows/NPC/ICDialogueRow.h"
 #include "Data/Rows/NPC/ICGiftPreferenceRow.h"
 #include "Data/Rows/NPC/ICScheduleRow.h"

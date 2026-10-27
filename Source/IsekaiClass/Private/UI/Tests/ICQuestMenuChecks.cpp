@@ -95,7 +95,7 @@ bool FICQuestMenuCheck::RunTest(const FString&)
         TestEqual(TEXT("Switch resets old progress"),Current.Quests[Talk].Objectives.Num(),0);TestTrue(TEXT("New quest starts"),Current.Quests[Collect].bStarted);
         TestTrue(TEXT("HUD replaces old quest"),TrackerText().Contains(TEXT("재료 수집"))&&!TrackerText().Contains(TEXT("상인과 대화")));
         TestTrue(TEXT("Explicit switching moves the running marker"),RowTitle(0).Contains(TEXT("(진행중)"))&&!RowTitle(1).Contains(TEXT("(진행중)")));
-        Q->ReportObjectiveEvent(EICQuestObjectiveType::Collect,TEXT("ITM_MAT_002"),1,FGuid::NewGuid());
+        Q->ReportObjectiveEvent(EICQuestObjectiveType::Collect,TEXT("ITM_R01_CROP_01"),1,FGuid::NewGuid());
         auto* Save=NewObject<UICSaveGame>();Save->WorldState=State->ExportState();TArray<uint8> Bytes;
         TestTrue(TEXT("Quest selection serializes with the real save type"),UGameplayStatics::SaveGameToMemory(Save,Bytes));
         auto* Loaded=Cast<UICSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes));TestNotNull(TEXT("Serialized save reloads"),Loaded);
@@ -105,7 +105,7 @@ bool FICQuestMenuCheck::RunTest(const FString&)
         if(Loaded){TestTrue(TEXT("Load restores active quest"),State->RestoreState(Loaded->WorldState));UI->RefreshQuests();TestEqual(TEXT("Journal refreshes after load"),UI->QuestIDs.Num(),2);TestTrue(TEXT("HUD restores started quest"),TrackerText().Contains(TEXT("재료 수집")));}
         UI->OpenQuest(Talk);Menu->HandleMenuKey(EKeys::Escape);TestFalse(TEXT("ESC in details returns to list"),UI->bShowingDetails);TestEqual(TEXT("Detail Back does not close game menu"),PC->Menu,FString(TEXT("Pause")));
         UI->OpenQuest(Collect);Menu->SelectTab(TEXT("Party"));Menu->SelectTab(TEXT("Quest"));TestFalse(TEXT("Reentering tab always starts at quest list"),UI->bShowingDetails);
-        Q->ReportObjectiveEvent(EICQuestObjectiveType::Collect,TEXT("ITM_MAT_002"),2,FGuid::NewGuid());UI->RefreshQuests();
+        Q->ReportObjectiveEvent(EICQuestObjectiveType::Collect,TEXT("ITM_R01_CROP_01"),2,FGuid::NewGuid());UI->RefreshQuests();
         TestTrue(TEXT("Started quest completes through actual objective runner"),State->ExportState().Quests[Collect].bCompleted);
         TestFalse(TEXT("Completed quest cannot be restarted for duplicate rewards"),Q->StartQuest(Collect));TestEqual(TEXT("Completed quest leaves HUD"),Tracker->GetVisibility(),ESlateVisibility::Collapsed);
         // Exercise entry and back buttons through their real delegates too.

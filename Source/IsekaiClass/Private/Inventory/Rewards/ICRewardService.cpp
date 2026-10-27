@@ -4,6 +4,59 @@
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Debug/ICLog.h"
+bool FICRewardService::PrepareLifeLoot(FICWorldState& Candidate,FName DropTableID,const FGuid& Receipt,UICDefinitionSubsystem* D,const FVector& Position,double Now,TArray<FICItemAmount>& Received,FString& Reason)
+{
+    Received.Reset();Reason.Empty();if(!D||!Receipt.IsValid())return false;
+    if(Candidate.CompletedTransactionIDs.Contains(Receipt))return true;
+    FICDefinitionResult R;const auto* Drop=D->Find<FICDropTableRow>(DropTableID,R);
+    if(!Drop||Drop->Rolls<1||Drop->MinimumGold<0||Drop->MaximumGold<Drop->MinimumGold){Reason=R.Reason;return false;}
+    FICWorldState Next=Candidate;FRandomStream Random(GetTypeHash(Receipt));
+    const auto* Player=Next.Characters.Find(UICWorldStateSubsystem::PlayerId());
+    FICStatSettingsRow Defaults;const auto* Stats=D->Find<FICStatSettingsRow>(TEXT("CFG_STAT_001"),R);if(!Stats)Stats=&Defaults;
+    const double LUK=Player?Player->MainStats.LUK:1;
+    const double Luck=1+Stats->LUKRewardBonus*(LUK-1)/(LUK-1+Stats->LUKCurveK);
+    for(const auto& Entry:Drop->Entries)
+        if(!D->Find<FICItemRow>(Entry.ItemID,R)||Entry.MinimumCount<1||Entry.MaximumCount<Entry.MinimumCount||!FMath::IsFinite(Entry.Probability)||Entry.Probability<0||Entry.Probability>1||!FMath::IsFinite(Entry.Weight)||Entry.Weight<0||Entry.bEquipmentGradeRoll)return false;
+    auto* Bag=NewObject<UICInventoryComponent>();Bag->BeginStaging(D,Next.Job);if(!Bag->ApplySnapshot(Next.Inventory))return false;
+    FICDropState Ground;Ground.ID=FGuid::NewGuid();Ground.Position=Position;Ground.CreatedPlaySecond=Now;
+    auto Grant=[&](const FICDropEntry& Entry)
+    {
+        int32 Count=Random.RandRange(Entry.MinimumCount,Entry.MaximumCount);
+        const auto* Item=D->Find<FICItemRow>(Entry.ItemID,R);
+        while(Count>0)
+        {
+            auto* Builder=NewObject<UICInventoryComponent>();Builder->BeginStaging(D,Next.Job);
+            const int32 Chunk=FMath::Min(Count,FMath::Max(1,Item->StackLimit));
+            if(!Builder->AddItem(Entry.ItemID,Chunk,false))return false;
+            auto Instances=Builder->GetSnapshot().Bag.Slots;Instances.Append(Builder->GetSnapshot().QuestItems);
+            for(auto Instance:Instances)if(!Instance.IsEmpty())
+            {
+                const int32 Remainder=Drop->bAutoCollectItems?Bag->TryAddItemInstance(Instance):Instance.Count;
+                const int32 Added=Instance.Count-Remainder;
+                if(Added>0){auto* Existing=Received.FindByPredicate([&](const auto& Value){return Value.ItemID==Entry.ItemID;});if(Existing)Existing->Count+=Added;else{auto& Value=Received.AddDefaulted_GetRef();Value.ItemID=Entry.ItemID;Value.Count=Added;}}
+                if(Remainder>0){if(Added>0)Instance.InstanceID=FGuid::NewGuid();Instance.Count=Remainder;Ground.Contents.Add(Instance);}
+            }
+            Count-=Chunk;
+        }
+        return true;
+    };
+    for(int32 Roll=0;Roll<Drop->Rolls;++Roll)
+    {
+        if(Drop->Selection==EICDropSelection::IndependentProbability)
+        {for(const auto& Entry:Drop->Entries)if(Random.FRand()<FMath::Clamp(Entry.Probability*(Entry.bApplyPlayerLUKToProbability?Luck:1),0.,1.))if(!Grant(Entry))return false;}
+        else
+        {
+            double Total=0;for(const auto& Entry:Drop->Entries)Total+=Entry.Weight*(Entry.bApplyPlayerLUKToProbability?Luck:1);
+            if(Total<=0)return false;double Choice=Random.FRand()*Total;
+            for(const auto& Entry:Drop->Entries){Choice-=Entry.Weight*(Entry.bApplyPlayerLUKToProbability?Luck:1);if(Choice<=0){if(!Grant(Entry))return false;break;}}
+        }
+    }
+    const int64 Gold=static_cast<int64>(Next.Gold)+FMath::RoundToInt64(Random.RandRange(Drop->MinimumGold,Drop->MaximumGold)*(Drop->bApplyPlayerLUKToGold?Luck:1));
+    if(Gold>MAX_int32||Gold<0)return false;
+    Next.Gold=Gold;Next.Inventory=Bag->GetSnapshot();if(!Ground.Contents.IsEmpty())Next.Drops.Add(Ground);
+    Next.CompletedTransactionIDs.Add(Receipt);if(!UICWorldStateSubsystem::ValidateState(Next))return false;
+    Candidate=MoveTemp(Next);return true;
+}
 bool FICRewardService::PrepareMonsterDefeat(FICWorldState& Candidate,FName Key,const FICMonsterRow& Monster,UICDefinitionSubsystem* D,double Now,FString& Reason)
 {
     IC_TRACE_FUNCTION();Reason.Empty();auto* Slot=Candidate.SpawnSlots.Find(Key);if(!D||!Slot||!Slot->IncarnationID.IsValid()){Reason=ICText::Get(TEXT("Native_8fdc440ab009")).ToString();return false;}

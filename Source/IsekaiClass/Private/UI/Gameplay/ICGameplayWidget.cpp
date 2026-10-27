@@ -249,7 +249,7 @@ void UICGameplayWidget::RefreshCurrentScreen()
         if (auto* Notice = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Notice"))))
             Notice->SetText(PC->NoticeDisplayText);
         const bool Open = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Death") && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
-            PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue");
+            PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue") && PC->Menu != TEXT("Station");
         Menu->SetVisibility(Open ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
         Menu->SetSessionPresentation(PC->Menu, PC->Menu == TEXT("Confirm") ? PC->ModalDisplayText : PC->NoticeDisplayText);
         OnRefreshGameplayUI();
@@ -277,7 +277,7 @@ void UICGameplayWidget::RefreshCurrentScreen()
     if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Notice"))))
         Text->SetText(PC->NoticeDisplayText);
     const bool HasPanel = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Death") && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
-                          PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue");
+                          PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue") && PC->Menu != TEXT("Station");
     if (auto* Panel = GetWidgetFromName(TEXT("MenuPanel")))
         Panel->SetVisibility(HasPanel ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     if (HasPanel)

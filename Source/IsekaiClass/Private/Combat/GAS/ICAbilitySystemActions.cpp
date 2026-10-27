@@ -244,7 +244,7 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
         const auto Family=GetEquippedWeaponFamily();
         if(PlaySecond()>ComboReadyUntil||ComboWeaponFamily!=Family)ComboIndex=0;
         ComboWeaponFamily=Family;const auto& Stage=Class->NormalAttackStages[ComboIndex];
-        Skill.Hits={Stage.Hit};Skill.Montage=Stage.Montage;Skill.CastSection=Stage.MontageSection;
+        Skill.Hits={Stage.Hit};Skill.Montage=Stage.Montage;Skill.CastSection=Stage.MontageSection;Skill.Presentation.Visuals=Stage.Visuals;
         const auto* Profile=Character->GetAnimationProfile();
         const auto* Set=Profile?Profile->FindSet(Family):nullptr;
         if(Set&&Set->AttackCombo.IsValidIndex(ComboIndex)&&Set->AttackCombo[ComboIndex])
@@ -346,11 +346,13 @@ void UICAbilitySystemComponent::EndCurrentAction(bool Cancelled)
 void UICAbilitySystemComponent::AdvanceAction(double Now)
 {
     IC_TRACE_FUNCTION();
+    bool ActiveHitWindow=false;
+    for(int32 Index:OpenTraceHits)if(Now<TraceEndsAt.FindRef(Index)){ActiveHitWindow=true;break;}
     if(!BufferedInputAction.IsNone())
     {
         if(Now>BufferedAttackUntil||!IsAlive()||HasMatchingGameplayTag(ICTags::Staggered)||HasMatchingGameplayTag(ICTags::Returning))ClearBufferedInput();
         else if(!CurrentID.IsValid()||(BufferedInputAction==TEXT("Dodge")&&RequestedAction==TEXT("Attack")&&bCancelWindow)
-            ||(BufferedInputAction==TEXT("Attack")&&RequestedAction==TEXT("Attack")&&bCancelWindow&&!EmittedHits.IsEmpty()))
+            ||(BufferedInputAction==TEXT("Attack")&&RequestedAction==TEXT("Attack")&&bCancelWindow&&!EmittedHits.IsEmpty()&&!ActiveHitWindow))
         {
             const FName Pending=BufferedInputAction;
             auto* PendingTarget=BufferedInputTarget.Get();
@@ -446,7 +448,14 @@ bool UICAbilitySystemComponent::EmitHit(int32 Index,bool ContinueTrace)
     if(!ContinueTrace&&RequestedAction==TEXT("Attack")&&Primary&&Hit->Shape==EICHitShape::Cone)
     {
         const double Reach=GetEquippedWeaponFamily()==EICWeaponFamily::Sword&&C->EquippedWeaponActor?FMath::Max(50.f,C->EquippedWeaponActor->GetMeleeReachCm()):Hit->RadiusCm;
-        AICAttackEffect::SpawnSlash(C,Reach,Hit->ConeAngleDegrees,ComboIndex);
+        AICAttackEffect::SpawnSlash(C,Reach,Hit->ConeAngleDegrees,ComboIndex,Skill.Presentation);
+        // A cone is active for the authored hit window, just like a blade trace.
+        // Sampling only the release frame lost hits during the finisher swing.
+        if(GetEquippedWeaponFamily()==EICWeaponFamily::Sword&&Hit->TraceDurationPlaySeconds>0)
+        {
+            OpenTraceHits.Add(Index);
+            TraceEndsAt.Add(Index,PlaySecond()+Hit->TraceDurationPlaySeconds/FMath::Max(.01,Stat(EICStat::AttackSpeed)));
+        }
     }
     TArray<AICCharacterBase*> Targets;
     if(Hit->Shape==EICHitShape::Direct){if(TargetActor.IsValid())Targets.Add(TargetActor.Get());else if(Skill.TargetRules.Target==EICCombatTarget::Self)Targets.Add(C);}
@@ -494,6 +503,7 @@ bool UICAbilitySystemComponent::EmitHit(int32 Index,bool ContinueTrace)
         if (ExecuteEffect(*Effect,Target->GetICAbilitySystem()))
         {
             FICCombatPresentation Presentation = Skill.Presentation;
+            if(!Effect->Presentation.Visuals.IsNull())Presentation.Visuals=Effect->Presentation.Visuals;
             if (!Effect->Presentation.ImpactVFX.IsNull()) Presentation.ImpactVFX = Effect->Presentation.ImpactVFX;
             if (!Effect->Presentation.ImpactSound.IsNull()) Presentation.ImpactSound = Effect->Presentation.ImpactSound;
             PlayCombatCue(true,Presentation,Target,Target->GetActorLocation());

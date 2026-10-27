@@ -22,6 +22,6 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="IC|Interaction") FName ItemID;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="IC|Interaction",meta=(ClampMin="1")) int32 ItemCount=1;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="IC|Interaction") bool bDestroyAfterUse=false;
-    UFUNCTION(BlueprintPure,Category="IC|Interaction") FText GetInteractionText() const;
+    UFUNCTION(BlueprintPure,Category="IC|Interaction") virtual FText GetInteractionText() const;
     UFUNCTION(BlueprintNativeEvent,BlueprintCallable,Category="IC|Interaction") bool TryInteract(AICPlayerController* Controller);
 };

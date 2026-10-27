@@ -21,6 +21,7 @@ struct ISEKAICLASS_API FICItemRow : public FPlayerItemDefinition
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSoftObjectPtr<UTexture2D> Icon;
     /** Automatic reads resource/crop/fish/production DT yields. Explicit categories cover future items. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Codex") EICCodexProductCategory CodexProductCategory=EICCodexProductCategory::Automatic;
+    /** World-drop appearance. Empty or unavailable meshes fall back to the basic cube. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") TSoftObjectPtr<UStaticMesh> WorldMesh;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") FVector WorldMeshScale = FVector(.25f);
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EICItemTarget UseTarget = EICItemTarget::None;

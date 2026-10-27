@@ -14,11 +14,12 @@ public:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual bool TryInteract_Implementation(AICPlayerController* Controller) override;
+    virtual FText GetInteractionText() const override;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Life") EICDefinitionType LifeType=EICDefinitionType::Resource;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Life") FName DefinitionID;
     /** Give each placed plot/resource a stable unique ID. Falls back to its level actor name. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Life") FName PointID;
-    /** Test-map display only. Planting still begins with the invisible seed stage. */
+    /** Show the first stage before a player has created the saved world state. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Life|Preview") bool bPreviewUnplantedCrop=false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Life|Presentation") bool bShowLifeLabel=false;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UWidgetComponent> LifeLabel;
@@ -29,11 +30,17 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Life") void RefreshLife();
     UFUNCTION(BlueprintPure, Category="IC|Life") int32 GetGrowthStage() const;
     UFUNCTION(BlueprintPure, Category="IC|Life") bool IsHarvestable() const;
+    UFUNCTION(BlueprintPure, Category="IC|Life") bool IsResourceAvailable() const;
     static int32 ResolveGrowthStage(const FICCropRow& Crop,double ElapsedMinutes);
 private:
     friend class UICGatheringSubsystem;
+#if WITH_DEV_AUTOMATION_TESTS
+    friend class FICLifeCalendarCheck;
+#endif
     bool CompleteResourceGather(AICPlayerController* Controller, FText& Failure);
     FName PointKey() const;
     FTimerHandle RefreshTimer;
     int32 PresentedStage=INDEX_NONE;
+    UFUNCTION() void GameTimeJumped(double From,double To);
+    void EnsureNaturalCrop();
 };

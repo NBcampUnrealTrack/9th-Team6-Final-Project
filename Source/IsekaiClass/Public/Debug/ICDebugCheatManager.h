@@ -10,7 +10,12 @@ class ISEKAICLASS_API UICDebugCheatManager : public UCheatManager
 public:
     UFUNCTION(Exec) void ICCreateTestPlayer();
     UFUNCTION(Exec) void ICAddGameMinutes(double Minutes);
+    /** Advance the game calendar by hours, including fractional hours. */
+    UFUNCTION(Exec) void ICAddGameHours(double Hours);
     UFUNCTION(Exec) void ICGiveItem(FName ItemId, int32 Count);
+    /** Give one of each starter weapon together. Requires room for all four. */
+    UFUNCTION(Exec) void ICGiveStarterWeapons();
+    UFUNCTION(Exec) void ICGiveGold();
     UFUNCTION(Exec) void ICSetAffinity(FName NpcId, int32 Value);
     UFUNCTION(Exec) void ICTeleport(float X, float Y, float Z);
     UFUNCTION(Exec) void ICCompleteActiveQuests();

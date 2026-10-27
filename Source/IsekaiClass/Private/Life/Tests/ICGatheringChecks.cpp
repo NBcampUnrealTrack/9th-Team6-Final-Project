@@ -61,7 +61,7 @@ bool FICGatheringCheck::RunTest(const FString&)
     TestTrue(TEXT("F starts gathering immediately"),Plant->TryInteract(PC));
     AddInfo(FString::Printf(TEXT("Gathering start returned in %.3f ms"),(FPlatformTime::Seconds()-Started)*1000));
     TestTrue(TEXT("World keeps running while gathering"),Time->IsRunning()&&!World->IsPaused());
-    TestEqual(TEXT("No upfront reward"),Count(),0);TestFalse(TEXT("No upfront resource depletion"),State->ExportState().ResourceReadyAt.Contains(Plant->PointID));
+    TestEqual(TEXT("No upfront reward"),Count(),0);TestFalse(TEXT("No upfront resource depletion"),State->ExportState().ResourceReadyAtGameMinute.Contains(Plant->PointID));
     TestFalse(TEXT("Repeated F cannot start a second pending reward"),Plant->TryInteract(PC));
     auto* Widget=Gather->GetProgressWidget();
     if(TestNotNull(TEXT("Progress overlay is visible"),Widget))
@@ -84,11 +84,11 @@ bool FICGatheringCheck::RunTest(const FString&)
     {
         const auto* Item=D->Find<FICItemRow>(Resource->Yields[0].ItemID,R);
         const auto Text=CastChecked<UTextBlock>(Toast->GetWidgetFromName(TEXT("TXT_Items")))->GetText().ToString();
-        TestEqual(TEXT("Gathering HUD uses the actual item name and count"),Text,FString(TEXT("+ "))+Item->DisplayName.ToString()+TEXT(" 1개"));
+        TestEqual(TEXT("Gathering HUD uses the actual item name and count"),Text,FString(TEXT("+ "))+Item->DisplayName.ToString()+TEXT(" 1개 획득"));
         TestEqual(TEXT("Gathering does not show zero gold"),Toast->GetWidgetFromName(TEXT("TXT_Gold"))->GetVisibility(),ESlateVisibility::Collapsed);
         TestEqual(TEXT("Gathering does not show monster essence"),Toast->GetWidgetFromName(TEXT("TXT_Essence"))->GetVisibility(),ESlateVisibility::Collapsed);
     }
-    TestTrue(TEXT("Completion starts the saved resource cooldown"),State->ExportState().ResourceReadyAt.Contains(Plant->PointID));
+    TestTrue(TEXT("Completion starts the saved resource cooldown"),State->ExportState().ResourceReadyAtGameMinute.Contains(Plant->PointID));
     TestFalse(TEXT("Depleted resource cannot start another gather"),Plant->TryInteract(PC));
     Step(1);TestEqual(TEXT("Further ticks cannot duplicate rewards"),Count(),Resource->Yields[0].Count);
     TestEqual(TEXT("Further ticks cannot duplicate HUD notices"),RewardCanvas->GetChildrenCount(),1);
@@ -100,7 +100,7 @@ bool FICGatheringCheck::RunTest(const FString&)
         PC->HandleInputCommand(Command);TestFalse(TEXT("F and ESC cancel gathering"),Gather->IsGathering());
         TestTrue(TEXT("Cancellation keeps gameplay active"),PC->Menu.IsEmpty()&&Time->IsRunning());
         Step(6);TestEqual(TEXT("Cancellation grants no reward"),Count(),0);
-        TestFalse(TEXT("Cancellation consumes no resource"),State->ExportState().ResourceReadyAt.Contains(Plant->PointID));
+        TestFalse(TEXT("Cancellation consumes no resource"),State->ExportState().ResourceReadyAtGameMinute.Contains(Plant->PointID));
         TestEqual(TEXT("Cancellation displays no reward notice"),RewardCanvas->GetChildrenCount(),0);
     }
     Reset();Plant->TryInteract(PC);Pawn->SetActorLocation(Pawn->GetActorLocation()+FVector(25,0,0));Gather->Tick(0);
@@ -129,7 +129,7 @@ bool FICGatheringCheck::RunTest(const FString&)
     TestTrue(TEXT("Full inventory fixture commits"),State->CommitInventoryState(Inventory->GetSnapshot()));
     TestTrue(TEXT("Gather starts before final capacity check"),Plant->TryInteract(PC));Step(5);
     TestEqual(TEXT("Full bag grants no partial loot"),Count(),0);
-    TestFalse(TEXT("Full bag does not deplete the plant"),State->ExportState().ResourceReadyAt.Contains(Plant->PointID));
+    TestFalse(TEXT("Full bag does not deplete the plant"),State->ExportState().ResourceReadyAtGameMinute.Contains(Plant->PointID));
     TestTrue(TEXT("Full bag reports why reward failed"),PC->Notice.Contains(TEXT("가방")));
     TestEqual(TEXT("Full bag displays no reward notice"),RewardCanvas->GetChildrenCount(),0);
 
@@ -140,7 +140,7 @@ bool FICGatheringCheck::RunTest(const FString&)
     Ore->PointID=TEXT("TEST_MINING_NOTICE");TestTrue(TEXT("Real ore begins mining"),Ore->TryInteract(PC));Step(5);
     TestEqual(TEXT("Mining creates one HUD reward notice"),RewardCanvas->GetChildrenCount(),1);
     if(auto* Toast=Cast<UICRewardNoticeWidget>(RewardCanvas->GetChildAt(0)))
-        TestEqual(TEXT("Mining HUD names the real ore and quantity"),CastChecked<UTextBlock>(Toast->GetWidgetFromName(TEXT("TXT_Items")))->GetText().ToString(),FString(TEXT("+ 광석1 1개")));
+        TestEqual(TEXT("Mining HUD names the real ore and quantity"),CastChecked<UTextBlock>(Toast->GetWidgetFromName(TEXT("TXT_Items")))->GetText().ToString(),FString(TEXT("+ 광석1 1개 획득")));
     Feedback->RemoveFromParent();
     GI->Shutdown();GEngine->DestroyWorldContext(World);World->DestroyWorld(false);
     return !HasAnyErrors();

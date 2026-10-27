@@ -57,7 +57,8 @@ public:
     UFUNCTION(BlueprintPure, Category="IC|Weapons") TArray<FPlayerItemInstance> GetWeaponLoadout() const;
     UFUNCTION(BlueprintCallable, Category="IC|Weapons") bool UnequipWeapon(EICWeaponFamily Family);
     bool BuildNextWeaponState(FICInventoryState& Next) const;
-    bool SelectWeaponForTransition(FGuid InstanceID);
+    /** Atomically selects and reveals a loadout weapon at the draw notify. */
+    bool DrawWeaponForTransition(FGuid InstanceID);
     bool SetWeaponSheathed(bool bSheathed);
     UFUNCTION(BlueprintCallable) bool Unequip(EPlayerEquipSlot Slot);
     UFUNCTION(BlueprintCallable) bool EnhanceEquipment(int32 BagIndex,UPARAM(ref) int32& Gold);

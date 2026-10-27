@@ -46,7 +46,7 @@ bool UICGatheringSubsystem::StartGather(AICLifeActor* Resource, AICPlayerControl
     FICDefinitionResult Result;
     const auto* Row = Definitions->Find<FICResourceRow>(Resource->DefinitionID, Result);
     if (!Row || !Clock->IsRunning() || Row->Yields.IsEmpty()
-        || Clock->GetClock().PlaySecond < GI->GetSubsystem<UICWorldStateSubsystem>()->ExportState().ResourceReadyAt.FindRef(Resource->PointKey())) return false;
+        || !Resource->IsResourceAvailable()) return false;
     const auto* Production = Definitions->Find<FICProductionRow>(Row->ProductionID, Result);
     Duration = Production && FMath::IsFinite(Production->DurationPlaySeconds) && Production->DurationPlaySeconds > 0
         ? Production->DurationPlaySeconds : 5.;

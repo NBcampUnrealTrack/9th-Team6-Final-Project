@@ -31,6 +31,8 @@ struct FICWorldState
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, double> MonsterKilledAt;
     UPROPERTY(BlueprintReadOnly, SaveGame) TSet<FName> DefeatedBosses;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, double> ResourceReadyAt;
+    UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, double> ResourceReadyAtGameMinute;
+    UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName,FICRanchAnimalState> RanchAnimals;
     UPROPERTY(BlueprintReadOnly, SaveGame) TArray<FICDropState> Drops;
 
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FGuid, FICProductionJobState> ProductionJobs;

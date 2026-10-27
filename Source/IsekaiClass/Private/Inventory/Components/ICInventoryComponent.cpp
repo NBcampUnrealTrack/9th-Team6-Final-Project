@@ -409,19 +409,21 @@ bool UICInventoryComponent::SetWeaponSheathed(bool bSheathed)
     return Commit(Next);
 }
 
-bool UICInventoryComponent::SelectWeaponForTransition(FGuid InstanceID)
+bool UICInventoryComponent::DrawWeaponForTransition(FGuid InstanceID)
 {
     if (!InstanceID.IsValid()) return false;
     auto Next = GetSnapshot();
     const int32 WeaponSlot = static_cast<int32>(EPlayerEquipSlot::Weapon);
     if (!Next.Equipment.IsValidIndex(WeaponSlot)) return false;
+    if (Next.Equipment[WeaponSlot].InstanceID == InstanceID && !Next.bWeaponSheathed) return true;
     if (Next.Equipment[WeaponSlot].InstanceID != InstanceID)
     {
         const int32 Slot = Next.WeaponSlots.IndexOfByPredicate([&](const auto& Item) { return Item.InstanceID == InstanceID; });
         if (!SelectLoadoutWeapon(Next,Slot)) return false;
     }
-    // Selection happens between the two montages; the draw notify reveals it.
-    Next.bWeaponSheathed = true;
+    // Keep the previous weapon drawn until the new weapon replaces it. Never
+    // publish an empty-hand state between two occupied equipment slots.
+    Next.bWeaponSheathed = false;
     return Commit(Next);
 }
 

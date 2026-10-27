@@ -66,7 +66,7 @@ TArray<FICDefinitionSchema> UICDefinitionLibrary::GetDefinitionSchemas()
         case EICDefinitionType::NPC: case EICDefinitionType::Schedule: case EICDefinitionType::GiftPreference: case EICDefinitionType::Dialogue: case EICDefinitionType::Service: case EICDefinitionType::Shop: Group=TEXT("NPC"); break;
         case EICDefinitionType::Region: case EICDefinitionType::Anchor: case EICDefinitionType::Spawner: case EICDefinitionType::Warp: case EICDefinitionType::Home: case EICDefinitionType::Map: case EICDefinitionType::Landmark: Group=TEXT("World"); break;
         case EICDefinitionType::Recipe: Group=TEXT("Recipes"); break;
-        case EICDefinitionType::Production: case EICDefinitionType::Resource: case EICDefinitionType::Crop: case EICDefinitionType::Fish: case EICDefinitionType::FishingPoint: case EICDefinitionType::Ranching: Group=TEXT("Life"); break;
+        case EICDefinitionType::Production: case EICDefinitionType::Resource: case EICDefinitionType::Crop: case EICDefinitionType::Fish: case EICDefinitionType::FishingPoint: case EICDefinitionType::Ranching: case EICDefinitionType::GachaMachine: Group=TEXT("Life"); break;
         case EICDefinitionType::Quest: case EICDefinitionType::Progression: case EICDefinitionType::Ending: Group=TEXT("Quest"); break;
         case EICDefinitionType::IDRegistry: Group=TEXT("Registry"); break;
         default: Group=TEXT("Presentation"); break;
