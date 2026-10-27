@@ -360,15 +360,12 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
     }
     TestNotNull(TEXT("Existing quest tracker is embedded"), HUD ? Cast<UICQuestTrackerWidget>(HUD->GetWidgetFromName(TEXT("HUD_QuestTracker"))) : nullptr);
     TestNotNull(TEXT("Map placeholder exists"), HUD ? HUD->GetWidgetFromName(TEXT("HUD_Minimap")) : nullptr);
-    auto* SkillCooldown = HUD ? HUD->GetWidgetFromName(TEXT("HUD_SkillCooldown")) : nullptr;
-    TestNotNull(TEXT("HUD contains the Q skill cooldown"), SkillCooldown);
-    TestNotNull(TEXT("Q skill cooldown contains its icon"), HUD ? HUD->GetWidgetFromName(TEXT("IMG_SkillIcon")) : nullptr);
-    TestNotNull(TEXT("Q skill cooldown contains its progress ring"), HUD ? HUD->GetWidgetFromName(TEXT("RING_SkillCooldown")) : nullptr);
-    TestNotNull(TEXT("Q skill cooldown contains remaining seconds"), HUD ? HUD->GetWidgetFromName(TEXT("TXT_SkillCooldown")) : nullptr);
-    TestEqual(TEXT("Q skill cooldown is hidden without an equipped skill"), SkillCooldown ? SkillCooldown->GetVisibility() : ESlateVisibility::Visible,
-        ESlateVisibility::Collapsed);
-    auto* SkillSlot = SkillCooldown ? Cast<UCanvasPanelSlot>(SkillCooldown->Slot) : nullptr;
-    TestTrue(TEXT("Q skill cooldown is anchored at the bottom center"), SkillSlot && SkillSlot->GetAnchors().Minimum == FVector2D(.5f, 1.f));
+    TestNull(TEXT("Standalone Q skill panel is removed"), HUD ? HUD->GetWidgetFromName(TEXT("HUD_SkillCooldown")) : nullptr);
+    TestNotNull(TEXT("Player portrait contains the Q cooldown overlay"), Status ? Status->GetWidgetFromName(TEXT("PortraitCooldownOverlay")) : nullptr);
+    TestNotNull(TEXT("Player portrait contains remaining seconds"), Status ? Status->GetWidgetFromName(TEXT("TXT_SkillCooldown")) : nullptr);
+    auto* SkillKey = Status ? Status->GetWidgetFromName(TEXT("TXT_SkillKey")) : nullptr;
+    TestNotNull(TEXT("Player portrait contains the Q label"), SkillKey);
+    TestEqual(TEXT("Q label is hidden without an equipped skill"), SkillKey ? SkillKey->GetVisibility() : ESlateVisibility::Visible, ESlateVisibility::Collapsed);
     GI->Shutdown();
     GEngine->DestroyWorldContext(World);
     World->DestroyWorld(false);
