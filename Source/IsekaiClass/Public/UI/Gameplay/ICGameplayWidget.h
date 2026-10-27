@@ -18,6 +18,8 @@ public:
 protected:
     virtual void NativeOnInitialized() override;
     virtual void NativeTick(const FGeometry& Geometry, float DeltaSeconds) override;
+    virtual int32 NativePaint(const FPaintArgs& Args,const FGeometry& Geometry,const FSlateRect& Culling,
+        FSlateWindowElementList& Elements,int32 Layer,const FWidgetStyle& Style,bool ParentEnabled) const override;
     virtual FReply NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event) override;
 
 private:

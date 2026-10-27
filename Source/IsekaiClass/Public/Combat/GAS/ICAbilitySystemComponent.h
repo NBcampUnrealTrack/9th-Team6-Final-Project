@@ -65,6 +65,7 @@ public:
     UFUNCTION(BlueprintPure, Category="IC|Weapons") FName GetCurrentWeaponSkill() const;
     UFUNCTION(BlueprintCallable, Category="IC|Weapons") bool EquipWeaponSkill(EICWeaponFamily Family, FName SkillID);
     UFUNCTION(BlueprintPure, Category="IC|Combat") double GetSkillCooldownRemaining(FName SkillID) const;
+    UFUNCTION(BlueprintPure, Category="IC|Combat") double GetNormalAttackRangeCm() const;
     UFUNCTION(BlueprintPure, Category="IC|Movement") double GetMovementCooldownRemaining() const;
     UFUNCTION(BlueprintPure, Category="IC|Movement") float GetMovementCooldownProgress() const;
     UFUNCTION(BlueprintCallable, Category="IC|Combat")
@@ -118,6 +119,8 @@ private:
     double ActionEndsAt = 0;
     double MovementCooldownDuration = 0, MovementDuration = 0, MovementDistance = 0, MovementAlpha = 0;
     int32 ComboIndex = 0;
+    EICWeaponFamily ComboWeaponFamily = EICWeaponFamily::None;
+    double AttackCancelStart = 0, AttackCancelEnd = 0;
     double ComboReadyUntil = 0, BufferedAttackUntil = 0;
     FName BufferedInputAction;
     TWeakObjectPtr<AICCharacterBase> BufferedInputTarget;

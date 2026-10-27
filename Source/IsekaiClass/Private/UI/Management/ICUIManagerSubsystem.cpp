@@ -12,8 +12,26 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/PanelWidget.h"
 #include "Components/WidgetSwitcher.h"
+#include "Components/TextBlock.h"
+#include "Settings/ICGameUserSettings.h"
 namespace
 {
+struct FICScaledFont {float Base=0,Applied=0;};
+TMap<TWeakObjectPtr<UTextBlock>,FICScaledFont> ScaledFonts;
+void ApplyUserTextScale(UWidget* Widget,float Scale)
+{
+    if(!Widget)return;
+    if(auto* Text=Cast<UTextBlock>(Widget))
+    {
+        auto Font=Text->GetFont();auto& Size=ScaledFonts.FindOrAdd(TWeakObjectPtr<UTextBlock>(Text),FICScaledFont{Font.Size,Font.Size});
+        if(!FMath::IsNearlyEqual(Font.Size,Size.Applied))Size.Base=Font.Size;
+        const float Desired=FMath::Max(8.f,Size.Base*Scale);
+        if(!FMath::IsNearlyEqual(Font.Size,Desired)){Font.Size=Desired;Text->SetFont(Font);}
+        Size.Applied=Desired;
+    }
+    else if(auto* User=Cast<UUserWidget>(Widget)){if(User->WidgetTree)ApplyUserTextScale(User->WidgetTree->RootWidget,Scale);}
+    else if(auto* Panel=Cast<UPanelWidget>(Widget))for(auto* Child:Panel->GetAllChildren())ApplyUserTextScale(Child,Scale);
+}
 UWidget* FirstKeyboardTarget(UWidget* Widget)
 {
     if(!Widget||!Widget->IsVisible()||!Widget->GetIsEnabled())return nullptr;
@@ -199,6 +217,8 @@ void UICUIManagerSubsystem::CloseAllScreens()
 void UICUIManagerSubsystem::Tick(float DeltaTime)
 {
     IC_TRACE_FUNCTION();
+    if(Root)ApplyUserTextScale(Root,FMath::Clamp(UICGameUserSettings::Get()->UIScale,.75f,1.3f));
+    if(ScaledFonts.Num()>4096)for(auto It=ScaledFonts.CreateIterator();It;++It)if(!It.Key().IsValid())It.RemoveCurrent();
     bool Changed = false;
     for (int32 I = Screens.Num() - 1; I >= 0; --I)
         if (!Screens[I].Widget.IsValid() || (!Screens[I].Widget->GetCachedWidget().IsValid()))

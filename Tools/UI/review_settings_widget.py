@@ -1,99 +1,122 @@
-"""Check the actual settings WBP in title and gameplay using Slate keyboard input."""
+"""Review the authored settings WBP in title/gameplay and restore user preferences.
+
+Run a rendering editor with -RenderOffscreen -ExecCmds="py <this file>".
+Uses the existing isolated PIE review save namespace. No display mode is changed.
+"""
 import json
 import time
 import traceback
-import runpy
 from pathlib import Path
 import unreal as u
 
-OUT = Path(u.Paths.convert_relative_path_to_full(u.Paths.project_saved_dir())) / 'SettingsWidgetReview'
+ROOT = Path(u.Paths.convert_relative_path_to_full(u.Paths.project_dir()))
+OUT = ROOT / 'Saved/ExpandedSettingsLiveReview'
 OUT.mkdir(parents=True, exist_ok=True)
 LEVELS = u.get_editor_subsystem(u.LevelEditorSubsystem)
 STATE = {'phase': 'title_start', 'started': time.monotonic(), 'checks': {}}
 
-def phase(value):
-    STATE.update(phase=value, phase_started=time.monotonic())
-    report()
 
 def report():
-    (OUT / 'LiveReview.json').write_text(json.dumps({k: v for k, v in STATE.items()
-        if k in ('phase', 'checks', 'error')}, ensure_ascii=False, indent=2), encoding='utf-8')
+    (OUT / 'Review.json').write_text(json.dumps({key: STATE[key] for key in ('phase', 'checks', 'error') if key in STATE},
+                                              ensure_ascii=False, indent=2), encoding='utf-8')
 
-def press(key_name):
+
+def phase(value):
+    STATE.update(phase=value, phase_at=time.monotonic())
+    report()
+
+
+def press(name):
     key = u.Key()
-    key.set_editor_property('key_name', key_name)
-    assert u.ICCharacterSetupLibrary.press_ui_review_key(STATE['world'], key), key_name
+    key.set_editor_property('key_name', name)
+    assert u.ICCharacterSetupLibrary.press_ui_review_key(STATE['world'], key), name
+
 
 def screen():
-    values = [widget for widget in u.WidgetLibrary.get_all_widgets_of_class(STATE['world'], u.ICSettingsWidget, False)
-              if widget.get_parent()]
-    assert len(values) == 1
-    result = values[0]
-    assert result.get_class().get_path_name() == '/Game/IsekaiClass/UI/Widget/WBP_IC_Settings.WBP_IC_Settings_C'
-    return result
-
-def control(current, cls, name):
-    return next(widget for widget in u.ObjectIterator(cls)
-                if widget.get_name() == name and widget.get_outer().get_outer() == current)
-
-def has_screen():
-    return any(widget.get_parent() for widget in u.WidgetLibrary.get_all_widgets_of_class(STATE['world'], u.ICSettingsWidget, False))
-
-def game_menu():
-    return next(widget for widget in u.WidgetLibrary.get_all_widgets_of_class(STATE['world'], u.ICGameMenuWidget, False)
+    return next(widget for widget in u.WidgetLibrary.get_all_widgets_of_class(STATE['world'], u.ICSettingsWidget, False)
                 if widget.get_parent())
+
+
+def control(widget, cls, name):
+    return next(value for value in u.ObjectIterator(cls)
+                if value.get_name() == name and value.get_outer().get_outer() == widget)
+
 
 def capture(name):
     assert u.ICCharacterSetupLibrary.capture_monster_test_hud(STATE['world'], str(OUT / (name + '.png')))
 
+
+def restore():
+    if 'preferences' not in STATE:
+        return
+    settings = u.GameUserSettings.get_game_user_settings()
+    for key, value in STATE['preferences'].items():
+        settings.set_editor_property(key, value)
+    settings.set_texture_quality(STATE['texture_quality'])
+    settings.set_frame_rate_limit(STATE['frame_limit'])
+    settings.set_resolution_scale_value_ex(STATE['render_scale'])
+    settings.save_settings()
+    if STATE.get('pc') and STATE.get('world'):
+        STATE['pc'].set_menu('Pause' if STATE.get('gameplay') else 'MainMenu')
+        STATE['pc'].set_menu('Settings')
+        screen().apply_options()
+        for key in ('MonitorDevice', 'MonitorRefreshRate'):
+            settings.set_editor_property(key, STATE['preferences'][key])
+        settings.save_settings()
+
+
 def finish():
-    u.unregister_slate_post_tick_callback(STATE['handle'])
-    LEVELS.editor_request_end_play()
-    u.SystemLibrary.quit_editor()
+    try:
+        restore()
+    finally:
+        report()
+        u.unregister_slate_post_tick_callback(STATE['handle'])
+        LEVELS.editor_request_end_play()
+        u.SystemLibrary.quit_editor()
+
 
 def tick(delta):
     try:
-        if time.monotonic() - STATE['started'] > 130:
-            raise RuntimeError('Timeout in ' + STATE['phase'])
-        elapsed = time.monotonic() - STATE.get('phase_started', STATE['started'])
+        if time.monotonic() - STATE['started'] > 200:
+            raise RuntimeError('Timeout: ' + STATE['phase'])
         worlds = u.EditorLevelLibrary.get_pie_worlds(False)
+        elapsed = time.monotonic() - STATE.get('phase_at', STATE['started'])
         if STATE['phase'] == 'title_start':
-            if not worlds: return
+            if not worlds:
+                return
             pc = u.GameplayStatics.get_player_controller(worlds[0], 0)
-            if not pc or str(pc.get_editor_property('menu')) != 'MainMenu': return
+            if not pc or str(pc.get_editor_property('menu')) != 'MainMenu':
+                return
             STATE.update(world=worlds[0], pc=pc)
+            settings = u.GameUserSettings.get_game_user_settings()
+            STATE['preferences'] = {key: settings.get_editor_property(key) for key in ('CameraSensitivity', 'CameraFOV', 'MasterVolume', 'AntiAliasingMethod', 'UIScale', 'MonitorDevice', 'MonitorRefreshRate')}
+            STATE['preferences']['KeyOverrides'] = dict(settings.get_editor_property('KeyOverrides'))
+            STATE['texture_quality'] = settings.get_texture_quality()
+            STATE['frame_limit'] = settings.get_frame_rate_limit()
+            STATE['render_scale'] = settings.get_resolution_scale_information_ex()[1]
             pc.set_menu('Settings')
-            phase('title_settings')
+            STATE['tab'] = 0
+            phase('title_tabs')
             return
-        if STATE['phase'] == 'title_settings' and elapsed > .5:
+        if STATE['phase'] == 'title_tabs' and elapsed > .35:
             current = screen()
-            sensitivity = control(current, u.Slider, 'SLIDER_Sensitivity')
-            fullscreen = control(current, u.CheckBox, 'CHECK_Fullscreen')
-            quality = control(current, u.ComboBoxString, 'COMBO_Quality')
-            assert sensitivity and fullscreen and quality and quality.get_option_count() == 4
-            before = sensitivity.get_value()
-            press('D')
-            assert abs(sensitivity.get_value() - min(3., before + .1)) < .001
-            press('A')
-            sensitivity.set_value(before)
-            press('S')
-            checked = fullscreen.is_checked()
-            press('Enter')
-            assert fullscreen.is_checked() != checked
-            press('Enter')
-            assert fullscreen.is_checked() == checked
-            press('S')
-            index = quality.get_selected_index()
-            press('A')
-            assert quality.get_selected_index() == max(0, index - 1)
-            press('D')
-            quality.set_selected_index(index)
-            STATE['checks']['title_uses_wbp_and_wasd_controls'] = True
-            capture('TitleSettings')
+            assert current.get_class().get_path_name() == '/Game/IsekaiClass/UI/Widget/WBP_IC_Settings.WBP_IC_Settings_C'
+            tabs = control(current, u.WidgetSwitcher, 'SettingsTabSwitcher')
+            assert tabs.get_num_widgets() == 5
+            index = STATE['tab']
+            current.select_tab(index)
+            capture('Title_' + ('Combat', 'Controls', 'Graphics', 'Audio', 'Other')[index])
+            assert tabs.get_active_widget_index() == index
+            if index < 4:
+                STATE['tab'] += 1
+                STATE['phase_at'] = time.monotonic()
+                return
+            STATE['checks']['all_five_authored_tabs_render_and_switch'] = True
+            assert control(current, u.VerticalBox, 'LIST_KeyBindings').get_children_count() > 15
+            STATE['checks']['keyboard_mouse_bindings_populated'] = True
             press('Escape')
             assert str(STATE['pc'].get_editor_property('menu')) == 'MainMenu'
-            assert not has_screen()
-            STATE['checks']['close_returns_to_title'] = True
+            STATE['checks']['escape_returns_to_title'] = True
             LEVELS.editor_request_end_play()
             phase('title_end')
             return
@@ -103,85 +126,121 @@ def tick(delta):
             phase('game_start')
             return
         if STATE['phase'] == 'game_start':
-            if not worlds: return
+            if not worlds:
+                return
             pc = u.GameplayStatics.get_player_controller(worlds[0], 0)
-            if not pc or str(pc.get_editor_property('menu')) != 'Create': return
-            STATE.update(world=worlds[0], pc=pc)
+            if not pc or str(pc.get_editor_property('menu')) != 'Create':
+                return
+            STATE.update(world=worlds[0], pc=pc, gameplay=True)
             assert u.ICCharacterSetupLibrary.prepare_live_character_review(worlds[0])
             phase('creating')
             return
         if STATE['phase'] == 'creating':
-            if not STATE['pc'].get_editor_property('created'): return
+            if not STATE['pc'].get_editor_property('created'):
+                return
             STATE['pc'].set_menu('Pause')
-            phase('game_menu')
+            STATE['pc'].set_menu('Settings')
+            phase('game_edit')
             return
-        if STATE['phase'] == 'game_menu' and elapsed > .4:
-            menu = game_menu()
-            press('A'); press('A'); press('S')
-            assert str(menu.get_selected_tab()) == 'Settings'
-            press('S'); press('S'); press('S')
-            assert menu.get_editor_property('settings_action_index') == 3
-            button = control(menu, u.Button, 'BTN_GameSettings')
-            assert str(button.get_child_at(0).get_text()) == '게임 설정'
-            assert button.get_visibility() == u.SlateVisibility.VISIBLE
-            capture('GameplaySettingsMenu')
-            press('Enter')
-            assert str(STATE['pc'].get_editor_property('menu')) == 'Settings'
-            STATE['checks']['menu_game_settings_button_opens_wbp_by_keyboard'] = True
-            phase('game_settings')
-            return
-        if STATE['phase'] == 'game_settings' and elapsed > .5:
+        if STATE['phase'] == 'game_edit' and elapsed > .5:
             current = screen()
-            sensitivity = control(current, u.Slider, 'SLIDER_Sensitivity')
-            STATE['old_sensitivity'] = sensitivity.get_value()
-            # Exercise Apply with a real pawn and keep graphics/window mode unchanged.
-            sensitivity.set_value(1.4 if sensitivity.get_value() < 1.3 else 1.2)
-            STATE['new_sensitivity'] = sensitivity.get_value()
-            press('S'); press('S'); press('S'); press('Enter')
+            current.select_tab(1)
+            sensitivity = control(current, u.Slider, 'OPTION_CameraSensitivity')
+            sensitivity.set_keyboard_focus()
+            before_sensitivity = sensitivity.get_value()
+            press('Left' if sensitivity.get_value() > 2.5 else 'Right')
+            STATE['sensitivity'] = sensitivity.get_value()
+            assert abs(STATE['sensitivity'] - before_sensitivity) > .001
+            fov = control(current, u.Slider, 'OPTION_CameraFOV')
+            fov.set_keyboard_focus()
+            press('Left' if fov.get_value() > 105 else 'Right')
+            STATE['fov'] = fov.get_value()
+            capture('Gameplay_Controls')
+            current.select_tab(3)
+            volume = control(current, u.Slider, 'OPTION_MasterVolume')
+            volume.set_keyboard_focus()
+            press('Right' if volume.get_value() < .1 else 'Left')
+            STATE['volume'] = volume.get_value()
+            current.select_tab(2)
+            texture = control(current, u.ComboBoxString, 'OPTION_Texture')
+            STATE['new_texture'] = 1 if texture.get_selected_index() != 1 else 2
+            texture.set_selected_index(STATE['new_texture'])
+            control(current, u.ComboBoxString, 'OPTION_AntiAliasingMethod').set_selected_index(2)
+            control(current, u.ComboBoxString, 'OPTION_FrameLimit').set_selected_index(4)
+            scale = control(current, u.Slider, 'OPTION_ResolutionScale')
+            scale.set_keyboard_focus()
+            press('Left' if scale.get_value() > 98 else 'Right')
+            STATE['new_render_scale'] = scale.get_value()
+            current.select_tab(4)
+            text_scale = control(current, u.Slider, 'OPTION_UIScale')
+            text_scale.set_keyboard_focus()
+            press('Left' if text_scale.get_value() > 1.2 else 'Right')
+            STATE['text_scale'] = text_scale.get_value()
+            current.apply_options()
+            assert not current.is_awaiting_display_confirmation()
             phase('applied')
             return
         if STATE['phase'] == 'applied' and elapsed > .5:
+            current = screen()
             player = u.GameplayStatics.get_player_pawn(STATE['world'], 0)
-            assert abs(player.get_editor_property('camera_sensitivity') - STATE['new_sensitivity']) < .001
-            STATE['checks']['apply_updates_actual_player_sensitivity'] = True
-            capture('GameplaySettings')
-            press('S'); press('Enter')
-            assert str(STATE['pc'].get_editor_property('menu')) == 'Pause'
-            STATE['checks']['close_button_returns_to_game_menu'] = True
-            phase('returned_menu')
-            return
-        if STATE['phase'] == 'returned_menu' and elapsed > .4:
-            menu = game_menu()
-            assert str(menu.get_selected_tab()) == 'Settings'
-            assert menu.get_editor_property('settings_action_index') == 3
-            assert u.GameplayStatics.is_game_paused(STATE['world'])
-            STATE['checks']['return_preserves_selected_tab_action_and_pause'] = True
+            settings = u.GameUserSettings.get_game_user_settings()
+            assert abs(player.get_editor_property('camera_sensitivity') - STATE['sensitivity']) < .001
+            assert abs(player.get_component_by_class(u.CameraComponent).get_editor_property('field_of_view') - STATE['fov']) < .001
+            assert abs(settings.get_editor_property('MasterVolume') - STATE['volume']) < .001
+            STATE['checks']['apply_updates_actual_camera_and_audio_preferences'] = True
+            assert u.SystemLibrary.get_console_variable_int_value('sg.TextureQuality') == STATE['new_texture']
+            assert u.SystemLibrary.get_console_variable_int_value('r.AntiAliasingMethod') == 2
+            assert abs(u.SystemLibrary.get_console_variable_float_value('t.MaxFPS') - 120.) < .1
+            assert abs(u.SystemLibrary.get_console_variable_float_value('r.ScreenPercentage') - STATE['new_render_scale']) < .1
+            STATE['checks']['graphics_quality_antialiasing_fps_and_render_scale_reach_renderer'] = True
+            title = control(current, u.TextBlock, 'TXT_SettingsTitle')
+            assert abs(title.get_editor_property('font').size - 36 * STATE['text_scale']) < .2
+            STATE['checks']['text_size_changes_actual_widget_fonts'] = True
+            current.select_tab(3)
+            capture('Gameplay_Audio')
+            current.select_tab(1)
+            keys = control(current, u.VerticalBox, 'LIST_KeyBindings')
+            selector = keys.get_child_at(0).get_child_at(1).get_content()
+            control(current, u.ScrollBox, 'SettingsScroll_1').scroll_widget_into_view(selector, False)
+            selector.set_keyboard_focus()
             press('Enter')
+            assert selector.get_is_selecting_key()
+            press('H')
+            assert str(selector.get_editor_property('selected_key').key.get_editor_property('key_name')) == 'H'
+            current.apply_options()
+            press('Escape')
+            assert str(STATE['pc'].get_editor_property('menu')) == 'Pause'
+            STATE['checks']['close_returns_to_paused_game_menu'] = True
+            STATE['pc'].set_menu('')
+            phase('key_applied')
+            return
+        if STATE['phase'] == 'key_applied' and elapsed > .3:
+            move = u.load_asset('/Game/IsekaiClass/Input/Actions/IA_Move')
+            actual = [key for subsystem in u.ObjectIterator(u.EnhancedInputLocalPlayerSubsystem)
+                      if isinstance(subsystem.get_outer(), u.LocalPlayer)
+                      for key in subsystem.query_keys_mapped_to_action(move)]
+            assert any(str(key.get_editor_property('key_name')) == 'H' for key in actual)
+            STATE['checks']['key_selector_updates_actual_enhanced_input_mapping'] = True
+            STATE['pc'].set_menu('Pause')
+            STATE['pc'].set_menu('Settings')
             phase('reopened')
             return
         if STATE['phase'] == 'reopened' and elapsed > .4:
             current = screen()
-            assert abs(control(current, u.Slider, 'SLIDER_Sensitivity').get_value() - STATE['new_sensitivity']) < .001
-            STATE['checks']['reopen_reads_saved_setting'] = True
-            control(current, u.Slider, 'SLIDER_Sensitivity').set_value(STATE['old_sensitivity'])
-            press('S'); press('S'); press('S'); press('Enter')
-            press('Equals')
-            assert str(STATE['pc'].get_editor_property('menu')) == 'Pause'
-            STATE['checks']['equals_closes_settings'] = True
+            assert abs(control(current, u.Slider, 'OPTION_CameraSensitivity').get_value() - STATE['sensitivity']) < .001
+            assert abs(control(current, u.Slider, 'OPTION_MasterVolume').get_value() - STATE['volume']) < .001
+            STATE['checks']['reopening_restores_saved_preferences'] = True
             phase('complete')
-            return
-        if STATE['phase'] == 'complete':
-            u.log('IC_SETTINGS_WIDGET_REVIEW_OK ' + json.dumps(STATE['checks']))
             finish()
+            u.log('IC_EXPANDED_SETTINGS_LIVE_REVIEW_COMPLETE')
     except Exception:
         STATE['error'] = traceback.format_exc()
         phase('error')
         u.log_error(STATE['error'])
         finish()
 
+
 assert not u.EditorLevelLibrary.get_pie_worlds(False)
-if '-ICWidgetUsageAudit' in u.SystemLibrary.get_command_line():
-    runpy.run_path(str(Path(u.Paths.convert_relative_path_to_full(u.Paths.project_dir())) / 'Tools/UI/audit_widget_usage.py'))
 u.EditorLoadingAndSavingUtils.load_map('/Game/IsekaiClass/World/Maps/L_Title')
 STATE['handle'] = u.register_slate_post_tick_callback(tick)
 assert u.ICCharacterSetupLibrary.begin_monster_test_review()

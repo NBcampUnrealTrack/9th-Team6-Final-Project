@@ -24,6 +24,8 @@ struct ISEKAICLASS_API FICCharacterAnimationSet
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> Land;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> Sprint;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimMontage> Attack;
+    /** Three consecutive normal attacks, authored for this character's skeleton. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<TObjectPtr<UAnimMontage>> AttackCombo;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimMontage> Skill;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimMontage> Hit;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimMontage> Dodge;
