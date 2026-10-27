@@ -253,7 +253,8 @@ void UICGameplayWidget::RefreshCurrentScreen()
         if (auto* Bar = Cast<UProgressBar>(GetWidgetFromName(FName(*FString::Printf(TEXT("BAR_%s"), Keys[I])))))
             Bar->SetPercent(Maximums[I] > 0 ? FMath::Clamp(Values[I] / Maximums[I], 0.f, 1.f) : 0);
     }
-    SetText(TEXT("TXT_Hint"), PC->InteractionHint.IsEmpty() ? TEXT("") : TEXT("[F] ") + PC->InteractionHint);
+    const FString CombatHint=PC->bInCombat ? TEXT("전투 중") : TEXT("");
+    SetText(TEXT("TXT_Hint"), CombatHint+(PC->InteractionHint.IsEmpty()?TEXT(""):(CombatHint.IsEmpty()?TEXT("[F] "):TEXT("\n[F] "))+PC->InteractionHint));
     if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Notice"))))
         Text->SetText(PC->NoticeDisplayText);
     const bool HasPanel = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Death") && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
