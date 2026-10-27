@@ -44,6 +44,7 @@ public:
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|GAS") TSubclassOf<UGameplayEffect> SPEffectClass;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|GAS") TSubclassOf<UGameplayEffect> StatusEffectClass;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+    virtual bool GetShouldTick() const override;
     void InitializeForCharacter(AICCharacterBase* Character, bool PrimaryStats, bool PlayerSP);
     bool CanRestore(const FICCharacterState& State, FString& Reason) const;
     bool Restore(const FICCharacterState& State);
@@ -64,8 +65,13 @@ public:
     UFUNCTION(BlueprintPure, Category="IC|Weapons") FName GetCurrentWeaponSkill() const;
     UFUNCTION(BlueprintCallable, Category="IC|Weapons") bool EquipWeaponSkill(EICWeaponFamily Family, FName SkillID);
     UFUNCTION(BlueprintPure, Category="IC|Combat") double GetSkillCooldownRemaining(FName SkillID) const;
+    UFUNCTION(BlueprintPure, Category="IC|Combat") double GetNormalAttackRangeCm() const;
+    UFUNCTION(BlueprintPure, Category="IC|Movement") double GetMovementCooldownRemaining() const;
+    UFUNCTION(BlueprintPure, Category="IC|Movement") float GetMovementCooldownProgress() const;
     UFUNCTION(BlueprintCallable, Category="IC|Combat")
     void CancelAction();
+    void ClearBufferedInput();
+    bool CanAcceptInteractionInput() const;
     UFUNCTION(BlueprintCallable, Category="IC|Combat") bool NotifyCombatEvent(FGuid ActionID, FName Event, int32 HitIndex);
     UFUNCTION(BlueprintPure, Category="IC|Combat") FGuid GetActionID() const;
     UFUNCTION(BlueprintCallable, Category="IC|Combat") bool ApplyStatus(FName EffectID, UICAbilitySystemComponent* Source);
@@ -76,6 +82,9 @@ public:
     bool ApplyDamage(const FICAttackCapture& Attack, UICAbilitySystemComponent* Source, bool Critical, bool Guardable, bool AutoDodge, bool CancelCasting);
     void SetGuarding(bool Guarding);
     bool IsAlive() const;
+    bool CanAcceptMovementInput() const;
+    bool HandleMovementInput();
+    bool CanAcceptJumpInput() const;
     bool HasRecentCombat() const;
     void MarkCombat();
     bool BeginRequestedAction(UICGameplayAbility* Ability);
@@ -86,6 +95,7 @@ public:
     void AdvanceNaturalSP(double Seconds);
     void NotifyEquipmentChanged();
     bool NotifyFromMontage(int32 MontageInstanceID,FName Event,int32 HitIndex);
+    void PlayCombatCue(bool bImpact, const FICCombatPresentation& Presentation, AActor* Recipient, const FVector& Location);
     void SetOrdinaryStaggerImmunity(bool Immune) { bOrdinaryStaggerImmune=Immune; }
     UPROPERTY(BlueprintAssignable) FICGASStateChanged OnStateChanged;
 private:
@@ -94,6 +104,8 @@ private:
     UPROPERTY(Transient) TObjectPtr<UICSurvivalAttributeSet> Survival;
     UPROPERTY(Transient) TObjectPtr<UICGameplayAbility> RunningAbility;
     FGameplayAbilitySpecHandle AbilityHandle;
+    TMap<FName, FGameplayAbilitySpecHandle> SkillAbilityHandles;
+    TMap<FName, FActiveGameplayEffectHandle> CooldownEffectHandles;
     FICCharacterState Runtime;
     TMap<FGuid, FActiveGameplayEffectHandle> EffectHandles;
     TMap<EICStat, double> MonsterBase;
@@ -105,8 +117,13 @@ private:
     TSet<FString> HitReceipts;
     double StartedAt = 0, RecentCombatAt = -100, DodgeReadyAt = 0, StaggerReadyAt = 0, StaggerUntil = 0;
     double ActionEndsAt = 0;
+    double MovementCooldownDuration = 0, MovementDuration = 0, MovementDistance = 0, MovementAlpha = 0;
     int32 ComboIndex = 0;
+    EICWeaponFamily ComboWeaponFamily = EICWeaponFamily::None;
+    double AttackCancelStart = 0, AttackCancelEnd = 0;
     double ComboReadyUntil = 0, BufferedAttackUntil = 0;
+    FName BufferedInputAction;
+    TWeakObjectPtr<AICCharacterBase> BufferedInputTarget;
     bool bCommitted = false, bReady = false, bRestoring = false, bEnding = false, bGuarding = false;
     bool bOrdinaryStaggerImmune = false;
     bool bCancelWindow=false;
@@ -124,4 +141,7 @@ private:
     void SyncEffectHandles();
     void ClearActionTags();
     void UnlockSkills();
+    FGameplayAbilitySpecHandle GetOrGrantSkillAbility(const FICSkillRow& Row);
+    void SyncCooldownEffects();
+    void ApplySkillCooldown(const FICSkillRow& Row, double Duration);
 };

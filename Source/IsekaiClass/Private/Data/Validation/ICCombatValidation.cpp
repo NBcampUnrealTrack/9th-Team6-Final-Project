@@ -234,11 +234,11 @@ void ValidateCombat(const TArray<FICDefinitionTable>& Tables, bool bComplete, TA
             if ((*Skill)->OwnerType != EICSkillOwner::RecruitUnique || (*Skill)->NPCID != Row.NPCID)
                 Issue(Issues, At, TEXT("UniqueSkillID"), TEXT("Unique skill ownership must point back to this recruit's NPC."));
         }
-        const FName Equipment[] = {Row.InitialEquipment.WeaponID, Row.InitialEquipment.ClothesID, Row.InitialEquipment.RingID, Row.InitialEquipment.NecklaceID};
-        const TCHAR* EquipmentFields[] = {TEXT("WeaponID"), TEXT("ClothesID"), TEXT("RingID"), TEXT("NecklaceID")};
+        const FName Equipment[] = {Row.InitialEquipment.WeaponID};
+        const TCHAR* EquipmentFields[] = {TEXT("WeaponID")};
         for (int32 Index = 0; Index < UE_ARRAY_COUNT(Equipment); ++Index)
         {
-            if (Equipment[Index].IsNone()) Missing(Issues, At, FString(TEXT("InitialEquipment.")) + EquipmentFields[Index], TEXT("Author all four recruit initial equipment slots."), bComplete);
+            if (Index==0 && Equipment[Index].IsNone()) Missing(Issues, At, FString(TEXT("InitialEquipment.")) + EquipmentFields[Index], TEXT("Author the recruit's initial weapon."), bComplete);
         }
     });
 

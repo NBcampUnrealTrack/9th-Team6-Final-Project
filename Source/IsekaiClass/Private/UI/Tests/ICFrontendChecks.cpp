@@ -49,6 +49,7 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
     Definitions->ConfigureCatalog(GetDefault<UICDefinitionSettings>()->Catalog.LoadSynchronous());
     const EICWeaponFamily Families[] = {EICWeaponFamily::Sword, EICWeaponFamily::Bow, EICWeaponFamily::Staff,
                                         EICWeaponFamily::Wand};
+    const FName StartingNPCs[]={TEXT("NPC_R01_002"),TEXT("NPC_R01_004"),TEXT("NPC_R01_001"),TEXT("NPC_R01_003")};
     for (int32 I = 0; I < 4; ++I)
     {
         const auto* Row = Flow->FindOption(3, I);
@@ -56,6 +57,7 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
             continue;
         TestFalse(TEXT("Weapon configured"), Row->WeaponItemID.IsNone());
         TestFalse(TEXT("Skill configured"), Row->SkillID.IsNone());
+        TestEqual(TEXT("Approved music NPC mapping"),Row->NPCID,StartingNPCs[I]);
         FICDefinitionResult Result;
         const auto* Skill = Definitions->Find<FICSkillRow>(Row->SkillID, Result);
         const auto* Item = Definitions->Find<FICItemRow>(Row->WeaponItemID, Result);
@@ -64,6 +66,7 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
         {
             TestEqual(TEXT("Skill family matches choice"), Skill->RequiredWeaponFamily, Families[I]);
             TestFalse(TEXT("Starting skill has an effect"), Skill->Hits.IsEmpty());
+            TestEqual(TEXT("Starting skill is the chosen NPC unique skill"),Skill->NPCID,Row->NPCID);
         }
         if (TestNotNull(TEXT("Starting weapon resolves in actual catalog"), Equipment))
             TestEqual(TEXT("Weapon family matches choice"), Equipment->WeaponFamily, Families[I]);
@@ -85,11 +88,28 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "UI/MainMenu/ICMainMenuWidget.h"
 #include "UI/CharacterCreate/ICCharacterCreateWidget.h"
-#include "UI/Framework/ICConfirmPopupWidget.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Settings/ICSettingsWidget.h"
+#include "UI/Save/ICSaveLoadWidget.h"
+#include "UI/Save/ICSaveSlotWidget.h"
+#include "UI/Save/ICLoadConfirmWidget.h"
+#include "UI/Tests/ICPlayWindowSettingsRestore.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/LocalPlayer.h"
+#include "Slate/SceneViewport.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWindow.h"
+#include "PlayInEditorDataTypes.h"
+#include "ImageUtils.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Time/ICTimeSubsystem.h"
 #include "Save/ICSaveSubsystem.h"
@@ -108,7 +128,7 @@ public:
     }
     virtual bool Update() override
     {
-        if (FPlatformTime::Seconds() - Started > 75)
+        if (FPlatformTime::Seconds() - Started > 100)
         {
             Test->AddError(TEXT("Title-to-play timed out"));
             Cleanup();
@@ -121,6 +141,8 @@ public:
         if (!PC)
             return false;
         auto* Flow = PC->GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
+        auto* Client = PC->GetLocalPlayer() ? PC->GetLocalPlayer()->ViewportClient.Get() : nullptr;
+        if (!Client || !Client->GetWindow()) return false;
         if (Stage == 0)
         {
             if (!PC->IsMainMenuLevel())
@@ -129,9 +151,6 @@ public:
             GI = PC->GetGameInstance();
             auto* Saves = PC->GetSaves();
             const FString Prefix = TEXT("IC_Frontend_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
-            Test->TestTrue(TEXT("Save files isolated from player saves"),
-                           Saves->ConfigureServices(PC->GetWorldState(), PC->GetTime(), Prefix));
-            Saves->bCaptureSaveThumbnail = false;
             TArray<UUserWidget*> Widgets;
             UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Widgets, UICMainMenuWidget::StaticClass(), false);
             UICMainMenuWidget* Menu = nullptr;
@@ -141,8 +160,82 @@ public:
                         Menu = Candidate;
             if (!Menu)
                 return false;
-            auto* Continue = Cast<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Continue")));
-            Test->TestTrue(TEXT("Continue disabled for this milestone"), Continue && !Continue->GetIsEnabled());
+            if (!bSeededSaves)
+            {
+                Test->TestTrue(TEXT("Save files isolated from player saves"),
+                               Saves->ConfigureServices(PC->GetWorldState(), PC->GetTime(), Prefix));
+                auto* Continue = Cast<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Continue")));
+                Test->TestTrue(TEXT("Continue stays clickable with no save"), Continue && Continue->GetIsEnabled());
+                if (!Click(Client, Continue)) return false;
+                Test->TestEqual(TEXT("Empty continue stays on title"), PC->Menu, FString(TEXT("MainMenu")));
+                Test->TestEqual(TEXT("Empty continue explains the missing save"),
+                                CastChecked<UTextBlock>(Menu->GetWidgetFromName(TEXT("TXT_Subtitle")))->GetText().ToString(),
+                                FString(TEXT("이어할 저장 데이터가 없습니다.")));
+                for (int32 Slot = 0; Slot < 2; ++Slot)
+                {
+                    auto* Save = NewObject<UICSaveGame>();
+                    Save->Slot = Slot; Save->SavedAt = FDateTime::UtcNow() - FTimespan::FromDays(1);
+                    Save->WorldState.bPlayerCreated = true; Save->WorldState.PlayerName = TEXT("이전 여행자");
+                    Save->WorldState.FirstSkill = TEXT("SKL_TEST");
+                    FICCharacterState Player; Player.CharacterId = UICWorldStateSubsystem::PlayerId();
+                    Player.Kind = EICCharacterKind::Player; Save->WorldState.Characters.Add(Player.CharacterId, Player);
+                    TArray<uint8> Bytes;
+                    Test->TestTrue(TEXT("Encode existing save fixture"), UICSaveGame::EncodeForFile(Save, Bytes));
+                    Test->TestTrue(TEXT("Write isolated save fixture"), FFileHelper::SaveArrayToFile(Bytes, *Saves->GetSlotPath(Slot)));
+                    if (Slot == 1) ManualBytes = Bytes;
+                }
+                bSeededSaves = true;
+                Test->TestTrue(TEXT("Existing auto save is valid before new game"), Saves->GetSlotList()[0].bValid);
+            }
+            const TCHAR* Actions[] = {TEXT("BTN_Continue"), TEXT("BTN_Start"), TEXT("BTN_SaveList"),
+                                      TEXT("BTN_Settings"), TEXT("BTN_Quit")};
+            const TCHAR* Labels[] = {TEXT("이어하기"), TEXT("게임시작"), TEXT("저장목록"),
+                                     TEXT("설정"), TEXT("그만하기")};
+            float PreviousY = -1.f;
+            for (int32 I = 0; I < UE_ARRAY_COUNT(Actions); ++I)
+            {
+                auto* Button = CastChecked<UButton>(Menu->GetWidgetFromName(Actions[I]));
+                Test->TestTrue(TEXT("Every title action is clickable"), Button->GetIsEnabled());
+                Test->TestEqual(TEXT("Title action uses requested label"),
+                                CastChecked<UTextBlock>(Button->GetContent())->GetText().ToString(), FString(Labels[I]));
+                const float Y = Button->GetCachedGeometry().GetAbsolutePosition().Y;
+                Test->TestTrue(TEXT("Title actions follow requested order"), Y > PreviousY);
+                PreviousY = Y;
+            }
+            if (!Click(Client, CastChecked<UButton>(Menu->GetWidgetFromName(TEXT("BTN_SaveList"))))) return false;
+            Test->TestEqual(TEXT("Save list opens from title"), PC->Menu, FString(TEXT("Load")));
+            PC->CloseSessionMenu();
+            Test->TestEqual(TEXT("Save list close returns to title"), PC->Menu, FString(TEXT("MainMenu")));
+            NextStage(8);
+            return false;
+        }
+        if (Stage == 8)
+        {
+            if (FPlatformTime::Seconds() - StageAt < .3) return false;
+            TArray<UUserWidget*> Widgets;
+            UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Widgets, UICMainMenuWidget::StaticClass(), false);
+            UICMainMenuWidget* Menu = nullptr;
+            for (auto* Widget : Widgets)
+                if (auto* Candidate = Cast<UICMainMenuWidget>(Widget))
+                    if (Candidate->IsActivated()) Menu = Candidate;
+            if (!Menu) return false;
+            if (!Click(Client, CastChecked<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Settings"))))) return false;
+            Test->TestTrue(TEXT("Title settings opens existing options"), PC->Menu == TEXT("Settings") && PC->SettingsScreen);
+            PC->CloseSessionMenu();
+            Test->TestEqual(TEXT("Closing title settings returns to title"), PC->Menu, FString(TEXT("MainMenu")));
+            NextStage(9);
+            return false;
+        }
+        if (Stage == 9)
+        {
+            if (FPlatformTime::Seconds() - StageAt < .3) return false;
+            TArray<UUserWidget*> Widgets;
+            UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Widgets, UICMainMenuWidget::StaticClass(), false);
+            UICMainMenuWidget* Menu = nullptr;
+            for (auto* Widget : Widgets)
+                if (auto* Candidate = Cast<UICMainMenuWidget>(Widget))
+                    if (Candidate->IsActivated()) Menu = Candidate;
+            if (!Menu) return false;
             auto* Start = Cast<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Start")));
             if (!Start)
             {
@@ -150,7 +243,22 @@ public:
                 Cleanup();
                 return true;
             }
-            Start->OnClicked.Broadcast();
+            if (!Click(Client, Start)) return false;
+            NextStage(10);
+            return false;
+        }
+        if (Stage == 15)
+        {
+            if (FPlatformTime::Seconds() - StageAt < .3) return false;
+            auto* Wizard = PC->CharacterCreateScreen.Get();
+            if (!Wizard) return false;
+            Capture(Client, TEXT("01_Name"));
+            if (!Click(Client, CastChecked<UButton>(Wizard->GetWidgetFromName(TEXT("BTN_Next"))))) return false;
+            NextStage(11); return false;
+        }
+        if (Stage >= 10 && Stage <= 14)
+        {
+            if (FPlatformTime::Seconds() - StageAt < .3) return false;
             auto* Wizard = PC->CharacterCreateScreen.Get();
             if (!Wizard)
             {
@@ -158,31 +266,51 @@ public:
                 Cleanup();
                 return true;
             }
-            auto* Name = Cast<UEditableTextBox>(Wizard->GetWidgetFromName(TEXT("EDIT_Name")));
-            Name->SetText(FText::FromString(TEXT("테스트여행자")));
-            Wizard->Next();
-            Wizard->SelectAnswer(1);
-            Wizard->SelectAnswer(2);
+            const int32 Question = Stage - 10;
+            if (!Test->TestEqual(TEXT("Question advances exactly once"), Wizard->GetStep(), Question))
+            { Cleanup(); return true; }
+            for (const auto* Name : {TEXT("TXT_Step"), TEXT("TXT_Detail"), TEXT("BTN_Back")})
+                Test->TestNull(TEXT("Obsolete progress, hints and back controls removed"), Wizard->GetWidgetFromName(Name));
+            auto* Prompt = CastChecked<UTextBlock>(Wizard->GetWidgetFromName(TEXT("TXT_Question")));
+            Test->TestTrue(TEXT("Question is a single line"), !Prompt->GetAutoWrapText() && Prompt->GetWrapTextAt() == 0.f);
             Wizard->Back();
-            Test->TestEqual(TEXT("Back preserves selected story"), Flow->Answers.Story, 2);
-            Wizard->SelectAnswer(2);
-            Wizard->SelectAnswer(2);
-            Wizard->SelectAnswer(3);
-            Test->TestEqual(TEXT("All questions reach review"), Wizard->GetStep(), 5);
-            Wizard->Next();
-            Widgets.Reset();
-            UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Widgets, UICConfirmPopupWidget::StaticClass(), false);
-            for (auto* Widget : Widgets)
-                if (auto* Popup = Cast<UICConfirmPopupWidget>(Widget))
-                    if (Popup->IsActivated())
-                    {
-                        CastChecked<UButton>(Popup->GetWidgetFromName(TEXT("BTN_Accept")))->OnClicked.Broadcast();
-                        Stage = 1;
-                        return false;
-                    }
-            Test->AddError(TEXT("Final confirmation missing"));
-            Cleanup();
-            return true;
+            Test->TestEqual(TEXT("Back cannot reverse creation"), Wizard->GetStep(), Question);
+            if (Question == 0)
+            {
+                auto* Name = CastChecked<UEditableTextBox>(Wizard->GetWidgetFromName(TEXT("EDIT_Name")));
+                auto* Next = CastChecked<UButton>(Wizard->GetWidgetFromName(TEXT("BTN_Next")));
+                Test->TestFalse(TEXT("Empty name cannot advance"), Next->GetIsEnabled());
+                Name->SetUserFocus(PC);
+                for (TCHAR Character : FString(TEXT("테스트여행자")))
+                    FSlateApplication::Get().ProcessKeyCharEvent(FCharacterEvent(Character, FModifierKeysState(), 0, false));
+                Test->TestEqual(TEXT("Typed name reaches creation state"), Flow->Answers.Name, FString(TEXT("테스트여행자")));
+                Test->TestEqual(TEXT("Name button caption"), CastChecked<UTextBlock>(Next->GetContent())->GetText().ToString(), FString(TEXT("이름 설정")));
+                NextStage(15); return false;
+            }
+            else
+            {
+                const int32 Answers[] = {0, 1, 2, 2, 3};
+                const int32 Choice = Answers[Question];
+                for (int32 I = 0; I < (Question == 1 ? 2 : 4); ++I)
+                {
+                    auto* Button = CastChecked<UButton>(Wizard->GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_Choice%d"), I))));
+                    auto* Caption = CastChecked<UTextBlock>(Button->GetContent());
+                    Test->TestTrue(TEXT("Choice caption is a single line"), !Caption->GetAutoWrapText() && Caption->GetWrapTextAt() == 0.f);
+                    Test->TestTrue(TEXT("Choice fits inside its button"), Caption->GetDesiredSize().X <= Button->GetCachedGeometry().GetLocalSize().X);
+                    if (Question > 1)
+                        Test->TestEqual(TEXT("Choice uses current StringTable label"), Caption->GetText().ToString(), Flow->GetOption(Question, I).Label.ToString());
+                }
+                Capture(Client, FString::Printf(TEXT("%02d_Question"), Question + 1));
+                auto* Answer = CastChecked<UButton>(Wizard->GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_Choice%d"), Choice))));
+                if (!Click(Client, Answer)) return false;
+            }
+            if (Question == 4)
+            {
+                Test->TestTrue(TEXT("Last answer starts loading without confirmation"), Flow->bPendingNewGame && Flow->Phase == EICGameFlowPhase::Loading);
+                NextStage(1);
+            }
+            else NextStage(Stage + 1);
+            return false;
         }
         if (Stage == 1)
         {
@@ -202,12 +330,19 @@ public:
             Test->TestEqual(TEXT("Answers survive map travel"), Snapshot.CreationAnswers.Music, 2);
             Test->TestEqual(TEXT("Gender follows answer"), PC->Preset, 1);
             Test->TestEqual(TEXT("No NPC fabricated for unconfigured choice"), Snapshot.CreationAnswers.Story, 2);
-            Test->TestEqual(TEXT("Staff granted by music choice"), PC->GetInventory()->GetEquippedWeaponFamily(),
+            Test->TestEqual(TEXT("Staff granted by music choice"), PC->GetInventory()->GetSelectedWeaponFamily(),
                             EICWeaponFamily::Staff);
+            Test->TestEqual(TEXT("New game starts with empty hands"), PC->GetInventory()->GetEquippedWeaponFamily(),
+                            EICWeaponFamily::None);
+            Test->TestTrue(TEXT("Starting weapon is owned but put away"), Snapshot.Inventory.bWeaponSheathed);
             Test->TestTrue(TEXT("Initial auto save completed"),
                            PC->GetSaves()->GetSlotList()[0].bValid && !PC->GetSaves()->bSaving);
             Test->TestNotNull(TEXT("HUD mounted"), PC->Screen.Get());
-            PC->SetMenu(TEXT("Pause"));
+            Test->TestEqual(TEXT("New game replaced the auto save"), PC->GetSaves()->GetSlotList()[0].PlayerName, FString(TEXT("테스트여행자")));
+            TArray<uint8> CurrentManual;
+            FFileHelper::LoadFileToArray(CurrentManual, *PC->GetSaves()->GetSlotPath(1));
+            Test->TestTrue(TEXT("New game preserves manual save bytes"), CurrentManual == ManualBytes);
+            PC->HandleInputCommand(EICInputCommand::Menu);
             PausedAt = PC->GetTime()->GetClock().PlaySecond;
             StageAt = FPlatformTime::Seconds();
             Stage = 2;
@@ -218,11 +353,87 @@ public:
             if (FPlatformTime::Seconds() - StageAt < .25)
                 return false;
             Test->TestEqual(TEXT("Pause freezes PlayClock"), PC->GetTime()->GetClock().PlaySecond, PausedAt);
-            PC->SetMenu(TEXT(""));
-            StartPosition = PC->GetPawn()->GetActorLocation();
-            StageAt = FPlatformTime::Seconds();
-            Stage = 3;
-            return false;
+            TestMenuButtons(PC, {TEXT("Party"), TEXT("Inventory"), TEXT("Quest"), TEXT("Codex"), TEXT("Settings"), TEXT("Resume")});
+            Test->TestEqual(TEXT("ESC menu title"), CastChecked<UTextBlock>(PC->Screen->GetWidgetFromName(TEXT("TXT_Menu")))->GetText().ToString(), FString(TEXT("메뉴")));
+            auto* BackToGame = CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Resume")));
+            Test->TestEqual(TEXT("ESC menu back button label"), CastChecked<UTextBlock>(BackToGame->GetContent())->GetText().ToString(), FString(TEXT("뒤로가기")));
+            Capture(Client, TEXT("06_Menu"));
+            for (const auto* Key : {TEXT("Party"), TEXT("Inventory"), TEXT("Quest"), TEXT("Codex")})
+            {
+                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_%s"), Key)))));
+                Test->TestEqual(TEXT("Placeholder button leaves menu unchanged"), PC->Menu, FString(TEXT("Pause")));
+            }
+            Click(Client, BackToGame);
+            Test->TestTrue(TEXT("ESC menu back button resumes gameplay"), PC->Menu.IsEmpty() && !World->IsPaused());
+            PC->HandleInputCommand(EICInputCommand::Menu);
+            Test->TestEqual(TEXT("ESC reopens menu after back button"), PC->Menu, FString(TEXT("Pause")));
+            Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Settings"))));
+            NextStage(20); return false;
+        }
+        if (Stage >= 20 && Stage <= 29)
+        {
+            if (FPlatformTime::Seconds() - StageAt < .3) return false;
+            Test->TestTrue(TEXT("Submenus keep the game paused"), World->IsPaused());
+            if (Stage == 20)
+            {
+                Test->TestEqual(TEXT("Settings opens the submenu"), PC->Menu, FString(TEXT("MenuSettings")));
+                TestMenuButtons(PC, {TEXT("Resume"), TEXT("Save"), TEXT("Load"), TEXT("GameSettings"), TEXT("Quit")});
+                Capture(Client, TEXT("07_SettingsMenu"));
+                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Save"))));
+            }
+            else if (Stage == 21)
+            {
+                Test->TestEqual(TEXT("Save opens existing save screen"), PC->Menu, FString(TEXT("Save")));
+                PC->CloseSessionMenu();
+                Test->TestEqual(TEXT("Save returns to settings submenu"), PC->Menu, FString(TEXT("MenuSettings")));
+            }
+            else if (Stage == 22)
+            {
+                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Load"))));
+            }
+            else if (Stage == 23)
+            {
+                Test->TestEqual(TEXT("Load opens existing load screen"), PC->Menu, FString(TEXT("Load")));
+                PC->CloseSessionMenu();
+                Test->TestEqual(TEXT("Load returns to settings submenu"), PC->Menu, FString(TEXT("MenuSettings")));
+            }
+            else if (Stage == 24)
+            {
+                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_GameSettings"))));
+            }
+            else if (Stage == 25)
+            {
+                Test->TestTrue(TEXT("Game settings opens existing options screen"), PC->Menu == TEXT("Settings") && PC->SettingsScreen);
+                PC->HandleInputCommand(EICInputCommand::Menu);
+                Test->TestEqual(TEXT("Options ESC returns to settings submenu"), PC->Menu, FString(TEXT("MenuSettings")));
+            }
+            else if (Stage == 26)
+            {
+                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Quit"))));
+            }
+            else if (Stage == 27)
+            {
+                Test->TestEqual(TEXT("Quit uses existing exit screen"), PC->Menu, FString(TEXT("Quit")));
+                PC->HandleInputCommand(EICInputCommand::Menu);
+                Test->TestEqual(TEXT("Quit cancel returns to settings submenu"), PC->Menu, FString(TEXT("MenuSettings")));
+            }
+            else if (Stage == 28)
+            {
+                PC->HandleInputCommand(EICInputCommand::Menu);
+                Test->TestEqual(TEXT("Submenu ESC returns to main menu"), PC->Menu, FString(TEXT("Pause")));
+                PC->HandleInputCommand(EICInputCommand::Menu);
+                Test->TestTrue(TEXT("Main menu ESC resumes gameplay"), PC->Menu.IsEmpty() && !World->IsPaused());
+                PC->HandleInputCommand(EICInputCommand::Menu);
+                PC->SetMenu(TEXT("MenuSettings"));
+            }
+            else
+            {
+                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Resume"))));
+                Test->TestTrue(TEXT("Continue resumes gameplay"), PC->Menu.IsEmpty() && !World->IsPaused());
+                StartPosition = PC->GetPawn()->GetActorLocation();
+                NextStage(3); return false;
+            }
+            NextStage(Stage + 1); return false;
         }
         if (Stage == 3)
         {
@@ -235,6 +446,96 @@ public:
             Test->TestTrue(TEXT("Initial save loads through save service"), PC->GetSaves()->LoadSlot(0));
             Test->TestEqual(TEXT("Questionnaire retained on load"),
                             PC->GetWorldState()->ExportState().CreationAnswers.Happiness, 3);
+            Flow->ReturnToTitle(PC);
+            NextStage(4);
+            return false;
+        }
+        if (Stage == 4)
+        {
+            if (!PC->IsMainMenuLevel()) return false;
+            TArray<UUserWidget*> Widgets;
+            UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Widgets, UICMainMenuWidget::StaticClass(), false);
+            UICMainMenuWidget* Menu = nullptr;
+            for (auto* Widget : Widgets)
+                if (auto* Candidate = Cast<UICMainMenuWidget>(Widget))
+                    if (Candidate->IsActivated()) Menu = Candidate;
+            if (!Menu) return false;
+            Test->TestTrue(TEXT("Continue is enabled after returning to title"),
+                           CastChecked<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Continue")))->GetIsEnabled());
+            if (!Click(Client, CastChecked<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Continue"))))) return false;
+            NextStage(5);
+            return false;
+        }
+        if (Stage == 5)
+        {
+            if (PC->IsMainMenuLevel() || !PC->bCreated || !PC->GetPawn()) return false;
+            Test->TestEqual(TEXT("Continue loads the newest valid save"), PC->PlayerName, FString(TEXT("테스트여행자")));
+            Test->TestEqual(TEXT("Continue restores playing flow"), Flow->Phase, EICGameFlowPhase::Playing);
+            Test->TestTrue(TEXT("Continue unlocks gameplay"), PC->Menu.IsEmpty() && !World->IsPaused());
+            Flow->ReturnToTitle(PC);
+            NextStage(30);
+            return false;
+        }
+        if (Stage == 30)
+        {
+            if (!PC->IsMainMenuLevel()) return false;
+            TArray<UUserWidget*> Widgets;
+            UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Widgets, UICMainMenuWidget::StaticClass(), false);
+            UICMainMenuWidget* Menu = nullptr;
+            for (auto* Widget : Widgets)
+                if (auto* Candidate = Cast<UICMainMenuWidget>(Widget))
+                    if (Candidate->IsActivated()) Menu = Candidate;
+            if (!Menu) return false;
+            if (!Click(Client, CastChecked<UButton>(Menu->GetWidgetFromName(TEXT("BTN_SaveList"))))) return false;
+            NextStage(31);
+            return false;
+        }
+        if (Stage >= 31 && Stage <= 34)
+        {
+            if (FPlatformTime::Seconds() - StageAt < .3) return false;
+            TArray<UUserWidget*> Widgets;
+            UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Widgets, UICSaveLoadWidget::StaticClass(), false);
+            UICSaveLoadWidget* List = nullptr;
+            for (auto* Widget : Widgets)
+                if (auto* Candidate = Cast<UICSaveLoadWidget>(Widget))
+                    if (Candidate->GetParent()) List = Candidate;
+            if (!List) return false;
+            Test->TestEqual(TEXT("Title save list stays in load mode"), PC->GetSessionMenu(), FString(TEXT("Load")));
+            if (Stage == 31 || Stage == 32)
+            {
+                const int32 Slot = Stage == 31 ? 1 : 0;
+                auto* Rows = CastChecked<UVerticalBox>(List->GetWidgetFromName(TEXT("IC_SaveLoad_SlotList")));
+                UICSaveSlotWidget* Row = nullptr;
+                for (int32 I = 0; I < Rows->GetChildrenCount(); ++I)
+                    if (auto* Candidate = Cast<UICSaveSlotWidget>(Rows->GetChildAt(I)))
+                        if (Candidate->GetSlotIndex() == Slot) Row = Candidate;
+                if (!Row || !Click(Client, CastChecked<UButton>(Row->GetWidgetFromName(TEXT("IC_SaveSlot_Button"))))) return false;
+                Test->TestEqual(TEXT("Clicking a saved row changes selected load slot"), PC->SelectedLoadSlot, Slot);
+            }
+            else if (Stage == 33)
+            {
+                auto* Load = CastChecked<UButton>(List->GetWidgetFromName(TEXT("IC_SaveLoad_Load")));
+                Test->TestTrue(TEXT("Selected save can be loaded"), Load->GetIsEnabled());
+                if (!Click(Client, Load)) return false;
+            }
+            else
+            {
+                Widgets.Reset();
+                UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Widgets, UICLoadConfirmWidget::StaticClass(), false);
+                UICLoadConfirmWidget* Confirm = nullptr;
+                for (auto* Widget : Widgets)
+                    if (auto* Candidate = Cast<UICLoadConfirmWidget>(Widget))
+                        if (Candidate->GetParent()) Confirm = Candidate;
+                if (!Confirm || !Click(Client, CastChecked<UButton>(Confirm->GetWidgetFromName(TEXT("IC_LoadConfirm_Confirm"))))) return false;
+            }
+            NextStage(Stage + 1);
+            return false;
+        }
+        if (Stage == 35)
+        {
+            if (PC->IsMainMenuLevel() || !PC->bCreated || !PC->GetPawn()) return false;
+            Test->TestEqual(TEXT("Chosen title save restores the player"), PC->PlayerName, FString(TEXT("테스트여행자")));
+            Test->TestTrue(TEXT("Chosen title save returns to active gameplay"), PC->Menu.IsEmpty() && !World->IsPaused());
             Cleanup();
             return true;
         }
@@ -245,14 +546,47 @@ private:
     FAutomationTestBase* Test;
     TWeakObjectPtr<UGameInstance> GI;
     int32 Stage = 0;
+    bool bSeededSaves = false;
+    TArray<uint8> ManualBytes;
     double Started = 0, StageAt = 0, PausedAt = 0;
     FVector StartPosition = FVector::ZeroVector;
+    void NextStage(int32 Value) { Stage = Value; StageAt = FPlatformTime::Seconds(); }
+    bool Click(UGameViewportClient* Client, UButton* Button)
+    {
+        const auto G = Button->GetCachedGeometry();
+        if (G.GetLocalSize().X < 1 || G.GetLocalSize().Y < 1) return false;
+        const FVector2D Position = G.LocalToAbsolute(G.GetLocalSize() * .5f);
+        auto& App = FSlateApplication::Get(); App.SetCursorPos(Position);
+        FPointerEvent Move(0, Position, Position, TSet<FKey>{}, EKeys::Invalid, 0, FModifierKeysState()); App.ProcessMouseMoveEvent(Move);
+        FPointerEvent Down(0, Position, Position, TSet<FKey>{EKeys::LeftMouseButton}, EKeys::LeftMouseButton, 0, FModifierKeysState()); App.ProcessMouseButtonDownEvent(Client->GetWindow()->GetNativeWindow(), Down);
+        FPointerEvent Up(0, Position, Position, TSet<FKey>{}, EKeys::LeftMouseButton, 0, FModifierKeysState()); App.ProcessMouseButtonUpEvent(Up);
+        return true;
+    }
+    void TestMenuButtons(AICPlayerController* PC, std::initializer_list<const TCHAR*> Visible)
+    {
+        for (const auto* Key : {TEXT("Party"), TEXT("Inventory"), TEXT("Quest"), TEXT("Codex"), TEXT("Settings"), TEXT("Resume"), TEXT("Save"), TEXT("Load"), TEXT("GameSettings"), TEXT("Quit")})
+        {
+            bool Expected = false;
+            for (const auto* Entry : Visible) if (FCString::Strcmp(Key, Entry) == 0) Expected = true;
+            auto* Button = CastChecked<UButton>(PC->Screen->GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_%s"), Key))));
+            Test->TestEqual(TEXT("Only expected menu buttons are visible"), Button->GetVisibility() == ESlateVisibility::Visible, Expected);
+        }
+    }
+    void Capture(UGameViewportClient* Client, const FString& Name)
+    {
+        TArray<FColor> Pixels; FIntVector Size;
+        if (!FSlateApplication::Get().TakeScreenshot(Client->GetWindow().ToSharedRef(), Pixels, Size)) return;
+        const FString Folder = FPaths::ProjectSavedDir() / TEXT("CreationMenuReview"); IFileManager::Get().MakeDirectory(*Folder, true);
+        for (auto& Pixel : Pixels) Pixel.A = 255;
+        TArray64<uint8> PNG; FImageUtils::PNGCompressImageArray(Size.X, Size.Y, Pixels, PNG);
+        FFileHelper::SaveArrayToFile(PNG, *(Folder / Name + TEXT(".png")));
+    }
     void Cleanup()
     {
         if (GI.IsValid())
             if (auto* Saves = GI->GetSubsystem<UICSaveSubsystem>())
                 if (!Saves->bSaving)
-                    Saves->DeleteSlot(0);
+                { Saves->DeleteSlot(0); Saves->DeleteSlot(1); }
     }
 };
 }
@@ -271,9 +605,14 @@ bool FICFrontendPlaythroughCheck::RunTest(const FString& Parameters)
         AddError(TEXT("Could not open title map"));
         return false;
     }
-    ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+    auto RestorePlayWindow = MakeShared<FICPlayWindowSettingsRestore>();
+    auto Window = SNew(SWindow).ClientSize(FVector2D(1280, 720)).UseOSWindowBorder(false).CreateTitleBar(false);
+    FSlateApplication::Get().AddWindow(Window);
+    FRequestPlaySessionParams Params; Params.CustomPIEWindow = Window; Params.bAllowOnlineSubsystem = false;
+    ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(Params));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FICPlaythroughCommand>(this));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+    FAutomationTestFramework::Get().EnqueueLatentCommand(RestorePlayWindow);
     ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(.5f));
     return true;
 }

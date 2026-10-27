@@ -1,6 +1,9 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Save/ICSaveSubsystem.h"
+#include "Core/Flow/ICGameFlowSubsystem.h"
+#include "Core/Flow/ICLoadingScreenSubsystem.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -21,13 +24,17 @@ FString AICPlayerController::MenuCancelLabel() const
             if(Binding.Command==EICInputCommand::Menu&&Binding.Action)
                 for(const FEnhancedActionKeyMapping& Mapping:DefaultMappingContext->GetMappings())
                     if(Mapping.Action==Binding.Action)return Mapping.Key.GetDisplayName().ToString();
-    return TEXT("메뉴 / 취소");
+    return ICText::Get(TEXT("Input_MenuCancel")).ToString();
 }
 
 void AICPlayerController::ShowModal(const FString& Action,const FString& Text,int32 Slot)
 {
+    IC_TRACE_FUNCTION();ShowModal(Action,FText::FromString(Text),Slot);
+}
+void AICPlayerController::ShowModal(const FString& Action,const FText& Text,int32 Slot)
+{
     IC_TRACE_FUNCTION();
-    ModalReturnMenu=Menu;ModalAction=Action;ModalText=Text;ModalSlot=Slot;SetMenu(TEXT("Confirm"));
+    ModalReturnMenu=Menu;ModalAction=Action;ModalDisplayText=Text;ModalText=Text.ToString();ModalSlot=Slot;SetMenu(TEXT("Confirm"));
 }
 FString AICPlayerController::GetSessionMenu() const
 {
@@ -70,40 +77,72 @@ void AICPlayerController::RequestLoadPlayer()
 {
     IC_TRACE_FUNCTION();
     auto* Saves=GetSaves();if(!Saves||Menu!=TEXT("Load"))return;
-    if(Saves->bSaving){Show(TEXT("저장 완료 후 불러오세요."));return;}
-    if(IsMainMenuLevel()&&SessionGameplayMap.IsNull()){Show(TEXT("메인 메뉴의 Start Map을 지정하세요."));return;}
+    if(Saves->bSaving){ShowLocalized(ICText::Get(TEXT("Native_519c9c884838")));return;}
+    if(IsMainMenuLevel()&&SessionGameplayMap.IsNull()){ShowLocalized(ICText::Get(TEXT("Native_649fe9810a66")));return;}
     RefreshSaveSlots();
-    if(!SaveSlots.IsValidIndex(SelectedLoadSlot)||!SaveSlots[SelectedLoadSlot].bValid){Show(TEXT("불러올 수 있는 슬롯을 선택하세요."));return;}
-    ShowModal(TEXT("Load"),FString::Printf(TEXT("%s / %s 저장을 불러올까요? 현재 저장하지 않은 진행은 교체됩니다."),SelectedLoadSlot==0?TEXT("자동 저장"):*FString::Printf(TEXT("수동 슬롯 %d"),SelectedLoadSlot),*SaveSlots[SelectedLoadSlot].PlayerName),SelectedLoadSlot);
+    if(!SaveSlots.IsValidIndex(SelectedLoadSlot)||!SaveSlots[SelectedLoadSlot].bValid){ShowLocalized(ICText::Get(TEXT("Native_12080ba88469")));return;}
+    ShowModal(TEXT("Load"),ICText::FormatText(TEXT("Native_85f281a56d17"),SelectedLoadSlot==0?ICText::Get(TEXT("Native_f79024b509aa")):ICText::FormatText(TEXT("Native_8ace6aff0651"),SelectedLoadSlot),FText::FromString(SaveSlots[SelectedLoadSlot].PlayerName)),SelectedLoadSlot);
 }
-void AICPlayerController::LoadSelectedSessionSlot()
+bool AICPlayerController::ContinueLatestSave()
+{
+    IC_TRACE_FUNCTION();
+    if (!IsMainMenuLevel()) return false;
+    auto* Saves = GetSaves();
+    if (!Saves || Saves->bSaving)
+    {
+        ShowLocalized(ICText::Get(TEXT("Continue_SaveBusy")));
+        return false;
+    }
+    RefreshSaveSlots();
+    const FICSaveSlotInfo* Latest = nullptr;
+    for (const FICSaveSlotInfo& Slot : SaveSlots)
+        if (Slot.bValid && (!Latest || Slot.SavedAt > Latest->SavedAt)) Latest = &Slot;
+    if (!Latest)
+    {
+        ShowLocalized(ICText::Get(TEXT("Continue_NoSave")));
+        return false;
+    }
+    SelectedLoadSlot = Latest->Slot;
+    SessionGameplayMap = GetDefault<UICGameFlowSettings>()->PlayMap;
+    if (SessionGameplayMap.IsNull())
+    {
+        ShowLocalized(ICText::Get(TEXT("Continue_MapMissing")));
+        return false;
+    }
+    return LoadSelectedSessionSlot();
+}
+bool AICPlayerController::LoadSelectedSessionSlot()
 {
     IC_TRACE_FUNCTION();
     if(!IsMainMenuLevel())
     {
-        if(LoadPlayer())SetMenu(TEXT(""));
-        return;
+        if(LoadPlayer()){SetMenu(TEXT(""));return true;}
+        return false;
     }
-    auto* Saves=GetSaves();if(!Saves||SessionGameplayMap.IsNull())return;
-    if(!Saves->LoadSlot(SelectedLoadSlot)){Show(Saves->GetLastMessage());RefreshSaveSlots();return;}
+    auto* Saves=GetSaves();if(!Saves||SessionGameplayMap.IsNull())return false;
+    if(!Saves->LoadSlot(SelectedLoadSlot)){ShowLocalized(Saves->GetLastMessageText());RefreshSaveSlots();return false;}
     Saves->SetAutoSaveSuspended(true);
-    if(auto* Time=GetTime())Time->PrepareForTravel();
     if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->CloseAllScreens();
+    SetMenu(TEXT("Loading"));
+    if(auto* Time=GetTime())Time->PrepareForTravel();
+    if(auto* Loading=GetGameInstance()->GetSubsystem<UICLoadingScreenSubsystem>())Loading->Arm();
     UGameplayStatics::SetGamePaused(this,false);
     UE_LOG(LogICSave,Log,TEXT("[Session.Load.Travel] Slot=%d Map=%s"),SelectedLoadSlot,*SessionGameplayMap.ToSoftObjectPath().ToString());
     UGameplayStatics::OpenLevelBySoftObjectPtr(this,SessionGameplayMap);
+    return true;
 }
 void AICPlayerController::OpenSaveMenu(bool bQuitAfter)
 {
     IC_TRACE_FUNCTION();
-    if(!bCreated){Show(TEXT("캐릭터 생성 후 수동 저장할 수 있습니다."));return;}
+    if(bDead){SetMenu(TEXT("Death"));return;}
+    if(!bCreated){ShowLocalized(ICText::Get(TEXT("Native_1d492b506be0")));return;}
     if(Menu==TEXT("Confirm"))return;
-    if(bItemTransactionInProgress){Show(TEXT("아이템 효과 처리 완료 후 저장하세요."));return;}
+    if(bItemTransactionInProgress){ShowLocalized(ICText::Get(TEXT("Native_b8c492a66d83")));return;}
     bExitAfterSave=bQuitAfter;
     if(Menu!=TEXT("Save"))SaveReturnMenu=Menu;
     if(SelectedSaveSlot<1||SelectedSaveSlot>4)SelectedSaveSlot=1;
     RefreshSaveSlots();SetMenu(TEXT("Save"));
-    Show(TEXT("버튼 또는 키보드 1~4로 슬롯 선택 → Enter 또는 저장 실행"));
+    ShowLocalized(ICText::Get(TEXT("Native_8094d9d48e6d")));
 }
 void AICPlayerController::OpenLoadMenu()
 {
@@ -116,30 +155,32 @@ void AICPlayerController::CloseSessionMenu()
 {
     IC_TRACE_FUNCTION();
     if(auto* Saves=GetSaves();Saves&&Saves->bSaving&&(GetSessionMenu()==TEXT("Save")||GetSessionMenu()==TEXT("Load")))
-    {Show(TEXT("저장이 완료된 뒤 돌아갈 수 있습니다."));return;}
+    {ShowLocalized(ICText::Get(TEXT("Native_890a429e13bf")));return;}
     if(Menu==TEXT("Confirm")){ConfirmModal(false);return;}
     if(Menu==TEXT("Save")){bExitAfterSave=false;SetMenu(SaveReturnMenu);return;}
     if(Menu==TEXT("Load"))
     {
-        SetMenu(IsMainMenuLevel()?LoadReturnMenu:bDead?TEXT("Pause"):!bCreated?TEXT("Create"):LoadReturnMenu);
-        if(bDead)Show(TEXT("사망 상태입니다. 저장을 불러오거나 게임을 종료하세요."));
+        SetMenu(IsMainMenuLevel()?LoadReturnMenu:bDead?TEXT("Death"):!bCreated?TEXT("Create"):LoadReturnMenu);
         return;
     }
     if(Menu==TEXT("Quit")){bQuitAfterWrite=false;bExitAfterSave=false;SetMenu(QuitReturnMenu);return;}
-    SetMenu(bDead?TEXT("Load"):bCreated?TEXT(""):TEXT("Create"));
+    if(Menu==TEXT("Settings")){SetMenu(SettingsReturnMenu);return;}
+    if(Menu==TEXT("MenuSettings")){SetMenu(TEXT("Pause"));return;}
+    if(Menu==TEXT("Death"))return;
+    SetMenu(bDead?TEXT("Death"):bCreated?TEXT(""):TEXT("Create"));
 }
 void AICPlayerController::RequestManualSave()
 {
     IC_TRACE_FUNCTION();
     auto* Saves=GetSaves();if(!Saves||Menu!=TEXT("Save"))return;
-    if(SelectedSaveSlot<1||SelectedSaveSlot>4){Show(TEXT("수동 저장 슬롯 1~4를 선택하세요."));return;}
+    if(SelectedSaveSlot<1||SelectedSaveSlot>4){ShowLocalized(ICText::Get(TEXT("Native_a443b14e9863")));return;}
     SyncSaveSafety();
-    const FString Reason=Saves->GetSaveBlockReason(false);
-    if(!Reason.IsEmpty()){Show(Reason);return;}
+    const FText Reason=Saves->GetSaveBlockReasonText(false);
+    if(!Reason.IsEmpty()){ShowLocalized(Reason);return;}
     RefreshSaveSlots();
     if(SaveSlots[SelectedSaveSlot].bExists)
     {
-        ShowModal(TEXT("Overwrite"),FString::Printf(TEXT("수동 슬롯 %d / %s의 기존 저장을 덮어쓸까요?"),SelectedSaveSlot,SaveSlots[SelectedSaveSlot].bValid?*SaveSlots[SelectedSaveSlot].PlayerName:TEXT("읽을 수 없는 저장")),SelectedSaveSlot);return;
+        ShowModal(TEXT("Overwrite"),ICText::FormatText(TEXT("Native_f7b4049ed41c"),SelectedSaveSlot,SaveSlots[SelectedSaveSlot].bValid?FText::FromString(SaveSlots[SelectedSaveSlot].PlayerName):ICText::Get(TEXT("Save_Unreadable"))),SelectedSaveSlot);return;
     }
     SavePlayer();
 }
@@ -151,68 +192,70 @@ void AICPlayerController::RequestCreatePlayer()
     auto* Saves=GetSaves();
     RefreshSaveSlots();
     if(!bInitialSavePending&&SaveSlots[0].bExists)
-    {ShowModal(TEXT("CreateOverwrite"),FString::Printf(TEXT("새 캐릭터를 생성하면 자동 저장 / %s를 교체합니다. 계속할까요?"),SaveSlots[0].bValid?*SaveSlots[0].PlayerName:TEXT("읽을 수 없는 저장")),0);return;}
+    {ShowModal(TEXT("CreateOverwrite"),ICText::FormatText(TEXT("Native_654e45c909eb"),SaveSlots[0].bValid?FText::FromString(SaveSlots[0].PlayerName):ICText::Get(TEXT("Save_Unreadable"))),0);return;}
     CreatePlayer();
 }
 void AICPlayerController::RequestQuit()
 {
     IC_TRACE_FUNCTION();
-    if(Menu==TEXT("Confirm"))return;
-    if(Menu!=TEXT("Quit"))QuitReturnMenu=Menu;
-    bExitAfterSave=false;bQuitAfterWrite=false;SetMenu(TEXT("Quit"));
-    Show(TEXT("저장 후 종료 / 저장하지 않고 종료 / 취소 중 선택하세요."));
+    if(Menu==TEXT("Confirm")||bSessionClosing)return;
+    bExitAfterSave=false;
+    if(auto* Saves=GetSaves();Saves&&Saves->bSaving)
+    {bQuitAfterWrite=true;ShowLocalized(ICText::Get(TEXT("Native_fc02a78eddf6")));return;}
+    CompleteQuit();
 }
 void AICPlayerController::RequestDelete(bool bLegacy)
 {
     IC_TRACE_FUNCTION();
     auto* Saves=GetSaves();if(!Saves)return;
-    if(Saves->bSaving){Show(TEXT("저장 완료 후 삭제하세요."));return;}
+    if(Saves->bSaving){ShowLocalized(ICText::Get(TEXT("Native_bd04992c6f93")));return;}
     RefreshSaveSlots();
     const int32 Slot=Menu==TEXT("Save")?SelectedSaveSlot:SelectedLoadSlot;
     if(bLegacy)
     {
-        if(!Saves->HasLegacySave()){Show(TEXT("기존 Version 1/8 원본이 없습니다."));return;}
-        ShowModal(TEXT("DeleteLegacy"),TEXT("기존 Version 1/8 원본을 삭제할까요? 이미 가져온 수동 저장은 유지됩니다."));return;
+        if(!Saves->HasLegacySave()){ShowLocalized(ICText::Get(TEXT("Native_4f52cbacd7d9")));return;}
+        ShowModal(TEXT("DeleteLegacy"),ICText::Get(TEXT("Save_DeleteLegacyConfirm")));return;
     }
-    if(!SaveSlots.IsValidIndex(Slot)||!SaveSlots[Slot].bExists){Show(TEXT("선택 슬롯이 비어 있습니다."));return;}
-    const FString Label=Slot==0?TEXT("자동 저장"):FString::Printf(TEXT("수동 슬롯 %d"),Slot);
-    ShowModal(TEXT("Delete"),Label+TEXT(" / ")+(SaveSlots[Slot].bValid?SaveSlots[Slot].PlayerName:TEXT("읽을 수 없는 저장"))+TEXT("과 백업·임시·복구 파일을 삭제할까요? 되돌릴 수 없습니다. 현재 플레이는 계속됩니다.")+(Slot==0?TEXT(" 이후 자동 저장이 새로 생성될 수 있습니다."):TEXT("")),Slot);
+    if(!SaveSlots.IsValidIndex(Slot)||!SaveSlots[Slot].bExists){ShowLocalized(ICText::Get(TEXT("Native_f369d0e2a9f4")));return;}
+    const FText Label=Slot==0?ICText::Get(TEXT("Native_f79024b509aa")):ICText::FormatText(TEXT("Native_8ace6aff0651"),Slot);
+    const FText PlayerLabel=SaveSlots[Slot].bValid?FText::FromString(SaveSlots[Slot].PlayerName):ICText::Get(TEXT("Save_Unreadable"));
+    ShowModal(TEXT("Delete"),ICText::FormatText(Slot==0?TEXT("Save_DeleteAutoConfirm"):TEXT("Save_DeleteManualConfirm"),Label,PlayerLabel),Slot);
 }
 void AICPlayerController::ConfirmModal(bool bAccept)
 {
     IC_TRACE_FUNCTION();
     if(Menu!=TEXT("Confirm"))return;
     auto* Saves=GetSaves();if(!Saves)return;
-    if(Saves->bSaving){Show(TEXT("저장 완료 후 확인하세요."));return;}
+    if(Saves->bSaving){ShowLocalized(ICText::Get(TEXT("Native_d2fcf886a269")));return;}
     const FString Action=ModalAction;const int32 Slot=ModalSlot;const FString Return=ModalReturnMenu;
     UE_LOG(LogICUI, Log, TEXT("[UI.Modal.Result] Action=%s Slot=%d Accepted=%d"),*Action,Slot,bAccept);
-    ModalAction.Empty();ModalText.Empty();ModalSlot=INDEX_NONE;SetMenu(Return);
-    if(!bAccept){Show(TEXT("취소했습니다."));return;}
+    ModalAction.Empty();ModalText.Empty();ModalDisplayText=FText::GetEmpty();ModalSlot=INDEX_NONE;SetMenu(Return);
+    if(!bAccept){ShowLocalized(ICText::Get(TEXT("Native_72a564eab4ea")));return;}
     if(Action==TEXT("Overwrite")){SelectedSaveSlot=Slot;SavePlayer();}
     else if(Action==TEXT("Load")){SelectedLoadSlot=Slot;LoadSelectedSessionSlot();}
     else if(Action==TEXT("CreateOverwrite"))CreatePlayer();
     else if(Action==TEXT("Delete")||Action==TEXT("DeleteLegacy"))
     {
         if(Action==TEXT("Delete"))Saves->DeleteSlot(Slot);else Saves->DeleteLegacySave();
-        RefreshSaveSlots();Show(Saves->GetLastMessage());
+        RefreshSaveSlots();ShowLocalized(Saves->GetLastMessageText());
     }
 }
 void AICPlayerController::QuitWithoutSave()
 {
     IC_TRACE_FUNCTION();
     if(Menu!=TEXT("Quit"))return;
-    if(auto* Saves=GetSaves();Saves&&Saves->bSaving)
-    {bQuitAfterWrite=true;Show(TEXT("진행 중인 저장이 완료되면 종료합니다. 실패하면 이 화면을 유지합니다."));return;}
-    CompleteQuit();
+    RequestQuit();
 }
 void AICPlayerController::FinishSessionSave(int32 Slot,bool bSuccess)
 {
     IC_TRACE_FUNCTION();
-    if(bQuitAfterWrite||(bExitAfterSave&&Slot==SelectedSaveSlot&&Slot>=1))
+    // A direct quit finishes after any existing write, without opening another choice screen.
+    if(bQuitAfterWrite){CompleteQuit();return;}
+    if(bExitAfterSave&&Slot==SelectedSaveSlot&&Slot>=1)
     {
         if(bSuccess){CompleteQuit();return;}
         bQuitAfterWrite=false;bExitAfterSave=false;SetMenu(TEXT("Quit"));
-        Show(TEXT("저장에 실패하여 종료하지 않았습니다. 저장 상태를 확인하세요."));
+        ShowLocalized(ICText::Get(TEXT("Native_c9b04467ce1c")));
     }
 }
 void AICPlayerController::CompleteQuit()

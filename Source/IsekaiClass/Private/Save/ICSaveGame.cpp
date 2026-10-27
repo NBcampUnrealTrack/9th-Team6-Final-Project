@@ -19,6 +19,8 @@ constexpr uint32 MaxPayload = 16 * 1024 * 1024 - ICSaveEnvelopeBytes;
 bool UICSaveGame::EncodeForFile(UICSaveGame* Save, TArray<uint8>& Bytes)
 {
     IC_TRACE_FUNCTION();
+    // Keep the old tagged field readable, but never write screenshot payloads again.
+    if (Save) Save->Preview.ThumbnailPNG.Reset();
     TArray<uint8> Payload;
     if (!Save || Save->SaveVersion != CurrentVersion || !UICWorldStateSubsystem::ValidateState(Save->WorldState)
         || !UICWorldStateSubsystem::ValidateStateClock(Save->WorldState, Save->Clock)
@@ -42,6 +44,7 @@ UICSaveGame* UICSaveGame::DecodeFile(const TArray<uint8>& Bytes)
     TArray<uint8> Payload; Payload.Append(Bytes.GetData() + ICSaveEnvelopeBytes, Size);
     UICSaveGame* Save = Cast<UICSaveGame>(UGameplayStatics::LoadGameFromMemory(Payload));
     if (!Save){UE_LOG(LogICSave, VeryVerbose, TEXT("[Save.Decode.Rejected] Format=%u: SaveGame 자료형 복원 실패"),Format);return nullptr;}
+    Save->Preview.ThumbnailPNG.Reset();
 
 
     if (Format == 2)
@@ -97,6 +100,7 @@ bool UICSaveGame::UpgradeFromVersion2()
         }
     }
     SaveVersion = CurrentVersion;
+    ICSaveDataMigration::NormalizeWeaponOnly(WorldState);
     UE_LOG(LogICSave, Log, TEXT("[Save.Upgraded] FromVersion=2 ToVersion=%d Characters=%d Quests=%d"),SaveVersion,WorldState.Characters.Num(),WorldState.Quests.Num());
     return UICWorldStateSubsystem::ValidateState(WorldState) && UICWorldStateSubsystem::ValidateStateClock(WorldState, Clock);
 }

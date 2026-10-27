@@ -33,8 +33,8 @@ struct ISEKAICLASS_API FICTimeSettingsRow : public FICDefinitionRow
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double RealSecondsPerGameMinute = 2;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="10", ClampMax="10", Units="s")) double SPDrainIntervalPlaySeconds = 10;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double SleepRecoveryPerGameMinute = 1;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 MinimumSleepGameMinutes = 60;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) double SleepRecoveryPerGameMinute = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="120")) int32 MinimumSleepGameMinutes = 120;
 };
 
 USTRUCT(BlueprintType)
@@ -64,8 +64,8 @@ struct ISEKAICLASS_API FICStatSettingsRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double DEXCriticalBonus = 0.20;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double BaseCriticalMultiplier = 1.50;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double LUKCriticalBonus = 0.50;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double CHABonus = 0.15;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<EICStat> CompanionCHAAffectedStats = { EICStat::MaxHP, EICStat::MaxMP, EICStat::PhysicalAttack, EICStat::MagicAttack, EICStat::Defense };
+    UPROPERTY() double CHABonus = 0; // Retired, serialized for existing assets.
+    UPROPERTY() TArray<EICStat> CompanionCHAAffectedStats; // Legacy asset compatibility; ignored.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double LUKRewardBonus = 0.30;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double CriticalChanceCap = 0.50;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double CriticalMultiplierCap = 2.50;
@@ -91,10 +91,13 @@ struct ISEKAICLASS_API FICCombatSettingsRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeInvulnerabilityPlaySeconds = 0.25;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeDistanceCm = 300;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeCooldownPlaySeconds = 3;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.01")) double DashDurationPlaySeconds = 0.25;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DashDistanceCm = 500;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double HitStaggerPlaySeconds = 0.2;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double HitStaggerIntervalPlaySeconds = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double CanceledCastRetryPlaySeconds = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double RecentCombatPlaySeconds = 8;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double PlayerCombatGracePlaySeconds = 5;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.001")) double DefenseFormulaK = 100;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double InteractionDistanceCm = 250;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double LockOnDistanceCm = 2500;
@@ -106,8 +109,8 @@ USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICPartySettingsRow : public FICDefinitionRow
 {
     GENERATED_BODY()
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="4")) int32 MaximumCompanions = 4;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="100")) int32 RequiredRecruitAffinity = 100;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="3")) int32 MaximumCompanions = 3;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="500")) int32 RequiredRecruitAffinity = 300;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double LowHPRatio = 0.20;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double AutoHealHPRatio = 0.50;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double SearchDistanceCm = 1200;
@@ -126,9 +129,9 @@ struct ISEKAICLASS_API FICInventorySettingsRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 MaximumSlots = 100;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 StackLimit = 99;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="4")) int32 QuickSlots = 4;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="4")) int32 MaximumStorageInstallations = 4;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="3")) int32 MaximumStorageInstallations = 3;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) int32 SlotsPerStorage = 40;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DropLifetimePlaySeconds = 1800;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DropLifetimePlaySeconds = 600;
 };
 
 USTRUCT(BlueprintType)

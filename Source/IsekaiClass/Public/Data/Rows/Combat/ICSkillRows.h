@@ -4,6 +4,8 @@
 #include "Data/Rows/Combat/ICCombatTypes.h"
 #include "ICSkillRows.generated.h"
 
+class UGameplayAbility;
+class UGameplayEffect;
 
 USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICSkillRow : public FICDefinitionRow
@@ -16,6 +18,8 @@ struct ISEKAICLASS_API FICSkillRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Owner") FName MonsterID;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Owner", meta=(ClampMin="0", ClampMax="4")) int32 ClassSlotIndex = 0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Owner") EICWeaponFamily RequiredWeaponFamily = EICWeaponFamily::None;
+    /** Optional fixed position, 0..14, within this weapon family's codex block. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation", meta=(ClampMin="-1",ClampMax="14")) int32 CodexIndex=INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Owner") bool bRequiresEquippedWeapon = true;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Unlock") bool bInitiallyUnlocked = false;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Unlock") FName PreviousSkillID;
@@ -32,6 +36,9 @@ struct ISEKAICLASS_API FICSkillRow : public FICDefinitionRow
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill", meta=(ClampMin="0")) double RecoveryPlaySeconds = 0.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill", meta=(ClampMin="0")) double CooldownPlaySeconds = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GAS") TSoftClassPtr<UGameplayAbility> AbilityClass;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GAS") TSoftClassPtr<UGameplayEffect> CooldownEffectClass;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GAS") FGameplayTag CooldownTag;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill", meta=(ClampMin="0")) double BeforeFirstEffectRetryPlaySeconds = 1.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill") FICSkillCancelRules CancelRules;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill") TArray<FICSkillHitDefinition> Hits;

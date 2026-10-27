@@ -8,6 +8,7 @@
 #include "World/State/Types/ICWorldProgressStateTypes.h"
 #include "World/State/Types/ICClockStateTypes.h"
 #include "World/State/Types/ICLifeStateTypes.h"
+#include "World/State/Types/ICCodexStateTypes.h"
 #include "ICWorldStateTypes.generated.h"
 
 USTRUCT(BlueprintType)
@@ -41,6 +42,7 @@ struct FICWorldState
     UPROPERTY(BlueprintReadOnly, SaveGame) TSet<FName> DiscoveredRegionIDs;
     UPROPERTY(BlueprintReadOnly, SaveGame) TSet<FName> DiscoveredAnchorIDs;
     UPROPERTY(BlueprintReadOnly, SaveGame) TSet<FName> CodexEntryIDs;
+    UPROPERTY(BlueprintReadOnly, SaveGame) FICCodexState Codex;
     UPROPERTY(BlueprintReadOnly, SaveGame) TSet<FName> UnlockedRecipeIDs;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, int32> ProgressionStages;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, bool> Flags;
@@ -66,6 +68,7 @@ USTRUCT(BlueprintType)
 struct FICSavePreview
 {
     GENERATED_BODY()
+    // Stable region ID (currently R01); resolve its display name through a String Table.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) FString Location;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) TArray<FName> PartyIds;
     UPROPERTY(BlueprintReadOnly, SaveGame) TArray<uint8> ThumbnailPNG;

@@ -32,7 +32,9 @@ enum class EICInputCommand : uint8
     ClearTarget = 23,
     SwitchWeapon = 24,
     Settings = 25,
-    Fishing = 26
+    Fishing = 26,
+    Roll = 27,
+    QuestFollow = 28
 };
 
 USTRUCT(BlueprintType)

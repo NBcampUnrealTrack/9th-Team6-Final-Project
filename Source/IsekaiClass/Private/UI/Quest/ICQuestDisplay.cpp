@@ -1,4 +1,5 @@
 #include "UI/Quest/ICQuestDisplay.h"
+#include "UI/Framework/ICText.h"
 
 #include "Quest/ICQuestSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -7,7 +8,7 @@ void FICQuestDisplay::GetActiveQuestIDs(const FICWorldState& World, TArray<FName
 {
     for (const TPair<FName, FICQuestState>& Entry : World.Quests)
     {
-        if (Entry.Value.bAccepted && !Entry.Value.bCompleted)
+        if (Entry.Value.bAccepted && Entry.Value.bStarted && !Entry.Value.bCompleted)
         {
             QuestIDs.Add(Entry.Key);
         }
@@ -24,6 +25,6 @@ FText FICQuestDisplay::FormatObjective(const FText& Description, const FICQuestO
         return Description;
     }
 
-    return FText::Format(NSLOCTEXT("ICQuest", "ObjectiveProgress", "{0} ({1}/{2})"),
+    return FText::Format(ICText::Get(TEXT("Native_516e57ce9608")),
         Description, FText::AsNumber(CurrentCount), FText::AsNumber(Objective.RequiredCount));
 }

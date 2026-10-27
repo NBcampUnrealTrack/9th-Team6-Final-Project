@@ -8,12 +8,13 @@
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Engine/GameInstance.h"
 #include "Debug/ICLog.h"
+#include "Codex/ICCodexSubsystem.h"
 
 namespace
 {
 double Curve(double S, double K) { IC_TRACE_FUNCTION(); return FMath::Max(0.,S-1)/(FMath::Max(0.,S-1)+FMath::Max(1.,K)); }
 double PrimaryBase(const FICMainStats& S, EICStat Stat)
-{ IC_TRACE_FUNCTION(); switch(Stat) { case EICStat::STR:return S.STR;case EICStat::DEX:return S.DEX;case EICStat::INT:return S.INT;case EICStat::CON:return S.CON;case EICStat::CHA:return S.CHA;case EICStat::LUK:return S.LUK;default:return 0; } }
+{ IC_TRACE_FUNCTION(); switch(Stat) { case EICStat::STR:return S.STR;case EICStat::DEX:return S.DEX;case EICStat::INT:return S.INT;case EICStat::CON:return S.CON;case EICStat::LUK:return S.LUK;default:return 0; } }
 bool Compare(double A, double B, EICComparison Op)
 { IC_TRACE_FUNCTION(); switch(Op) {case EICComparison::Equal:return A==B;case EICComparison::NotEqual:return A!=B;case EICComparison::Greater:return A>B;case EICComparison::GreaterOrEqual:return A>=B;case EICComparison::Less:return A<B;case EICComparison::LessOrEqual:return A<=B;default:return false;} }
 }
@@ -30,7 +31,7 @@ bool UICAbilitySystemComponent::Conditions(const FICConditionGroup& Group, const
         switch(C.Type)
         {
             case EICConditionType::None:Pass=true;Numeric=false;break;
-            case EICConditionType::Stat:Value=BaseOnly||!C.bUseEffectiveStats?PrimaryBase(Subject->Runtime.MainStats,C.Stat):Subject->Stat(C.Stat);break;
+            case EICConditionType::Stat:if(C.Stat==EICStat::CHA)return false;Value=BaseOnly||!C.bUseEffectiveStats?PrimaryBase(Subject->Runtime.MainStats,C.Stat):Subject->Stat(C.Stat);break;
             case EICConditionType::Affinity:if(const auto* S=World.Characters.Find(C.Target.ID))Value=S->Affinity;break;
             case EICConditionType::CurrentHPRatio:Value=Subject->Combat&&Subject->Combat->GetMaxHealth()>0?Subject->Combat->GetHealth()/Subject->Combat->GetMaxHealth():0;break;
             case EICConditionType::CurrentMPRatio:Value=Subject->Combat&&Subject->Combat->GetMaxMana()>0?Subject->Combat->GetMana()/Subject->Combat->GetMaxMana():0;break;
@@ -68,10 +69,13 @@ void UICAbilitySystemComponent::RebuildDerivedStats()
         if(Staging->ApplySnapshot(I))Mods=Staging->GetEquipmentStats().Modifiers;
     }
     for(const auto& E:Runtime.Combat.Effects)if(const auto* R=Definitions()?Definitions()->Find<FICStatusEffectRow>(E.EffectID,Result):nullptr)
-        for(auto M:R->StatModifiers){const double Scale=E.CapturedMagnitudes.Contains(TEXT("PersonalCHA"))?E.CapturedMagnitudes.FindRef(TEXT("PersonalCHA")):1.;M.Flat*=Scale*E.Stacks;M.Percent*=Scale*E.Stacks;Mods.Add(M);}
+        for(auto M:R->StatModifiers){M.Flat*=E.Stacks;M.Percent*=E.Stacks;Mods.Add(M);}
 
     auto* W=GetWorld()&&GetWorld()->GetGameInstance()?GetWorld()->GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr;
     FICWorldState World=W?W->ExportState():FICWorldState();TArray<FName> Synergies;TMap<EICStat,TArray<FICStatModifier>> SynergyMods;
+    if(Runtime.HasStats()&&(Runtime.Kind==EICCharacterKind::Player||(Runtime.Mode==EICCharacterMode::Companion&&Runtime.PartySlot>=0)))
+        if(auto* Codex=GetWorld()->GetGameInstance()->GetSubsystem<UICCodexSubsystem>())
+        {const int32 Pet=Codex->GetEquippedPet(Runtime.CharacterId);if(Codex->IsPetUnlocked(Pet))if(const auto* Row=Codex->FindPet(Pet))Mods.Append(Row->PetBuffs);}
     if(Definitions()&&Runtime.HasStats()&&!Runtime.IsDowned()&& (Runtime.Kind==EICCharacterKind::Player||Runtime.PartySlot>=0))
     {
         Definitions()->GetDefinitionIDs(EICDefinitionType::Synergy,Synergies);
@@ -84,28 +88,21 @@ void UICAbilitySystemComponent::RebuildDerivedStats()
 
     }
     auto Modified=[&](EICStat S,double Base){IC_TRACE_FUNCTION();double Flat=0,Percent=0;for(const auto& M:Mods)if(M.Stat==S){Flat+=M.Flat;Percent+=M.Percent;}double Value=(Base+Flat)*(1+Percent);if(const auto* Candidates=SynergyMods.Find(S)){double Best=-DBL_MAX;for(const auto& M:*Candidates)Best=FMath::Max(Best,(Base+Flat+M.Flat)*(1+Percent+M.Percent));if(Best>-DBL_MAX)Value=Best;}return Value;};
-    double STR=1,DEX=1,INT=1,CON=1,CHA=1,LUK=1;
+    double STR=1,DEX=1,INT=1,CON=1,LUK=1;
     if(Primary)
     {
         auto SetPrimary=[&](EICStat S,FGameplayAttribute A){IC_TRACE_FUNCTION();const double V=FMath::RoundToDouble(FMath::Clamp(Modified(S,PrimaryBase(Runtime.MainStats,S)),1.,double(Rules->MainStatCap)));SetNumericAttributeBase(A,V);return V;};
         STR=SetPrimary(EICStat::STR,UICPrimaryAttributeSet::GetSTRAttribute());DEX=SetPrimary(EICStat::DEX,UICPrimaryAttributeSet::GetDEXAttribute());
         INT=SetPrimary(EICStat::INT,UICPrimaryAttributeSet::GetINTAttribute());CON=SetPrimary(EICStat::CON,UICPrimaryAttributeSet::GetCONAttribute());
-        CHA=SetPrimary(EICStat::CHA,UICPrimaryAttributeSet::GetCHAAttribute());LUK=SetPrimary(EICStat::LUK,UICPrimaryAttributeSet::GetLUKAttribute());
+        SetNumericAttributeBase(UICPrimaryAttributeSet::GetCHAAttribute(),1); // Legacy attribute is inert.
+        LUK=SetPrimary(EICStat::LUK,UICPrimaryAttributeSet::GetLUKAttribute());
     }
     double BaseHP=Rules->BaseMaxHP+Rules->HPPerCON*(CON-1),BaseMP=Rules->BaseMaxMP+Rules->MPPerINT*(INT-1),BaseSP=Rules->BaseMaxSP+Rules->SPPerCON*(CON-1);
 
     if(Runtime.Kind==EICCharacterKind::Player)if(const auto* New=Definitions()?Definitions()->Find<FICNewGameRow>(TEXT("CFG_NEWGAME_001"),Result):nullptr)
     {BaseHP=New->InitialMaxHP+Rules->HPPerCON*(CON-New->InitialStats.CON);BaseMP=New->InitialMaxMP+Rules->MPPerINT*(INT-New->InitialStats.INT);BaseSP=New->InitialMaxSP+Rules->SPPerCON*(CON-New->InitialStats.CON);}
-    double CompanionCHA=1;
-    if(Runtime.Kind==EICCharacterKind::Recruitable&&Runtime.PartySlot>=0)
-    {
-        const auto* P=World.Characters.Find(UICWorldStateSubsystem::PlayerId());
-        double EffectiveCHA=P?P->MainStats.CHA:1;
-        if(P)if(auto* Player=Cast<AICCharacterBase>(UGameplayStatics::GetPlayerPawn(GetWorld(),0)))if(auto* ASC=Player->GetICAbilitySystem())EffectiveCHA=ASC->Stat(EICStat::CHA);
-        CompanionCHA+=Rules->CHABonus*Curve(EffectiveCHA,Rules->CHACurveK);
-    }
     auto Base=[&](EICStat S,double V){IC_TRACE_FUNCTION();return Primary?V:MonsterBase.FindRef(S);};
-    auto Final=[&](EICStat S,double V,bool Round){IC_TRACE_FUNCTION();double N=Modified(S,Base(S,V));if(Rules->CompanionCHAAffectedStats.Contains(S))N*=CompanionCHA;N=FMath::Max(0.,N);return Round?FMath::RoundToDouble(N):N;};
+    auto Final=[&](EICStat S,double V,bool Round){IC_TRACE_FUNCTION();double N=FMath::Max(0.,Modified(S,Base(S,V)));return Round?FMath::RoundToDouble(N):N;};
     const float HP=Combat->GetHealth(),MP=Combat->GetMana(),SP=Survival?Survival->GetSP():0;
     SetNumericAttributeBase(UICCombatAttributeSet::GetMaxHealthAttribute(),FMath::Max(1.,Final(EICStat::MaxHP,BaseHP,true)));
     SetNumericAttributeBase(UICCombatAttributeSet::GetMaxManaAttribute(),Final(EICStat::MaxMP,BaseMP,true));

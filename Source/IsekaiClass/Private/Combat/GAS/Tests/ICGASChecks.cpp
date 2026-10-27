@@ -4,6 +4,13 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Player/Character/ICPlayerCharacter.h"
+#include "Character/Animation/ICCharacterAnimationProfile.h"
+#include "Character/Animation/ICCharacterAnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Animation/AnimMontage.h"
+#include "Save/ICSaveGame.h"
+#include "Kismet/GameplayStatics.h"
 #include "Enemy/Character/ICEnemyBase.h"
 #include "NPC/Character/ICNPCBase.h"
 #include "AI/ICAIController.h"
@@ -14,6 +21,17 @@
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Combat/GAS/Attributes/ICAttributeSets.h"
 #include "Combat/GAS/ICGameplayTags.h"
+#include "Combat/GAS/Abilities/ICGameplayAbility.h"
+#include "Combat/GAS/Effects/ICGameplayEffects.h"
+#include "Combat/GAS/Cues/ICCombatCueNotify.h"
+#include "Combat/Actors/ICProjectile.h"
+#include "Combat/Actors/ICWeaponActor.h"
+#include "Camera/CameraComponent.h"
+#include "Settings/ICGameUserSettings.h"
+#include "GameFramework/ProjectileMovementComponent.h"
+#include "Components/BoxComponent.h"
+#include "EngineUtils.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "Combat/GAS/Simulation/ICCombatSimulation.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -77,6 +95,65 @@ bool FICGASCommitCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("First hit commits"),F.ASC->NotifyCombatEvent(A.ActionID,TEXT("AN_HitStart"),0));TestEqual(TEXT("MP paid once"),F.ASC->Capture().MP,90.f);TestEqual(TEXT("First recovery applies once"),F.ASC->Capture().HP,70.f);
     TestFalse(TEXT("Duplicate notify rejected"),F.ASC->NotifyCombatEvent(A.ActionID,TEXT("AN_HitStart"),0));TestTrue(TEXT("Next repeat hits"),F.ASC->NotifyCombatEvent(A.ActionID,TEXT("AN_HitStart"),1));TestEqual(TEXT("Repeat does not charge again"),F.ASC->Capture().MP,90.f);TestEqual(TEXT("Two distinct recoveries"),F.ASC->Capture().HP,80.f);
     F.ASC->CancelAction();TestFalse(TEXT("Old action notify rejected"),F.ASC->NotifyCombatEvent(A.ActionID,TEXT("AN_HitStart"),2));TestFalse(TEXT("Full cooldown persists after committed cancellation"),F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player).bSuccess);TestTrue(TEXT("Cooldown is captured by definition ID"),F.ASC->Capture().Combat.SkillReadyAtPlaySecond.FindRef(F.SkillID)>F.Time->GetClock().PlaySecond);
+    return !HasAnyErrors();
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASSkillEventCheck,"IC.GAS.SkillGameplayEventAndCooldownEffect",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICGASSkillEventCheck::RunTest(const FString& Parameters)
+{
+    FGASFixture F;
+    const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"));
+    auto* Row = F.Skills->FindRow<FICSkillRow>(F.SkillID,TEXT("GAS test"));
+    if (!TestNotNull(TEXT("Fixture skill"),Row)) return false;
+    Row->CooldownTag=Tag;
+    const auto Action=F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player);
+    if (!TestTrue(TEXT("Dedicated skill ability starts"),Action.bSuccess)) return false;
+    FGameplayEventData Event;Event.EventTag=ICTags::HitStartEvent;Event.Instigator=F.Player;Event.EventMagnitude=0;
+    UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(F.Player,ICTags::HitStartEvent,Event);
+    TestEqual(TEXT("Gameplay Event reaches skill ability and commits MP"),F.ASC->Capture().MP,90.f);
+    TestTrue(TEXT("Cooldown GE grants only this skill tag"),F.ASC->HasMatchingGameplayTag(Tag));
+    const auto Saved=F.ASC->Capture();
+    F.ASC->CancelAction();
+    TestTrue(TEXT("Committed cooldown restores"),F.ASC->Restore(Saved));
+    TestTrue(TEXT("Restored cooldown GE grants tag"),F.ASC->HasMatchingGameplayTag(Tag));
+    F.Step(5.1);
+    TestFalse(TEXT("PlayClock expiry removes cooldown GE tag"),F.ASC->HasMatchingGameplayTag(Tag));
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASSkillAssetCheck,"IC.GAS.SkillAssets",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICGASSkillAssetCheck::RunTest(const FString& Parameters)
+{
+    auto* Table=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Combat/DT_IC_Skill.DT_IC_Skill"));
+    if (!TestNotNull(TEXT("Skill data table"),Table)) return false;
+    TArray<FICSkillRow*> Rows;Table->GetAllRows(TEXT("GAS asset validation"),Rows);
+    TestEqual(TEXT("Authored skill count"),Rows.Num(),16);
+    for (const auto& Entry : TArray<TPair<FName,double>>{
+        {TEXT("SKL_START_SWORD_001"),20.}, {TEXT("SKL_START_BOW_001"),30.}, {TEXT("SKL_START_STAFF_001"),30.}})
+        if (const auto* Row=Table->FindRow<FICSkillRow>(Entry.Key,TEXT("Starter cooldown")))
+            TestEqual(Entry.Key.ToString()+TEXT(" cooldown seconds"),Row->CooldownPlaySeconds,Entry.Value);
+    for (const auto* Row:Rows)
+    {
+        const FString Label=Row->ID.ToString();
+        auto* AbilityClass=Row->AbilityClass.LoadSynchronous();
+        const auto* Effect=Row->CooldownEffectClass.LoadSynchronous();
+        if (!TestNotNull(Label+TEXT(" ability class"),AbilityClass) || !TestNotNull(Label+TEXT(" effect"),Effect)) continue;
+        const auto* Ability=Cast<UICSkillGameplayAbility>(AbilityClass->GetDefaultObject());
+        if (!TestNotNull(Label+TEXT(" skill ability"),Ability)) continue;
+        TestEqual(Label+TEXT(" ability ID"),Ability->SkillID,Row->ID);
+        TestTrue(Label+TEXT(" cooldown tag"),Row->CooldownTag.IsValid()&&Ability->CooldownTag==Row->CooldownTag);
+        TestTrue(Label+TEXT(" duration GE"),Effect->IsChildOf(UICSkillCooldownEffect::StaticClass()));
+    }
+    for (const TCHAR* Path:{TEXT("/Game/IsekaiClass/Combat/GAS/Cues/GC_IC_Combat_Cast.GC_IC_Combat_Cast_C"),TEXT("/Game/IsekaiClass/Combat/GAS/Cues/GC_IC_Combat_Impact.GC_IC_Combat_Impact_C")})
+    {
+        auto* Cue=LoadClass<UICCombatCueNotify>(nullptr,Path);
+        if (TestNotNull(Path,Cue))
+        {
+            const auto* Defaults=Cue->GetDefaultObject<UICCombatCueNotify>();
+            TestTrue(TEXT("Cue has a gameplay tag"),Defaults->GameplayCueTag.IsValid());
+            TestFalse(TEXT("Cue has a default Niagara effect"),Defaults->DefaultVFX.IsNull());
+            TestFalse(TEXT("Cue has a default sound"),Defaults->DefaultSound.IsNull());
+        }
+    }
     return !HasAnyErrors();
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASResourcesCheck,"IC.GAS.ResourcesAndPause",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
@@ -192,12 +269,14 @@ void ConfigureInputWeapons(FGASFixture& F)
     FICEquipmentRow BowGear=SwordGear;BowGear.ID=BowItem.EquipmentID;BowGear.ItemID=BowItem.ID;BowGear.WeaponFamily=EICWeaponFamily::Bow;BowGear.RequiredClass=EICCharacterClass::Archer;
     F.Table<FICEquipmentRow>(EICDefinitionType::Equipment,{SwordGear,BowGear});
     auto SwordSkill=*F.Skills->FindRow<FICSkillRow>(F.SkillID,TEXT("Input"));SwordSkill.Purpose=EICSkillPurpose::Heal;SwordSkill.RequiredWeaponFamily=EICWeaponFamily::Sword;SwordSkill.bRequiresEquippedWeapon=true;SwordSkill.TargetRules.Target=EICCombatTarget::PartyMember;SwordSkill.TargetRules.bAllowCaster=true;
+    SwordSkill.CooldownTag=FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"));
     F.Skills->AddRow(SwordSkill.ID,SwordSkill);
     auto BowSkill=SwordSkill;BowSkill.ID=TEXT("SKL_INPUT_997");BowSkill.ClassID=Bow.ID;BowSkill.RequiredWeaponFamily=EICWeaponFamily::Bow;BowSkill.CooldownPlaySeconds=7;
+    BowSkill.CooldownTag=FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_BOW_001"));
     F.Skills->AddRow(BowSkill.ID,BowSkill);
     F.Definitions->ConfigureCatalog(F.Catalog);
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(F.Definitions,0);
-    check(Staging->AddItem(SwordItem.ID,1,false));check(Staging->Equip(0));check(Staging->AddItem(BowItem.ID,1,false));
+    check(Staging->AddItem(SwordItem.ID,1,false));check(Staging->Equip(0));check(Staging->AddItem(BowItem.ID,1,false));check(Staging->Equip(0));
     check(F.Player->Inventory->ApplySnapshot(Staging->GetSnapshot()));
     auto Player=F.ASC->Capture();Player.UnlockedSkillIDs.Add(BowSkill.ID);check(F.ASC->Restore(Player));
 }
@@ -213,6 +292,8 @@ bool FICInputWeaponCheck::RunTest(const FString& Parameters)
     const auto Sword=F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player);
     TestTrue(TEXT("Sword skill activates"),Sword.bSuccess);
     TestTrue(TEXT("Sword effect commits its own cooldown"),F.ASC->NotifyCombatEvent(Sword.ActionID,TEXT("AN_HitStart"),0));
+    TestTrue(TEXT("Sword cooldown GE owns sword tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"))));
+    TestFalse(TEXT("Sword cooldown GE does not own bow tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_BOW_001"))));
     F.ASC->CancelAction();
     const double SwordCooldown=F.ASC->GetSkillCooldownRemaining(F.SkillID);
     TestTrue(TEXT("Changing weapon ignores the original class restriction"),Inventory->CycleWeapon());
@@ -223,6 +304,8 @@ bool FICInputWeaponCheck::RunTest(const FString& Parameters)
     const auto Bow=F.ASC->RequestAction(TEXT("Skill"),BowID,F.Player);
     TestTrue(TEXT("Sword cooldown does not block bow skill"),Bow.bSuccess);
     TestTrue(TEXT("Bow starts an independent cooldown"),F.ASC->NotifyCombatEvent(Bow.ActionID,TEXT("AN_HitStart"),0));
+    TestTrue(TEXT("Bow cooldown GE owns bow tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_BOW_001"))));
+    TestTrue(TEXT("Bow does not remove sword GE"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"))));
     F.ASC->CancelAction();
     TestTrue(TEXT("Skill can be unequipped during its cooldown"),F.ASC->EquipWeaponSkill(EICWeaponFamily::Bow,NAME_None));
     TestTrue(TEXT("Empty skill slot stays empty"),F.ASC->GetCurrentWeaponSkill().IsNone());
@@ -232,7 +315,165 @@ bool FICInputWeaponCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Load restores skill loadout and cooldowns"),F.ASC->Restore(Saved));
     TestEqual(TEXT("Saved weapon skill remains equipped"),F.ASC->GetCurrentWeaponSkill(),BowID);
     TestEqual(TEXT("Saved bow cooldown is unchanged"),F.ASC->GetSkillCooldownRemaining(BowID),7.);
-    TestEqual(TEXT("Both weapons remain owned"),Inventory->GetSnapshot().Bag.Slots[0].Count+Inventory->GetSnapshot().Equipment[0].Count,2);
+    TestEqual(TEXT("Both weapons remain in their equipment slots"),Inventory->GetWeaponLoadout()[0].Count+Inventory->GetWeaponLoadout()[1].Count,2);
+    TestTrue(TEXT("Switching does not put either weapon in the bag"),Inventory->GetSnapshot().Bag.Slots[0].IsEmpty());
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICEmptyHandCycleCheck,"IC.Input.WeaponCycleEmptyHandsAndFullBag",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICEmptyHandCycleCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    auto* Inventory=F.Player->Inventory.Get();
+    auto OnlySword=Inventory->GetSnapshot();
+    OnlySword.WeaponSlots[1]=FPlayerItemInstance();
+    OnlySword.bWeaponSheathed=true;
+    const FGuid SwordID=OnlySword.Equipment[0].InstanceID;
+    TestTrue(TEXT("Single owned weapon can start put away"),Inventory->ApplySnapshot(OnlySword));
+    TestEqual(TEXT("Put-away weapon is not an active family"),F.ASC->GetEquippedWeaponFamily(),EICWeaponFamily::None);
+    TestTrue(TEXT("Empty hands have no Q skill"),F.ASC->GetCurrentWeaponSkill().IsNone());
+    TestFalse(TEXT("An owned but put-away weapon cannot attack"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,F.Player).bSuccess);
+    TestFalse(TEXT("An owned but put-away weapon cannot cast its weapon skill"),F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player).bSuccess);
+    TestTrue(TEXT("Own an unequipped bow in the bag"),Inventory->AddItem(TEXT("ITM_INPUT_997"),1,false));
+    for(int32 Index=1;Index<OnlySword.Bag.Slots.Num();++Index)
+        TestTrue(TEXT("Fill every bag slot with a separate same-family weapon"),Inventory->AddItem(OnlySword.Equipment[0].ItemID,1,false));
+    for(int32 Repeat=0;Repeat<3;++Repeat)
+    {
+        TestTrue(TEXT("Single-weapon cycle draws even when the bag is full"),Inventory->CycleWeapon());
+        TestEqual(TEXT("Draw selects the owned sword"),F.ASC->GetEquippedWeaponFamily(),EICWeaponFamily::Sword);
+        TestTrue(TEXT("Single-weapon cycle returns to empty hands"),Inventory->CycleWeapon());
+        TestTrue(TEXT("Weapon is put away"),Inventory->IsWeaponSheathed());
+        TestEqual(TEXT("Repeated cycles preserve the selected instance"),Inventory->GetSnapshot().Equipment[0].InstanceID,SwordID);
+        TestTrue(TEXT("Bow in the bag never enters the equipment cycle"),Inventory->GetWeaponLoadout()[1].IsEmpty());
+    }
+    TestTrue(TEXT("Full bag remains valid"),Inventory->ValidateState());
+    auto Empty=FICInventoryState();
+    TestTrue(TEXT("No-weapon state is valid"),Inventory->ApplySnapshot(Empty));
+    TestFalse(TEXT("Right click without any weapon does nothing"),F.Player->RequestCycleWeapon());
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICWeaponCycleSaveCheck,"IC.Input.WeaponCycleOrderAndSave",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICWeaponCycleSaveCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    auto* Inventory=F.Player->Inventory.Get();
+    const FGuid SwordID=Inventory->GetSnapshot().Equipment[0].InstanceID;
+    for(const auto Family:{EICWeaponFamily::Bow,EICWeaponFamily::None,EICWeaponFamily::Sword,EICWeaponFamily::Bow,EICWeaponFamily::None})
+    {
+        TestTrue(TEXT("Cycle advances through owned families and empty hands"),Inventory->CycleWeapon());
+        TestEqual(TEXT("Missing families are skipped and empty hands follow the last family"),Inventory->GetEquippedWeaponFamily(),Family);
+        auto* Save=NewObject<UICSaveGame>();Save->WorldState=F.State->ExportState();Save->Clock=F.Time->GetClock();
+        TArray<uint8> Bytes;
+        TestTrue(TEXT("Weapon state encodes in the real save envelope"),UICSaveGame::EncodeForFile(Save,Bytes));
+        auto* Loaded=UICSaveGame::DecodeFile(Bytes);
+        if(!TestNotNull(TEXT("Weapon state decodes from the real save envelope"),Loaded))return false;
+        TestEqual(TEXT("Drawn/put-away flag survives serialization"),Loaded->WorldState.Inventory.bWeaponSheathed,Inventory->IsWeaponSheathed());
+        TestEqual(TEXT("Selected weapon instance survives serialization"),Loaded->WorldState.Inventory.Equipment[0].InstanceID,Inventory->GetSnapshot().Equipment[0].InstanceID);
+        TestTrue(TEXT("Loaded inventory restores"),Inventory->ApplySnapshot(Loaded->WorldState.Inventory));
+    }
+    TestTrue(TEXT("Removing the sword from its equipment slot puts it in the bag"),Inventory->UnequipWeapon(EICWeaponFamily::Sword));
+    TestTrue(TEXT("Empty hands can still draw the selected bow"),Inventory->CycleWeapon());
+    TestEqual(TEXT("An unequipped sword in the bag is skipped"),Inventory->GetEquippedWeaponFamily(),EICWeaponFamily::Bow);
+    TestEqual(TEXT("The unequipped sword instance remains owned"),Inventory->GetSnapshot().Bag.Slots[0].InstanceID,SwordID);
+    TestTrue(TEXT("Sword equipment slot is now empty"),Inventory->GetWeaponLoadout()[0].IsEmpty());
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICWeaponMontageCycleCheck,"IC.Input.WeaponCycleMontageAndInterruption",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICWeaponMontageCycleCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    auto* Player=F.Player;auto* Inventory=Player->Inventory.Get();
+    auto* Mesh=LoadObject<USkeletalMesh>(nullptr,TEXT("/Game/IsekaiClass/Player/SamplePlayer/Male/SK_Player_M.SK_Player_M"));
+    auto* Profile=LoadObject<UICCharacterAnimationProfile>(nullptr,TEXT("/Game/IsekaiClass/Animation/Player/MainMale/DA_ANIM_PLAYER_M.DA_ANIM_PLAYER_M"));
+    if(!TestNotNull(TEXT("Player mesh"),Mesh)||!TestNotNull(TEXT("Authored player animation profile"),Profile))return false;
+    TestNotNull(TEXT("Dedicated empty-hand locomotion"),Profile->Unarmed.Locomotion.Get());
+    for(const auto& Entry:Profile->WeaponSets)
+    { TestNotNull(TEXT("Every weapon family has a draw montage"),Entry.Value.Draw.Get());TestNotNull(TEXT("Every weapon family has a put-away montage"),Entry.Value.Sheathe.Get()); }
+    Player->AnimationProfile=Profile;Player->GetMesh()->SetSkeletalMesh(Mesh);Player->GetMesh()->SetAnimInstanceClass(UICCharacterAnimInstance::StaticClass());
+    auto Step=[&](float Seconds)
+    {
+        for(float Elapsed=0;Elapsed<Seconds;Elapsed+=.025f)
+        {Player->GetMesh()->TickAnimation(.025f,false);Player->GetMesh()->RefreshBoneTransforms();Player->GetMesh()->ConditionallyDispatchQueuedAnimEvents();}
+    };
+    Inventory->SetWeaponSheathed(true);Step(.05f);
+    auto* Anim=Cast<UICCharacterAnimInstance>(Player->GetMesh()->GetAnimInstance());
+    if(!TestNotNull(TEXT("Player native animation instance"),Anim))return false;
+    TestEqual(TEXT("Empty hands select the neutral locomotion"),Anim->Locomotion.Get(),Profile->Unarmed.Locomotion.Get());
+    TestTrue(TEXT("Right click begins drawing"),Player->RequestCycleWeapon());
+    TestTrue(TEXT("Drawing is an active transition"),Player->IsSwitchingWeapon());
+    TestTrue(TEXT("Weapon remains put away before the draw notify"),Inventory->IsWeaponSheathed());
+    TestFalse(TEXT("Repeated right click cannot skip the current transition"),Player->RequestCycleWeapon());
+    TestFalse(TEXT("Attack is blocked during the transition"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,Player).bSuccess);
+    TestFalse(TEXT("Weapon skill is blocked during the transition"),F.ASC->RequestAction(TEXT("Skill"),F.SkillID,Player).bSuccess);
+    const auto* Sword=Profile->WeaponSets.Find(EICWeaponFamily::Sword);
+    Step(Sword->Draw->GetPlayLength()*.7f);
+    TestFalse(TEXT("Draw notify reveals the weapon before the montage ends"),Inventory->IsWeaponSheathed());
+    TestTrue(TEXT("Recovery remains locked after reveal"),Player->IsSwitchingWeapon());
+    Step(Sword->Draw->GetPlayLength());
+    TestFalse(TEXT("Draw completion unlocks input"),Player->IsSwitchingWeapon());
+    TestEqual(TEXT("Sword is active after drawing"),Inventory->GetEquippedWeaponFamily(),EICWeaponFamily::Sword);
+    TestTrue(TEXT("Right click begins sword-to-bow transition"),Player->RequestCycleWeapon());
+    Step(Sword->Sheathe->GetPlayLength()*.7f);
+    TestTrue(TEXT("Put-away notify creates a temporary empty-hand interval"),Inventory->IsWeaponSheathed());
+    TestTrue(TEXT("Transition continues without another click"),Player->IsSwitchingWeapon());
+    Step(Sword->Sheathe->GetPlayLength()+Profile->WeaponSets[EICWeaponFamily::Bow].Draw->GetPlayLength()+.5f);
+    TestFalse(TEXT("Both montages complete from one click"),Player->IsSwitchingWeapon());
+    TestEqual(TEXT("Bow is now active"),Inventory->GetEquippedWeaponFamily(),EICWeaponFamily::Bow);
+    TestTrue(TEXT("Last weapon begins putting away"),Player->RequestCycleWeapon());
+    Step(Profile->WeaponSets[EICWeaponFamily::Bow].Sheathe->GetPlayLength()+.5f);
+    TestEqual(TEXT("Last weapon ends at empty hands"),Inventory->GetEquippedWeaponFamily(),EICWeaponFamily::None);
+    TestFalse(TEXT("Empty-hand state unlocks input"),Player->IsSwitchingWeapon());
+    TestTrue(TEXT("New cycle begins drawing the first weapon"),Player->RequestCycleWeapon());
+    Anim->Montage_Stop(0);
+    Step(.1f);
+    TestFalse(TEXT("Interrupted montage cannot leave switching stuck"),Player->IsSwitchingWeapon());
+    TestTrue(TEXT("Interrupted early draw keeps the weapon put away"),Inventory->IsWeaponSheathed());
+    TestFalse(TEXT("Stale or invalid montage notifications are rejected"),Player->NotifyWeaponVisibility(INDEX_NONE,true));
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICFourWeaponCycleCheck,"IC.Input.WeaponCycleFourFamilies",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICFourWeaponCycleCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    UDataTable* Items=nullptr;UDataTable* Equipment=nullptr;
+    for(const auto& Binding:F.Catalog->Tables)
+    {
+        if(Binding.RowStruct==FICItemRow::StaticStruct())Items=Binding.Table.LoadSynchronous();
+        if(Binding.RowStruct==FICEquipmentRow::StaticStruct())Equipment=Binding.Table.LoadSynchronous();
+    }
+    for(const auto& Pair:TArray<TPair<EICWeaponFamily,FString>>{{EICWeaponFamily::Staff,TEXT("996")},{EICWeaponFamily::Wand,TEXT("995")}})
+    {
+        auto Item=*Items->FindRow<FICItemRow>(TEXT("ITM_INPUT_998"),TEXT("Four weapons"));
+        auto Gear=*Equipment->FindRow<FICEquipmentRow>(TEXT("EQP_INPUT_998"),TEXT("Four weapons"));
+        Item.ID=FName(*(TEXT("ITM_INPUT_")+Pair.Value));Item.ItemID=Item.ID;Item.EquipmentID=FName(*(TEXT("EQP_INPUT_")+Pair.Value));
+        Gear.ID=Item.EquipmentID;Gear.ItemID=Item.ID;Gear.WeaponFamily=Pair.Key;
+        Items->AddRow(Item.ID,Item);Equipment->AddRow(Gear.ID,Gear);
+    }
+    F.Definitions->ConfigureCatalog(F.Catalog);
+    auto* Inventory=F.Player->Inventory.Get();
+    TestTrue(TEXT("Own staff"),Inventory->AddItem(TEXT("ITM_INPUT_996"),1,false));
+    TestTrue(TEXT("Staff has its own equipment slot"),Inventory->Equip(0));
+    for(const auto Expected:{EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::None,EICWeaponFamily::Sword})
+    {
+        TestTrue(TEXT("Three equipped weapons cycle"),Inventory->CycleWeapon());
+        TestEqual(TEXT("Three weapons return to empty hands after the third"),Inventory->GetEquippedWeaponFamily(),Expected);
+    }
+    TestTrue(TEXT("Own wand"),Inventory->AddItem(TEXT("ITM_INPUT_995"),1,false));
+    TestTrue(TEXT("Healing wand has its own equipment slot"),Inventory->Equip(0));
+    const auto Slots=Inventory->GetWeaponLoadout();
+    for(const auto Expected:{EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::Wand,EICWeaponFamily::None,EICWeaponFamily::Sword})
+    {
+        TestTrue(TEXT("Four-weapon cycle advances"),Inventory->CycleWeapon());
+        TestEqual(TEXT("Sword, bow, staff, wand, empty hands repeat in order"),Inventory->GetEquippedWeaponFamily(),Expected);
+        const auto CurrentSlots=Inventory->GetWeaponLoadout();
+        for(int32 Index=0;Index<4;++Index)
+            TestEqual(TEXT("Every weapon stays in the same family equipment slot"),CurrentSlots[Index].InstanceID,Slots[Index].InstanceID);
+        for(const auto& Item:Inventory->GetSnapshot().Bag.Slots)
+            TestTrue(TEXT("Cycling all four weapons leaves the bag empty"),Item.IsEmpty());
+    }
     return !HasAnyErrors();
 }
 
@@ -261,6 +502,202 @@ bool FICInputTargetCheck::RunTest(const FString& Parameters)
     TestFalse(TEXT("Confirm leaves target selection"),PC->HasTargetSelection());
     TestTrue(TEXT("Confirmed support skill starts a real GAS action"),F.ASC->GetActionID().IsValid());
     F.ASC->CancelAction();PC->Destroy();
+    return !HasAnyErrors();
+}
+
+namespace
+{
+void ConfigureNormalAttackWeapons(FGASFixture& F)
+{
+    ConfigureInputWeapons(F);
+    UDataTable* Classes=nullptr;UDataTable* Items=nullptr;UDataTable* Equipment=nullptr;
+    for(const auto& Binding:F.Catalog->Tables)
+    {
+        if(Binding.RowStruct==FICClassRow::StaticStruct())Classes=Binding.Table.LoadSynchronous();
+        if(Binding.RowStruct==FICItemRow::StaticStruct())Items=Binding.Table.LoadSynchronous();
+        if(Binding.RowStruct==FICEquipmentRow::StaticStruct())Equipment=Binding.Table.LoadSynchronous();
+    }
+    auto* Authored=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Character/DT_IC_Class.DT_IC_Class"));
+    check(Authored);Classes->EmptyTable();TArray<FICClassRow*> Rows;Authored->GetAllRows(TEXT("Combo test"),Rows);
+    for(const auto* Row:Rows)Classes->AddRow(Row->ID,*Row);
+    for(int32 I=0;I<2;++I)
+    {
+        auto Item=*Items->FindRow<FICItemRow>(TEXT("ITM_INPUT_998"),TEXT("Combo"));
+        Item.ID=I==0?TEXT("ITM_INPUT_996"):TEXT("ITM_INPUT_995");Item.ItemID=Item.ID;Item.EquipmentID=I==0?TEXT("EQP_INPUT_996"):TEXT("EQP_INPUT_995");
+        auto Gear=*Equipment->FindRow<FICEquipmentRow>(TEXT("EQP_INPUT_998"),TEXT("Combo"));
+        Gear.ID=Item.EquipmentID;Gear.ItemID=Item.ID;Gear.RequiredClass=EICCharacterClass::None;Gear.WeaponFamily=I==0?EICWeaponFamily::Staff:EICWeaponFamily::Wand;
+        Items->AddRow(Item.ID,Item);Equipment->AddRow(Gear.ID,Gear);
+    }
+    F.Definitions->ConfigureCatalog(F.Catalog);
+    for(const FName ID:{FName(TEXT("ITM_INPUT_996")),FName(TEXT("ITM_INPUT_995"))})
+    {check(F.Player->Inventory->AddItem(ID,1,false));check(F.Player->Inventory->Equip(0));}
+}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICNormalComboCheck,"IC.Combat.NormalAttack.ComboAnimations",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICNormalComboCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureNormalAttackWeapons(F);
+    for(const FString Suffix:{FString(TEXT("M")),FString(TEXT("F"))})
+    {
+        const FString Gender=Suffix==TEXT("M")?TEXT("Male"):TEXT("Female");
+        auto* Mesh=LoadObject<USkeletalMesh>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Player/SamplePlayer/%s/SK_Player_%s"),*Gender,*Suffix));
+        auto* Profile=LoadObject<UICCharacterAnimationProfile>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Animation/Player/Main%s/DA_ANIM_PLAYER_%s"),*Gender,*Suffix));
+        if(!TestNotNull(TEXT("Player combo profile"),Profile)||!TestNotNull(TEXT("Player mesh"),Mesh))return false;
+        F.Player->AnimationProfile=Profile;F.Player->GetMesh()->SetSkeletalMesh(Mesh);F.Player->GetMesh()->SetAnimInstanceClass(UICCharacterAnimInstance::StaticClass());
+        for(const auto Family:{EICWeaponFamily::Sword,EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::Wand})
+        {
+            F.ASC->CancelAction();F.Step(1.);
+            for(int32 I=0;I<6&&F.ASC->GetEquippedWeaponFamily()!=Family;++I)F.Player->Inventory->CycleWeapon();
+            const auto* Set=Profile->FindSet(Family);
+            if(!TestEqual(TEXT("Each family has exactly three attacks"),Set->AttackCombo.Num(),3))return false;
+            if(Family==EICWeaponFamily::Staff)
+            {
+                const auto* Healer=Profile->FindSet(EICWeaponFamily::Wand);
+                if(!Healer||Healer->AttackCombo.Num()!=3)return false;
+                for(int32 I=0;I<3;++I)
+                    TestEqual(TEXT("Mage uses the healer's matching combo action"),
+                        Set->AttackCombo[I]->SlotAnimTracks[0].AnimTrack.AnimSegments[0].GetAnimReference().Get(),
+                        Healer->AttackCombo[I]->SlotAnimTracks[0].AnimTrack.AnimSegments[0].GetAnimReference().Get());
+            }
+            auto* Anim=F.Player->GetMesh()->GetAnimInstance();
+            auto Advance=[&](double Seconds)
+            {
+                for(double Elapsed=0;Elapsed<Seconds;Elapsed+=.01)
+                {F.Step(.01);F.Player->GetMesh()->TickAnimation(.01,false);F.Player->GetMesh()->RefreshBoneTransforms();F.Player->GetMesh()->ConditionallyDispatchQueuedAnimEvents();}
+            };
+            TestTrue(TEXT("First normal attack starts without a target"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr).bSuccess);
+            for(int32 Stage=0;Stage<3;++Stage)
+            {
+                TestTrue(*FString::Printf(TEXT("%s %d uses its own montage"),*Gender,Stage+1),Anim->Montage_IsPlaying(Set->AttackCombo[Stage]));
+                if(Stage<2)TestTrue(TEXT("Early extra click queues the next combo stage"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr).bSuccess);
+                const FGuid Current=F.ASC->GetActionID();
+                for(int32 Frame=0;Frame<600&&F.ASC->GetActionID()==Current;++Frame)Advance(.01);
+                if(Stage<2){Advance(.02);TestTrue(TEXT("Queued attack advances after recovery"),F.ASC->GetActionID().IsValid());}
+            }
+            Advance(1.);
+            TestTrue(TEXT("Combo restarts after the connection timeout"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr).bSuccess);
+            TestTrue(TEXT("Timeout returns to stage one"),Anim->Montage_IsPlaying(Set->AttackCombo[0]));
+            F.ASC->CancelAction();
+        }
+    }
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICNormalRangedCheck,"IC.Combat.NormalAttack.RangedTravelAndDamage",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICNormalRangedCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureNormalAttackWeapons(F);
+    for(const auto Family:{EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::Wand})
+    {
+        for(int32 I=0;I<6&&F.ASC->GetEquippedWeaponFamily()!=Family;++I)F.Player->Inventory->CycleWeapon();
+        TestEqual(TEXT("Job-specific attack range"),F.ASC->GetNormalAttackRangeCm(),Family==EICWeaponFamily::Bow?3000.:1800.);
+        auto* Enemy=F.World->SpawnActor<AICEnemyBase>(FVector(1000,0,0),FRotator::ZeroRotator);
+        if(!TestNotNull(TEXT("Ranged target"),Enemy))return false;
+        Enemy->Tags.Add(TEXT("IC.Enemy"));Enemy->EnableCombat(false,false);
+        auto* Target=Enemy->GetICAbilitySystem();Target->SetCombatBase(1000,0,1,1,0,0,1,0,1);
+        FICCharacterState EnemyState;EnemyState.CharacterId=TEXT("RANGED_TARGET");EnemyState.Kind=EICCharacterKind::Background;
+        EnemyState.MaxHP=EnemyState.HP=1000;EnemyState.MaxMP=EnemyState.MP=0;EnemyState.Position=Enemy->GetActorLocation();
+        TestTrue(TEXT("Ranged target has a live combat state"),Target->Restore(EnemyState));
+        const float Before=Target->Capture().HP;
+        const auto Action=F.ASC->RequestAction(TEXT("Attack"),NAME_None,Enemy);
+        TestTrue(TEXT("Ranged attack starts at ten metres"),Action.bSuccess);
+        TestTrue(TEXT("Release event spawns projectile"),F.ASC->NotifyCombatEvent(Action.ActionID,TEXT("AN_ProjectileFire"),0));
+        TestFalse(TEXT("Timer/notify cannot double fire"),F.ASC->NotifyCombatEvent(Action.ActionID,TEXT("AN_ProjectileFire"),0));
+        AICProjectile* Shot=nullptr;for(TActorIterator<AICProjectile> It(F.World);It;++It)if(!It->IsActorBeingDestroyed())Shot=*It;
+        if(!TestNotNull(TEXT("Visible normal attack projectile"),Shot))return false;
+        auto* Movement=Shot->FindComponentByClass<UProjectileMovementComponent>();
+        for(int32 I=0;I<100&&!Shot->IsActorBeingDestroyed();++I)
+        {F.Time->AdvanceClock(.01,false);Shot->Tick(.01);if(!Shot->IsActorBeingDestroyed())Movement->TickComponent(.01,LEVELTICK_All,nullptr);}
+        TestTrue(TEXT("Projectile damages a distant enemy"),Target->Capture().HP<Before);
+        TestTrue(TEXT("Single-target projectile stops on impact"),Shot->IsActorBeingDestroyed());
+        F.ASC->CancelAction();Enemy->Destroy();F.Step(1.);
+        const auto Free=F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr);
+        F.ASC->NotifyCombatEvent(Free.ActionID,TEXT("AN_ProjectileFire"),0);
+        Shot=nullptr;for(TActorIterator<AICProjectile> It(F.World);It;++It)if(!It->IsActorBeingDestroyed())Shot=*It;
+        if(!TestNotNull(TEXT("Free aiming also fires"),Shot))return false;
+        Movement=Shot->FindComponentByClass<UProjectileMovementComponent>();const FVector Origin=Shot->GetActorLocation();
+        // A deliberately slow frame must never allow a hit beyond authored range.
+        Shot->Tick(3.f);Movement->TickComponent(3.f,LEVELTICK_All,nullptr);
+        TestTrue(TEXT("Slow frame respects projectile distance"),FVector::Distance(Origin,Shot->GetActorLocation())<=F.ASC->GetNormalAttackRangeCm()+.1);
+        Shot->Destroy();F.ASC->CancelAction();F.Step(1.);
+        auto* Obstacle=F.World->SpawnActor<AActor>(FVector(500,0,0),FRotator::ZeroRotator);
+        auto* Box=NewObject<UBoxComponent>(Obstacle);Obstacle->SetRootComponent(Box);Obstacle->AddInstanceComponent(Box);
+        Box->SetBoxExtent(FVector(20,200,200));Box->SetCollisionProfileName(TEXT("BlockAll"));Box->RegisterComponent();Obstacle->SetActorLocation(FVector(500,0,0));
+        const auto Blocked=F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr);
+        F.ASC->NotifyCombatEvent(Blocked.ActionID,TEXT("AN_ProjectileFire"),0);
+        Shot=nullptr;for(TActorIterator<AICProjectile> It(F.World);It;++It)if(!It->IsActorBeingDestroyed())Shot=*It;
+        if(!TestNotNull(TEXT("Shot toward obstacle"),Shot))return false;
+        Movement=Shot->FindComponentByClass<UProjectileMovementComponent>();
+        for(int32 I=0;I<90&&!Shot->IsActorBeingDestroyed();++I)
+        {Shot->Tick(.01);if(!Shot->IsActorBeingDestroyed())Movement->TickComponent(.01,LEVELTICK_All,nullptr);}
+        TestTrue(TEXT("World collision stops the projectile"),Shot->IsActorBeingDestroyed());
+        TestTrue(TEXT("Projectile never passes through obstacle"),Shot->GetActorLocation().X<500);
+        Shot->Destroy();Obstacle->Destroy();F.ASC->CancelAction();F.Step(1.);
+    }
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICNormalCameraAimCheck,"IC.Combat.NormalAttack.ScreenCentreAndHands",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICNormalCameraAimCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureNormalAttackWeapons(F);
+    TGuardValue<bool> AimCorrection(UICGameUserSettings::Get()->bProjectileAimAssist,true);
+    F.Player->Camera->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+    const FVector ViewLocation(-350,100,150),AimCentre(1000,-250,400);
+    auto* Target=F.World->SpawnActor<AICEnemyBase>(AimCentre,FRotator::ZeroRotator);
+    auto* Selected=F.World->SpawnActor<AICEnemyBase>(FVector(500,600,0),FRotator::ZeroRotator);
+    for(auto* Enemy:{Target,Selected})
+    {
+        Enemy->Tags.Add(TEXT("IC.Enemy"));Enemy->EnableCombat(false,false);
+        Enemy->GetICAbilitySystem()->SetCombatBase(10000,0,1,1,0,0,1,0,1);
+        FICCharacterState EnemyState;EnemyState.CharacterId=Enemy->GetFName();EnemyState.Kind=EICCharacterKind::Background;
+        EnemyState.MaxHP=EnemyState.HP=10000;EnemyState.MaxMP=EnemyState.MP=0;EnemyState.Position=Enemy->GetActorLocation();
+        TestTrue(TEXT("Aim target has a live combat state"),Enemy->GetICAbilitySystem()->Restore(EnemyState));
+    }
+    const float SelectedBefore=Selected->GetICAbilitySystem()->Capture().HP;
+    for(const FString Suffix:{FString(TEXT("M")),FString(TEXT("F"))})
+    {
+        const FString Gender=Suffix==TEXT("M")?TEXT("Male"):TEXT("Female");
+        auto* Mesh=LoadObject<USkeletalMesh>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Player/SamplePlayer/%s/SK_Player_%s"),*Gender,*Suffix));
+        auto* Profile=LoadObject<UICCharacterAnimationProfile>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Animation/Player/Main%s/DA_ANIM_PLAYER_%s"),*Gender,*Suffix));
+        if(!TestNotNull(TEXT("Player hand skeleton"),Mesh)||!TestNotNull(TEXT("Player combo profile"),Profile))return false;
+        F.Player->AnimationProfile=Profile;F.Player->GetMesh()->SetSkeletalMesh(Mesh);
+        F.Player->GetMesh()->SetAnimInstanceClass(UICCharacterAnimInstance::StaticClass());
+        F.Player->GetMesh()->RefreshBoneTransforms();
+        TestTrue(TEXT("Player mesh has an actual left-palm socket"),F.Player->GetMesh()->DoesSocketExist(TEXT("weapon_l")));
+        for(const auto Family:{EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::Wand})
+        {
+            for(int32 I=0;I<6&&F.ASC->GetEquippedWeaponFamily()!=Family;++I)F.Player->Inventory->CycleWeapon();
+            // A distant weapon tip must not become the source of spell or arrow.
+            auto* Weapon=F.World->SpawnActor<AICWeaponActor>();Weapon->SetActorLocation(FVector(0,0,800));
+            F.Player->EquippedWeaponActor=Weapon;
+            F.Player->Camera->SetWorldLocationAndRotation(ViewLocation,FRotator::ZeroRotator);
+            const float Before=Target->GetICAbilitySystem()->Capture().HP;
+            const auto Action=F.ASC->RequestAction(TEXT("Attack"),NAME_None,Selected);
+            TestTrue(TEXT("Normal attack accepts an off-centre selected target"),Action.bSuccess);
+            TestTrue(TEXT("Body faces the camera instead of the off-centre enemy"),FMath::Abs(F.Player->GetActorRotation().Yaw)<.1);
+            F.Player->Camera->SetWorldRotation((AimCentre-ViewLocation).Rotation());
+            TestTrue(TEXT("Release after moving the camera"),F.ASC->NotifyCombatEvent(Action.ActionID,TEXT("AN_ProjectileFire"),0));
+            AICProjectile* Shot=nullptr;for(TActorIterator<AICProjectile> It(F.World);It;++It)if(!It->IsActorBeingDestroyed())Shot=*It;
+            if(!TestNotNull(TEXT("The normal attack produces a shot"),Shot))return false;
+            auto* Movement=Shot->FindComponentByClass<UProjectileMovementComponent>();
+            const FVector Palm=F.Player->GetMesh()->GetSocketLocation(TEXT("weapon_l"));
+            AddInfo(FString::Printf(TEXT("Aim %s/%d: Camera=%s Forward=%s Source=%s Velocity=%s Target=%s Controller=%s"),*Gender,int32(Family),
+                *F.Player->Camera->GetComponentLocation().ToString(),*F.Player->Camera->GetForwardVector().ToString(),
+                *Shot->GetActorLocation().ToString(),*Movement->Velocity.ToString(),*Target->GetActorLocation().ToString(),*GetNameSafe(F.Player->GetController())));
+            TestTrue(TEXT("Projectile starts within 9cm of the animated hand"),FVector::Distance(Shot->GetActorLocation(),Palm)<9);
+            TestTrue(TEXT("Projectile does not start at the weapon tip"),FVector::Distance(Shot->GetActorLocation(),Weapon->GetMuzzleLocation())>300);
+            TestTrue(TEXT("Shot converges on the elevated screen-centre target"),FVector::DotProduct(Movement->Velocity.GetSafeNormal(),(AimCentre-Shot->GetActorLocation()).GetSafeNormal())>.999);
+            for(int32 I=0;I<120&&!Shot->IsActorBeingDestroyed();++I)
+            {Shot->Tick(.01f);if(!Shot->IsActorBeingDestroyed())Movement->TickComponent(.01f,LEVELTICK_All,nullptr);}
+            TestTrue(TEXT("The enemy under the crosshair takes damage"),Target->GetICAbilitySystem()->Capture().HP<Before);
+            TestEqual(TEXT("Off-centre selected enemy is not auto-hit"),Selected->GetICAbilitySystem()->Capture().HP,SelectedBefore);
+            Shot->Destroy();F.ASC->CancelAction();F.Step(1.);
+            F.Player->EquippedWeaponActor=nullptr;Weapon->Destroy();
+        }
+    }
+    Target->Destroy();Selected->Destroy();
     return !HasAnyErrors();
 }
 #endif

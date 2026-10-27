@@ -7,6 +7,7 @@
 class ACharacter;
 class UAnimInstance;
 class USkeletalMesh;
+class UICCharacterAnimationProfile;
 
 UENUM(BlueprintType)
 enum class EICPlayerPresetGender : uint8 { Male , Female  };
@@ -25,7 +26,6 @@ struct ISEKAICLASS_API FICClassRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") FName SkillSlot3ID;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") FName SkillSlot4ID;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") FName StartingWeaponID;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") FName StartingClothesID;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") TArray<FICNormalAttackStage> NormalAttackStages;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Class") FName WeaponRightSocket = TEXT("weapon_r");
@@ -46,6 +46,8 @@ struct ISEKAICLASS_API FICPlayerPresetRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Preset") TSoftClassPtr<ACharacter> CharacterClass;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Preset") TSoftObjectPtr<UTexture2D> Portrait;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Preset") FName AppearanceResourceID;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Preset") TSoftObjectPtr<UICCharacterAnimationProfile> AnimationProfile;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Preset") FTransform MeshTransform = FTransform(FRotator(0,-90,0),FVector(0,0,-88));
 };
 
 

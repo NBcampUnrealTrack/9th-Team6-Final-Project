@@ -14,7 +14,7 @@ class AICDroppedItem;
 class UICCraftingComponent;
 class UICInventoryComponent;
 class UICGameplayWidget;
-class UICQuestWidget;
+class UICDeathWidget;
 class UICQuestTrackerWidget;
 class UICNPCDialogueWidget;
 class UICMainMenuWidget;
@@ -58,11 +58,12 @@ public:
     TSubclassOf<UICMainMenuWidget> MainMenuWidgetClass;
     UFUNCTION(BlueprintPure, Category="IC|Main Menu")
     bool IsMainMenuLevel() const;
+    UFUNCTION(BlueprintCallable, Category="IC|Main Menu")
+    bool ContinueLatestSave();
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|New Game") FName NewGameDefinitionID=TEXT("CFG_NEWGAME_001");
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="UI")
     TSubclassOf<UICCharacterCreateWidget> CharacterCreateWidgetClass;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|UI") TSubclassOf<UICGameplayWidget> GameplayWidgetClass;
-    UPROPERTY(EditDefaultsOnly, Category="IC|UI") TSoftClassPtr<UICQuestWidget> QuestWidgetClass;
     UPROPERTY(EditDefaultsOnly, Category="IC|UI") TSoftClassPtr<UICQuestTrackerWidget> QuestTrackerWidgetClass;
     UPROPERTY(EditDefaultsOnly, Category="IC|UI") TSubclassOf<UICNPCDialogueWidget> DialogueWidgetClass;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input") TObjectPtr<UInputMappingContext> DefaultMappingContext;
@@ -84,6 +85,7 @@ public:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void SetupInputComponent() override;
     virtual void FlushPressedKeys() override;
+    void RefreshUserInputMapping();
     virtual void PlayerTick(float DeltaSeconds) override;
     virtual void OnPossess(APawn* InPawn) override;
     virtual void OnUnPossess() override;
@@ -114,6 +116,7 @@ public:
     UPROPERTY(BlueprintReadOnly) int32 SelectedLoadSlot=0;
     UPROPERTY(BlueprintReadOnly) TArray<FICSaveSlotInfo> SaveSlots;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString ModalText;
+    UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") FText ModalDisplayText;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString InteractionHint;
     UFUNCTION(BlueprintPure,Category="IC|Input") FString MenuCancelLabel() const;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Items") TSubclassOf<AICDroppedItem> DroppedItemClass;
@@ -132,6 +135,7 @@ public:
     AICNPCBase* FindNPCInteractionTarget() const;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString Menu=TEXT("Create");
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString Notice;
+    UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") FText NoticeDisplayText;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FName OpenStorage;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FName ActiveStation;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FName ActiveWorkAnchor;
@@ -146,7 +150,7 @@ public:
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") int32 PendingPartyKey=INDEX_NONE;
     bool bDirty=true;
     UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") TObjectPtr<UICGameplayWidget> Screen;
-    UPROPERTY(Transient) TObjectPtr<UICQuestWidget> QuestScreen;
+    UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") TObjectPtr<UICDeathWidget> DeathScreen;
     UPROPERTY(Transient) TObjectPtr<UICQuestTrackerWidget> QuestTrackerScreen;
     UPROPERTY(Transient) TObjectPtr<UICNPCDialogueWidget> DialogueScreen;
     UPROPERTY(Transient) TObjectPtr<UICSettingsWidget> SettingsScreen;
@@ -179,6 +183,7 @@ public:
     UFUNCTION(BlueprintCallable,Category="IC|UI") void ExecuteUI(const FString& Command,int32 Index=0);
     UFUNCTION(BlueprintCallable,Category="IC|UI") void SetMenu(const FString& NewMenu);
     UFUNCTION(BlueprintCallable,Category="IC|UI") void Show(const FString& Text);
+    void ShowLocalized(const FText& Text);
     UFUNCTION(BlueprintCallable,Category="IC|Session") bool SavePlayer();
     bool AutoSavePlayer();
     UFUNCTION(BlueprintCallable,Category="IC|Session") bool LoadPlayer();
@@ -200,9 +205,10 @@ public:
     virtual bool CanRestoreWorldState_Implementation(const FICWorldState& Candidate) const override;
     virtual void RestoreFromWorldState_Implementation(const FICWorldState& Candidate) override;
 private:
+    friend class UICGatheringSubsystem;
     TSoftObjectPtr<UWorld> SessionGameplayMap;
     UPROPERTY(Transient) TObjectPtr<UICSaveLoadWidget> SessionSaveLoadScreen;
-    void LoadSelectedSessionSlot();
+    bool LoadSelectedSessionSlot();
     void ExecuteCombatInput(FName Action,int32 Slot);
     void SelectCombatTarget(bool Next);
     void BeginSkillTarget(class AICCharacterBase* Caster, FName SkillID);
@@ -216,6 +222,7 @@ private:
     TObjectPtr<UICMainMenuWidget> MainMenuWidget;
     UPROPERTY(Transient) TObjectPtr<UICLoadingWidget> LoadingScreen;
     FString SaveReturnMenu;
+    FString SettingsReturnMenu;
     FString LoadReturnMenu=TEXT("Create");
     FString QuitReturnMenu;
     FString ModalReturnMenu;
@@ -225,6 +232,7 @@ private:
     bool bQuitAfterWrite=false;
     bool bSessionClosing=false;
     void ShowModal(const FString& Action,const FString& Text,int32 Slot=INDEX_NONE);
+    void ShowModal(const FString& Action,const FText& Text,int32 Slot=INDEX_NONE);
     void CompleteQuit();
     bool bItemTransactionInProgress=false;
     bool bDead=false;
@@ -247,11 +255,17 @@ private:
     void ApplyInputMapping();
     void RemoveInputMapping();
     void Move(const FInputActionValue& Value);
+    void StopMove(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
+    void ZoomCamera(const FInputActionValue& Value);
+    UPROPERTY(Transient) TObjectPtr<UInputAction> CameraZoomAction;
+    UPROPERTY(Transient) TObjectPtr<UInputMappingContext> CameraMappingContext;
+    bool bCameraLockOn=false;
     void CancelInputCommand(EICInputCommand Command,int32 Slot);
     void ResetHeldInput();
     bool CanHandleGameplayInput() const;
     bool bGameplayInitialized=false;
     UPROPERTY(Transient) TObjectPtr<UICInventoryComponent> BoundInventory;
     UPROPERTY(Transient) TObjectPtr<UInputMappingContext> AppliedMappingContext;
+    UPROPERTY(Transient) TObjectPtr<UInputMappingContext> UserMappingContext;
 };

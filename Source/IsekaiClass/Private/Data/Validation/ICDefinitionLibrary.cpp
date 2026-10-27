@@ -53,6 +53,7 @@ TArray<FICDefinitionSchema> UICDefinitionLibrary::GetDefinitionSchemas()
         if (Value==INDEX_NONE) continue;
         FICDefinitionSchema Schema; Schema.Type=static_cast<EICDefinitionType>(Value); Schema.RowStruct=Struct;
         Schema.AssetName=FName(*(TEXT("DT_IC_")+Kind));
+        if(Kind==TEXT("Ranching"))Schema.AssetName=TEXT("DT_Ranching");
         FString Group;
         switch (Schema.Type)
         {
@@ -65,7 +66,7 @@ TArray<FICDefinitionSchema> UICDefinitionLibrary::GetDefinitionSchemas()
         case EICDefinitionType::NPC: case EICDefinitionType::Schedule: case EICDefinitionType::GiftPreference: case EICDefinitionType::Dialogue: case EICDefinitionType::Service: case EICDefinitionType::Shop: Group=TEXT("NPC"); break;
         case EICDefinitionType::Region: case EICDefinitionType::Anchor: case EICDefinitionType::Spawner: case EICDefinitionType::Warp: case EICDefinitionType::Home: case EICDefinitionType::Map: case EICDefinitionType::Landmark: Group=TEXT("World"); break;
         case EICDefinitionType::Recipe: Group=TEXT("Recipes"); break;
-        case EICDefinitionType::Production: case EICDefinitionType::Resource: case EICDefinitionType::Crop: case EICDefinitionType::Fish: case EICDefinitionType::FishingPoint: Group=TEXT("Life"); break;
+        case EICDefinitionType::Production: case EICDefinitionType::Resource: case EICDefinitionType::Crop: case EICDefinitionType::Fish: case EICDefinitionType::FishingPoint: case EICDefinitionType::Ranching: Group=TEXT("Life"); break;
         case EICDefinitionType::Quest: case EICDefinitionType::Progression: case EICDefinitionType::Ending: Group=TEXT("Quest"); break;
         case EICDefinitionType::IDRegistry: Group=TEXT("Registry"); break;
         default: Group=TEXT("Presentation"); break;
@@ -219,7 +220,7 @@ bool UICDefinitionLibrary::ValidateTables(const TArray<FICDefinitionTable>& Tabl
             FString RefField=Field;
             if(Struct->GetFName()==TEXT("ICSkillHitDefinition") && Field==TEXT("EffectID")) RefField=TEXT("SkillEffectID");
             if(Struct->GetFName()==TEXT("ICBossPatternChoice") && Field==TEXT("PatternID")) RefField=TEXT("BossPatternID");
-            if(Struct->GetFName()==TEXT("ICInitialEquipment") || Field==TEXT("StartingWeaponID") || Field==TEXT("StartingClothesID")) RefField=TEXT("EquipmentID");
+            if(Struct->GetFName()==TEXT("ICInitialEquipment") || Field==TEXT("StartingWeaponID")) RefField=TEXT("EquipmentID");
             if(Field.StartsWith(TEXT("SkillSlot")) && Field.EndsWith(TEXT("ID"))) RefField=TEXT("SkillID");
             InspectProperty(T,Row,P,P->ContainerPtrToValuePtr<void>(Data),Path.IsEmpty()?Field:Path+TEXT(".")+Field,RefField);
         }
@@ -236,7 +237,7 @@ bool UICDefinitionLibrary::ValidateTables(const TArray<FICDefinitionTable>& Tabl
                 const auto* Item=reinterpret_cast<const FICItemRow*>(Pair.Value);
                 if(Item->ItemID!=Item->ID)Issue(T,Pair.Key,TEXT("ItemID"),TEXT("Legacy ItemID must equal ID."));
                 if(Item->StackLimit<1||Item->StackLimit>99||Item->BuyPrice<0||Item->SellPrice<0)Issue(T,Pair.Key,TEXT("StackLimit/Price"),TEXT("Invalid stack count or negative price."));
-                if(Item->Kind==EPlayerItemKind::Equipment && (Item->StackLimit!=1||Item->EquipSlot==EPlayerEquipSlot::None))Issue(T,Pair.Key,TEXT("EquipSlot"),TEXT("Equipment requires one item per slot and an equipment slot."));
+                if(Item->Kind==EPlayerItemKind::Equipment && (Item->StackLimit!=1||Item->EquipSlot!=EPlayerEquipSlot::Weapon))Issue(T,Pair.Key,TEXT("EquipSlot"),TEXT("Equipment requires a single weapon."));
                 if(Item->Tab==EPlayerItemTab::Quest && (Item->bCanDiscard||Item->bCanSell))Issue(T,Pair.Key,TEXT("Quest"),TEXT("Quest items cannot be discarded or sold."));
                 if(Item->Category==EPlayerItemCategory::Book && (Item->GrowthStat==EPlayerMainStat::None||!(Item->GrowthAmount==1||Item->GrowthAmount==3||Item->GrowthAmount==5)))Issue(T,Pair.Key,TEXT("GrowthAmount"),TEXT("Growth books require one stat and +1/+3/+5."));
             }
@@ -282,7 +283,7 @@ bool UICDefinitionLibrary::ValidateTables(const TArray<FICDefinitionTable>& Tabl
             if(B.Table->GetRowStruct()->IsChildOf(FICSkillRow::StaticStruct())){const auto* S=reinterpret_cast<const FICSkillRow*>(P.Value);if(S->OwnerType==EICSkillOwner::CharacterClass){++ClassSkills;++SkillsPerClass.FindOrAdd(S->ClassID);}else if(S->OwnerType==EICSkillOwner::RecruitUnique)++UniqueSkills;}
             if(B.Table->GetRowStruct()->IsChildOf(FICMonsterRow::StaticStruct())){const auto* M=reinterpret_cast<const FICMonsterRow*>(P.Value);if(M->Kind!=EICMonsterKind::Normal)++Bosses;if(M->Kind==EICMonsterKind::RegionalBoss){++RegionalBosses;++BossesPerRegion.FindOrAdd(M->RegionID);}else if(M->Kind==EICMonsterKind::FinalBoss)++FinalBosses;}
             if(B.Table->GetRowStruct()->IsChildOf(FICFishRow::StaticStruct())){const auto* F=reinterpret_cast<const FICFishRow*>(P.Value);++FishPerRegion.FindOrAdd(F->RegionID);}
-            if(B.Table->GetRowStruct()->IsChildOf(FICItemRow::StaticStruct())){const auto* I=reinterpret_cast<const FICItemRow*>(P.Value);if(I->Category==EPlayerItemCategory::Book){++Books;BookGrowths.FindOrAdd(I->GrowthStat).Add(I->GrowthAmount);}}
+            if(B.Table->GetRowStruct()->IsChildOf(FICItemRow::StaticStruct())){const auto* I=reinterpret_cast<const FICItemRow*>(P.Value);if(I->Category==EPlayerItemCategory::Book&&I->GrowthStat!=EPlayerMainStat::Charisma){++Books;BookGrowths.FindOrAdd(I->GrowthStat).Add(I->GrowthAmount);}}
         }
         if(Recruits!=24||Residents!=16||Backgrounds!=12)Issue(nullptr,NAME_None,TEXT("NPC.Types"),TEXT("Release NPC split must be 24 recruitable / 16 resident / 12 background."));
         if(ClassSkills!=16||UniqueSkills!=24)Issue(nullptr,NAME_None,TEXT("Skill.Owners"),TEXT("Release requires 16 class skills and 24 unique recruit skills."));
@@ -290,7 +291,7 @@ bool UICDefinitionLibrary::ValidateTables(const TArray<FICDefinitionTable>& Tabl
         if(ClassKinds.Num()!=4||ClassKinds.Contains(EICCharacterClass::None))Issue(nullptr,NAME_None,TEXT("Class.Types"),TEXT("Release requires each of Warrior, Archer, Mage and Healer exactly once."));
         if(MalePresets!=1||FemalePresets!=1)Issue(nullptr,NAME_None,TEXT("PlayerPreset.Gender"),TEXT("Release requires one male and one female player appearance."));
         for(const auto& C:SkillsPerClass)if(C.Value!=4)Issue(nullptr,NAME_None,TEXT("Skill.ClassID"),TEXT("Each class requires exactly four skills."));
-        if(Books!=18||BookGrowths.Num()!=6)Issue(nullptr,NAME_None,TEXT("Item.Books"),TEXT("Release requires three growth books per each of six main stats."));
+        if(Books!=15||BookGrowths.Num()!=5)Issue(nullptr,NAME_None,TEXT("Item.Books"),TEXT("Release requires three growth books per each of five main stats."));
         for(const auto& G:BookGrowths)if(G.Value.Num()!=3)Issue(nullptr,NAME_None,TEXT("Item.Books"),TEXT("Each main stat requires +1, +3 and +5 books."));
         for(int32 I=1;I<=8;++I){const FName Region(*FString::Printf(TEXT("R%02d"),I));if(FishPerRegion.FindRef(Region)!=(I<=4?3:2))Issue(nullptr,NAME_None,TEXT("Fish.RegionID"),TEXT("Fish distribution must be 3 per R01-R04 and 2 per R05-R08."));if(BossesPerRegion.FindRef(Region)!=1)Issue(nullptr,NAME_None,TEXT("Monster.RegionID"),TEXT("Each of R01-R08 requires exactly one regional boss."));}
     }

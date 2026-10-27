@@ -133,9 +133,8 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
     {
         IC_TRACE_FUNCTION();
         if(Row.ItemID.IsNone()) ItemIssue(Issues,At,TEXT("ItemID"),TEXT("Equipment requires its inventory item definition."),true,bComplete);
-        if(Row.Slot==EPlayerEquipSlot::None) ItemIssue(Issues,At,TEXT("Slot"),TEXT("Equipment requires one of the four equipment slots."),true,bComplete);
+        if(Row.Slot!=EPlayerEquipSlot::Weapon) ItemIssue(Issues,At,TEXT("Slot"),TEXT("Only weapons can be equipped."),true,bComplete);
         if(Row.Slot==EPlayerEquipSlot::Weapon && Row.WeaponFamily==EICWeaponFamily::None) ItemIssue(Issues,At,TEXT("WeaponFamily"),TEXT("A weapon requires its fixed family."),true,bComplete);
-        if(Row.Slot!=EPlayerEquipSlot::Weapon && Row.WeaponFamily!=EICWeaponFamily::None) ItemIssue(Issues,At,TEXT("WeaponFamily"),TEXT("Clothes, rings and necklaces are not weapon families."));
         EICWeaponFamily Expected=EICWeaponFamily::None;
         switch(Row.RequiredClass)
         {
@@ -166,15 +165,11 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
     {
         IC_TRACE_FUNCTION();
         CheckInitialEquipment(Row.StartingWeaponID,EPlayerEquipSlot::Weapon,Row.WeaponFamily,At,TEXT("StartingWeaponID"));
-        CheckInitialEquipment(Row.StartingClothesID,EPlayerEquipSlot::Clothes,Row.WeaponFamily,At,TEXT("StartingClothesID"));
     });
     ItemEach<FICRecruitCombatRow>(Tables,[&](const FICRecruitCombatRow& Row,const FItemLocation& At)
     {
         IC_TRACE_FUNCTION();
         CheckInitialEquipment(Row.InitialEquipment.WeaponID,EPlayerEquipSlot::Weapon,Row.WeaponFamily,At,TEXT("InitialEquipment.WeaponID"));
-        CheckInitialEquipment(Row.InitialEquipment.ClothesID,EPlayerEquipSlot::Clothes,Row.WeaponFamily,At,TEXT("InitialEquipment.ClothesID"));
-        CheckInitialEquipment(Row.InitialEquipment.RingID,EPlayerEquipSlot::Ring,Row.WeaponFamily,At,TEXT("InitialEquipment.RingID"));
-        CheckInitialEquipment(Row.InitialEquipment.NecklaceID,EPlayerEquipSlot::Necklace,Row.WeaponFamily,At,TEXT("InitialEquipment.NecklaceID"));
     });
     ItemEach<FICEnhancementRow>(Tables,[&](const FICEnhancementRow& Row,const FItemLocation& At)
     {
@@ -201,7 +196,7 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         IC_TRACE_FUNCTION();
         if(Row.Stat==EICStat::None) ItemIssue(Issues,At,TEXT("Stat"),TEXT("Random options require an explicit stat."),true,bComplete);
         if(Row.MinimumValue>Row.MaximumValue) ItemIssue(Issues,At,TEXT("MaximumValue"),TEXT("Option maximum must be at least its minimum."));
-        if(Row.AllowedSlots.Contains(EPlayerEquipSlot::None)) ItemIssue(Issues,At,TEXT("AllowedSlots"),TEXT("None is not an equipment slot; use an empty list for unrestricted slots."));
+        for(auto Allowed:Row.AllowedSlots)if(Allowed!=EPlayerEquipSlot::Weapon)ItemIssue(Issues,At,TEXT("AllowedSlots"),TEXT("Only weapons can receive equipment options."));
         if(Row.AllowedWeaponFamilies.Contains(EICWeaponFamily::None)) ItemIssue(Issues,At,TEXT("AllowedWeaponFamilies"),TEXT("Use an empty family list for unrestricted non-weapon options."));
     });
     ItemEach<FICOptionPoolRow>(Tables,[&](const FICOptionPoolRow& Row,const FItemLocation& At)
@@ -300,6 +295,7 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         IC_TRACE_FUNCTION();
         if(Row.SPDrainIntervalPlaySeconds!=10) ItemIssue(Issues,At,TEXT("SPDrainIntervalPlaySeconds"),TEXT("Natural SP drains by one per ten unpaused PlayClock seconds."));
         if(Row.RealSecondsPerGameMinute<=0 || Row.SleepRecoveryPerGameMinute<=0) ItemIssue(Issues,At,TEXT("RealSecondsPerGameMinute"),TEXT("Game-clock scale and sleep recovery must be positive."));
+        if(Row.MinimumSleepGameMinutes!=120 || Row.SleepRecoveryPerGameMinute<1 || Row.SleepRecoveryPerGameMinute!=FMath::FloorToDouble(Row.SleepRecoveryPerGameMinute)) ItemIssue(Issues,At,TEXT("MinimumSleepGameMinutes"),TEXT("Sleep uses integer SP recovery and a minimum of 120 game minutes."));
     });
     ItemEach<FICStatSettingsRow>(Tables,[&](const FICStatSettingsRow& Row,const FItemLocation& At)
     {
@@ -308,14 +304,7 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         if(Row.BaseMaxHP<1) ItemIssue(Issues,At,TEXT("BaseMaxHP"),TEXT("At primary stats of one, maximum HP must remain at least one."));
         if(Row.BaseCriticalChance>Row.CriticalChanceCap) ItemIssue(Issues,At,TEXT("CriticalChanceCap"),TEXT("Critical cap cannot be below the baseline critical chance."));
         if(Row.BaseCriticalMultiplier>Row.CriticalMultiplierCap) ItemIssue(Issues,At,TEXT("CriticalMultiplierCap"),TEXT("Critical multiplier cap cannot be below its baseline."));
-        const TSet<EICStat> Allowed={EICStat::MaxHP,EICStat::MaxMP,EICStat::PhysicalAttack,EICStat::MagicAttack,EICStat::Defense};
-        TSet<EICStat> Seen;
-        for(EICStat Stat:Row.CompanionCHAAffectedStats)
-        {
-            if(!Allowed.Contains(Stat) || Seen.Contains(Stat)) ItemIssue(Issues,At,TEXT("CompanionCHAAffectedStats"),TEXT("Player CHA affects only companion maximum HP/MP, physical/magic attack and defense, once each."));
-            Seen.Add(Stat);
-        }
-        if(Seen.Num()!=5) ItemIssue(Issues,At,TEXT("CompanionCHAAffectedStats"),TEXT("All five designated companion derived stats must receive player CHA."),Row.CompanionCHAAffectedStats.IsEmpty(),bComplete);
+        if(Row.CHABonus!=0 || !Row.CompanionCHAAffectedStats.IsEmpty()) ItemIssue(Issues,At,TEXT("CompanionCHAAffectedStats"),TEXT("Retired CHA settings must have zero bonus and no affected stats."));
     });
     ItemEach<FICCombatSettingsRow>(Tables,[&](const FICCombatSettingsRow& Row,const FItemLocation& At)
     {
@@ -323,11 +312,13 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         if(Row.RunSpeedCmPerSecond<Row.WalkSpeedCmPerSecond) ItemIssue(Issues,At,TEXT("RunSpeedCmPerSecond"),TEXT("Running cannot be slower than walking."));
         if(Row.InputBufferPlaySeconds>Row.ComboWindowPlaySeconds) ItemIssue(Issues,At,TEXT("ComboWindowPlaySeconds"),TEXT("Combo connection window must cover its input buffer."));
         if(Row.DodgeInvulnerabilityPlaySeconds>Row.DodgeCooldownPlaySeconds) ItemIssue(Issues,At,TEXT("DodgeCooldownPlaySeconds"),TEXT("Dodge cooldown must cover its invulnerability span."));
+        if(Row.DashDurationPlaySeconds<=0 || Row.DashDurationPlaySeconds>Row.DodgeCooldownPlaySeconds) ItemIssue(Issues,At,TEXT("DashDurationPlaySeconds"),TEXT("Dash duration must be positive and fit within the shared movement cooldown."));
         if(Row.HitStaggerPlaySeconds>Row.HitStaggerIntervalPlaySeconds) ItemIssue(Issues,At,TEXT("HitStaggerIntervalPlaySeconds"),TEXT("Repeat stagger interval must cover the stagger span."));
     });
     ItemEach<FICPartySettingsRow>(Tables,[&](const FICPartySettingsRow& Row,const FItemLocation& At)
     {
         IC_TRACE_FUNCTION();
+        if(Row.MaximumCompanions!=3 || Row.RequiredRecruitAffinity!=300) ItemIssue(Issues,At,TEXT("MaximumCompanions"),TEXT("Party allows three companions at affinity 300."));
         if(Row.SearchDistanceCm>Row.ChaseDistanceCm || Row.ChaseDistanceCm>Row.RecoveryDistanceCm) ItemIssue(Issues,At,TEXT("RecoveryDistanceCm"),TEXT("Party search, chase and safe recovery ranges must be non-decreasing."));
         if(!Row.FormationOffsetsCm.IsEmpty() && Row.FormationOffsetsCm.Num()<Row.MaximumCompanions) ItemIssue(Issues,At,TEXT("FormationOffsetsCm"),TEXT("Formation must supply a position for every companion slot."));
         if(bComplete && Row.FormationOffsetsCm.IsEmpty()) ItemIssue(Issues,At,TEXT("FormationOffsetsCm"),TEXT("Complete party settings require authored formation positions."));
@@ -338,6 +329,7 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         if(Row.InitialSlots>Row.MaximumSlots) ItemIssue(Issues,At,TEXT("MaximumSlots"),TEXT("Maximum inventory capacity cannot be below initial capacity."));
         if(Row.ExpansionSlots>0 && Row.MaximumSlots>=Row.InitialSlots && (Row.MaximumSlots-Row.InitialSlots)%Row.ExpansionSlots!=0) ItemIssue(Issues,At,TEXT("ExpansionSlots"),TEXT("Fixed expansion steps must reach the configured maximum without overshoot."));
         if(static_cast<int64>(Row.MaximumStorageInstallations)*Row.SlotsPerStorage>MAX_int32) ItemIssue(Issues,At,TEXT("SlotsPerStorage"),TEXT("Combined storage capacity exceeds the supported integer range."));
+        if(Row.MaximumStorageInstallations!=3 || Row.SlotsPerStorage!=40 || Row.DropLifetimePlaySeconds!=600) ItemIssue(Issues,At,TEXT("MaximumStorageInstallations"),TEXT("Storage uses three 40-slot stages; dropped items expire after 600 PlayClock seconds."));
     });
     ItemEach<FICSaveSettingsRow>(Tables,[&](const FICSaveSettingsRow& Row,const FItemLocation& At)
     {

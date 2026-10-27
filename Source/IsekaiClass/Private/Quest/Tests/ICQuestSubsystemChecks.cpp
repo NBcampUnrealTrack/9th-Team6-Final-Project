@@ -96,6 +96,29 @@ struct FICQuestFixture
     }
 };
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestStorageCheck, "IC.Runtime.QuestPossessionExcludesStorage",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FICQuestStorageCheck::RunTest(const FString& Parameters)
+{
+    FICQuestFixture Fixture;
+    FICQuestObjectiveDefinition Objective;Objective.Type=EICQuestObjectiveType::PossessItem;
+    Objective.RequiredCount=10;
+    Objective.Target.Type=EICDefinitionType::Item;Objective.Target.ID=TEXT("ITM_FOOD_998");
+    auto World=Fixture.State->ExportState();
+    FPlayerItemInstance Item;Item.InstanceID=FGuid::NewGuid();Item.ItemID=Objective.Target.ID;Item.Count=5;
+    World.Inventory.Storage.FindOrAdd(TEXT("PlayerHome")).Slots.Add(Item);
+    int32 Count=-1;FICQuestState Quest;
+    TestTrue(TEXT("Progress resolves"),Fixture.Quests->GetObjectiveProgress(Objective,Quest,World,Count));
+    TestEqual(TEXT("Stored items do not count"),Count,0);
+    World.Inventory.Bag.Slots[0]=Item;
+    Fixture.Quests->GetObjectiveProgress(Objective,Quest,World,Count);
+    TestEqual(TEXT("Withdrawal counts carried items only"),Count,5);
+    World.Inventory.Bag.Slots[0]=FPlayerItemInstance();
+    Fixture.Quests->GetObjectiveProgress(Objective,Quest,World,Count);
+    TestEqual(TEXT("Deposit removes possession progress"),Count,0);
+    return !HasAnyErrors();
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestRuntimeCheck, "IC.Runtime.QuestLifecycle",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -116,6 +139,9 @@ bool FICQuestRuntimeCheck::RunTest(const FString& Parameters)
         World.Quests.FindChecked(TEXT("QST_DEFEAT_998")), World, CurrentCount));
     TestEqual(TEXT("Defeat progress starts at zero"), CurrentCount, 0);
 
+    int32 RunningCount=0;for(const auto& Pair:World.Quests)if(Pair.Value.bStarted&&!Pair.Value.bCompleted)++RunningCount;
+    TestEqual(TEXT("Automatic acceptance starts only one quest"),RunningCount,1);
+    TestTrue(TEXT("Start possession quest"),Fixture.Quests->StartQuest(TEXT("QST_RING_998")));
     TestTrue(TEXT("Existing quest item granted"), Fixture.Inventory->AddItem(TEXT("ITM_QST_998"), 1, false));
     World = Fixture.State->ExportState();
     FICQuestRow DeliverDefinition;
@@ -129,6 +155,7 @@ bool FICQuestRuntimeCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Reward receipt recorded"), Ring && World.CompletedTransactionIDs.Contains(Ring->RewardTransactionID));
     TestEqual(TEXT("DT reward amount granted"), Fixture.Inventory->CountItem(TEXT("ITM_FOOD_998")), 10);
 
+    TestTrue(TEXT("Start delivery quest"),Fixture.Quests->StartQuest(TEXT("QST_DELIVER_998")));
     TestTrue(TEXT("Quest item delivery consumes dedicated inventory"), Fixture.Quests->DeliverItem(
         TEXT("QST_DELIVER_998"), TEXT("OBJ_RING")));
     World = Fixture.State->ExportState();
@@ -136,6 +163,7 @@ bool FICQuestRuntimeCheck::RunTest(const FString& Parameters)
     TestEqual(TEXT("Delivered quest item removed"), World.Inventory.QuestItems.Num(), 0);
 
     const FGuid EventID = FGuid::NewGuid();
+    TestTrue(TEXT("Start defeat quest"),Fixture.Quests->StartQuest(TEXT("QST_DEFEAT_998")));
     TestTrue(TEXT("Defeat event advances shared runner"), Fixture.Quests->ReportObjectiveEvent(
         EICQuestObjectiveType::Defeat, TEXT("MON_TEST_998"), 1, EventID));
     TestFalse(TEXT("Duplicate event rejected"), Fixture.Quests->ReportObjectiveEvent(
@@ -155,7 +183,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestForceCompleteCheck, "IC.Runtime.QuestFo
 bool FICQuestForceCompleteCheck::RunTest(const FString& Parameters)
 {
     FICQuestFixture Fixture;
-    TestEqual(TEXT("All active quests complete without objectives"), Fixture.Quests->ForceCompleteActiveQuests(), 3);
+    auto Waiting=Fixture.State->ExportState();for(auto& Pair:Waiting.Quests)Pair.Value.bStarted=false;
+    TestTrue(TEXT("Prepare accepted waiting quests for force-complete checks"),Fixture.State->RestoreState(Waiting));
+    TestEqual(TEXT("Waiting quests do not complete through active-quest cheat"),Fixture.Quests->ForceCompleteActiveQuests(),0);
+    for(const FName ID:{FName(TEXT("QST_DEFEAT_998")),FName(TEXT("QST_DELIVER_998")),FName(TEXT("QST_RING_998"))})
+    {TestTrue(TEXT("Start one quest"),Fixture.Quests->StartQuest(ID));TestEqual(TEXT("Only the started quest is forced complete"),Fixture.Quests->ForceCompleteActiveQuests(),1);}
 
     const FICWorldState World = Fixture.State->ExportState();
     for (const auto& Entry : World.Quests)
@@ -193,6 +225,7 @@ bool FICQuestRepeatCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Repeat quest is offered"), Fixture.Quests->CanOfferQuest(Repeat.ID));
     TestTrue(TEXT("First acceptance succeeds"), Fixture.Quests->AcceptQuest(Repeat.ID));
     TestFalse(TEXT("Active repeat quest cannot be accepted again"), Fixture.Quests->AcceptQuest(Repeat.ID));
+    TestTrue(TEXT("Start repeat quest"),Fixture.Quests->StartQuest(Repeat.ID));
     TestTrue(TEXT("Objective advances"), Fixture.Quests->ReportObjectiveEvent(
         EICQuestObjectiveType::Defeat, Objective.Target.ID, 1, FGuid::NewGuid()));
     TestTrue(TEXT("Ready quest can be reported"), Fixture.Quests->AreQuestObjectivesReady(Repeat.ID));
@@ -238,6 +271,8 @@ bool FICQuestDialogueDeliveryCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Quest can be accepted"), Fixture.Quests->AcceptQuest(Definition.ID));
     FICWorldState World = Fixture.State->ExportState();
     TestEqual(TEXT("Quest item granted on acceptance"), World.Inventory.QuestItems.Num(), 1);
+    TestFalse(TEXT("Waiting quest cannot be reported"),Fixture.Quests->AreQuestObjectivesReady(Definition.ID));
+    TestTrue(TEXT("Start delivery from journal"),Fixture.Quests->StartQuest(Definition.ID));
     TestTrue(TEXT("Quest can be reported with granted item"),
         Fixture.Quests->AreQuestObjectivesReady(Definition.ID));
     TestTrue(TEXT("Dialogue report completes quest"),
@@ -252,4 +287,101 @@ bool FICQuestDialogueDeliveryCheck::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestAcceptTrackingCheck,"IC.Runtime.QuestAcceptTracking",
+    EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICQuestAcceptTrackingCheck::RunTest(const FString&)
+{
+    FICQuestFixture F;auto* Table=F.Catalog->Tables.Last().Table.LoadSynchronous();
+    for(FName ID:Table->GetRowNames())
+    {FICQuestRow Definition;F.Definitions->GetQuest(ID,Definition);Definition.IsAutoAccept=false;Table->AddRow(ID,Definition);}
+    const FName First=TEXT("QST_ACCEPT_FIRST_998"),Second=TEXT("QST_ACCEPT_SECOND_998"),Third=TEXT("QST_ACCEPT_THIRD_998"),Target=TEXT("MON_TEST_998");
+    FICQuestRow Template;F.Definitions->GetQuest(TEXT("QST_DEFEAT_998"),Template);
+    Template.IsAutoAccept=false;Template.bAllowAbandon=true;Template.RewardID=NAME_None;
+    Template.ObjectiveGroups[0].Objectives[0].RequiredCount=3;
+    for(FName ID:{First,Second,Third}){auto Definition=Template;Definition.ID=ID;Table->AddRow(ID,Definition);}
+    auto Empty=F.State->ExportState();Empty.Quests.Reset();
+    TestTrue(TEXT("Begin with an empty quest list"),F.State->RestoreState(Empty));
+    TestTrue(TEXT("First NPC acceptance succeeds"),F.Quests->AcceptQuest(First));
+    TestTrue(TEXT("An empty HUD automatically tracks the accepted quest"),F.State->ExportState().Quests[First].bStarted);
+    TestTrue(TEXT("Automatic tracking advances actual objectives"),F.Quests->ReportObjectiveEvent(EICQuestObjectiveType::Defeat,Target,1,FGuid::NewGuid()));
+    const auto Running=F.State->ExportState().Quests[First];
+    TestTrue(TEXT("Second acceptance succeeds"),F.Quests->AcceptQuest(Second));
+    auto World=F.State->ExportState();
+    TestTrue(TEXT("Existing HUD quest keeps running"),World.Quests[First].bStarted);
+    TestEqual(TEXT("Accepting another quest preserves existing progress"),World.Quests[First].Objectives.FindRef(TEXT("OBJ_RING")),1);
+    TestEqual(TEXT("Accepting another quest preserves its start time"),World.Quests[First].AcceptedAtGameMinute,Running.AcceptedAtGameMinute);
+    TestTrue(TEXT("New quest remains accepted in the list"),World.Quests[Second].bAccepted&&!World.Quests[Second].bStarted);
+    TestTrue(TEXT("Further events still advance the HUD quest"),F.Quests->ReportObjectiveEvent(EICQuestObjectiveType::Defeat,Target,1,FGuid::NewGuid()));
+    World=F.State->ExportState();TestEqual(TEXT("Current quest continues from its old progress"),World.Quests[First].Objectives.FindRef(TEXT("OBJ_RING")),2);
+    TestTrue(TEXT("A waiting quest does not collect objective progress"),World.Quests[Second].Objectives.IsEmpty());
+    TestTrue(TEXT("Abandon the running quest"),F.Quests->AbandonQuest(First));
+    TestFalse(TEXT("Waiting quests are not started implicitly"),F.State->ExportState().Quests[Second].bStarted);
+    TestTrue(TEXT("Accept a new quest with an empty HUD and an existing waiting quest"),F.Quests->AcceptQuest(Third));
+    World=F.State->ExportState();
+    TestTrue(TEXT("The newly accepted quest becomes the HUD quest"),World.Quests[Third].bStarted);
+    TestTrue(TEXT("Previous waiting quest stays in the list"),World.Quests[Second].bAccepted&&!World.Quests[Second].bStarted);
+    TestFalse(TEXT("Duplicate acceptance is rejected"),F.Quests->AcceptQuest(Second));
+    TestTrue(TEXT("Manual Start still switches to an accepted waiting quest"),F.Quests->StartQuest(Second));
+    World=F.State->ExportState();TestTrue(TEXT("Exactly the manually selected quest is running"),World.Quests[Second].bStarted&&!World.Quests[Third].bStarted);
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestSingleRunCheck,"IC.Runtime.QuestSingleRun",
+    EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICQuestSingleRunCheck::RunTest(const FString&)
+{
+    FICQuestFixture F;const FName First=TEXT("QST_DEFEAT_998"),Second=TEXT("QST_DELIVER_998"),Target=TEXT("MON_TEST_998");
+    auto* Table=F.Catalog->Tables.Last().Table.LoadSynchronous();
+    for(FName ID:{First,Second})
+    {FICQuestRow Definition;F.Definitions->GetQuest(ID,Definition);Definition.bAllowAbandon=true;Definition.ObjectiveGroups[0].Objectives[0].RequiredCount=3;Table->AddRow(ID,Definition);}
+    auto Waiting=F.State->ExportState();for(auto& Pair:Waiting.Quests)Pair.Value.bStarted=false;
+    TestTrue(TEXT("Restore accepted waiting quests for explicit Start checks"),F.State->RestoreState(Waiting));
+    TestFalse(TEXT("Waiting quests ignore combat events"),F.Quests->ReportObjectiveEvent(EICQuestObjectiveType::Defeat,Target,1,FGuid::NewGuid()));
+    TestTrue(TEXT("Start first quest"),F.Quests->StartQuest(First));const FGuid FirstEvent=FGuid::NewGuid();
+    TestTrue(TEXT("Started quest advances"),F.Quests->ReportObjectiveEvent(EICQuestObjectiveType::Defeat,Target,1,FirstEvent));
+    TestFalse(TEXT("Invalid start leaves current quest intact"),F.Quests->StartQuest(TEXT("QST_MISSING")));
+    TestTrue(TEXT("Starting current quest is idempotent"),F.Quests->StartQuest(First));
+    TestEqual(TEXT("Repeated Start preserves current progress"),F.State->ExportState().Quests[First].Objectives.FindRef(TEXT("OBJ_RING")),1);
+    TestTrue(TEXT("Switch quest"),F.Quests->StartQuest(Second));auto World=F.State->ExportState();
+    TestTrue(TEXT("Stopped quest remains in the journal"),World.Quests[First].bAccepted&&!World.Quests[First].bStarted);
+    TestEqual(TEXT("Switch clears previous progress"),World.Quests[First].Objectives.Num(),0);
+    TestTrue(TEXT("Exactly the new quest starts"),World.Quests[Second].bStarted);
+    TestFalse(TEXT("Stopped quest ignores further events"),F.Quests->ReportObjectiveEvent(EICQuestObjectiveType::Defeat,Target,1,FGuid::NewGuid()));
+    TestTrue(TEXT("Restart former quest"),F.Quests->StartQuest(First));
+    TestFalse(TEXT("Old event cannot be replayed after restart"),F.Quests->ReportObjectiveEvent(EICQuestObjectiveType::Defeat,Target,1,FirstEvent));
+    TestTrue(TEXT("New event advances restarted quest"),F.Quests->ReportObjectiveEvent(EICQuestObjectiveType::Defeat,Target,1,FGuid::NewGuid()));
+    TestTrue(TEXT("Abandon running quest"),F.Quests->AbandonQuest(First));F.Quests->RefreshAvailableQuests();World=F.State->ExportState();
+    TestTrue(TEXT("Abandoned auto quest stays removed"),!World.Quests[First].bAccepted&&!World.Quests[First].bStarted&&World.Quests[First].bAbandoned);
+    TestEqual(TEXT("Abandon clears progress"),World.Quests[First].Objectives.Num(),0);
+    TestTrue(TEXT("Explicit acceptance can reacquire abandoned quest"),F.Quests->AcceptQuest(First));
+    TestTrue(TEXT("Reaccepted quest starts when no other quest is running"),F.State->ExportState().Quests[First].bStarted);
+    TestFalse(TEXT("Protected quest cannot be abandoned"),F.Quests->AbandonQuest(TEXT("QST_RING_998")));
+    return !HasAnyErrors();
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestReacceptGrantCheck, "IC.Runtime.QuestReacceptGrant",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FICQuestReacceptGrantCheck::RunTest(const FString& Parameters)
+{
+    FICQuestFixture F;
+    FICQuestRow Definition;
+    F.Definitions->GetQuest(TEXT("QST_DELIVER_998"), Definition);
+    Definition.ID = TEXT("QST_REACCEPT_998");
+    Definition.IsAutoAccept = false;
+    Definition.bAllowAbandon = true;
+    Definition.RewardID = NAME_None;
+    Definition.ObjectiveGroups[0].Objectives[0].RequiredCount = 100;
+    FICItemAmount Grant;
+    Grant.ItemID = TEXT("ITM_QST_998");
+    Grant.Count = 1;
+    Definition.AcceptanceQuestItems = {Grant, Grant};
+    F.Catalog->Tables.Last().Table.LoadSynchronous()->AddRow(Definition.ID, Definition);
+    TestTrue(TEXT("First acceptance grants the configured quest items"), F.Quests->AcceptQuest(Definition.ID));
+    TestEqual(TEXT("Duplicate grant rows aggregate to two items"), F.Inventory->CountItem(Grant.ItemID), 2);
+    TestTrue(TEXT("Granted quest can be abandoned"), F.Quests->AbandonQuest(Definition.ID));
+    TestEqual(TEXT("Abandon preserves the quest items"), F.Inventory->CountItem(Grant.ItemID), 2);
+    TestTrue(TEXT("Abandoned quest can be accepted again"), F.Quests->AcceptQuest(Definition.ID));
+    TestEqual(TEXT("Reacceptance does not duplicate retained quest items"), F.Inventory->CountItem(Grant.ItemID), 2);
+    return !HasAnyErrors();
+}
 #endif

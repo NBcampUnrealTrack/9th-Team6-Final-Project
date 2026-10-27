@@ -15,6 +15,7 @@ public:
     void Mount(UUserWidget* Widget, int32 ZOrder);
     void Unmount(UUserWidget* Widget);
     void SetHUD(UUserWidget* Widget);
+    void AddHUDWidget(UUserWidget* Widget);
 
 protected:
     virtual void NativeOnInitialized() override;

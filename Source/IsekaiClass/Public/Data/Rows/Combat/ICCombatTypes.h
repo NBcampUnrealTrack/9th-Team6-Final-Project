@@ -146,6 +146,8 @@ struct ISEKAICLASS_API FICSkillHitDefinition
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hit") bool bHitSameTargetOncePerRepeat = true;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hit", meta=(ClampMin="0")) double ProjectileSpeedCmPerSecond = 0.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hit", meta=(ClampMin="0")) double ProjectileLifetimePlaySeconds = 0.0;
+    /** Zero uses speed * lifetime. Explicit distance also bounds travel on slow frames. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hit", meta=(ClampMin="0")) double ProjectileMaxDistanceCm = 0.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hit") TSoftClassPtr<AActor> ProjectileClass;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hit") FName MontageSection;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hit") FName NotifyName;
@@ -171,9 +173,6 @@ struct ISEKAICLASS_API FICInitialEquipment
     GENERATED_BODY()
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Equipment") FName WeaponID;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Equipment") FName ClothesID;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Equipment") FName RingID;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Equipment") FName NecklaceID;
 };
 
 

@@ -524,9 +524,11 @@ namespace VRMSpringBone {
 namespace VRM1Spring {
 
 	void VRM1SpringManager::reset() {
-		for (auto &j : JointStateMap) {
-			j.Value.currentTail = j.Value.prevTail = j.Value.initialTail;
-		}
+		// Tails are stored in world space. Reusing initialTail after a teleport or
+		// a standing/sleeping pose change pulls them back to the old world pose.
+		// Rebuild from the next input pose, including rotations, just as VRM0 does.
+		JointStateMap.Reset();
+		bInit = false;
 	}
 
 	void VRM1SpringManager::init(const UVrmMetaObject* meta, FComponentSpacePoseContext& Output) {
@@ -534,7 +536,6 @@ namespace VRM1Spring {
 		if (meta == nullptr) return;
 
 		const FTransform ComponentTransform = Output.AnimInstanceProxy->GetComponentTransform();
-		FTransform ComponentToLocal = ComponentTransform.Inverse();
 
 		vrmMetaObject = meta;
 		skeletalMesh = VRMGetSkinnedAsset(Output.AnimInstanceProxy->GetSkelMeshComponent());
@@ -548,7 +549,7 @@ namespace VRM1Spring {
 
 				auto &j1 = s.joints[jointNo];
 
-				if (j1.boneNo == INDEX_NONE) {
+				if (!RefSkeletonTransform.IsValidIndex(j1.boneNo)) {
 					continue;
 				}
 
@@ -558,31 +559,39 @@ namespace VRM1Spring {
 				if (Output.Pose.GetPose().IsValidIndex(uu) == false) {
 					continue;
 				}
-				FTransform parentTransform = Output.Pose.GetComponentSpaceTransform(uu);
-
-				auto& state = JointStateMap.FindOrAdd(j1.boneNo);
-
-				if (RefSkeletonTransform.IsValidIndex(j1.boneNo) == false) {
+				FCompactPoseBoneIndex BoneIndex = Output.Pose.GetPose().GetBoneContainer().GetCompactPoseIndexFromSkeletonIndex(j1.boneNo);
+				if (!Output.Pose.GetPose().IsValidIndex(BoneIndex)) {
 					continue;
 				}
+				auto& state = JointStateMap.FindOrAdd(j1.boneNo);
 
 				state.initialLocalMatrix = RefSkeletonTransform[j1.boneNo];
 				state.initialLocalRotation = RefSkeletonTransform[j1.boneNo].GetRotation();
 
-#if	UE_VERSION_OLDER_THAN(5,0,0)
-				state.boneLength = RefSkeletonTransform[parentBoneIndex].GetLocation().Size();
-#else
-				state.boneLength = RefSkeletonTransform[j1.boneNo].GetLocation().Length();
-#endif
-				state.boneAxis = RefSkeletonTransform[j1.boneNo].TransformPosition(FVector::ZeroVector).GetSafeNormal();
+				// The simulated segment runs from this joint to its child. The
+				// parent-to-joint offset is in a different local space and often
+				// points upwards at a hair root; using it flips entire strands.
+				TArray<int32> Children;
+				RefSkeleton.GetDirectChildBones(j1.boneNo, Children);
+				FVector TailOffset = FVector::ZeroVector;
+				if (Children.Num() > 0) {
+					int32 Child = Children[0];
+					if (s.joints.IsValidIndex(jointNo + 1)
+						&& RefSkeletonTransform.IsValidIndex(s.joints[jointNo + 1].boneNo)
+						&& RefSkeleton.GetParentIndex(s.joints[jointNo + 1].boneNo) == j1.boneNo) {
+						Child = s.joints[jointNo + 1].boneNo;
+					}
+					TailOffset = RefSkeletonTransform[Child].GetLocation();
+				}
+				state.boneLength = TailOffset.Size();
+				state.boneAxis = TailOffset.GetSafeNormal();
 
 				{
-					FCompactPoseBoneIndex u = Output.Pose.GetPose().GetBoneContainer().GetCompactPoseIndexFromSkeletonIndex(j1.boneNo);
-					auto t = Output.Pose.GetComponentSpaceTransform(u);
+					auto t = Output.Pose.GetComponentSpaceTransform(BoneIndex);
 
 					state.prevTail = 
 						state.currentTail =
-						state.initialTail = ComponentToLocal.InverseTransformPosition(t.GetLocation());
+						state.initialTail = ComponentTransform.TransformPosition(t.TransformPosition(TailOffset));
 
 					state.resultQuat = t.GetRotation();
 				}
@@ -596,7 +605,23 @@ namespace VRM1Spring {
 		if (skeletalMesh == nullptr) {
 			return;
 		}
-		if (FMath::IsNearlyZero(DeltaTime)) {
+		if (!FMath::IsFinite(DeltaTime) || DeltaTime <= 0.f) {
+			return;
+		}
+		// Reset genuine stalls, but keep simulating at sustained low frame rates.
+		// A 100 ms cutoff freezes gravity at 8-10 fps by resetting every frame.
+		if (DeltaTime >= .25f) {
+			reset();
+			init(vrmMetaObject, Output);
+			return;
+		}
+		// Bound the integration step at low frame rates. The input body pose is
+		// held fixed while the existing spring constraints settle within a frame.
+		if (DeltaTime > 1.f / 60.f + SMALL_NUMBER) {
+			const int32 Steps = FMath::CeilToInt(DeltaTime * 60.f);
+			for (int32 Step = 0; Step < Steps; ++Step) {
+				update(animNode, DeltaTime / Steps, Output, OutBoneTransforms);
+			}
 			return;
 		}
 
@@ -687,12 +712,18 @@ namespace VRM1Spring {
 					currentTransform = t;
 				}
 
-				FQuat m_localRotation = state->initialLocalMatrix.GetRotation();
+				if (state->boneLength <= SMALL_NUMBER) {
+					// A terminal end bone has no segment to simulate. It must only
+					// follow its parent, rather than introduce another free rotation.
+					state->resultQuat = currentTransform.GetRotation();
+					calcTransform.Add(j1.boneNo, currentTransform);
+					continue;
+				}
 
 				const FVector currentTail = ComponentToLocal.TransformPosition(state->currentTail);
 				const FVector prevTail = ComponentToLocal.TransformPosition(state->prevTail);
 
-				const FVector inertia = (currentTail - prevTail) * (1.0f - j1.dragForce);
+				const FVector inertia = (currentTail - prevTail) * FMath::Pow(1.0f - FMath::Clamp(j1.dragForce, 0.f, 1.f), DeltaTime * 60.f);
 				const FVector stiffness = currentTransform.GetRotation() * state->boneAxis * 1.f * DeltaTime
 					* 100.f * j1.stiffness * animNode->stiffnessScale + animNode->stiffnessAdd;
 
@@ -700,6 +731,10 @@ namespace VRM1Spring {
 				ue4grav = vrmMetaObject->VrmAssetListObject->model_root_transform.Inverse().TransformVector(ue4grav);
 				FVector external = ComponentToLocal.TransformVector(ue4grav) * (j1.gravityPower * DeltaTime) * animNode->gravityScale
 					+ ComponentToLocal.TransformVector(animNode->gravityAdd) * DeltaTime;
+				// VRM forces use metres, just like stiffness and collider dimensions.
+				// Omitting this conversion makes gravity 100 times weaker than the
+				// restoring force and leaves long hair rigid in a lying/leaning pose.
+				external *= 100.f;
 
 
 				FVector nextTailTarget = currentTail + inertia + stiffness + external;
@@ -716,14 +751,16 @@ namespace VRM1Spring {
 					// このSpringが参照するコライダのインデックス
 					TArray<int> checkcolliderIndexArray;
 					for (auto colg : s.colliderGroups) {
-						checkcolliderIndexArray.Append(vrmMetaObject->VRM1SpringBoneMeta.ColliderGroups[colg].colliders);
+						if (vrmMetaObject->VRM1SpringBoneMeta.ColliderGroups.IsValidIndex(colg)) {
+							checkcolliderIndexArray.Append(vrmMetaObject->VRM1SpringBoneMeta.ColliderGroups[colg].colliders);
+						}
 					}
 
 					// 全てのコライダ
 					auto& AllColliderArray = vrmMetaObject->VRM1SpringBoneMeta.Colliders;
 
 					for (auto colNo : checkcolliderIndexArray){
-						if (colNo >= AllColliderArray.Num()) {
+						if (!AllColliderArray.IsValidIndex(colNo)) {
 							continue;
 						}
 						const auto& collider = AllColliderArray[colNo];

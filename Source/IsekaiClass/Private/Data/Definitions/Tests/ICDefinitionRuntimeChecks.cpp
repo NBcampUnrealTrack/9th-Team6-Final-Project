@@ -137,7 +137,7 @@ bool FICRealDefinitionAssetsCheck::RunTest(const FString& Parameters)
     auto* Catalog=GetDefault<UICDefinitionSettings>()->Catalog.LoadSynchronous();TestNotNull(TEXT("Production catalog is configured"),Catalog);if(!Catalog)return false;
     TestEqual(TEXT("Catalog resolves from DataAsset folder"),Catalog->GetPathName(),
         FString(TEXT("/Game/IsekaiClass/Data/DataAsset/DA_IC_DefinitionCatalog.DA_IC_DefinitionCatalog")));
-    TestEqual(TEXT("All native schemas registered"),Catalog->Tables.Num(),50);
+    TestEqual(TEXT("All native schemas registered"),Catalog->Tables.Num(),51);
     for(const auto& Schema:UICDefinitionLibrary::GetDefinitionSchemas())
     {
         const auto* Binding=Catalog->Tables.FindByPredicate([&](const auto& B){ IC_TRACE_FUNCTION();return B.Type==Schema.Type&&B.RowStruct==Schema.RowStruct;});
@@ -149,7 +149,7 @@ bool FICRealDefinitionAssetsCheck::RunTest(const FString& Parameters)
             Schema.Folder+TEXT("/")+Schema.AssetName.ToString()+TEXT(".")+Schema.AssetName.ToString());
         TestTrue(TEXT("Registered table retains row struct"),Table->GetRowStruct()==Schema.RowStruct.Get());
     }
-    TestEqual(TEXT("Definition, quest, and dialogue String Tables registered"),Catalog->StringTables.Num(),3);
+    TestEqual(TEXT("Definition, quest, dialogue and UI String Tables registered"),Catalog->StringTables.Num(),4);
     bool IsQuestTableRegistered = false;
     for(const auto& Reference:Catalog->StringTables)
     {

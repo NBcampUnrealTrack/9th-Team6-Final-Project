@@ -1,15 +1,11 @@
 #include "UI/CharacterCreate/ICCharacterCreateWidget.h"
 #include "UI/Framework/ICFrontendLayout.h"
-#include "UI/Framework/ICConfirmPopupWidget.h"
-#include "UI/Management/ICUIManagerSubsystem.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
 #include "Components/TextBlock.h"
 #include "Blueprint/WidgetTree.h"
 #include "Engine/GameInstance.h"
-#include "Engine/LocalPlayer.h"
-#include "Save/ICSaveSubsystem.h"
 void UICCharacterCreateWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
@@ -31,15 +27,13 @@ void UICCharacterCreateWidget::NativeOnInitialized()
         ChoiceButtons[3]->OnClicked.AddUniqueDynamic(this, &ThisClass::Choice3);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Next"))))
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::Next);
-    if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Back"))))
-        Button->OnClicked.AddUniqueDynamic(this, &ThisClass::Back);
     RefreshState();
 }
 UWidget* UICCharacterCreateWidget::NativeGetDesiredFocusTarget() const
 {
     if (Step == 0)
         return NameInput;
-    if (Step < 5 && !ChoiceButtons.IsEmpty())
+    if (!ChoiceButtons.IsEmpty())
         return ChoiceButtons[0];
     return GetWidgetFromName(TEXT("BTN_Next"));
 }
@@ -60,10 +54,11 @@ void UICCharacterCreateWidget::RefreshState()
         if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(Name)))
             Text->SetText(Value);
     };
-    SetText(TEXT("TXT_Step"),
-            FText::FromString(Step < 5 ? FString::Printf(TEXT("%d / 5"), Step + 1) : TEXT("5 / 5 · 시작 준비")));
-    SetText(TEXT("TXT_Question"), Step < 5 ? ICFrontendLayout::Text(*FString::Printf(TEXT("Question%d"), Step + 1))
-                                           : ICFrontendLayout::Text(TEXT("Review")));
+    // Hide obsolete controls as well if an older preview Blueprint is loaded.
+    for (const auto* Name : {TEXT("TXT_Step"), TEXT("TXT_Detail"), TEXT("BTN_Back")})
+        if (auto* Widget = GetWidgetFromName(Name))
+            Widget->SetVisibility(ESlateVisibility::Collapsed);
+    SetText(TEXT("TXT_Question"), ICFrontendLayout::Text(*FString::Printf(TEXT("Question%d"), Step + 1)));
     if (NameInput)
     {
         NameInput->SetVisibility(Step == 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -77,6 +72,7 @@ void UICCharacterCreateWidget::RefreshState()
             continue;
         const bool Visible = Step > 0 && Step < 5 && (Step != 1 || I < 2);
         Button->SetVisibility(Visible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        Button->SetIsEnabled(!bStartingNewGame);
         if (Visible)
             if (auto* Text = Cast<UTextBlock>(Button->GetContent()))
                 Text->SetText(Step == 1 ? ICFrontendLayout::Text(I == 0 ? TEXT("Male") : TEXT("Female"))
@@ -84,29 +80,14 @@ void UICCharacterCreateWidget::RefreshState()
     }
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Next"))))
     {
-        Button->SetVisibility(Step == 0 || Step == 5 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        Button->SetVisibility(Step == 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
         Button->SetIsEnabled(Step != 0 || FICCreationAnswers::IsNameValid(Flow->Answers.Name));
         if (auto* Text = Cast<UTextBlock>(Button->GetContent()))
-            Text->SetText(ICFrontendLayout::Text(Step == 5 ? TEXT("Begin") : TEXT("Next")));
+            Text->SetText(ICFrontendLayout::Text(TEXT("SetName")));
     }
-    FText Detail;
-    if (Step == 0)
-        Detail = ICFrontendLayout::Text(TEXT("NameHint"));
-    else if (Step == 3)
-        Detail = ICFrontendLayout::Text(TEXT("MusicHelp"));
-    else if (Step == 4)
-        Detail = ICFrontendLayout::Text(TEXT("HappinessHelp"));
-    else if (Step == 5)
-        Detail = FText::FromString(FString::Printf(
-            TEXT("%s · %s\n\n%s\n%s\n\n%s\n%s\n\n%s"), *Flow->Answers.Name.TrimStartAndEnd(),
-            *ICFrontendLayout::Text(Flow->Answers.Gender == 0 ? TEXT("Male") : TEXT("Female")).ToString(),
-            *Flow->GetOption(2, Flow->Answers.Story).Label.ToString(),
-            *Flow->GetOption(2, Flow->Answers.Story).ResultText.ToString(),
-            *Flow->GetOption(3, Flow->Answers.Music).Label.ToString(),
-            *Flow->GetOption(3, Flow->Answers.Music).ResultText.ToString(),
-            *Flow->GetOption(4, Flow->Answers.Happiness).Label.ToString()));
-    SetText(TEXT("TXT_Detail"), Detail);
     SetText(TEXT("TXT_Error"), FText::FromString(Flow->LastError));
+    if (auto* Error = GetWidgetFromName(TEXT("TXT_Error")))
+        Error->SetVisibility(Flow->LastError.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 }
 void UICCharacterCreateWidget::NameChanged(const FText& Value)
 {
@@ -121,7 +102,7 @@ void UICCharacterCreateWidget::NameChanged(const FText& Value)
 }
 void UICCharacterCreateWidget::SelectAnswer(int32 Index)
 {
-    if (Step < 1 || Step > 4 || Index < 0 || Index >= (Step == 1 ? 2 : 4))
+    if (bStartingNewGame || Step < 1 || Step > 4 || Index < 0 || Index >= (Step == 1 ? 2 : 4))
         return;
     auto* Flow = GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
     auto Draft = Flow->Answers;
@@ -134,6 +115,11 @@ void UICCharacterCreateWidget::SelectAnswer(int32 Index)
     else
         Draft.Happiness = Index;
     Flow->SetAnswers(Draft);
+    if (Step == 4)
+    {
+        StartGame();
+        return;
+    }
     ++Step;
     RefreshState();
     RequestRefreshFocus();
@@ -160,16 +146,7 @@ void UICCharacterCreateWidget::GoBack()
 }
 void UICCharacterCreateWidget::Back()
 {
-    StoreName();
-    if (Step > 0)
-    {
-        --Step;
-        RefreshState();
-        RequestRefreshFocus();
-    }
-    else
-        GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->ReturnToTitle(
-            Cast<AICPlayerController>(GetOwningPlayer()));
+    // Character creation advances only through the displayed answer buttons.
 }
 void UICCharacterCreateWidget::Next()
 {
@@ -181,25 +158,18 @@ void UICCharacterCreateWidget::Next()
         RefreshState();
         RequestRefreshFocus();
     }
-    else if (Step == 5 && Flow->Answers.IsComplete())
-        ConfirmStart();
 }
-void UICCharacterCreateWidget::ConfirmStart()
+void UICCharacterCreateWidget::StartGame()
 {
-    auto* UI = GetOwningLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>();
-    UClass* Class = LoadClass<UICConfirmPopupWidget>(
-        nullptr, TEXT("/Game/IsekaiClass/UI/Widget/WBP_ConfirmPopup.WBP_ConfirmPopup_C"));
-    auto* Popup =
-        CreateWidget<UICConfirmPopupWidget>(GetOwningPlayer(), Class ? Class : UICConfirmPopupWidget::StaticClass());
-    if (!Popup)
+    auto* Flow = GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
+    if (bStartingNewGame || !Flow->Answers.IsComplete())
         return;
-    const auto Slots = GetGameInstance()->GetSubsystem<UICSaveSubsystem>()->GetSlotList();
-    const bool Overwrite = Slots.IsValidIndex(0) && Slots[0].bExists;
-    Popup->Configure(ICFrontendLayout::Text(Overwrite ? TEXT("NewGameOverwrite") : TEXT("NewGameConfirm")),
-                     FSimpleDelegate::CreateWeakLambda(this, [this]() {
-                         if (!GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->BeginNewGame(
-                                 Cast<AICPlayerController>(GetOwningPlayer())))
-                             RefreshState();
-                     }));
-    UI->OpenScreen(Popup, true, 2000);
+    bStartingNewGame = true;
+    RefreshState();
+    if (!Flow->BeginNewGame(Cast<AICPlayerController>(GetOwningPlayer())))
+    {
+        bStartingNewGame = false;
+        RefreshState();
+        RequestRefreshFocus();
+    }
 }

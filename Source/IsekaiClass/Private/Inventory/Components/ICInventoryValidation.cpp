@@ -11,7 +11,7 @@ bool UICInventoryComponent::ValidateDefinitions() const
     {
         const auto* Row=Find(ID);
         if(!Row || Row->ItemID!=ID || Row->StackLimit<1 || Row->StackLimit>99 || Row->BuyPrice<0 || Row->SellPrice<0)return false;
-        if(Row->Kind==EPlayerItemKind::Equipment && (Row->StackLimit!=1 || Row->EquipSlot==EPlayerEquipSlot::None))return false;
+        if(Row->Kind==EPlayerItemKind::Equipment && (Row->StackLimit!=1 || Row->EquipSlot!=EPlayerEquipSlot::Weapon))return false;
         if(Row->Kind==EPlayerItemKind::Quest && (Row->bCanDiscard || Row->bCanSell))return false;
     }
     return true;

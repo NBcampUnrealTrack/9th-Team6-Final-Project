@@ -1,4 +1,5 @@
 #include "World/Spawn/ICSpawnSubsystem.h"
+#include "UI/Framework/ICText.h"
 #include "Inventory/Rewards/ICRewardService.h"
 #include "World/Anchors/ICWorldAnchor.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -11,6 +12,7 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
+#include "Components/CapsuleComponent.h"
 #include "Debug/ICLog.h"
 bool UICSpawnSubsystem::DoesSupportWorldType(EWorldType::Type Type) const { IC_TRACE_FUNCTION();return Type==EWorldType::Game||Type==EWorldType::PIE; }
 void UICSpawnSubsystem::OnWorldBeginPlay(UWorld& World)
@@ -37,13 +39,28 @@ AICCharacterBase* UICSpawnSubsystem::FindCharacter(FName ID) const
 bool UICSpawnSubsystem::FindSafePartyPlacement(FName ID,FTransform& Transform) const
 {
     IC_TRACE_FUNCTION();auto* Player=UGameplayStatics::GetPlayerPawn(GetWorld(),0);if(!Player)return false;
-    FCollisionQueryParams Q;Q.AddIgnoredActor(Player);if(auto* Existing=FindCharacter(ID))Q.AddIgnoredActor(Existing);
+    auto* Existing = FindCharacter(ID);
+    const auto* Capsule = Existing ? Existing->GetCapsuleComponent() : nullptr;
+    const float Radius = Capsule ? Capsule->GetScaledCapsuleRadius() : 42.f;
+    const float HalfHeight = Capsule ? Capsule->GetScaledCapsuleHalfHeight() : 90.f;
+    FCollisionQueryParams Q;Q.AddIgnoredActor(Player);if(Existing)Q.AddIgnoredActor(Existing);
+    FCollisionQueryParams Clearance;
+    if (Existing) Clearance.AddIgnoredActor(Existing);
+    auto* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+    const bool HasNavigation = Nav && Nav->GetDefaultNavDataInstance(FNavigationSystem::DontCreate);
+    // Prefer navigation, then allow clear walkable ground when the player has left the navigation bounds.
+    for (int32 Pass = 0; Pass < (HasNavigation ? 2 : 1); ++Pass)
     for(int32 I=0;I<12;++I)
     {
-        const double Angle=I*PI/6.;FVector Position=Player->GetActorLocation()+FVector(FMath::Cos(Angle),FMath::Sin(Angle),0)*(150+(I/6)*100);
-        FHitResult Floor;if(!GetWorld()->LineTraceSingleByChannel(Floor,Position+FVector(0,0,150),Position-FVector(0,0,400),ECC_Visibility,Q)||Floor.ImpactNormal.Z<.65)continue;Position=Floor.ImpactPoint+FVector(0,0,96);
-        if(GetWorld()->OverlapBlockingTestByChannel(Position,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(42,90),Q))continue;
-        if(auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))if(Nav->GetDefaultNavDataInstance(FNavigationSystem::DontCreate)) {FNavLocation Point;if(!Nav->ProjectPointToNavigation(Floor.ImpactPoint,Point,FVector(80,80,200)))continue;}
+        const double Angle=PI+I*PI/6.;FVector Position=Player->GetActorLocation()+Player->GetActorRotation().RotateVector(FVector(FMath::Cos(Angle),FMath::Sin(Angle),0))*(150+(I/6)*100);
+        if (HasNavigation && Pass == 0)
+        {
+            FNavLocation Point;
+            if (!Nav->ProjectPointToNavigation(Position, Point, FVector(80,80,200))) continue;
+            Position = Point.Location;
+        }
+        FHitResult Floor;if(!GetWorld()->LineTraceSingleByChannel(Floor,Position+FVector(0,0,150),Position-FVector(0,0,400),ECC_Visibility,Q)||Floor.ImpactNormal.Z<.65)continue;Position=Floor.ImpactPoint+FVector(0,0,HalfHeight+2);
+        if(GetWorld()->OverlapBlockingTestByChannel(Position,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(Radius,HalfHeight),Clearance))continue;
         Transform=FTransform(Player->GetActorRotation(),Position);return true;
     }
     return false;
@@ -125,16 +142,16 @@ bool UICSpawnSubsystem::CanReviveAtCurrentPlacement(AICCharacterBase* Target) co
 }
 AICNPCBase* UICSpawnSubsystem::ReserveReviveTarget(FName ID,UICAbilitySystemComponent* Caster,FString& Reason)
 {
-    IC_TRACE_FUNCTION();Reason.Empty();if(!Caster){Reason=TEXT("시전자가 없습니다.");return nullptr;}
+    IC_TRACE_FUNCTION();Reason.Empty();if(!Caster){Reason=ICText::Get(TEXT("Native_01e3d20fd15d")).ToString();return nullptr;}
     auto* S=GetWorld()->GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();auto* D=GetWorld()->GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();const auto State=S->GetSnapshot(ID);FTransform Transform;FICDefinitionResult R;
-    if(State.CharacterId.IsNone()||!State.IsDowned()||State.PartySlot<0||State.Kind!=EICCharacterKind::Recruitable){Reason=TEXT("부활할 Downed 동료가 없습니다.");return nullptr;}
-    if(auto* Existing=Cast<AICNPCBase>(FindCharacter(ID))){if(!CanReviveAtCurrentPlacement(Existing)){Reason=TEXT("안전하게 부활할 공간이 없습니다.");return nullptr;}Existing->HoldDownedActor();ReviveReservations.Add(ID,Caster);return Existing;}
-    if(!FindSafePartyPlacement(ID,Transform)){Reason=TEXT("안전하게 부활할 공간이 없습니다.");return nullptr;}
+    if(State.CharacterId.IsNone()||!State.IsDowned()||State.PartySlot<0||State.Kind!=EICCharacterKind::Recruitable){Reason=ICText::Get(TEXT("Native_e9d0ed549f03")).ToString();return nullptr;}
+    if(auto* Existing=Cast<AICNPCBase>(FindCharacter(ID))){if(!CanReviveAtCurrentPlacement(Existing)){Reason=ICText::Get(TEXT("Native_06b639551f1b")).ToString();return nullptr;}Existing->HoldDownedActor();ReviveReservations.Add(ID,Caster);return Existing;}
+    if(!FindSafePartyPlacement(ID,Transform)){Reason=ICText::Get(TEXT("Native_06b639551f1b")).ToString();return nullptr;}
     const auto* Row=D->Find<FICNPCRow>(ID,R);UClass* Type=Row?(Row->ActorClass.IsNull()?AICNPCBase::StaticClass():Row->ActorClass.LoadSynchronous()):nullptr;
-    if(!Type||!Type->IsChildOf(AICNPCBase::StaticClass())){Reason=TEXT("NPC 실행 클래스가 올바르지 않습니다.");return nullptr;}
+    if(!Type||!Type->IsChildOf(AICNPCBase::StaticClass())){Reason=ICText::Get(TEXT("Native_d21587f276c1")).ToString();return nullptr;}
     FActorSpawnParameters Params;Params.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     auto* Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Transform,Params);
-    if(!Actor||!Actor->InitializeNPC(ID)){if(Actor){Actor->ReleaseForLoad();Actor->Destroy();}Reason=TEXT("부활 대상의 상태를 준비하지 못했습니다.");return nullptr;}
+    if(!Actor||!Actor->InitializeNPC(ID)){if(Actor){Actor->ReleaseForLoad();Actor->Destroy();}Reason=ICText::Get(TEXT("Native_8bee5d678230")).ToString();return nullptr;}
     Actor->SetActorEnableCollision(false);NPCs.Add(ID,Actor);ReviveReservations.Add(ID,Caster);return Actor;
 }
 void UICSpawnSubsystem::Deinitialize()

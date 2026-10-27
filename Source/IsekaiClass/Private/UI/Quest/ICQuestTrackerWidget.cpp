@@ -1,4 +1,5 @@
 #include "UI/Quest/ICQuestTrackerWidget.h"
+#include "UI/Framework/ICText.h"
 
 #include "Components/TextBlock.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -11,6 +12,7 @@
 void UICQuestTrackerWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+    if (IsDesignTime() || !GetGameInstance()) return;
 
     if (UICWorldStateSubsystem* State = GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>())
     {
@@ -22,7 +24,7 @@ void UICQuestTrackerWidget::NativeConstruct()
 
 void UICQuestTrackerWidget::NativeDestruct()
 {
-    if (UICWorldStateSubsystem* State = GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>())
+    if (UICWorldStateSubsystem* State = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>() : nullptr)
     {
         State->OnInventoryChanged.RemoveDynamic(this, &ThisClass::RefreshQuests);
         State->OnWorldRestored.RemoveDynamic(this, &ThisClass::RefreshQuests);
@@ -32,6 +34,7 @@ void UICQuestTrackerWidget::NativeDestruct()
 
 void UICQuestTrackerWidget::RefreshQuests()
 {
+    if (!GetGameInstance() || !QuestText) return;
     UICWorldStateSubsystem* State = GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();
     UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
     UICQuestSubsystem* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>();
@@ -66,7 +69,7 @@ void UICQuestTrackerWidget::RefreshQuests()
                 const FICTextLookupResult Description = UICTextLibrary::ResolveText(Strings, Objective.DescriptionKey);
                 if (Description.bSuccess)
                 {
-                    Lines.Add(FText::Format(NSLOCTEXT("ICQuestTracker", "Objective", "  • {0}"),
+                    Lines.Add(FText::Format(ICText::Get(TEXT("Native_4dfde083f2db")),
                         FICQuestDisplay::FormatObjective(Description.Text, Objective, Quest, Snapshot, Quests)));
                 }
             }

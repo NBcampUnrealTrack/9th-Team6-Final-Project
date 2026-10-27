@@ -1,4 +1,5 @@
 #include "Combat/GAS/ICAbilitySystemComponent.h"
+#include "UI/Framework/ICText.h"
 #include "Combat/GAS/Attributes/ICAttributeSets.h"
 #include "Combat/GAS/Effects/ICGameplayEffects.h"
 #include "Combat/GAS/Abilities/ICGameplayAbility.h"
@@ -34,14 +35,14 @@ bool UICAbilitySystemComponent::CanRestore(const FICCharacterState& State, FStri
         || !FMath::IsFinite(State.MaxHP) || !FMath::IsFinite(State.MaxMP) || !FMath::IsFinite(State.MaxSP)
         || State.MaxHP < 1 || State.MaxMP < 0 || State.MaxSP < 0 || State.HP < 0 || State.HP > State.MaxHP
         || State.MP < 0 || State.MP > State.MaxMP || State.SP < 0 || State.SP > State.MaxSP)
-    { Reason = TEXT("GAS 자원 스냅샷이 올바르지 않습니다."); return false; }
+    { Reason = ICText::Get(TEXT("Native_cb3c4edccfa8")).ToString(); return false; }
     FICDefinitionResult Result;
     for (const auto& Effect : State.Combat.Effects)
         if (!Effect.InstanceID.IsValid() || !Definitions() || !Definitions()->Find<FICStatusEffectRow>(Effect.EffectID, Result))
-        { Reason = TEXT("복원할 상태 효과의 정의 또는 인스턴스가 없습니다."); return false; }
+        { Reason = ICText::Get(TEXT("Native_37891a2aeabd")).ToString(); return false; }
     for(const auto& Cooldown:State.Combat.SkillReadyAtPlaySecond)
         if(!FMath::IsFinite(Cooldown.Value)||Cooldown.Value<0||!Definitions()||!Definitions()->Find<FICSkillRow>(Cooldown.Key,Result))
-        {Reason=TEXT("복원할 쿨타임의 스킬 정의 또는 종료 시각이 올바르지 않습니다.");return false;}
+        {Reason=ICText::Get(TEXT("Native_3f8aa571532a")).ToString();return false;}
     return true;
 }
 bool UICAbilitySystemComponent::Restore(const FICCharacterState& State)
@@ -50,13 +51,16 @@ bool UICAbilitySystemComponent::Restore(const FICCharacterState& State)
     const bool IdentityChanged = Runtime.CharacterId != State.CharacterId;
 
     if (IdentityChanged) CancelAction();
+    for (const auto& Entry : CooldownEffectHandles) RemoveActiveGameplayEffect(Entry.Value);
+    CooldownEffectHandles.Reset();
     { TGuardValue<bool> Guard(bRestoring, true); Runtime = State; bReady = true;
     SetNumericAttributeBase(UICCombatAttributeSet::GetMaxHealthAttribute(), State.MaxHP);
     SetNumericAttributeBase(UICCombatAttributeSet::GetMaxManaAttribute(), State.MaxMP);
     if (Survival) SetNumericAttributeBase(UICSurvivalAttributeSet::GetMaxSPAttribute(), State.MaxSP);
-    RebuildDerivedStats(); SetVitals(State.HP, State.MP, State.SP); SyncEffectHandles();
+    RebuildDerivedStats(); SetVitals(State.HP, State.MP, State.SP); SyncEffectHandles(); SyncCooldownEffects();
     SetLooseGameplayTagCount(ICTags::Downed, State.IsDowned() ? 1 : 0);
     SetLooseGameplayTagCount(ICTags::Dead,State.HP<=0&&State.Kind!=EICCharacterKind::Recruitable?1:0);LastTickAt = PlaySecond(); }
+    UpdateShouldTick();
     OnStateChanged.Broadcast(); return true;
 }
 FICCharacterState UICAbilitySystemComponent::Capture() const
@@ -111,22 +115,37 @@ double UICAbilitySystemComponent::Stat(EICStat Value) const
         case EICStat::CriticalMultiplier:return Combat->GetCriticalMultiplier(); case EICStat::AutoDodgeChance:return Combat->GetAutoDodgeChance();
         case EICStat::STR:return Primary?Primary->GetSTR():0; case EICStat::DEX:return Primary?Primary->GetDEX():0;
         case EICStat::INT:return Primary?Primary->GetINT():0; case EICStat::CON:return Primary?Primary->GetCON():0;
-        case EICStat::CHA:return Primary?Primary->GetCHA():0; case EICStat::LUK:return Primary?Primary->GetLUK():0;
+        case EICStat::CHA:return 0; case EICStat::LUK:return Primary?Primary->GetLUK():0;
         default:return 0;
     }
 }
 bool UICAbilitySystemComponent::IsAlive() const
 { IC_TRACE_FUNCTION(); return bReady && Combat && Combat->GetHealth() > 0 && !HasMatchingGameplayTag(ICTags::Downed) && !HasMatchingGameplayTag(ICTags::Dead); }
+bool UICAbilitySystemComponent::GetShouldTick() const
+{
+    // GAS only knows its own tickable tasks. PlayClock actions, cooldowns and
+    // status effects also need ticks while this character has a restored state.
+    return bReady||Super::GetShouldTick();
+}
 bool UICAbilitySystemComponent::HasRecentCombat() const
 {
     IC_TRACE_FUNCTION(); FICDefinitionResult R; auto* Rule = Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;
-    return PlaySecond() - RecentCombatAt < (Rule ? Rule->RecentCombatPlaySeconds : 8);
+    const double Grace = Runtime.Kind == EICCharacterKind::Player ? (Rule ? Rule->PlayerCombatGracePlaySeconds : 5) : (Rule ? Rule->RecentCombatPlaySeconds : 8);
+    return IsAlive() && (HasMatchingGameplayTag(ICTags::Dodging) || PlaySecond() - RecentCombatAt < Grace);
 }
 void UICAbilitySystemComponent::MarkCombat() { IC_TRACE_FUNCTION(); RecentCombatAt = PlaySecond(); }
+double UICAbilitySystemComponent::GetMovementCooldownRemaining() const
+{
+    return FMath::Max(0.,DodgeReadyAt-PlaySecond());
+}
+float UICAbilitySystemComponent::GetMovementCooldownProgress() const
+{
+    return MovementCooldownDuration>0?FMath::Clamp(1.-GetMovementCooldownRemaining()/MovementCooldownDuration,0.,1.):1.f;
+}
 void UICAbilitySystemComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* Function)
 {
     IC_TRACE_FUNCTION(); Super::TickComponent(DeltaTime, TickType, Function); if (!bReady || bRestoring) return;
-    const double Now = PlaySecond(); if (Now > LastTickAt) { AdvanceEffects(Now); AdvanceAction(Now); LastTickAt = Now; }
+    const double Now = PlaySecond(); if (Now > LastTickAt) { AdvanceEffects(Now); SyncCooldownEffects(); AdvanceAction(Now); LastTickAt = Now; }
     if (Now >= StaggerUntil) SetLooseGameplayTagCount(ICTags::Staggered, 0);
     if (Combat->GetHealth() <= 0)
     {
@@ -136,10 +155,11 @@ void UICAbilitySystemComponent::TickComponent(float DeltaTime, ELevelTick TickTy
     }
 }
 void UICAbilitySystemComponent::Shutdown()
-{ IC_TRACE_FUNCTION(); CancelAction();SetGuarding(false); bReady = false; for (const auto& Entry : EffectHandles) RemoveActiveGameplayEffect(Entry.Value); EffectHandles.Reset(); }
+{ IC_TRACE_FUNCTION(); CancelAction();SetGuarding(false); bReady = false; for (const auto& Entry : EffectHandles) RemoveActiveGameplayEffect(Entry.Value); EffectHandles.Reset(); for (const auto& Entry : CooldownEffectHandles) RemoveActiveGameplayEffect(Entry.Value); CooldownEffectHandles.Reset();UpdateShouldTick(); }
 void UICAbilitySystemComponent::ResetExecutionForLoad()
 {
     IC_TRACE_FUNCTION();CancelAction();SetGuarding(false);RecentCombatAt=-100;DodgeReadyAt=StaggerReadyAt=StaggerUntil=0;
+    MovementCooldownDuration=MovementDuration=MovementDistance=MovementAlpha=0;
     ComboIndex=0;ComboReadyUntil=BufferedAttackUntil=0;SetLooseGameplayTagCount(ICTags::Staggered,0);
 }
 void UICAbilitySystemComponent::AdvanceNaturalSP(double Seconds)

@@ -7,8 +7,80 @@
 #include "Debug/ICLog.h"
 #include "UI/Framework/ICUIRootWidget.h"
 #include "CommonActivatableWidget.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/NavigationConfig.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/PanelWidget.h"
+#include "Components/WidgetSwitcher.h"
+#include "Components/TextBlock.h"
+#include "Settings/ICGameUserSettings.h"
+namespace
+{
+struct FICScaledFont {float Base=0,Applied=0;};
+TMap<TWeakObjectPtr<UTextBlock>,FICScaledFont> ScaledFonts;
+void ApplyUserTextScale(UWidget* Widget,float Scale)
+{
+    if(!Widget)return;
+    if(auto* Text=Cast<UTextBlock>(Widget))
+    {
+        auto Font=Text->GetFont();auto& Size=ScaledFonts.FindOrAdd(TWeakObjectPtr<UTextBlock>(Text),FICScaledFont{Font.Size,Font.Size});
+        if(!FMath::IsNearlyEqual(Font.Size,Size.Applied))Size.Base=Font.Size;
+        const float Desired=FMath::Max(8.f,Size.Base*Scale);
+        if(!FMath::IsNearlyEqual(Font.Size,Desired)){Font.Size=Desired;Text->SetFont(Font);}
+        Size.Applied=Desired;
+    }
+    else if(auto* User=Cast<UUserWidget>(Widget)){if(User->WidgetTree)ApplyUserTextScale(User->WidgetTree->RootWidget,Scale);}
+    else if(auto* Panel=Cast<UPanelWidget>(Widget))for(auto* Child:Panel->GetAllChildren())ApplyUserTextScale(Child,Scale);
+}
+UWidget* FirstKeyboardTarget(UWidget* Widget)
+{
+    if(!Widget||!Widget->IsVisible()||!Widget->GetIsEnabled())return nullptr;
+    if(auto* User=Cast<UUserWidget>(Widget))
+    {if(User->WidgetTree)if(auto* Target=FirstKeyboardTarget(User->WidgetTree->RootWidget))return Target;}
+    else if(auto* Switcher=Cast<UWidgetSwitcher>(Widget))
+    {if(auto* Target=FirstKeyboardTarget(Switcher->GetActiveWidget()))return Target;}
+    else if(auto* Panel=Cast<UPanelWidget>(Widget))
+        for(auto* Child:Panel->GetAllChildren())if(auto* Target=FirstKeyboardTarget(Child))return Target;
+    const auto Slate=Widget->GetCachedWidget();return Slate.IsValid()&&Slate->SupportsKeyboardFocus()?Widget:nullptr;
+}
+class FICKeyboardNavigation : public FNavigationConfig
+{
+public:
+    explicit FICKeyboardNavigation(TSharedRef<FNavigationConfig> InFallback):Fallback(InFallback){}
+    virtual EUINavigation GetNavigationDirectionFromKey(const FKeyEvent& Event) const override
+    {
+        const FKey Key=Event.GetKey();
+        if((Key==EKeys::W||Key==EKeys::A||Key==EKeys::S||Key==EKeys::D)&&!Event.IsControlDown()&&!Event.IsAltDown())
+        {
+            const auto Focus=FSlateApplication::Get().GetUserFocusedWidget(Event.GetUserIndex());
+            const FName Type=Focus.IsValid()?Focus->GetType():NAME_None;
+            // Character creation, save names and other text fields must still accept WASD letters.
+            if(Type==TEXT("SEditableText")||Type==TEXT("SMultiLineEditableText")||Type==TEXT("SEditableTextBox")||Type==TEXT("SMultiLineEditableTextBox"))return EUINavigation::Invalid;
+            return Key==EKeys::W?EUINavigation::Up:Key==EKeys::S?EUINavigation::Down:Key==EKeys::A?EUINavigation::Left:EUINavigation::Right;
+        }
+        return Fallback->GetNavigationDirectionFromKey(Event);
+    }
+    virtual EUINavigation GetNavigationDirectionFromAnalog(const FAnalogInputEvent& Event) override {return Fallback->GetNavigationDirectionFromAnalog(Event);}
+    virtual EUINavigationAction GetNavigationActionFromKey(const FKeyEvent& Event) const override {return Fallback->GetNavigationActionFromKey(Event);}
+private:
+    TSharedRef<FNavigationConfig> Fallback;
+};
+int32 KeyboardNavigationUsers=0;
+TSharedPtr<FNavigationConfig> PreviousKeyboardNavigation,KeyboardNavigation;
+void RegisterKeyboardNavigation()
+{
+    if(KeyboardNavigationUsers++==0)
+    {PreviousKeyboardNavigation=FSlateApplication::Get().GetNavigationConfig();KeyboardNavigation=MakeShared<FICKeyboardNavigation>(PreviousKeyboardNavigation.ToSharedRef());FSlateApplication::Get().SetNavigationConfig(KeyboardNavigation.ToSharedRef());}
+}
+void UnregisterKeyboardNavigation()
+{
+    if(--KeyboardNavigationUsers==0)
+    {if(FSlateApplication::IsInitialized()&&FSlateApplication::Get().GetNavigationConfig()==KeyboardNavigation)FSlateApplication::Get().SetNavigationConfig(PreviousKeyboardNavigation.ToSharedRef());KeyboardNavigation.Reset();PreviousKeyboardNavigation.Reset();}
+}
+}
 bool UICUIManagerSubsystem::EnsureRoot()
 {
+    if(!bKeyboardNavigationRegistered&&FSlateApplication::IsInitialized()){RegisterKeyboardNavigation();bKeyboardNavigationRegistered=true;}
     if (Root && Root->GetWorld() == GetWorld() && Root->IsInViewport())
         return true;
     if (Root)
@@ -16,14 +88,17 @@ bool UICUIManagerSubsystem::EnsureRoot()
     auto* PC = GetLocalPlayer()->GetPlayerController(GetWorld());
     if (!PC)
         return false;
-    auto* Class = LoadClass<UICUIRootWidget>(nullptr, TEXT("/Game/IsekaiClass/UI/Widget/WBP_UIRoot.WBP_UIRoot_C"));
-    Root = CreateWidget<UICUIRootWidget>(PC, Class ? Class : UICUIRootWidget::StaticClass());
+    Root = CreateWidget<UICUIRootWidget>(PC, UICUIRootWidget::StaticClass());
     return Root && Root->AddToPlayerScreen(0);
 }
 void UICUIManagerSubsystem::SetHUD(UUserWidget* Widget)
 {
     if (EnsureRoot())
         Root->SetHUD(Widget);
+}
+void UICUIManagerSubsystem::AddHUDWidget(UUserWidget* Widget)
+{
+    if(EnsureRoot())Root->AddHUDWidget(Widget);
 }
 bool UICUIManagerSubsystem::OpenScreen(UUserWidget* Widget, bool PauseWorld, int32 ZOrder)
 {
@@ -98,9 +173,11 @@ void UICUIManagerSubsystem::RefreshContext()
         if (Focus)
         {
             Mode.SetWidgetToFocus(Focus->TakeWidget());
+            UWidget* Desired=nullptr;
             if (auto* Active = Cast<UCommonActivatableWidget>(Focus))
-                if (auto* Desired = Active->GetDesiredFocusTarget())
-                    Mode.SetWidgetToFocus(Desired->TakeWidget());
+                Desired=Active->GetDesiredFocusTarget();
+            if(!Desired)Desired=FirstKeyboardTarget(Focus);
+            if(Desired)Mode.SetWidgetToFocus(Desired->TakeWidget());
         }
         PC->SetInputMode(Mode);
     }
@@ -140,6 +217,8 @@ void UICUIManagerSubsystem::CloseAllScreens()
 void UICUIManagerSubsystem::Tick(float DeltaTime)
 {
     IC_TRACE_FUNCTION();
+    if(Root)ApplyUserTextScale(Root,FMath::Clamp(UICGameUserSettings::Get()->UIScale,.75f,1.3f));
+    if(ScaledFonts.Num()>4096)for(auto It=ScaledFonts.CreateIterator();It;++It)if(!It.Key().IsValid())It.RemoveCurrent();
     bool Changed = false;
     for (int32 I = Screens.Num() - 1; I >= 0; --I)
         if (!Screens[I].Widget.IsValid() || (!Screens[I].Widget->GetCachedWidget().IsValid()))
@@ -173,5 +252,6 @@ void UICUIManagerSubsystem::Deinitialize()
 {
     IC_TRACE_FUNCTION();
     CloseAllScreens();
+    if(bKeyboardNavigationRegistered){UnregisterKeyboardNavigation();bKeyboardNavigationRegistered=false;}
     Super::Deinitialize();
 }

@@ -12,13 +12,13 @@ enum class EICDefinitionType : uint8
     Synergy , Monster , BossPattern , Region , Anchor , Spawner , Warp , Home , Item , Equipment ,
     Enhancement , Option , OptionPool , Reward , DropTable , Schedule , GiftPreference ,
     Dialogue , Service , Shop , Recipe , Production , Resource , Crop , Fish , FishingPoint ,
-    Quest , Progression , Ending , Codex , Landmark , Map , Hint , ResourceReference , IDRegistry
+    Quest , Progression , Ending , Codex , Landmark , Map , Hint , ResourceReference , IDRegistry , Ranching
 };
 
 UENUM(BlueprintType)
 enum class EICStat : uint8
 {
-    None , STR , DEX , INT , CON , CHA , LUK , MaxHP , MaxMP , MaxSP , PhysicalAttack ,
+    None , STR , DEX , INT , CON , CHA UMETA(Hidden), LUK , MaxHP , MaxMP , MaxSP , PhysicalAttack ,
     MagicAttack , Defense , AttackSpeed , MoveSpeed , CriticalChance , CriticalMultiplier , AutoDodgeChance
 };
 

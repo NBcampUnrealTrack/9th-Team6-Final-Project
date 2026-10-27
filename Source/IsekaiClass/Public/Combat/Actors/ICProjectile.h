@@ -5,6 +5,8 @@
 #include "ICProjectile.generated.h"
 class USphereComponent;
 class UProjectileMovementComponent;
+class UStaticMeshComponent;
+class UMaterialInterface;
 UCLASS()
 class ISEKAICLASS_API AICProjectile : public AActor
 {
@@ -12,17 +14,25 @@ class ISEKAICLASS_API AICProjectile : public AActor
 public:
     AICProjectile();
     virtual void Tick(float Seconds) override;
-    void InitializeShot(UICAbilitySystemComponent* Source, const FICSkillEffectRow& Effect, const FICSkillHitDefinition& Hit, const FICAttackCapture& Capture, FVector Direction);
+    void InitializeShot(UICAbilitySystemComponent* Source, const FICSkillEffectRow& Effect, const FICSkillHitDefinition& Hit, const FICAttackCapture& Capture, FVector Direction, const FICCombatPresentation& Presentation);
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<USphereComponent> Collision;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UProjectileMovementComponent> Movement;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Body;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> Trail;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UStaticMeshComponent> ArrowTip;
+    UPROPERTY() TSoftObjectPtr<UMaterialInterface> GlowMaterial;
     UFUNCTION() void Hit(UPrimitiveComponent* Component, AActor* Other, UPrimitiveComponent* OtherComponent, FVector Impulse, const FHitResult& Result);
 private:
     TWeakObjectPtr<UICAbilitySystemComponent> Source;
     FICSkillEffectRow Effect;
+    FICCombatPresentation Presentation;
     FICAttackCapture Captured;
     TSet<TWeakObjectPtr<AActor>> HitActors;
     bool bPierce = false, bStopAtWorld = true, bEnemySource = false;
     double ExpiresAt = 0;
     int32 RemainingTargets = 1;
+    EICWeaponFamily Family = EICWeaponFamily::None;
+    FVector ShotOrigin=FVector::ZeroVector;
+    double MaximumTravel=0, ShotSpeed=0;
 };
