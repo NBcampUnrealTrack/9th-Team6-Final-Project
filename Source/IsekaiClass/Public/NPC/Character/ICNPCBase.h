@@ -7,6 +7,7 @@
 
 class AICNPCBase;
 class AICPlayerController;
+class UICLifeObjectUserComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FICNPCInteractionStarted, AICNPCBase*, NPC, AICPlayerController*, Requester, FName, ServiceID);
 
@@ -76,6 +77,10 @@ public:
     FName NPCDefinitionID;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="IC|Quest") TObjectPtr<class UWidgetComponent> QuestMarker;
+
+    /** 생활 오브젝트(침대·의자·카운터 등) 예약/점유 상태. 연출 전용이며 저장하지 않는다. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="IC|Life") TObjectPtr<UICLifeObjectUserComponent> LifeObjectUser;
+    UFUNCTION(BlueprintPure, Category="IC|Life") UICLifeObjectUserComponent* GetLifeObjectUser() const { return LifeObjectUser; }
 
 protected:
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|NPC|Movement",meta=(ClampMin="0"))

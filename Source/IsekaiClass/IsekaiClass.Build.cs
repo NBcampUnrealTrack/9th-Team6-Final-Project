@@ -26,6 +26,7 @@ public class IsekaiClass : ModuleRules
             "GameplayTasks",
             "StateTreeModule",
             "GameplayStateTreeModule",
+            "SmartObjectsModule",
             "NavigationSystem",
             "Niagara",
             "GeometryCollectionEngine",

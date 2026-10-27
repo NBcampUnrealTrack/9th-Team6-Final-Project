@@ -20,10 +20,12 @@
 #include "Components/WidgetComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "UI/Quest/ICNPCQuestMarkerWidget.h"
+#include "NPC/LifeObject/ICLifeObjectUserComponent.h"
+#include "AI/ICNPCAIController.h"
 AICNPCBase::AICNPCBase()
 {
     IC_TRACE_FUNCTION();
-    AIControllerClass=AICAIController::StaticClass();
+    AIControllerClass=AICNPCAIController::StaticClass();
     AutoPossessAI=EAutoPossessAI::Disabled;
     QuestMarker=CreateDefaultSubobject<UWidgetComponent>(TEXT("QuestMarker"));
     QuestMarker->SetupAttachment(GetCapsuleComponent());
@@ -31,6 +33,7 @@ AICNPCBase::AICNPCBase()
     QuestMarker->SetDrawSize(FVector2D(70,80));
     QuestMarker->SetRelativeLocation(FVector(0,0,125));
     QuestMarker->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LifeObjectUser=CreateDefaultSubobject<UICLifeObjectUserComponent>(TEXT("LifeObjectUser"));
 
     auto* Movement=GetCharacterMovement();
     Movement->MaxWalkSpeed=ScheduleMoveSpeed;
@@ -89,6 +92,12 @@ void AICNPCBase::HandleTimeJumped(double FromGameMinute, double ToGameMinute)
     if (!bInitialized || !WorldState()) return;
     const FICCharacterState Previous = WorldState()->GetSnapshot(CharacterID);
     if (Previous.IsDowned() || Previous.Mode != EICCharacterMode::Scheduled) return;
+    if (LifeObjectUser)
+    {
+        // 시간 점프 전의 오브젝트 사용 상태를 이어가지 않는다. 새 시각 기준으로 오브젝트를 다시 고른다.
+        LifeObjectUser->ReleaseAll(TEXT("TimeJump"));
+        LifeObjectUser->RequestReschedule(TEXT("TimeJump"));
+    }
 
     auto* Definitions = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>() : nullptr;
     auto* Spawns = GetWorld() ? GetWorld()->GetSubsystem<UICSpawnSubsystem>() : nullptr;
@@ -131,7 +140,7 @@ void AICNPCBase::RefreshExecution()
 }
 void AICNPCBase::HandleZeroHP()
 {
-    IC_TRACE_FUNCTION();if(bZeroHPHandled)return;EndInteraction();if(auto* AI=Cast<AICAIController>(GetController()))AI->StopExecution();
+    IC_TRACE_FUNCTION();if(bZeroHPHandled)return;EndInteraction();if(LifeObjectUser)LifeObjectUser->ReleaseAll(TEXT("ZeroHP"));if(auto* AI=Cast<AICAIController>(GetController()))AI->StopExecution();
 
     SetActorEnableCollision(false);GetWorldTimerManager().SetTimer(DefeatTimer,this,&AActor::K2_DestroyActor,1.f,false);
     Super::HandleZeroHP();
@@ -145,7 +154,7 @@ void AICNPCBase::StoredCharacterChanged(FName ID)
     if(ID==CharacterID&&AbilitySystem){const auto Current=AbilitySystem->Capture();if(Previous.Mode!=Current.Mode||Previous.LifeState!=Current.LifeState)RefreshExecution();}
 }
 void AICNPCBase::RestoreFromWorldState_Implementation(const FICWorldState& Candidate)
-{ IC_TRACE_FUNCTION();Super::RestoreFromWorldState_Implementation(Candidate);RefreshExecution(); }
+{ IC_TRACE_FUNCTION();if(LifeObjectUser)LifeObjectUser->ReleaseAll(TEXT("Load"));Super::RestoreFromWorldState_Implementation(Candidate);RefreshExecution(); }
 TArray<FName> AICNPCBase::GetAvailableServices() const
 {
     IC_TRACE_FUNCTION();
@@ -167,9 +176,14 @@ bool AICNPCBase::TryInteract(AICPlayerController* Requester)
     const auto State=WorldState()->GetSnapshot(CharacterID);
     if(State.IsDowned()||(State.Mode!=EICCharacterMode::Scheduled&&!CanDismiss()))
     {UE_LOG(LogICInteraction,Verbose,TEXT("[NPC.InteractRejected] NPC=%s Mode=%d Downed=%d"),*CharacterID.ToString(),static_cast<int32>(State.Mode),State.IsDowned()?1:0);return false;}
+    // 취침 중 NPC는 일반 대화 후보에서 제외한다(NPC 최신 구현 규칙 3장).
+    if(LifeObjectUser&&LifeObjectUser->IsSleeping())
+    {UE_LOG(LogICInteraction,Verbose,TEXT("[NPC.InteractRejected] NPC=%s Reason=Sleeping"),*CharacterID.ToString());return false;}
     const TArray<FName> Services=GetAvailableServices();
     const FName ServiceID=Services.Num()>0?Services[0]:NAME_None;
     bInteracting=true;
+    // 대화를 시작하면 생활 행동과 오브젝트 점유를 즉시 해제한다.
+    if(LifeObjectUser)LifeObjectUser->ReleaseAll(TEXT("Dialogue"));
     if(auto* AI=Cast<AICAIController>(GetController()))AI->SetInteractionHold(true,Requester->GetPawn());
     UE_LOG(LogICInteraction,Log,TEXT("[NPC.Interact] NPC=%s Service=%s"),*CharacterID.ToString(),*ServiceID.ToString());
     OnInteractionStarted.Broadcast(this,Requester,ServiceID);
@@ -185,6 +199,8 @@ void AICNPCBase::EndInteraction()
         AI->SetInteractionHold(false,nullptr);
         AI->RestoreScheduleFacing();
     }
+    // 대화가 끝나면 현재 GameClock 기준 일과를 다시 계산해 복귀한다.
+    if(LifeObjectUser)LifeObjectUser->RequestReschedule(TEXT("DialogueEnded"));
     UE_LOG(LogICInteraction,Log,TEXT("[NPC.InteractEnd] NPC=%s"),*CharacterID.ToString());
 }
 bool AICNPCBase::TryGiveGift(AICPlayerController* Requester, FName ItemID)

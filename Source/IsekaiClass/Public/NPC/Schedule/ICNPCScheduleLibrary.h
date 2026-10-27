@@ -16,6 +16,9 @@ struct ISEKAICLASS_API FICNPCScheduleResolution
     UPROPERTY(BlueprintReadOnly, Category="IC|NPC|Schedule") EICScheduleActivity Activity = EICScheduleActivity::Idle;
     UPROPERTY(BlueprintReadOnly, Category="IC|NPC|Schedule") FName DepartureAnchorID;
     UPROPERTY(BlueprintReadOnly, Category="IC|NPC|Schedule") FName DestinationAnchorID;
+    UPROPERTY(BlueprintReadOnly, Category="IC|NPC|Schedule") FGameplayTag ActivityTag;
+    UPROPERTY(BlueprintReadOnly, Category="IC|NPC|Schedule") int32 StartGameMinute = 0;
+    UPROPERTY(BlueprintReadOnly, Category="IC|NPC|Schedule") int32 EndGameMinute = 0;
 };
 
 /** Single source of truth for resolving an NPC's data-driven daily schedule. */

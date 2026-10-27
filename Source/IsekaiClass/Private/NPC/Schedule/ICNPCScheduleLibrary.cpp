@@ -20,5 +20,8 @@ FICNPCScheduleResolution UICNPCScheduleLibrary::ResolveSchedule(const FICSchedul
     Result.Activity = Segment->Activity;
     Result.DepartureAnchorID = Segment->DepartureAnchorID;
     Result.DestinationAnchorID = Segment->DestinationAnchorID;
+    Result.ActivityTag = Segment->ActivityTag;
+    Result.StartGameMinute = Segment->StartGameMinute;
+    Result.EndGameMinute = Segment->EndGameMinute;
     return Result;
 }
