@@ -13,6 +13,10 @@
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Components/Button.h"
+#include "Components/Border.h"
+#include "Components/HorizontalBox.h"
+#include "Components/SizeBox.h"
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Kismet/GameplayStatics.h"
@@ -67,6 +71,37 @@ bool FICQuestMenuCheck::RunTest(const FString&)
         }
         TestTrue(TEXT("Reset to the isolated journal fixture"),State->RestoreState(Data));UI->RefreshQuests();
         auto* Detail=CastChecked<UICQuestDetailWidget>(UI->GetWidgetFromName(TEXT("QuestDetail")));
+        auto* RewardEntries=Cast<UVerticalBox>(Detail->GetWidgetFromName(TEXT("RewardEntries")));
+        if(TestNotNull(TEXT("Existing detail Blueprint gains reward cards"),RewardEntries))
+        {
+            auto* Reward=const_cast<FICRewardRow*>(D->Find<FICRewardRow>(TEXT("RWD_RING_001"),R));
+            if(TestNotNull(TEXT("Actual item reward fixture resolves"),Reward))
+            {
+                TGuardValue<FName> QuestReward(TalkRow->RewardID,TEXT("RWD_RING_001"));
+                TGuardValue<FICRewardRow> RestoreReward(*Reward,*Reward);
+                Reward->Gold=125;Reward->Affinity.Reset();
+                FICAffinityReward Affinity;Affinity.NPCID=TEXT("NPC_R01_001");Affinity.Amount=30;Reward->Affinity.Add(Affinity);
+                Reward->UnlockRecipeIDs={TEXT("RCP_COOK_001")};
+                const int32 GoldBeforePreview=State->ExportState().Gold;
+                Detail->Present(Talk);
+                TestEqual(TEXT("Gold, item, affinity and recipe have separate cards"),RewardEntries->GetChildrenCount(),4);
+                const auto Summary=CastChecked<UTextBlock>(Detail->GetWidgetFromName(TEXT("TXT_Rewards")))->GetText().ToString();
+                TestTrue(TEXT("Actual amounts are previewed"),Summary.Contains(TEXT("125"))&&Summary.Contains(TEXT("× 10"))&&Summary.Contains(TEXT("+30")));
+                TestTrue(TEXT("Recipe unlock is identified"),Summary.Contains(TEXT("제작법 해금")));
+                auto* GoldRow=CastChecked<UHorizontalBox>(CastChecked<UBorder>(RewardEntries->GetChildAt(0))->GetContent());
+                auto* GoldIcon=Cast<UImage>(CastChecked<USizeBox>(GoldRow->GetChildAt(0))->GetContent());
+                TestTrue(TEXT("Gold uses an actual coin icon"),GoldIcon&&GoldIcon->GetBrush().GetResourceObject());
+                TestTrue(TEXT("Item card exposes a hover tooltip"),!RewardEntries->GetChildAt(1)->GetToolTipText().IsEmpty());
+                Detail->Present(Talk);
+                TestEqual(TEXT("Refresh replaces cards without duplicates"),RewardEntries->GetChildrenCount(),4);
+                TestEqual(TEXT("Preview does not grant gold"),State->ExportState().Gold,GoldBeforePreview);
+            }
+            {
+                TGuardValue<FName> NoReward(TalkRow->RewardID,NAME_None);Detail->Present(Talk);
+                TestEqual(TEXT("No reward clears previous cards"),RewardEntries->GetChildrenCount(),1);
+                TestEqual(TEXT("No reward is explicitly labeled"),CastChecked<UTextBlock>(Detail->GetWidgetFromName(TEXT("TXT_Rewards")))->GetText().ToString(),FString(TEXT("없음")));
+            }
+        }
         auto* Tracker=CastChecked<UICQuestTrackerWidget>(HUD->GetWidgetFromName(TEXT("HUD_QuestTracker")));
         auto TrackerText=[&](){return CastChecked<UTextBlock>(Tracker->GetWidgetFromName(TEXT("QuestText")))->GetText().ToString();};
         auto Label=[&](const TCHAR* Name){return CastChecked<UTextBlock>(Detail->GetWidgetFromName(Name))->GetText().ToString();};
