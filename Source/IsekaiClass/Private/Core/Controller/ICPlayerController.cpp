@@ -35,6 +35,8 @@
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
+#include "Settings/ICGameUserSettings.h"
+#include "InputAction.h"
 #include "UI/Settings/ICSettingsWidget.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Core/Flow/ICGameFlowSubsystem.h"
@@ -79,6 +81,7 @@ void AICPlayerController::BeginPlay()
         PlayerCameraManager->UpdateCamera(0.f);
     }
     UE_LOG(LogICCore, Log, TEXT("[Player.BeginPlay] Controller=%s Pawn=%s Local=%d"),*GetNameSafe(this),*GetNameSafe(GetPawn()),IsLocalController());
+    if(IsLocalController())UICGameUserSettings::Get()->ApplyRuntime(this);
     if (IsLocalController() && IsMainMenuLevel())
     {
         InitializeMainMenu();
@@ -134,7 +137,7 @@ void AICPlayerController::BindPawnSystems()
     BoundInventory->OnMessage.AddUniqueDynamic(this,&ThisClass::InventoryMessage);
     BoundInventory->OnLootResult.AddUniqueDynamic(this,&ThisClass::InventoryLootResult);
     BoundInventory->CurrentClass=Job;
-    if(auto* C=Cast<AICPlayerCharacter>(GetPawn())){GConfig->GetFloat(TEXT("/Script/IsekaiClass.Input"),TEXT("CameraSensitivity"),C->CameraSensitivity,GGameUserSettingsIni);C->CameraSensitivity=FMath::Clamp(C->CameraSensitivity,.1f,3.f);C->InitializeState(UICWorldStateSubsystem::PlayerId());if(auto* ASC=C->GetICAbilitySystem())ASC->OnStateChanged.AddUniqueDynamic(this,&ThisClass::CombatCacheChanged);}
+    if(auto* C=Cast<AICPlayerCharacter>(GetPawn())){UICGameUserSettings::Get()->ApplyRuntime(this);C->InitializeState(UICWorldStateSubsystem::PlayerId());if(auto* ASC=C->GetICAbilitySystem())ASC->OnStateChanged.AddUniqueDynamic(this,&ThisClass::CombatCacheChanged);}
 }
 
 void AICPlayerController::UnbindPawnSystems()
@@ -214,15 +217,18 @@ void AICPlayerController::TryInitializeGameplay()
 void AICPlayerController::ApplyInputMapping()
 {
     IC_TRACE_FUNCTION();
-    if (!IsLocalController() || IsMainMenuLevel() || AppliedMappingContext==DefaultMappingContext) return;
+    if (!IsLocalController() || IsMainMenuLevel() || AppliedMappingContext) return;
     if (ULocalPlayer* LocalPlayer=GetLocalPlayer())
         if (auto* Input=LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
         {
             RemoveInputMapping();
             if (DefaultMappingContext)
             {
-                Input->AddMappingContext(DefaultMappingContext,MappingPriority);
-                AppliedMappingContext=DefaultMappingContext;
+                const UInputAction* Roll=nullptr;for(const auto& Binding:CommandActions)if(Binding.Command==EICInputCommand::Roll)Roll=Binding.Action;
+                UserMappingContext=UICGameUserSettings::Get()->MakeInputMapping(DefaultMappingContext,this,MoveAction,Roll);
+                Input->AddMappingContext(UserMappingContext,MappingPriority);
+                AppliedMappingContext=UserMappingContext;
+                if(CameraMappingContext)Input->AddMappingContext(CameraMappingContext,MappingPriority);
     UE_LOG(LogICInput, Log, TEXT("[Input.MappingApplied] Controller=%s IMC=%s Priority=%d"),*GetNameSafe(this),*GetPathNameSafe(DefaultMappingContext),MappingPriority);
             }
         }
@@ -233,9 +239,18 @@ void AICPlayerController::RemoveInputMapping()
     IC_TRACE_FUNCTION();
     if (ULocalPlayer* LocalPlayer=GetLocalPlayer())
         if (auto* Input=LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+        {
             if (AppliedMappingContext) Input->RemoveMappingContext(AppliedMappingContext);
+            if (CameraMappingContext) Input->RemoveMappingContext(CameraMappingContext);
+        }
     if(AppliedMappingContext) UE_LOG(LogICInput, Log, TEXT("[Input.MappingRemoved] Controller=%s IMC=%s"),*GetNameSafe(this),*GetPathNameSafe(AppliedMappingContext));
     AppliedMappingContext=nullptr;
+    UserMappingContext=nullptr;
+}
+
+void AICPlayerController::RefreshUserInputMapping()
+{
+    FlushPressedKeys();RemoveInputMapping();ApplyInputMapping();
 }
 
 void AICPlayerController::UpdateScreens()

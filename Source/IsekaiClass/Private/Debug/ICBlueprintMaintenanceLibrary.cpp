@@ -10,6 +10,8 @@
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Framework/ICUIRootWidget.h"
+#include "UI/Settings/ICSettingsWidget.h"
+#include "Editor.h"
 #include "UI/Framework/ICDisplayPolicy.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
@@ -135,9 +137,14 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
 {
 #if WITH_EDITOR
     auto* BP=Cast<UWidgetBlueprint>(Blueprint);if(!BP||!BP->WidgetTree||Width<1||Height<1||!FSlateApplication::IsInitialized())return false;
-    auto* Preview=NewObject<UICUIRootWidget>(GetTransientPackage());
-    Preview->WidgetTree=DuplicateObject<UWidgetTree>(BP->WidgetTree,Preview);Preview->SetIsEnabled(true);
-    if(Question>=0&&Question<5)
+    const bool bSettings=BP->GetFName()==TEXT("WBP_IC_Settings");
+    UUserWidget* Preview=nullptr;
+    if(bSettings)Preview=NewObject<UICSettingsWidget>(GetTransientPackage(),BP->GeneratedClass);
+    else Preview=NewObject<UICUIRootWidget>(GetTransientPackage());
+    if(!Preview)return false;
+    if(bSettings)Preview->Initialize();
+    if(!bSettings)Preview->WidgetTree=DuplicateObject<UWidgetTree>(BP->WidgetTree,Preview);Preview->SetIsEnabled(true);
+    if(!bSettings&&Question>=0&&Question<5)
     {
         auto SetText=[Preview](const TCHAR* Name,FText Text){if(auto* Widget=Cast<UTextBlock>(Preview->WidgetTree->FindWidget(Name)))Widget->SetText(Text);};
         SetText(TEXT("TXT_Question"),ICFrontendLayout::Text(*FString::Printf(TEXT("Question%d"),Question+1)));
@@ -155,6 +162,7 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
     }
     FWidgetRenderer Renderer(true);
     TSharedRef<SWidget> Surface=Preview->TakeWidget();
+    if(auto* Settings=Cast<UICSettingsWidget>(Preview))Settings->SelectTab(FMath::Clamp(Question,0,4));
     if(BP->GetFName()==TEXT("WBP_GameHUD")||BP->GetFName()==TEXT("WBP_IC_GameMenu"))
         Surface=SNew(SBorder).Padding(0).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
             .BorderBackgroundColor(FLinearColor(.055f,.075f,.10f))

@@ -21,6 +21,7 @@
 #include "InputKeyEventArgs.h"
 #include "InputMappingContext.h"
 #include "Components/BoxComponent.h"
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICMovementInputCheck,"IC.Input.MovementAndCooldown",
@@ -97,7 +98,10 @@ bool FICMovementInputCheck::RunTest(const FString& Parameters)
     Refresh();if(Widget)TestEqual(TEXT("Ready ring is complete"),Widget->Progress,1.f);
     if(Ring)TestEqual(TEXT("Ready characters show no ring"),Ring->GetVisibility(),ESlateVisibility::Hidden);
     Key(EKeys::LeftShift,true);
-    TestTrue(TEXT("Shift starts a dash out of combat"),ASC->GetActionID().IsValid());
+    TestTrue(TEXT("Shift holds sprint out of combat"),Player->bSprintHeld);
+    TestFalse(TEXT("Sprinting starts no dash ability or cooldown"),ASC->GetActionID().IsValid());
+    Key(EKeys::LeftShift,false);TestFalse(TEXT("Releasing Shift ends sprint intent"),Player->bSprintHeld);
+    TestTrue(TEXT("The dash ability remains available"),ASC->RequestAction(TEXT("Dash"),NAME_None,nullptr).bSuccess);
     TestFalse(TEXT("Dash grants no combat invulnerability"),ASC->HasMatchingGameplayTag(ICTags::Invulnerable));
     TestEqual(TEXT("Dash starts the existing 3-second cooldown"),ASC->GetMovementCooldownRemaining(),3.);
     const FGuid DashID=ASC->GetActionID();Key(EKeys::LeftShift,false);Key(EKeys::LeftShift,true);
@@ -120,12 +124,12 @@ bool FICMovementInputCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Rejected retry preserves dodge invulnerability"),ASC->HasMatchingGameplayTag(ICTags::Invulnerable));Key(EKeys::RightShift,false);
     Refresh();if(Ring)TestEqual(TEXT("Dodge reveals the ring again without a label"),Ring->GetVisibility(),ESlateVisibility::HitTestInvisible);
     const FVector DodgeStart=Player->GetActorLocation();Step(.25);
-    TestTrue(TEXT("Dodge uses its separate 300cm distance"),FMath::IsNearlyEqual(Player->GetActorLocation().X-DodgeStart.X,300.,.1));
+    TestTrue(TEXT("No-input combat dodge moves 300cm backward"),FMath::IsNearlyEqual(Player->GetActorLocation().X-DodgeStart.X,-300.,.1));
     TestFalse(TEXT("Dodge immunity ends with the action"),ASC->HasMatchingGameplayTag(ICTags::Invulnerable));
     TestFalse(TEXT("Dash and dodge share one cooldown"),ASC->RequestAction(TEXT("Dash"),NAME_None,nullptr).bSuccess);
     ASC->ResetExecutionForLoad();Refresh();if(Widget)TestTrue(TEXT("Loading resets transient movement cooldown UI"),Widget->bReady&&Widget->Progress==1.f);
 
-    Player->SetActorLocation({0,0,100});auto* Wall=World->SpawnActor<AActor>();
+    Player->SetActorLocation({0,0,100});Player->SetActorRotation(FRotator::ZeroRotator);auto* Wall=World->SpawnActor<AActor>();
     auto* Box=NewObject<UBoxComponent>(Wall);Wall->SetRootComponent(Box);Wall->AddInstanceComponent(Box);
     Box->SetBoxExtent({10,500,500});Box->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     Box->SetCollisionObjectType(ECC_WorldStatic);Box->SetCollisionResponseToAllChannels(ECR_Block);Box->RegisterComponent();Wall->SetActorLocation({200,0,100});
@@ -136,6 +140,33 @@ bool FICMovementInputCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Half fill advances to 6 o'clock"),UICRadialCooldownBar::ClockwisePoint(.5).Equals({0,1},.001));
     auto* HUD=PC->GameplayWidgetClass?CreateWidget<UICGameplayWidget>(PC,PC->GameplayWidgetClass):nullptr;
     TestNotNull(TEXT("HUD includes the separate movement cooldown WBP"),HUD?Cast<UICMovementCooldownWidget>(HUD->GetWidgetFromName(TEXT("HUD_MovementCooldown"))):nullptr);
+    auto* SkillPanel=HUD?HUD->GetWidgetFromName(TEXT("HUD_SkillCooldown")):nullptr;
+    auto* SkillRing=HUD?Cast<UICRadialCooldownBar>(HUD->GetWidgetFromName(TEXT("RING_SkillCooldown"))):nullptr;
+    auto* SkillSeconds=HUD?Cast<UTextBlock>(HUD->GetWidgetFromName(TEXT("TXT_SkillCooldown"))):nullptr;
+    TestNotNull(TEXT("HUD includes the Q skill cooldown panel"),SkillPanel);
+    TestNotNull(TEXT("Q skill cooldown uses the reusable ring"),SkillRing);
+    if(ASC->GetCurrentWeaponSkill().IsNone())
+    {
+        TestTrue(TEXT("Add a sword before testing its Q skill"),Player->Inventory->AddItem(TEXT("EQP_WPN_SWORD_001"),1,false));
+        const auto Inventory=Player->Inventory->GetSnapshot();
+        const int32 Sword=Inventory.Bag.Slots.IndexOfByPredicate([](const FPlayerItemInstance& Item){return Item.ItemID==TEXT("EQP_WPN_SWORD_001");});
+        TestTrue(TEXT("Equip the sword before testing its Q skill"),Sword!=INDEX_NONE&&Player->Inventory->Equip(Sword));
+    }
+    if(HUD)HUD->RefreshSkillCooldown();
+    TestEqual(TEXT("Ready Q skill is visible"),SkillPanel?SkillPanel->GetVisibility():ESlateVisibility::Collapsed,ESlateVisibility::HitTestInvisible);
+    TestEqual(TEXT("Ready Q skill hides its countdown"),SkillSeconds?SkillSeconds->GetVisibility():ESlateVisibility::Visible,ESlateVisibility::Hidden);
+    const FName SkillID=ASC->GetCurrentWeaponSkill();
+    ASC->CancelAction();
+    const auto SkillAction=ASC->RequestAction(TEXT("Skill"),SkillID,nullptr);
+    TestTrue(TEXT("Q starts its equipped weapon skill"),SkillAction.bSuccess);
+    TestTrue(TEXT("Q effect starts its configured cooldown"),ASC->NotifyCombatEvent(SkillAction.ActionID,TEXT("AN_EffectCommit"),0));
+    if(HUD)HUD->RefreshSkillCooldown();
+    TestEqual(TEXT("Active Q cooldown reveals the ring"),SkillRing?SkillRing->GetVisibility():ESlateVisibility::Hidden,ESlateVisibility::HitTestInvisible);
+    TestEqual(TEXT("Active Q cooldown shows whole remaining seconds"),SkillSeconds?SkillSeconds->GetText().ToString():FString(),FString(TEXT("20")));
+    TestTrue(TEXT("Used Q ring starts empty"),SkillRing&&FMath::IsNearlyZero(SkillRing->Progress));
+    ASC->CancelAction();Step(10);if(HUD)HUD->RefreshSkillCooldown();
+    TestTrue(TEXT("Half of Q cooldown fills half of the ring"),SkillRing&&FMath::IsNearlyEqual(SkillRing->Progress,.5f));
+    TestEqual(TEXT("Q countdown follows play time"),SkillSeconds?SkillSeconds->GetText().ToString():FString(),FString(TEXT("10")));
     if(Widget)Widget->ReleaseSlateResources(true);Player->ReleaseForLoad();GI->Shutdown();GEngine->DestroyWorldContext(World);World->DestroyWorld(false);
     return !HasAnyErrors();
 }

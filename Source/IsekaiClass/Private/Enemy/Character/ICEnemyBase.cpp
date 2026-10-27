@@ -1,4 +1,5 @@
 #include "Enemy/Character/ICEnemyBase.h"
+#include "Settings/ICGameUserSettings.h"
 #include "Inventory/Rewards/ICRewardService.h"
 #include "AI/ICAIController.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
@@ -132,6 +133,7 @@ void AICEnemyBase::PlayHitReaction()
 void AICEnemyBase::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if(HealthBar)HealthBar->SetVisibility(UICGameUserSettings::Get()->bEnemyHealthBars&&!bDefeatCommitted&&AbilitySystem&&AbilitySystem->IsAlive());
     if(!bEnemyInitialized||bDefeatCommitted||!AbilitySystem->IsAlive()||!Definition.AnimationClass.IsNull())return;
     if(AbilitySystem->PlaySecond()<HitAnimationUntil)return;
     const FGuid Action=AbilitySystem->GetActionID();

@@ -85,6 +85,7 @@ public:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void SetupInputComponent() override;
     virtual void FlushPressedKeys() override;
+    void RefreshUserInputMapping();
     virtual void PlayerTick(float DeltaSeconds) override;
     virtual void OnPossess(APawn* InPawn) override;
     virtual void OnUnPossess() override;
@@ -254,11 +255,17 @@ private:
     void ApplyInputMapping();
     void RemoveInputMapping();
     void Move(const FInputActionValue& Value);
+    void StopMove(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
+    void ZoomCamera(const FInputActionValue& Value);
+    UPROPERTY(Transient) TObjectPtr<UInputAction> CameraZoomAction;
+    UPROPERTY(Transient) TObjectPtr<UInputMappingContext> CameraMappingContext;
+    bool bCameraLockOn=false;
     void CancelInputCommand(EICInputCommand Command,int32 Slot);
     void ResetHeldInput();
     bool CanHandleGameplayInput() const;
     bool bGameplayInitialized=false;
     UPROPERTY(Transient) TObjectPtr<UICInventoryComponent> BoundInventory;
     UPROPERTY(Transient) TObjectPtr<UInputMappingContext> AppliedMappingContext;
+    UPROPERTY(Transient) TObjectPtr<UInputMappingContext> UserMappingContext;
 };
