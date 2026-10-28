@@ -1,4 +1,5 @@
 #include "Data/Text/ICTextLibrary.h"
+#include "Data/Text/ICLocalization.h"
 #include "Debug/ICLog.h"
 #include "Internationalization/StringTable.h"
 #include "Internationalization/StringTableCore.h"
@@ -34,7 +35,7 @@ FICTextLookupResult UICTextLibrary::ResolveText(UStringTable* Table, const FStri
             Result.FailureReason = FString::Printf(TEXT("Key '%s' has an empty source string in '%s'."), *Key, *Table->GetPathName());
         else
         {
-            Result.Text = FText::FromStringTable(Table->GetStringTableId(), Key);
+            Result.Text = ICLocalization::Localize(FText::FromStringTable(Table->GetStringTableId(), Key));
             Result.bSuccess = true;
         }
     }

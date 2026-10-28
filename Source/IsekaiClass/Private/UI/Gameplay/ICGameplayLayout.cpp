@@ -184,6 +184,9 @@ void QuickSlot(UWidgetTree* Tree)
     auto* CountSlot = Content->AddChildToOverlay(Count);
     CountSlot->SetHorizontalAlignment(HAlign_Right);
     CountSlot->SetVerticalAlignment(VAlign_Bottom);
+    auto* Key=Label(Tree,TEXT("TXT_SlotKey"),FText::FromString(TEXT("1")),14);
+    Key->SetShadowColorAndOpacity(FLinearColor::Black);Key->SetShadowOffset(FVector2D(1,1));
+    auto* KeySlot=Content->AddChildToOverlay(Key);KeySlot->SetHorizontalAlignment(HAlign_Left);KeySlot->SetVerticalAlignment(VAlign_Top);
 }
 
 void QuickSlots(UWidgetTree* Tree)
@@ -193,7 +196,7 @@ void QuickSlots(UWidgetTree* Tree)
     for (int32 Index = 0; Index < 4; ++Index)
         if (auto* Widget = Child(Tree, TEXT("WBP_IC_QuickSlot"), FName(*FString::Printf(TEXT("QuickSlot%d"), Index + 1))))
         {
-            Widget->SetVisibility(ESlateVisibility::Collapsed);
+            Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
             // Transparent cells preserve each registered slot's position when another slot is empty.
             Bar->AddChildToHorizontalBox(Size(Tree, Widget, 64, 64))->SetPadding(FMargin(Index > 0 ? 10 : 0, 0, 0, 0));
         }
@@ -328,7 +331,7 @@ void HUD(UWidgetTree* Tree)
             Place(Canvas, Widget, Anchor, Alignment, Position, Extent);
         }
     };
-    Add(TEXT("WBP_IC_Minimap"), TEXT("HUD_Minimap"), {0, 0}, {0, 0}, {32, 32}, {240, 240});
+    Add(TEXT("WBP_IC_Minimap"), TEXT("HUD_Minimap"), {0, 0}, {0, 0}, {32, 32}, {240, 140});
     Add(TEXT("WBP_IC_PlayerStatus"), TEXT("HUD_PlayerStatus"), {0, 1}, {0, 1}, {32, -32}, {350, 200});
     Add(TEXT("WBP_IC_CompanionGroup"), TEXT("HUD_Companions"), {0, 1}, {0, 1}, {32, -248}, {350, 280});
     if (auto* Companions = Tree->FindWidget(TEXT("HUD_Companions")))
@@ -480,8 +483,20 @@ bool Build(UWidgetTree* Tree, FName Kind)
         Row(Content, Text, 0);
     }
     else if (Kind == TEXT("GameMenu")) GameMenu(Tree);
-    else if (Kind == TEXT("HUD")) HUD(Tree);
+    else if (Kind == TEXT("HUD")) {HUD(Tree);EnsureGameClock(Tree);}
     else return false;
+    return true;
+}
+bool EnsureGameClock(UWidgetTree* Tree)
+{
+    auto* Canvas=Tree?Cast<UCanvasPanel>(Tree->FindWidget(TEXT("HUDCanvas"))):nullptr;if(!Canvas)return false;
+    if(!Tree->FindWidget(TEXT("TXT_GameClock")))
+    {
+        auto* Clock=Label(Tree,TEXT("TXT_GameClock"),FText::GetEmpty(),18);
+        Clock->SetJustification(ETextJustify::Center);Clock->SetVisibility(ESlateVisibility::HitTestInvisible);
+        Place(Canvas,Clock,{0,0},{0,0},{32,20},{240,30});
+    }
+    if(auto* Map=Tree->FindWidget(TEXT("HUD_Minimap")))if(auto* Slot=Cast<UCanvasPanelSlot>(Map->Slot)){Slot->SetPosition(FVector2D(32,58));Slot->SetSize(FVector2D(240,140));}
     return true;
 }
 }

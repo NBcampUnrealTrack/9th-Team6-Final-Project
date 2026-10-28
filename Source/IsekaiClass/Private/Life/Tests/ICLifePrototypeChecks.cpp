@@ -61,7 +61,7 @@ bool FICLifePrototypeCheck::RunTest(const FString&)
         }
     }
     for(auto* Plot:Plots)
-    {TestTrue(TEXT("Ripe crop grants its actual yield"),Plot->TryInteract(PC));TestEqual(TEXT("Harvest hides the crop during regrowth"),Plot->GetGrowthStage(),INDEX_NONE);TestFalse(TEXT("Cooldown cannot grant duplicate harvest"),Plot->TryInteract(PC));TestNull(TEXT("Harvested crop has no visible mesh"),Plot->VisualMesh->GetStaticMesh().Get());}
+    {FText Reason;TestTrue(TEXT("Ripe crop grants its actual yield at work completion"),Plot->CompletePlayerAction(PC,NAME_None,Reason));TestEqual(TEXT("Harvest hides the crop during regrowth"),Plot->GetGrowthStage(),INDEX_NONE);TestFalse(TEXT("Cooldown cannot grant duplicate harvest"),Plot->CompletePlayerAction(PC,NAME_None,Reason));TestNull(TEXT("Harvested crop has no visible mesh"),Plot->VisualMesh->GetStaticMesh().Get());}
     const auto Dormant=State->ExportState();
     TestTrue(TEXT("A harvested crop state can be saved"),UICWorldStateSubsystem::ValidateStateClock(Dormant,Time->GetClock()));
     TestTrue(TEXT("119 calendar minutes elapse"),Time->JumpGameMinutes(119));

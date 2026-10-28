@@ -24,11 +24,15 @@ public:
     virtual UWorld* GetTickableGameObjectWorld() const override { return GetWorld(); }
     virtual TStatId GetStatId() const override;
     UFUNCTION(BlueprintCallable, Category="IC|Life") bool StartGather(AICLifeActor* Resource, AICPlayerController* Player);
+    UFUNCTION(BlueprintCallable, Category="IC|Life") bool StartPlant(AICLifeActor* Plot,AICPlayerController* Player,FName CropID);
+    UFUNCTION(BlueprintCallable, Category="IC|Fishing") bool StartFishing(AICLifeActor* Zone,AICPlayerController* Player,FVector Landing);
     UFUNCTION(BlueprintCallable, Category="IC|Life") void CancelGather();
     UFUNCTION(BlueprintPure, Category="IC|Life") bool IsGathering() const { return ActiveResource.IsValid(); }
     UFUNCTION(BlueprintPure, Category="IC|Life") float GetProgress() const;
     UFUNCTION(BlueprintPure, Category="IC|Life") UICGatherProgressWidget* GetProgressWidget() const { return ProgressWidget; }
 private:
+    bool StartAction(AICLifeActor* Resource,AICPlayerController* Player,FName CropID,const FVector* FishingLanding=nullptr);
+    FName PendingCrop;
     UFUNCTION() void OnDamaged(AActor* Victim, float Amount);
     TWeakObjectPtr<AICLifeActor> ActiveResource;
     TWeakObjectPtr<AICPlayerController> Controller;

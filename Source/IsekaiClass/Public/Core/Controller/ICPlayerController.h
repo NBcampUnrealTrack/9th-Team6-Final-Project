@@ -6,11 +6,15 @@
 #include "Life/Survival/ICPlayerSurvival.h"
 #include "World/State/ICStateParticipant.h"
 #include "Input/ICInputTypes.h"
+#include "Data/Rows/NPC/ICDialoguePresentationRow.h"
 #include "ICPlayerController.generated.h"
 
 class AICInteractionActor;
 class AICNPCBase;
 class AICDroppedItem;
+class ACameraActor;
+class AICRanchAnimal;
+class UICChestPresentationComponent;
 class UICCraftingComponent;
 class UICInventoryComponent;
 class UICGameplayWidget;
@@ -22,6 +26,7 @@ class UICCharacterCreateWidget;
 class UICSaveLoadWidget;
 class UICSettingsWidget;
 class UICLoadingWidget;
+class UICMapWidget;
 class UICWorldStateSubsystem;
 class UICTimeSubsystem;
 class UICSaveSubsystem;
@@ -44,6 +49,10 @@ class ISEKAICLASS_API AICPlayerController : public APlayerController, public IIC
 {
     GENERATED_BODY()
 public:
+    friend class UICPlayerLifeComponent;
+    TWeakObjectPtr<UICChestPresentationComponent> ActiveChestPresentation;
+    void CloseChestPresentation();
+    friend class FICNPCInteractionCameraCheck;
     AICPlayerController();
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|UI") TSubclassOf<UICSaveLoadWidget> SaveLoadWidgetClass;
     UPROPERTY(BlueprintAssignable,Category="IC|Session") FICSaveSessionChanged OnSaveSessionChanged;
@@ -74,6 +83,10 @@ public:
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input") TArray<FICInputCommandBinding> CommandActions;
     UPROPERTY(BlueprintAssignable, Category="IC|Fishing") FICFishingInputRequested OnFishingRequested;
     UFUNCTION(BlueprintCallable, Category="IC|Fishing") void RequestFishing();
+    UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Dialogue") TSoftObjectPtr<UDataTable> DialoguePresentationTable;
+    UFUNCTION(BlueprintPure,Category="IC|Dialogue") FICDialoguePresentationRow GetDialoguePresentation() const;
+    UFUNCTION(BlueprintPure,Category="IC|Dialogue") bool IsLiveNPCDialogue() const;
+    bool ForwardDialogueMovementKey(FKey Key,bool Pressed);
     UFUNCTION(BlueprintPure, Category="IC|Input") bool HasTargetSelection() const { return !PendingItem.IsNone() || !PendingSkill.IsNone(); }
     UFUNCTION(BlueprintCallable, Category="IC|Input") bool SelectTarget(FName CharacterID);
     UFUNCTION(BlueprintCallable, Category="IC|Input") void ConfirmSelectedTarget();
@@ -85,6 +98,9 @@ public:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void SetupInputComponent() override;
+    virtual bool InputKey(const FInputKeyEventArgs& Args) override;
+    UFUNCTION(BlueprintPure,Category="IC|Input") bool IsUsingGamepad() const;
+    bool RouteGameplayGamepadKey(FKey Key,bool Pressed);
     virtual void FlushPressedKeys() override;
     void RefreshUserInputMapping();
     virtual void PlayerTick(float DeltaSeconds) override;
@@ -138,6 +154,7 @@ public:
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString Notice;
     UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") FText NoticeDisplayText;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FName OpenStorage;
+    UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") TObjectPtr<class UICStorageWidget> StorageScreen;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FName ActiveStation;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FName ActiveWorkAnchor;
     UFUNCTION() void ProductionChanged(FGuid JobID,const FString& Message);
@@ -180,6 +197,7 @@ public:
     UFUNCTION(BlueprintCallable) bool CraftRecipe(FName RecipeID);
     UFUNCTION(BlueprintCallable) void OpenContainer(FName ContainerID,bool bPlayerHome,bool bAccessGranted);
     UFUNCTION(BlueprintCallable,Category="IC|Input") void HandleInputCommand(EICInputCommand Command,int32 Slot=0);
+    UFUNCTION(BlueprintPure,Category="IC|Combat") class AICCharacterBase* GetLockedCombatTarget() const;
     UFUNCTION(BlueprintCallable,Category="IC|Input") void ReleaseInputCommand(EICInputCommand Command,int32 Slot=0);
     UFUNCTION(BlueprintCallable,Category="IC|UI") void ExecuteUI(const FString& Command,int32 Index=0);
     UFUNCTION(BlueprintCallable,Category="IC|UI") void SetMenu(const FString& NewMenu);
@@ -190,6 +208,8 @@ public:
     UFUNCTION(BlueprintCallable,Category="IC|Session") bool LoadPlayer();
     UFUNCTION(BlueprintCallable,Category="IC|Items") void BeginItem(FName ID,int32 Quick=-1);
     UFUNCTION(BlueprintCallable,Category="IC|Items") void ConfirmTarget(FName TargetID);
+    /** Atomic item use shared by quick slots and the inventory's party picker. */
+    UFUNCTION(BlueprintCallable,Category="IC|Items") bool UseInventoryItem(FName ItemID,FName TargetID,FText& Reason);
     UFUNCTION(BlueprintCallable,Category="IC|Items") void ConfirmPartyTarget(int32 Slot);
     void SyncSaveSafety();
     void RefreshSaveSlots();
@@ -222,6 +242,7 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UICMainMenuWidget> MainMenuWidget;
     UPROPERTY(Transient) TObjectPtr<UICLoadingWidget> LoadingScreen;
+    UPROPERTY(Transient) TObjectPtr<UICMapWidget> MapScreen;
     FString SaveReturnMenu;
     FString SettingsReturnMenu;
     FString LoadReturnMenu=TEXT("Create");
@@ -243,7 +264,15 @@ private:
     void FlushWorldState();
     void CancelTarget();
     void Interact();
+    AICRanchAnimal* FindRanchInteractionTarget() const;
     void OpenNPCDialogue(AICNPCBase* NPC);
+    void BeginNPCDialogueCamera(AICNPCBase* NPC);
+    void UpdateNPCDialogue(float DeltaSeconds);
+    void EndNPCDialogueCamera();
+    TWeakObjectPtr<AICNPCBase> DialogueNPC;
+    UPROPERTY(Transient) TObjectPtr<ACameraActor> NPCDialogueCamera;
+    UPROPERTY(Transient) TArray<TObjectPtr<AActor>> DialogueHiddenActors;
+    TWeakObjectPtr<AActor> DialoguePreviousViewTarget;
 
     UFUNCTION()
     void HandleNPCInteractionStarted(AICNPCBase* NPC, AICPlayerController* Requester, FName ServiceID);
@@ -262,6 +291,9 @@ private:
     UPROPERTY(Transient) TObjectPtr<UInputAction> CameraZoomAction;
     UPROPERTY(Transient) TObjectPtr<UInputMappingContext> CameraMappingContext;
     bool bCameraLockOn=false;
+    bool bExplicitCombatTarget=false;
+    bool bLastInputGamepad=false,bGamepadModifier=false,bGamepadChordUsed=false,bGamepadAttackHeld=false,bTargetStickLatched=false;
+    bool RouteGamepadButton(FKey Key,bool Pressed);
     void CancelInputCommand(EICInputCommand Command,int32 Slot);
     void ResetHeldInput();
     bool CanHandleGameplayInput() const;

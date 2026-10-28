@@ -1,12 +1,13 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "Data/Text/ICLocalization.h"
 
 /** One localization source for native UI labels and gameplay notices. */
 namespace ICText
 {
     inline FText Get(const TCHAR* Key)
     {
-        return FText::FromStringTable(TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_UI.ST_IC_UI"), Key);
+        return ICLocalization::Localize(FText::FromStringTable(TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_UI.ST_IC_UI"), Key));
     }
     inline FFormatArgumentValue Argument(const TCHAR* Value) { return FText::FromString(Value); }
     inline FFormatArgumentValue Argument(const FString& Value) { return FText::FromString(Value); }

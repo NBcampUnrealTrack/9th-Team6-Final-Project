@@ -36,6 +36,7 @@ struct ISEKAICLASS_API FICServiceRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Service") FName NPCID;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Service") FName RegionID;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Service") FName WorkAnchorID;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Service") bool bRequireWorkSchedule=true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Service") TArray<FICServiceHours> OpeningHours;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Service") FName ShopID;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Service") FName WarpID;

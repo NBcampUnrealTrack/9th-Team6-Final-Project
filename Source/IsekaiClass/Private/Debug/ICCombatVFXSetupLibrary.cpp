@@ -30,6 +30,7 @@
 
 namespace ICCombatNiagaraAuthoring
 {
+const FString CaptureColor=TEXT("CustomHLSLOutput = Particles.Color;");
 void Expression(UNiagaraNodeFunctionCall* Module,FName Target,const FNiagaraTypeDefinition& Type,const FString& Code)
 {
     const auto Handle=FNiagaraParameterHandle::CreateAliasedModuleParameterHandle(
@@ -183,6 +184,9 @@ UNiagaraSystem* UICCombatVFXSetupLibrary::DuplicateCombatNiagara(const FString& 
     if(auto* Existing=LoadObject<UNiagaraSystem>(nullptr,*Path))return Existing;
     auto* System=DuplicateObject<UNiagaraSystem>(Source,CreatePackage(*Path),*FPackageName::GetLongPackageAssetName(Path));
     Parameters(System);
+    // Imported ScaleColor modules read Initial.Color. Attribute trimming can
+    // discard that state after adding the tint backup/restore expressions.
+    System->SetTrimAttributesOnCook(false);
     for(const auto& Handle:System->GetEmitterHandles())if(auto* Data=Handle.GetEmitterData())
     {
         Data->bLocalSpace=true;
@@ -192,11 +196,11 @@ UNiagaraSystem* UICCombatVFXSetupLibrary::DuplicateCombatNiagara(const FString& 
         if(!Spawn||!Update)continue;
         TArray<FNiagaraVariable> BaseVars={FNiagaraVariable(FNiagaraTypeDefinition::GetColorDef(),TEXT("Particles.IC_UntintedColor"))};
         auto* Capture=FNiagaraStackGraphUtilities::AddParameterModuleToStack(BaseVars,*Spawn,INDEX_NONE,{TEXT("1,1,1,1")});
-        Expression(Capture,TEXT("Particles.IC_UntintedColor"),FNiagaraTypeDefinition::GetColorDef(),TEXT("CustomHLSLOutput = Particles.Color;"));
+        Expression(Capture,TEXT("Particles.IC_UntintedColor"),FNiagaraTypeDefinition::GetColorDef(),CaptureColor);
         auto* Restore=FNiagaraStackGraphUtilities::AddParameterModuleToStack({FNiagaraVariable(FNiagaraTypeDefinition::GetColorDef(),TEXT("Particles.Color"))},*Update,0,{TEXT("1,1,1,1")});
         Expression(Restore,TEXT("Particles.Color"),FNiagaraTypeDefinition::GetColorDef(),TEXT("CustomHLSLOutput = Particles.IC_UntintedColor;"));
         auto* Remember=FNiagaraStackGraphUtilities::AddParameterModuleToStack(BaseVars,*Update,INDEX_NONE,{TEXT("1,1,1,1")});
-        Expression(Remember,TEXT("Particles.IC_UntintedColor"),FNiagaraTypeDefinition::GetColorDef(),TEXT("CustomHLSLOutput = Particles.Color;"));
+        Expression(Remember,TEXT("Particles.IC_UntintedColor"),FNiagaraTypeDefinition::GetColorDef(),CaptureColor);
         for(auto* Output:{Spawn,Update})
         {
             auto* Tint=FNiagaraStackGraphUtilities::AddParameterModuleToStack({FNiagaraVariable(FNiagaraTypeDefinition::GetColorDef(),TEXT("Particles.Color"))},*Output,INDEX_NONE,{TEXT("1,1,1,1")});
@@ -228,6 +232,36 @@ bool UICCombatVFXSetupLibrary::DumpCombatNiagara(UNiagaraSystem* System)
     return false;
 #endif
 }
+bool UICCombatVFXSetupLibrary::CompileCombatNiagara(UNiagaraSystem* System)
+{
+#if WITH_EDITOR
+    if(!System)return false;System->RequestCompile(true);System->WaitForCompilationComplete(true,false);
+    return IsCombatNiagaraReady(System);
+#else
+    return System!=nullptr;
+#endif
+}
+bool UICCombatVFXSetupLibrary::RepairCombatNiagaraColor(UNiagaraSystem* System)
+{
+#if WITH_EDITOR
+    if(!System||!System->GetPathName().StartsWith(TEXT("/Game/IsekaiClass/VFX/CombatEffect/")))return false;
+    System->SetTrimAttributesOnCook(false);
+    for(const auto& Handle:System->GetEmitterHandles())if(auto* Data=Handle.GetEmitterData())
+    {
+        auto* Source=Cast<UNiagaraScriptSource>(Data->GraphSource);if(!Source)continue;
+        for(const auto& GraphNode:Source->NodeGraph->Nodes)if(auto* Node=Cast<UNiagaraNodeCustomHlsl>(GraphNode.Get()))
+            if(Node->Signature.Name==TEXT("IC_Particles_IC_UntintedColor"))
+            {
+                auto* Property=FindFProperty<FStrProperty>(Node->GetClass(),TEXT("CustomHlsl"));
+                Property->SetPropertyValue_InContainer(Node,ICCombatNiagaraAuthoring::CaptureColor);
+                Node->MarkNodeRequiresSynchronization(TEXT("Preserve original color and Initial.Color while tinting"),true);
+            }
+    }
+    System->MarkPackageDirty();return CompileCombatNiagara(System);
+#else
+    return false;
+#endif
+}
 int32 UICCombatVFXSetupLibrary::GetCombatParticleCount(UNiagaraComponent* Component)
 {
 #if WITH_EDITOR
@@ -245,6 +279,8 @@ FString UICCombatVFXSetupLibrary::DescribeCombatParticles(UNiagaraComponent* Com
         Controller->WaitForConcurrentTickAndFinalize();if(auto* Instance=Controller->GetSystemInstance_Unsafe())for(const auto& Emitter:Instance->GetEmitters())if(Emitter->GetNumParticles()>0)
         {
             const auto& Data=Emitter->GetParticleData();
+            if(Emitter->GetSimTarget()==ENiagaraSimTarget::GPUComputeSim||!Data.GetCurrentData()||Data.GetCurrentData()->GetNumInstances()==0)
+            {Result+=FString::Printf(TEXT("Count=%d GPU/no CPU readback "),Emitter->GetNumParticles());continue;}
             FNiagaraDataSetAccessor<FVector3f> Scale(Data,TEXT("Scale"));auto ScaleReader=Scale.GetReader(Data.GetCurrentData());
             FNiagaraDataSetAccessor<FLinearColor> Color(Data,TEXT("Color"));auto ColorReader=Color.GetReader(Data.GetCurrentData());
             Result+=FString::Printf(TEXT("Count=%d Scale=%s Color=%s "),Emitter->GetNumParticles(),*ScaleReader.GetSafe(0,FVector3f(-1)).ToString(),*ColorReader.GetSafe(0,FLinearColor::Black).ToString());

@@ -30,6 +30,8 @@ public:
     UFUNCTION(BlueprintCallable) void ShowRecipeList();
     UFUNCTION(BlueprintCallable) void MakeRecipe();
     UFUNCTION(BlueprintCallable) void CloseStation();
+    UFUNCTION(BlueprintCallable) void CraftTab();
+    UFUNCTION(BlueprintCallable) void EnhanceTab();
     UFUNCTION(BlueprintPure) bool IsOpen() const {return bOpen;}
     bool HandleStationKey(FKey Key);
     virtual void NativeTick(const FGeometry& Geometry,float DeltaSeconds) override;
@@ -43,6 +45,7 @@ private:
     UPROPERTY(Transient) TObjectPtr<AICCraftingStation> Workstation;
     TArray<FName> Recipes;
     bool bOpen=false;
+    bool bEnhancing=false;
     float RefreshAt=0;
     void RefreshList();
     void RefreshDetails();

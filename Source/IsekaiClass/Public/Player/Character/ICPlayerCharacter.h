@@ -10,6 +10,7 @@ class UICQuestGuideComponent;
 class UICPartyWarpComponent;
 class USpringArmComponent;
 class USkeletalMesh;
+class UICPlayerLifeComponent;
 USTRUCT(BlueprintType)
 struct FICPlayerAppearancePreset
 {
@@ -44,6 +45,7 @@ public:
     bool NotifyWeaponVisibility(int32 MontageInstanceID, bool bDraw);
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UICInventoryComponent> Inventory;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UICCraftingComponent> Crafting;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="IC|Life") TObjectPtr<UICPlayerLifeComponent> LifeActions;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="IC|Quest Guide") TObjectPtr<UICQuestGuideComponent> QuestGuide;
     /** Handles paid Warp Stone travel for this player and their active party. */
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="IC|Warp") TObjectPtr<UICPartyWarpComponent> PartyWarp;

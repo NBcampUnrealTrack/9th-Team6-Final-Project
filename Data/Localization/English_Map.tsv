@@ -1,0 +1,22 @@
+테스트맵 · 포탈 이동	Test Map · Portal Travel
+포탈 클릭 / 방향키 선택 + 확인: {0}G로 이동 · 보유 {1}G · M / B: 닫기	Click a portal / Arrows + Confirm: travel for {0}G · Balance {1}G · M / B: close
+이동 중 · 로딩 중…	Traveling · Loading...
+왼쪽 포탈	Left Portal
+중앙 포탈	Central Portal
+오른쪽 포탈	Right Portal
+워프 ID가 없습니다.	A portal ID is required.
+정의 데이터를 찾을 수 없습니다.	Definition data is unavailable.
+워프 시스템을 초기화할 수 없습니다.	The portal system is unavailable.
+워프게이트 해금 상태를 저장하지 못했습니다.	Could not save portal activation.
+워프 비용은 0 이상이어야 합니다.	The travel fee must be zero or greater.
+아직 해금하지 않은 워프게이트입니다.	This portal has not been activated.
+골드가 부족합니다.	Not enough gold.
+워프 도착 지점이 현재 맵에 준비되지 않았습니다.	The destination is unavailable in this map.
+워프 도착 지점을 준비할 수 없습니다.	Could not prepare the destination.
+플레이어를 워프게이트로 이동하지 못했습니다.	Could not move the player to the portal.
+동료가 안전하게 도착할 위치를 찾지 못했습니다.	Could not find safe arrival positions for the party.
+플레이어 위치를 저장하지 못했습니다.	Could not save the player position.
+워프 비용을 처리하지 못했습니다.	Could not charge the travel fee.
+워프 돌이 활성화되었습니다.	Portal activated.
+M · 지도	M · Map
+테스트맵	Test Map

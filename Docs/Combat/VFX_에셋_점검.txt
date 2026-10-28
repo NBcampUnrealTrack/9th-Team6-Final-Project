@@ -1,0 +1,50 @@
+NPC 스킬 VFX 에셋 점검 (2026-10-27)
+
+검사 범위
+- 요청한 R01_01~R01_11 원본 Niagara 11종과 그 재질·텍스처·메시 의존성.
+- CombatEffect/Skill/NPC에 저장한 본체·명중·추가 레이어 Niagara 24종.
+- 원본 샘플은 보존하고, 게임에서는 새 NPC 복제본을 사용한다.
+
+재다운로드 여부
+이번에 지정한 11종에서 누락된 텍스처 파일이나 크기가 0인 손상 텍스처는 발견되지 않았다.
+현재 검사 대상의 재다운로드 목록은 없다. SampleVFX 전체 팩을 모두 검사했다는 뜻은 아니다.
+
+발견해서 수정한 문제
+1. Free_Magic / Free_Spells의 이전 폴더를 참조하는 재질·메시 경로 23개.
+   이전: /Game/IsekaiClass/VFX/Combat/Skills/Free/Free_Magic/
+         /Game/IsekaiClass/VFX/Combat/Skills/Free/Free_Spells/
+   현재: /Game/IsekaiClass/VFX/SampleVFX/Free/Free_Magic/
+         /Game/IsekaiClass/VFX/SampleVFX/Free/Free_Spells/
+   실제 파일은 현재 폴더에 존재했다. DefaultEngine.ini의 PackageRedirects로 연결했다.
+   재검사 결과 누락 의존성 0개. 원본 파일을 다시 받을 필요가 없는 경로 문제였다.
+
+2. NPC 복제본 일부가 입자는 생성하지만 투명하게 보이던 문제.
+   Niagara의 속성 제거 최적화가 원본 ScaleColor 모듈에서 읽는 Initial.Color를 제거했다.
+   복제본의 속성 제거 최적화를 편집·쿠킹 모두 해제하고 색상 저장/복원을 재컴파일했다.
+   원본과 복제본을 나란히 렌더링하여 색상과 알파가 정상적으로 유지되는 것을 확인했다.
+
+3. 첫 GPU 명중 이펙트가 로딩 중이라는 이유로 생성되지 않던 문제.
+   수입 이펙트는 Niagara 컴포넌트의 준비 대기 경로를 사용하도록 수정했다.
+   공격 스킬 8종에서 실제 피해와 대상에 부착된 명중 이펙트를 확인했다.
+
+4. 수입 이펙트의 크기가 DT Scale을 반영하지 않던 문제.
+   NPC 효과의 bUseComponentScale=True로 컴포넌트 크기를 적용한다.
+   기존 IC 제작 효과는 기존 User.IC_Scale 처리 방식을 유지한다.
+
+색상 관련
+DT_IC_CombatVFX의 Color/Intensity로 NPC 머리색을 참고한 틴트를 설정했다.
+검은 머리는 보이도록 청회색 빛으로 조정했다.
+원본의 녹색 치유·청록 음표·불꽃 같은 고유 색상도 곱해지므로 머리색과 완전히 같지는 않다.
+원본 질감과 모양을 유지한 상태이며, 텍스처 손상에 의한 회색 표시와는 구분된다.
+
+수정 위치
+- 스킬: DT_IC_Skill / DT_IC_SkillEffect / DT_IC_StatusEffect
+- 표시: DT_IC_CombatVFX의 NPC_R01_001~011
+- 새 파일: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_01~R01_11
+- 소리: /Game/IsekaiClass/Audio/Combat (원본 WAV는 Data/Audio/Sources)
+
+검사 자료
+- Saved/NPCSkillReview/Audit/Assets.json: 원본 의존성 검사.
+- Saved/NPCSkillReview/VFX/Review.json 및 PNG: 원본/복제/명중 효과 비교.
+- Saved/NPCSkillReview/Combat/Review.json: 실제 무기·스킬 발동 검사.
+- Saved/NPCSkillReview/FinalTests/index.json: 관련 자동 검사.

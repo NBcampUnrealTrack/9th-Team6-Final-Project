@@ -15,9 +15,10 @@ class ISEKAICLASS_API UICCodexSubsystem : public UGameInstanceSubsystem
 {
     GENERATED_BODY()
 public:
-    static constexpr int32 PetCount=55;
     static constexpr int32 EssenceRequired=100;
     UFUNCTION(BlueprintPure,Category="Codex") int32 GetPetEssence(int32 Index) const;
+    UFUNCTION(BlueprintPure,Category="Codex") TArray<FName> GetPetIDs() const;
+    UFUNCTION(BlueprintPure,Category="Codex") FText PetUsageText(int32 Index) const;
     UFUNCTION(BlueprintPure,Category="Codex") bool IsPetUnlocked(int32 Index) const;
     UFUNCTION(BlueprintCallable,Category="Codex") bool AddPetEssence(int32 Index,int32 Amount);
     UFUNCTION(BlueprintCallable,Category="Codex") bool EquipPet(int32 Index,FName CharacterID);
@@ -45,6 +46,9 @@ public:
     TArray<FName> Recipes(int32 Category) const;
     FText SkillDescription(FName ID) const;
     FText RecipeDescription(FName ID) const;
+    UFUNCTION(BlueprintPure,Category="Codex") TArray<FName> GetNPCIDs() const;
+    UFUNCTION(BlueprintPure,Category="Codex") int32 NPCAffinity(FName ID) const;
+    UFUNCTION(BlueprintPure,Category="Codex") FText NPCDescription(FName ID) const;
 private:
     UICDefinitionSubsystem* Definitions() const;
 };

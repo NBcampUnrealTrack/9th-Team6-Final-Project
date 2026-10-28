@@ -34,22 +34,19 @@ for property_name, key_name, camera in (
     deadzone.set_editor_property('upper_threshold', 1.0)
     deadzone.set_editor_property('type', u.DeadZoneType.RADIAL)
     modifiers = [deadzone]
-    if camera:
-        scalar = u.new_object(u.InputModifierScalar, outer=context)
-        scalar.set_editor_property('scalar', u.Vector(120, 90, 1))
-        modifiers.extend([scalar, u.new_object(u.InputModifierScaleByDeltaTime, outer=context)])
+    # The latest controller applies camera delta time and sensitivity in Look().
     add(defaults.get_editor_property(property_name), key_name, modifiers)
 
 buttons = {
     u.ICInputCommand.JUMP: 'Gamepad_FaceButton_Bottom',
-    u.ICInputCommand.DODGE: 'Gamepad_FaceButton_Right',
+    u.ICInputCommand.DODGE: 'Gamepad_LeftTrigger',
     u.ICInputCommand.INTERACT: 'Gamepad_FaceButton_Left',
-    u.ICInputCommand.SWITCH_WEAPON: 'Gamepad_FaceButton_Top',
+    u.ICInputCommand.FISHING: 'Gamepad_FaceButton_Top',
+    u.ICInputCommand.SWITCH_WEAPON: 'Gamepad_RightShoulder',
     u.ICInputCommand.ATTACK: 'Gamepad_RightTrigger',
-    u.ICInputCommand.SKILL: 'Gamepad_RightShoulder',
-    u.ICInputCommand.NEXT_TARGET: 'Gamepad_RightThumbstick',
+    u.ICInputCommand.NEXT_TARGET: 'Gamepad_LeftShoulder',
     u.ICInputCommand.MENU: 'Gamepad_Special_Right',
-    u.ICInputCommand.QUEST: 'Gamepad_Special_Left',
+    u.ICInputCommand.MAP: 'Gamepad_Special_Left',
 }
 directions = ('Gamepad_DPad_Up', 'Gamepad_DPad_Right', 'Gamepad_DPad_Down', 'Gamepad_DPad_Left')
 for binding in defaults.get_editor_property('command_actions'):
@@ -60,6 +57,8 @@ for binding in defaults.get_editor_property('command_actions'):
         name = directions[binding.slot]
     if name:
         add(binding.action, name)
+        if binding.command == u.ICInputCommand.MENU:
+            add(binding.action, 'Gamepad_FaceButton_Right')
 
 data = context.get_editor_property('default_key_mappings')
 data.set_editor_property('mappings', mappings)

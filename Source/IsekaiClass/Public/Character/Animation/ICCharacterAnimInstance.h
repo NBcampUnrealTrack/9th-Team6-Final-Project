@@ -20,6 +20,7 @@ public:
     virtual void NativeUpdateAnimation(float DeltaSeconds) override;
     virtual FAnimInstanceProxy* CreateAnimInstanceProxy() override;
     virtual void DestroyAnimInstanceProxy(FAnimInstanceProxy* Proxy) override;
+    void ResetForLoad(){PreviousHP=-1;bHasPreviousPosition=false;bAirStateInitialized=false;StopAllMontages(0.f);}
 
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UBlendSpace> Locomotion;
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UBlendSpace> CombatLocomotion;

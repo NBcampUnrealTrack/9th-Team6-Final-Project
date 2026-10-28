@@ -25,6 +25,8 @@
 #include "Enemy/Character/ICEnemyBase.h"
 #include "Settings/ICGameUserSettings.h"
 #include "Camera/CameraComponent.h"
+#include "Core/Controller/ICPlayerController.h"
+#include "Combat/VFX/ICCombatVFX.h"
 
 namespace
 {
@@ -45,6 +47,8 @@ void ICPlayerScreenCentreShot(AICPlayerCharacter* Player,double Range,FVector& O
     // its arrow rest, not the tip of either bow limb.
     for(FName Hand:{FName(TEXT("weapon_l")),FName(TEXT("J_Bip_L_Hand")),FName(TEXT("hand_l"))})
         if(Player->GetMesh()->DoesSocketExist(Hand)){Origin=Player->GetMesh()->GetSocketLocation(Hand)+Forward*8;break;}
+    if(const auto* PC=Cast<AICPlayerController>(Player->GetController()))if(const auto* Locked=PC->GetLockedCombatTarget())
+    {Direction=(Locked->GetActorLocation()-Origin).GetSafeNormal();return;}
     const double Near=FMath::Max(0.,FVector::DotProduct(Origin-ViewLocation,Forward));
     const FVector RayStart=ViewLocation+Forward*Near;
     FVector AimPoint=RayStart+Forward*FMath::Max(50.,Range);
@@ -310,15 +314,40 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
             }
     }
     else
-    {const double Rate=RequestedAction==TEXT("Attack")?FMath::Max(.01,Stat(EICStat::AttackSpeed)):1;ActionEndsAt=StartedAt+FMath::Max(.01,Skill.CastPlaySeconds+Skill.RecoveryPlaySeconds)/Rate;SetLooseGameplayTagCount(RequestedAction==TEXT("Attack")?ICTags::Attacking:ICTags::Casting,1);
-     if(auto* Montage=Skill.Montage.LoadSynchronous())if(auto* Anim=Character->GetMesh()->GetAnimInstance()){Anim->Montage_Play(Montage,RequestedAction==TEXT("Attack")?Stat(EICStat::AttackSpeed):1);FOnMontageEnded Ended;const FGuid ActionGUID=CurrentID;Ended.BindWeakLambda(this,[this,ActionGUID](UAnimMontage* EndedMontage,bool Interrupted){if(CurrentID==ActionGUID&&RunningAbility)RunningAbility->Finish(Interrupted);});Anim->Montage_SetEndDelegate(Ended,Montage);if(auto* Instance=Anim->GetActiveInstanceForMontage(Montage))ActiveMontageInstanceID=Instance->GetInstanceID();if(!Skill.CastSection.IsNone())Anim->Montage_JumpToSection(Skill.CastSection,Montage);}}
-    if (RequestedAction==TEXT("Skill")) PlayCombatCue(false, Skill.Presentation, Character, Character->GetActorLocation());
+    {
+        const double Rate=RequestedAction==TEXT("Attack")?FMath::Max(.01,Stat(EICStat::AttackSpeed)):1;
+        double Release=Skill.CastPlaySeconds;
+        if(RequestedAction==TEXT("Skill")&&Skill.bUseDataTableTiming)
+        {
+            Release=FMath::Max(Release,Skill.FirstEffectOffsetPlaySeconds);
+            for(const auto& Hit:Skill.Hits)Release=FMath::Max(Release,Hit.StartOffsetPlaySeconds+FMath::Max(0,Hit.RepeatCount-1)*Hit.RepeatIntervalPlaySeconds);
+        }
+        ActionEndsAt=StartedAt+FMath::Max(.01,Release+Skill.RecoveryPlaySeconds)/Rate;
+        SetLooseGameplayTagCount(RequestedAction==TEXT("Attack")?ICTags::Attacking:ICTags::Casting,1);
+        if(auto* Montage=Skill.Montage.LoadSynchronous())if(auto* Anim=Character->GetMesh()->GetAnimInstance())
+        {
+            const float MontageRate=RequestedAction==TEXT("Attack")?Stat(EICStat::AttackSpeed):Skill.bUseDataTableTiming?Montage->GetPlayLength()/FMath::Max(.01,ActionEndsAt-StartedAt):1.;
+            Anim->Montage_Play(Montage,MontageRate);FOnMontageEnded Ended;const FGuid ActionGUID=CurrentID;
+            Ended.BindWeakLambda(this,[this,ActionGUID](UAnimMontage*,bool Interrupted)
+            {if(CurrentID==ActionGUID&&RunningAbility&&(Interrupted||!Skill.bUseDataTableTiming||PlaySecond()+.01>=ActionEndsAt))RunningAbility->Finish(Interrupted);});
+            Anim->Montage_SetEndDelegate(Ended,Montage);if(auto* Instance=Anim->GetActiveInstanceForMontage(Montage))ActiveMontageInstanceID=Instance->GetInstanceID();
+            if(!Skill.CastSection.IsNone())Anim->Montage_JumpToSection(Skill.CastSection,Montage);
+        }
+    }
+    if(RequestedAction==TEXT("Skill"))
+    {
+        const auto* Visuals=ICCombatVFX::Resolve(Skill.Presentation);
+        auto* Recipient=Visuals&&Visuals->bCastAtTarget&&TargetActor.IsValid()?TargetActor.Get():Character;
+        PlayCombatCue(false,Skill.Presentation,Recipient,Recipient->GetActorLocation());
+    }
     UE_LOG(LogICCore, Log, TEXT("[Combat.Start] Entity=%s Action=%s Skill=%s ID=%s"),*Runtime.CharacterId.ToString(),*RequestedAction.ToString(),*RequestedSkill.ToString(),*CurrentID.ToString());
     OnStateChanged.Broadcast();return true;
 }
 bool UICAbilitySystemComponent::CommitFirstEffect()
 {
-    IC_TRACE_FUNCTION();if(bCommitted)return true;FString Reason;if(!ValidateAction(Reason))return false;
+    IC_TRACE_FUNCTION();if(bCommitted)return true;
+    if(RequestedAction==TEXT("Skill")&&Skill.bUseDataTableTiming&&PlaySecond()+UE_SMALL_NUMBER<StartedAt+Skill.FirstEffectOffsetPlaySeconds)return false;
+    FString Reason;if(!ValidateAction(Reason))return false;
     if(RequestedAction==TEXT("Skill"))
     {if(Skill.MPCost>0&&!ChangeResource(TEXT("MP"),-Skill.MPCost))return false;ApplySkillCooldown(Skill,Skill.CooldownPlaySeconds);}
     if(auto* C=Cast<AICCharacterBase>(GetAvatarActor());C&&TargetActor.IsValid()&&C->IsHostileTo(TargetActor.Get()))
@@ -410,7 +439,9 @@ bool UICAbilitySystemComponent::EmitHit(int32 Index,bool ContinueTrace)
     IC_TRACE_FUNCTION();if(Index<0||(!ContinueTrace&&EmittedHits.Contains(Index))||!CurrentID.IsValid())return false;
     const FICSkillHitDefinition* Hit=nullptr;int32 Cursor=0;
     for(const auto& H:Skill.Hits){if(Index>=Cursor&&Index<Cursor+H.RepeatCount){Hit=&H;break;}Cursor+=H.RepeatCount;}
-    if(!Hit)return false;EmittedHits.Add(Index);FICDefinitionResult R;FICSkillEffectRow Normal;const FICSkillEffectRow* Effect=nullptr;
+    if(!Hit)return false;
+    if(RequestedAction==TEXT("Skill")&&Skill.bUseDataTableTiming&&PlaySecond()+UE_SMALL_NUMBER<StartedAt+Hit->StartOffsetPlaySeconds+(Index-Cursor)*Hit->RepeatIntervalPlaySeconds)return false;
+    EmittedHits.Add(Index);FICDefinitionResult R;FICSkillEffectRow Normal;const FICSkillEffectRow* Effect=nullptr;
     if(RequestedAction==TEXT("Attack")&&!Primary){Normal.Magnitude.Coefficient=1;Normal.Magnitude.SourceStat=EICStat::PhysicalAttack;Normal.Magnitude.bApplyPersonalCHA=false;Effect=&Normal;}
     else if(RequestedAction==TEXT("Attack"))
     {
@@ -431,7 +462,7 @@ bool UICAbilitySystemComponent::EmitHit(int32 Index,bool ContinueTrace)
         if(!CommitFirstEffect())return false;UClass* Type=Hit->ProjectileClass.IsNull()?AICProjectile::StaticClass():Hit->ProjectileClass.LoadSynchronous();if(!Type||!Type->IsChildOf(AICProjectile::StaticClass()))return false;
         FVector Origin=C->EquippedWeaponActor?C->EquippedWeaponActor->GetMuzzleLocation():C->GetMesh()->DoesSocketExist(TEXT("muzzle"))?C->GetMesh()->GetSocketLocation(TEXT("muzzle")):C->GetActorLocation()+C->GetActorForwardVector()*50;
         FVector Direction=C->GetActorForwardVector();
-        if(auto* Player=Cast<AICPlayerCharacter>(C);Player&&RequestedAction==TEXT("Attack"))
+        if(auto* Player=Cast<AICPlayerCharacter>(C))
         {
             const double Range=Hit->ProjectileMaxDistanceCm>0?Hit->ProjectileMaxDistanceCm:Hit->ProjectileSpeedCmPerSecond*Hit->ProjectileLifetimePlaySeconds;
             ICPlayerScreenCentreShot(Player,Range,Origin,Direction);

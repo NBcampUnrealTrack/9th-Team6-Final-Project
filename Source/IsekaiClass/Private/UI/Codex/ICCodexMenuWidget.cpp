@@ -1,4 +1,5 @@
 #include "UI/Codex/ICCodexMenuWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "Codex/ICCodexSubsystem.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -71,11 +72,11 @@ bool Up(FKey K){return K==EKeys::W||K==EKeys::Up||K==EKeys::Gamepad_DPad_Up;}
 bool Down(FKey K){return K==EKeys::S||K==EKeys::Down||K==EKeys::Gamepad_DPad_Down;}
 bool Left(FKey K){return K==EKeys::A||K==EKeys::Left||K==EKeys::Gamepad_DPad_Left;}
 bool Right(FKey K){return K==EKeys::D||K==EKeys::Right||K==EKeys::Gamepad_DPad_Right;}
-bool Accept(FKey K){return K==EKeys::Enter||K==EKeys::SpaceBar||K==EKeys::Gamepad_FaceButton_Bottom;}
-bool BackKey(FKey K){return K==EKeys::Escape||K==EKeys::Equals||K==EKeys::Gamepad_FaceButton_Right;}
-const TCHAR* Categories[]={TEXT("스킬"),TEXT("펫"),TEXT("생산물"),TEXT("제작물")};
+bool Accept(FKey K){return K==EKeys::Enter||K==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(K);}
+bool BackKey(FKey K){return K==EKeys::Escape||K==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(K);}
+const TCHAR* Categories[]={TEXT("스킬"),TEXT("펫"),TEXT("생산물"),TEXT("제작물"),TEXT("NPC")};
 const TCHAR* Products[]={TEXT("채집"),TEXT("농사"),TEXT("낚시"),TEXT("채광"),TEXT("목축")};
-const TCHAR* Recipes[]={TEXT("무기"),TEXT("물건"),TEXT("요리")};
+const TCHAR* Recipes[]={TEXT("무기"),TEXT("요리")};
 }
 
 bool UICCodexCellWidget::BuildLayout(UWidgetTree* T)
@@ -183,7 +184,7 @@ bool UICCodexMenuWidget::BuildLayout(UWidgetTree* T)
     auto* Scroll=T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("GridScroll"));Column->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     auto* Grid=T->ConstructWidget<UUniformGridPanel>(UUniformGridPanel::StaticClass(),TEXT("CellsGrid"));Grid->SetSlotPadding(FMargin(3));Scroll->AddChild(Grid);
     auto* CategoriesColumn=T->ConstructWidget<UVerticalBox>();auto* RightSize=T->ConstructWidget<USizeBox>();RightSize->SetWidthOverride(116);RightSize->SetContent(CategoriesColumn);Body->AddChild(RightSize);
-    for(int32 I=0;I<4;++I){auto* S=T->ConstructWidget<USizeBox>();S->SetHeightOverride(88);S->SetContent(Button(T,FName(*FString::Printf(TEXT("BTN_Category%d"),I)),Txt(Categories[I])));Row(CategoriesColumn,S,10);}
+    for(int32 I=0;I<UE_ARRAY_COUNT(Categories);++I){auto* S=T->ConstructWidget<USizeBox>();S->SetHeightOverride(76);S->SetContent(Button(T,FName(*FString::Printf(TEXT("BTN_Category%d"),I)),Txt(Categories[I])));Row(CategoriesColumn,S,8);}
     auto* Detail=T->ConstructWidget<UICCodexPopupWidget>(WClass(TEXT("WBP_IC_CodexPopup"),UICCodexPopupWidget::StaticClass()),TEXT("DetailPopup"));Fill(Root,Detail);Detail->SetVisibility(ESlateVisibility::Collapsed);
     auto* Targets=T->ConstructWidget<UICCodexTargetsWidget>(WClass(TEXT("WBP_IC_CodexTargets"),UICCodexTargetsWidget::StaticClass()),TEXT("TargetPopup"));Fill(Root,Targets);Targets->SetVisibility(ESlateVisibility::Collapsed);
     for(const TCHAR* Name:{TEXT("ConfirmPopup"),TEXT("NoticePopup")}){auto* W=T->ConstructWidget<UICCodexPopupWidget>(WClass(TEXT("WBP_IC_CodexPopup"),UICCodexPopupWidget::StaticClass()),Name);Fill(Root,W);W->SetVisibility(ESlateVisibility::Collapsed);}return true;
@@ -194,6 +195,7 @@ void UICCodexMenuWidget::NativeOnInitialized()
     Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
     const FName Actions[]={TEXT("Category0"),TEXT("Category1"),TEXT("Category2"),TEXT("Category3")};
     for(int32 I=0;I<4;++I){FScriptDelegate D;D.BindUFunction(this,Actions[I]);CastChecked<UButton>(GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_Category%d"),I))))->OnClicked.AddUnique(D);CastChecked<UICCodexCellWidget>(GetWidgetFromName(FName(*FString::Printf(TEXT("Equipped%d"),I))))->OnPicked.AddUniqueDynamic(this,&ThisClass::CellPicked);}
+    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Category4")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Category4);
     const FName TabActions[]={TEXT("Tab0"),TEXT("Tab1"),TEXT("Tab2"),TEXT("Tab3"),TEXT("Tab4")};
     for(int32 I=0;I<5;++I){FScriptDelegate D;D.BindUFunction(this,TabActions[I]);CastChecked<UButton>(GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_Tab%d"),I))))->OnClicked.AddUnique(D);}
     auto* Detail=CastChecked<UICCodexPopupWidget>(GetWidgetFromName(TEXT("DetailPopup")));Detail->OnPrimary.AddUniqueDynamic(this,&ThisClass::DetailAction);Detail->OnBack.AddUniqueDynamic(this,&ThisClass::ClosePopup);
@@ -210,30 +212,29 @@ void UICCodexMenuWidget::NativeDestruct()
 {
     if(BoundState){BoundState->OnWorldRestored.RemoveDynamic(this,&ThisClass::RefreshCodex);BoundState->OnInventoryChanged.RemoveDynamic(this,&ThisClass::RefreshCodex);BoundState->OnCharacterChanged.RemoveDynamic(this,&ThisClass::CharacterChanged);BoundState=nullptr;}Super::NativeDestruct();
 }
-void UICCodexMenuWidget::CharacterChanged(FName){RefreshCodex();}
+void UICCodexMenuWidget::CharacterChanged(FName){RefreshCodex();if(Category==4&&Popup==1)RefreshDetail();}
 void UICCodexMenuWidget::Activate(){Popup=0;bNoticeOpen=false;NavigationArea=0;RefreshCodex();}
 void UICCodexMenuWidget::SelectCategory(int32 Index)
-{if(IsModalOpen()||Index<0||Index>3)return;Category=CategoryFocus=Index;SubTab=0;SelectedCell=0;NavigationArea=Category==0||Category>=2?1:2;RefreshCodex();CastChecked<UScrollBox>(GetWidgetFromName(TEXT("GridScroll")))->SetScrollOffset(0);NotifyNavigation();}
+{if(IsModalOpen()||Index<0||Index>=UE_ARRAY_COUNT(Categories))return;Category=CategoryFocus=Index;SubTab=0;SelectedCell=0;NavigationArea=Category==0||Category==2||Category==3?1:2;RefreshCodex();CastChecked<UScrollBox>(GetWidgetFromName(TEXT("GridScroll")))->SetScrollOffset(0);NotifyNavigation();}
 void UICCodexMenuWidget::SelectSubTab(int32 Index)
-{if(IsModalOpen()||Category<2||Index<0||Index>=(Category==2?5:3))return;SubTab=Index;SelectedCell=0;NavigationArea=1;RefreshCodex();CastChecked<UScrollBox>(GetWidgetFromName(TEXT("GridScroll")))->SetScrollOffset(0);NotifyNavigation();}
-int32 UICCodexMenuWidget::Columns() const{return Category==0?12:Category==1?5:7;}
+{if(IsModalOpen()||(Category!=2&&Category!=3)||Index<0||Index>=(Category==2?5:2))return;SubTab=Index;SelectedCell=0;NavigationArea=1;RefreshCodex();CastChecked<UScrollBox>(GetWidgetFromName(TEXT("GridScroll")))->SetScrollOffset(0);NotifyNavigation();}
+int32 UICCodexMenuWidget::Columns() const{return Category==0?6:Category==1||Category==4?5:7;}
 void UICCodexMenuWidget::RefreshCodex()
 {
     if(bRefreshing)return;TGuardValue<bool> Guard(bRefreshing,true);auto* C=Codex();if(!C)return;
-    for(int32 I=0;I<4;++I)CastChecked<UButton>(GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_Category%d"),I))))->SetBackgroundColor((NavigationArea==0?CategoryFocus:Category)==I?FLinearColor(.51f,.39f,.17f):CodexButton);
+    for(int32 I=0;I<UE_ARRAY_COUNT(Categories);++I)CastChecked<UButton>(GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_Category%d"),I))))->SetBackgroundColor((NavigationArea==0?CategoryFocus:Category)==I?FLinearColor(.51f,.39f,.17f):CodexButton);
     Text(this,TEXT("TXT_Heading"),Txt(Category>=0?Categories[Category]:TEXT("도감")));
     GetWidgetFromName(TEXT("TXT_Home"))->SetVisibility(Category<0?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
     GetWidgetFromName(TEXT("EquippedSkills"))->SetVisibility(Category==0?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
-    GetWidgetFromName(TEXT("SkillFamilies"))->SetVisibility(Category==0?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
-    GetWidgetFromName(TEXT("SubTabs"))->SetVisibility(Category>=2?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
+    GetWidgetFromName(TEXT("SkillFamilies"))->SetVisibility(ESlateVisibility::Collapsed);
+    GetWidgetFromName(TEXT("SubTabs"))->SetVisibility(Category==2||Category==3?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     if(Category==0)
     {
         const auto Equipped=C->EquippedSkills();auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;
         for(int32 I=0;I<4;++I){const auto* S=D->Find<FICSkillRow>(Equipped[I],R);CastChecked<UICCodexCellWidget>(GetWidgetFromName(FName(*FString::Printf(TEXT("Equipped%d"),I))))->Present(1000+I,FText::Format(Txt(TEXT("스킬 {0}")),FText::AsNumber(I+1)),S?C->DefinitionText(S->NameKey,S->ID):Txt(TEXT("미설정")),S?S->Presentation.Icon.LoadSynchronous():nullptr,false,NavigationArea==1&&EquippedIndex==I,165,64);}
     }
-    for(int32 I=0;I<5;++I){auto* B=CastChecked<UButton>(GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_Tab%d"),I))));B->SetVisibility(Category==2||I<3?ESlateVisibility::Visible:ESlateVisibility::Collapsed);Text(this,*FString::Printf(TEXT("BTN_Tab%d_Text"),I),Txt(Category==2?Products[I]:Recipes[FMath::Min(I,2)]));B->SetBackgroundColor(I==SubTab?FLinearColor(.51f,.39f,.17f):CodexButton);}
-    Cells=Category==0?C->SkillCells():Category==1?TArray<FName>():Category==2?C->ProductItems(SubTab):Category==3?C->Recipes(SubTab):TArray<FName>();
-    if(Category==1)Cells.SetNum(UICCodexSubsystem::PetCount);
+    for(int32 I=0;I<5;++I){auto* B=CastChecked<UButton>(GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_Tab%d"),I))));B->SetVisibility(Category==2||I<2?ESlateVisibility::Visible:ESlateVisibility::Collapsed);Text(this,*FString::Printf(TEXT("BTN_Tab%d_Text"),I),Txt(Category==2?Products[I]:Recipes[FMath::Min(I,1)]));B->SetBackgroundColor(I==SubTab?FLinearColor(.51f,.39f,.17f):CodexButton);}
+    Cells=Category==0?C->SkillCells():Category==1?C->GetPetIDs():Category==2?C->ProductItems(SubTab):Category==3?C->Recipes(SubTab):Category==4?C->GetNPCIDs():TArray<FName>();
     SelectedCell=FMath::Clamp(SelectedCell,0,FMath::Max(0,Cells.Num()-1));RefreshGrid();
     GetWidgetFromName(TEXT("TXT_Empty"))->SetVisibility(Category>=0&&Cells.IsEmpty()?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
     GetWidgetFromName(TEXT("DetailPopup"))->SetVisibility(Popup>0?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
@@ -254,10 +255,11 @@ void UICCodexMenuWidget::RefreshGrid()
     {
         FText Name,Progress;UTexture2D* Icon=nullptr;bool Unknown=false;
         if(Category==0){const auto* Player=World.Characters.Find(UICWorldStateSubsystem::PlayerId());Unknown=Cells[I].IsNone()||!Player||!Player->UnlockedSkillIDs.Contains(Cells[I]);if(!Unknown)if(const auto* S=D->Find<FICSkillRow>(Cells[I],R)){Name=C->DefinitionText(S->NameKey,S->ID);Icon=S->Presentation.Icon.LoadSynchronous();}}
-        else if(Category==1){const int32 Count=World.Codex.PetEssence.FindRef(I);Unknown=Count<100;Progress=Unknown?FText::Format(Txt(TEXT("{0}/100")),FText::AsNumber(Count)):Txt(TEXT("해금완료"));if(!Unknown){const auto* M=Pets[I];Name=M?(!M->PetName.IsEmpty()?M->PetName:C->DefinitionText(M->NameKey,M->ID)):FText::Format(Txt(TEXT("펫 {0}")),FText::AsNumber(I+1));if(M)Icon=M->Portrait.LoadSynchronous();}}
+        else if(Category==1){const auto* M=Pets[I];const int32 Count=C->GetPetEssence(M->PetCodexIndex);Unknown=Count<100;Progress=FText::Format(Txt(TEXT("{0}/100")),FText::AsNumber(Count));const auto Used=C->PetUsageText(M->PetCodexIndex);if(!Used.IsEmpty())Progress=Used;Name=C->PetName(M->PetCodexIndex);Icon=M->Portrait.LoadSynchronous();}
         else if(Category==2){Unknown=!World.Codex.AcquiredItemIDs.Contains(Cells[I]);if(!Unknown){Name=C->ItemName(Cells[I]);if(const auto* Item=D->Find<FICItemRow>(Cells[I],R))Icon=Item->Icon.LoadSynchronous();}}
+        else if(Category==4){Name=C->CharacterName(Cells[I]);Icon=C->CharacterPortrait(Cells[I]);Progress=FText::Format(NSLOCTEXT("ICCodex","NPCGridAffinity","호감도 {0}"),FText::AsNumber(C->NPCAffinity(Cells[I])));}
         else{if(const auto* Recipe=D->Find<FICRecipeRow>(Cells[I],R)){Unknown=!Recipe->bUnlockedByDefault&&!World.UnlockedRecipeIDs.Contains(Cells[I]);if(!Unknown){Name=C->DefinitionText(Recipe->NameKey,Recipe->ID);auto Results=Recipe->Results;if(Results.IsEmpty())if(const auto* P=D->Find<FICProductionRow>(Recipe->ProductionID,R))Results=P->Results;if(!Results.IsEmpty())if(const auto* Item=D->Find<FICItemRow>(Results[0].ItemID,R))Icon=Item->Icon.LoadSynchronous();}}}
-        CastChecked<UICCodexCellWidget>(Grid->GetChildAt(I))->Present(I,Name,Progress,Icon,Unknown,NavigationArea==2&&I==SelectedCell,Category==0?53:Category==1?125:91,Category==0?43:Category==1?114:98);
+        CastChecked<UICCodexCellWidget>(Grid->GetChildAt(I))->Present(I,Name,Progress,Icon,Unknown,NavigationArea==2&&I==SelectedCell,Category==0?105:Category==1||Category==4?125:91,Category==0?78:Category==1||Category==4?114:98);
     }
 }
 bool UICCodexMenuWidget::OpenCell(int32 Index)
@@ -265,7 +267,7 @@ bool UICCodexMenuWidget::OpenCell(int32 Index)
     if(IsModalOpen()||!Codex())return false;auto* C=Codex();DetailID=NAME_None;DetailPet=INDEX_NONE;
     if(Index>=1000&&Index<1004&&Category==0){const auto Equipped=C->EquippedSkills();DetailID=Equipped[Index-1000];if(DetailID.IsNone())return false;EquippedIndex=Index-1000;}
     else{if(!Cells.IsValidIndex(Index))return false;SelectedCell=Index;NavigationArea=2;
-        if(Category==1){if(!C->IsPetUnlocked(Index))return false;DetailPet=Index;}
+        if(Category==1){FICDefinitionResult R;const auto* Monster=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>()->Find<FICMonsterRow>(Cells[Index],R);if(!Monster||!C->IsPetUnlocked(Monster->PetCodexIndex))return false;DetailPet=Monster->PetCodexIndex;}
         else{DetailID=Cells[Index];if(DetailID.IsNone()||(Category==0&&!C->IsSkillUnlocked(DetailID))||(Category==2&&!C->HasAcquiredItem(DetailID))||(Category==3&&!C->IsRecipeKnown(DetailID)))return false;}}
     Popup=1;RefreshDetail();RefreshCodex();NotifyNavigation();return true;
 }
@@ -273,8 +275,9 @@ void UICCodexMenuWidget::RefreshDetail()
 {
     auto* C=Codex();auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;FText Name,Description,Action;UTexture2D* Icon=nullptr;
     if(Category==0){if(const auto* S=D->Find<FICSkillRow>(DetailID,R)){Name=C->DefinitionText(S->NameKey,S->ID);Description=C->SkillDescription(DetailID);Icon=S->Presentation.Icon.LoadSynchronous();Action=Txt(C->IsPlayerSkillEquipped(DetailID)?TEXT("스킬 해제하기"):TEXT("스킬 설정하기"));}}
-    else if(Category==1){Name=C->PetName(DetailPet);Description=C->PetBuffText(DetailPet);Action=Txt(TEXT("펫 설정"));if(const auto* M=C->FindPet(DetailPet))Icon=M->Portrait.LoadSynchronous();}
+    else if(Category==1){Name=C->PetName(DetailPet);Description=FText::Format(NSLOCTEXT("ICCodex","PetDetailProgress","{0}\n\n정수 {1}/100\n{2}"),C->PetBuffText(DetailPet),FText::AsNumber(C->GetPetEssence(DetailPet)),C->PetUsageText(DetailPet));Action=Txt(TEXT("펫 설정"));if(const auto* M=C->FindPet(DetailPet))Icon=M->Portrait.LoadSynchronous();}
     else if(Category==2){Name=C->ItemName(DetailID);if(const auto* Item=D->Find<FICItemRow>(DetailID,R)){Description=C->DefinitionText(Item->DescriptionKey);Icon=Item->Icon.LoadSynchronous();}}
+    else if(Category==4){Name=C->CharacterName(DetailID);Description=C->NPCDescription(DetailID);Icon=C->CharacterPortrait(DetailID);}
     else{if(const auto* Recipe=D->Find<FICRecipeRow>(DetailID,R))Name=C->DefinitionText(Recipe->NameKey,Recipe->ID);Description=C->RecipeDescription(DetailID);}
     CastChecked<UICCodexPopupWidget>(GetWidgetFromName(TEXT("DetailPopup")))->Present(Name,Description,Icon,Action,Txt(TEXT("뒤로가기")),Category<2,true);
 }
@@ -311,6 +314,7 @@ void UICCodexMenuWidget::CancelPet(){ResolvePet(false);}
 void UICCodexMenuWidget::CellPicked(int32 Index){OpenCell(Index);RefreshCodex();NotifyNavigation();}
 void UICCodexMenuWidget::NotifyNavigation(){OnNavigationChanged.Broadcast();}
 void UICCodexMenuWidget::Category0(){SelectCategory(0);}void UICCodexMenuWidget::Category1(){SelectCategory(1);}void UICCodexMenuWidget::Category2(){SelectCategory(2);}void UICCodexMenuWidget::Category3(){SelectCategory(3);}
+void UICCodexMenuWidget::Category4(){SelectCategory(4);}
 void UICCodexMenuWidget::Tab0(){SelectSubTab(0);}void UICCodexMenuWidget::Tab1(){SelectSubTab(1);}void UICCodexMenuWidget::Tab2(){SelectSubTab(2);}void UICCodexMenuWidget::Tab3(){SelectSubTab(3);}void UICCodexMenuWidget::Tab4(){SelectSubTab(4);}
 FText UICCodexMenuWidget::NavigationHint() const
 {
@@ -327,14 +331,14 @@ bool UICCodexMenuWidget::HandleMenuKey(FKey K,bool Repeat)
     if(NavigationArea==0)
     {
         if(Right(K)||(Up(K)&&CategoryFocus==0))return false;
-        if(Up(K)||Down(K))CategoryFocus=FMath::Clamp(CategoryFocus+(Down(K)?1:-1),0,3);
+        if(Up(K)||Down(K))CategoryFocus=FMath::Clamp(CategoryFocus+(Down(K)?1:-1),0,UE_ARRAY_COUNT(Categories)-1);
         else if((Left(K)||Accept(K))&&!Repeat)SelectCategory(CategoryFocus);
     }
     else if(NavigationArea==1)
     {
         if(Up(K))return false;
         if(Category==0){if(Left(K)||Right(K))EquippedIndex=FMath::Clamp(EquippedIndex+(Right(K)?1:-1),0,3);else if(Accept(K)&&!Repeat)OpenCell(1000+EquippedIndex);}
-        else if(Category>=2&&(Left(K)||Right(K)))SelectSubTab((SubTab+(Right(K)?1:(Category==2?4:2)))%(Category==2?5:3));
+        else if((Category==2||Category==3)&&(Left(K)||Right(K)))SelectSubTab((SubTab+(Right(K)?1:(Category==2?4:1)))%(Category==2?5:2));
         if(Down(K))NavigationArea=Cells.IsEmpty()?0:2;
     }
     else
@@ -342,7 +346,7 @@ bool UICCodexMenuWidget::HandleMenuKey(FKey K,bool Repeat)
         const int32 Col=SelectedCell%Columns();
         if(Left(K)&&Col==0)return false;
         if(Right(K)&&Col==Columns()-1){NavigationArea=0;CategoryFocus=FMath::Max(0,Category);}
-        else if(Up(K)&&SelectedCell<Columns()){NavigationArea=Category==1?0:1;CategoryFocus=FMath::Max(0,Category);}
+        else if(Up(K)&&SelectedCell<Columns()){NavigationArea=Category==1||Category==4?0:1;CategoryFocus=FMath::Max(0,Category);}
         else if(Up(K)||Down(K)||Left(K)||Right(K)){SelectedCell=FMath::Clamp(SelectedCell+(Down(K)?Columns():Up(K)?-Columns():Right(K)?1:-1),0,FMath::Max(0,Cells.Num()-1));}
         else if(Accept(K)&&!Repeat)OpenCell(SelectedCell);
     }

@@ -46,7 +46,7 @@ void AICDroppedItem::Tick(float DeltaSeconds)
     const auto* Rules=Definitions->Find<FICInventorySettingsRow>(TEXT("CFG_INVENTORY_001"),R);if(!Rules)return;
     FICWorldState Next=State->ExportState();const auto* Record=Next.Drops.FindByPredicate([&](const auto& D){ IC_TRACE_FUNCTION();return D.ID==RecordID;});
     if(!Record){Destroy();return;}
-    if(Clock->GetClock().PlaySecond-Record->CreatedPlaySecond>=Rules->DropLifetimePlaySeconds)
+    if(!Record->bStorageRecovery&&Clock->GetClock().PlaySecond-Record->CreatedPlaySecond>=Rules->DropLifetimePlaySeconds)
     {Next.Drops.RemoveAll([&](const auto& D){ IC_TRACE_FUNCTION();return D.ID==RecordID;});if(State->CommitGameplayTransaction(Next,FGuid::NewGuid()))UE_LOG(LogICInventory, Log, TEXT("[Drop.Expired] Drop=%s Lifetime=%.2f"),*RecordID.ToString(),Rules->DropLifetimePlaySeconds);}
 }
 void AICDroppedItem::TryPickup(AICPlayerController* Controller)

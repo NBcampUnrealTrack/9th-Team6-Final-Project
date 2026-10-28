@@ -6,6 +6,7 @@
 #include "Combat/GAS/Attributes/ICAttributeSets.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "NPC/Character/ICNPCBase.h"
+#include "Life/Production/ICPlayerLifeComponent.h"
 #include "Time/ICTimeSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "World/Spawn/ICSpawnSubsystem.h"
@@ -155,6 +156,8 @@ void UICCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
                     }
                 }
     }
+    const bool PlayerInBed=Player&&Player->LifeActions&&Player->LifeActions->IsSleeping();
+    if(PlayerInBed){bSleeping=Player->LifeActions->IsSleepPoseActive();BedAnchor=Player->LifeActions->GetSleepAnchor();}
     Character->UpdatePresentationTransform(Set->GroundOffsetCm,bSleeping?&BedAnchor:nullptr);
     if (ASC)
     {

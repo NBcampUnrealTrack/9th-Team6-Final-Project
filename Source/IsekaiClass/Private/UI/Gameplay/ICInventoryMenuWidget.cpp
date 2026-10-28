@@ -1,5 +1,9 @@
 #include "UI/Gameplay/ICInventoryMenuWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Gameplay/ICPartyMenuWidget.h"
+#include "UI/Codex/ICCodexMenuWidget.h"
+#include "Codex/ICCodexSubsystem.h"
+#include "Core/Controller/ICPlayerController.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Player/Character/ICPlayerCharacter.h"
@@ -22,6 +26,10 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Components/EditableTextBox.h"
+#include "Components/SpinBox.h"
+#include "Components/WrapBox.h"
+#include "Components/WrapBoxSlot.h"
 #include "Engine/GameInstance.h"
 #include "Engine/Texture2D.h"
 #include "Internationalization/StringTable.h"
@@ -76,6 +84,8 @@ bool UICInventorySlotWidget::BuildLayout(UWidgetTree* T)
 void UICInventorySlotWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    auto* Name=CastChecked<UTextBlock>(GetWidgetFromName(TEXT("TXT_Name")));
+    Name->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);Name->SetClipping(EWidgetClipping::ClipToBounds);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Select")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Pick);
 }
 void UICInventorySlotWidget::Present(int32 Index,FText Name,UTexture2D* Icon,int32 Count,bool Selected)
@@ -119,8 +129,8 @@ bool UICItemConfirmWidget::HandleKey(FKey Key,bool Repeat)
 {
     if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Left||Key==EKeys::Gamepad_DPad_Up)Choice=0;
     else if(Key==EKeys::D||Key==EKeys::Right||Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Right||Key==EKeys::Gamepad_DPad_Down)Choice=1;
-    else if(Key==EKeys::Enter||Key==EKeys::SpaceBar||Key==EKeys::Gamepad_FaceButton_Bottom){if(!Repeat)OnResolved.Broadcast(Choice==0);}
-    else if(Key==EKeys::Escape||Key==EKeys::Equals||Key==EKeys::Gamepad_FaceButton_Right){if(!Repeat)Cancel();}
+    else if(Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Repeat)OnResolved.Broadcast(Choice==0);}
+    else if(Key==EKeys::Escape||Key==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(Key)){if(!Repeat)Cancel();}
     else return false;
     RefreshChoice();return true;
 }
@@ -138,44 +148,62 @@ bool UICInventoryItemPopupWidget::BuildLayout(UWidgetTree* T)
     auto* Scroll=T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("DescriptionScroll"));auto* Limit=T->ConstructWidget<USizeBox>();Limit->SetMaxDesiredHeight(180);Limit->SetContent(Scroll);InventoryRow(Column,Limit,14);
     auto* Description=InventoryLabel(T,TEXT("TXT_Description"),FText::GetEmpty(),18);Description->SetAutoWrapText(true);Scroll->AddChild(Description);
     auto* Message=InventoryLabel(T,TEXT("TXT_Message"),FText::GetEmpty(),15);Message->SetAutoWrapText(true);Message->SetColorAndOpacity(Gold);InventoryRow(Column,Message,12);
-    auto* Actions=T->ConstructWidget<UHorizontalBox>();InventoryRow(Column,Actions,0);
-    const TCHAR* Keys[]={TEXT("BTN_Equip"),TEXT("BTN_Quick"),TEXT("BTN_Trash"),TEXT("BTN_Back")};
-    const TCHAR* Names[]={TEXT("장비 착용"),TEXT("퀵슬롯 설정"),TEXT("휴지통"),TEXT("뒤로가기")};
-    for(int32 I=0;I<4;++I){auto* Placement=Actions->AddChildToHorizontalBox(InventoryButton(T,Keys[I],FText::FromString(Names[I])));Placement->SetSize(FSlateChildSize(ESlateSizeRule::Fill));Placement->SetPadding(FMargin(3,0));}return true;
+    auto* Quantity=T->ConstructWidget<USpinBox>(USpinBox::StaticClass(),TEXT("SplitQuantity"));Quantity->SetMinValue(1);Quantity->SetDelta(1);Quantity->SetMinFractionalDigits(0);Quantity->SetMaxFractionalDigits(0);Quantity->SetVisibility(ESlateVisibility::Collapsed);InventoryRow(Column,Quantity,8);
+    Quantity->SetToolTipText(NSLOCTEXT("ICInventory","SplitCount","분리할 개수"));
+    auto* Actions=T->ConstructWidget<UWrapBox>();Actions->SetInnerSlotPadding(FVector2D(6,6));InventoryRow(Column,Actions,0);
+    const TCHAR* Keys[]={TEXT("BTN_Equip"),TEXT("BTN_Use"),TEXT("BTN_Quick"),TEXT("BTN_Lock"),TEXT("BTN_Split"),TEXT("BTN_Trash"),TEXT("BTN_Back")};
+    const FText Names[]={NSLOCTEXT("ICInventory","Equip","장비 착용"),NSLOCTEXT("ICInventory","Use","사용"),NSLOCTEXT("ICInventory","Quick","퀵슬롯 설정"),NSLOCTEXT("ICInventory","Lock","잠금"),NSLOCTEXT("ICInventory","Split","묶음 분할"),NSLOCTEXT("ICInventory","Trash","휴지통"),NSLOCTEXT("ICInventory","Back","뒤로가기")};
+    for(int32 I=0;I<UE_ARRAY_COUNT(Keys);++I)Actions->AddChildToWrapBox(InventoryButton(T,Keys[I],Names[I]));return true;
 }
 void UICInventoryItemPopupWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Equip")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Equip);
+    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Lock")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Lock);
+    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Split")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Split);
+    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Use")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Use);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Quick")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Quick);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Trash")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Trash);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Back")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Back);
 }
-void UICInventoryItemPopupWidget::Present(FText Name,FText Description,UTexture2D* Icon,EPlayerItemKind Kind,bool CanDiscard,bool CanBind)
+void UICInventoryItemPopupWidget::Present(FText Name,FText Description,UTexture2D* Icon,EPlayerItemKind Kind,bool CanDiscard,bool CanBind,bool CanUse)
 {
     Caption(this,TEXT("TXT_Name"),Name);Caption(this,TEXT("TXT_Description"),Description);
     auto* Image=CastChecked<UImage>(GetWidgetFromName(TEXT("IMG_Item")));Image->SetBrushFromTexture(Icon);Image->SetVisibility(Icon?ESlateVisibility::HitTestInvisible:ESlateVisibility::Hidden);
-    Buttons.Reset();if(Kind==EPlayerItemKind::Equipment)Buttons.Add(TEXT("BTN_Equip"));else if(Kind==EPlayerItemKind::Consumable||Kind==EPlayerItemKind::Expansion)Buttons.Add(TEXT("BTN_Quick"));
+    Buttons.Reset();if(Kind==EPlayerItemKind::Equipment)Buttons.Add(TEXT("BTN_Equip"));else if(Kind==EPlayerItemKind::Consumable||Kind==EPlayerItemKind::Expansion){if(CanUse)Buttons.Add(TEXT("BTN_Use"));Buttons.Add(TEXT("BTN_Quick"));}
     Buttons.Append({TEXT("BTN_Trash"),TEXT("BTN_Back")});
-    for(const auto* Key:{TEXT("BTN_Equip"),TEXT("BTN_Quick"),TEXT("BTN_Trash"),TEXT("BTN_Back")})GetWidgetFromName(Key)->SetVisibility(Buttons.Contains(FName(Key))?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
+    for(const auto* Key:{TEXT("BTN_Equip"),TEXT("BTN_Use"),TEXT("BTN_Quick"),TEXT("BTN_Lock"),TEXT("BTN_Split"),TEXT("BTN_Trash"),TEXT("BTN_Back")})GetWidgetFromName(Key)->SetVisibility(Buttons.Contains(FName(Key))?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     GetWidgetFromName(TEXT("BTN_Trash"))->SetIsEnabled(CanDiscard);GetWidgetFromName(TEXT("BTN_Quick"))->SetIsEnabled(CanBind);
     ActionIndex=FMath::Clamp(ActionIndex,0,Buttons.Num()-1);RefreshSelection();
 }
 void UICInventoryItemPopupWidget::SetMessage(FText Message)
 {Caption(this,TEXT("TXT_Message"),Message);GetWidgetFromName(TEXT("TXT_Message"))->SetVisibility(Message.IsEmpty()?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);}
+void UICInventoryItemPopupWidget::ConfigureStack(bool Locked,int32 Count,bool AllowLock,bool AllowSplit)
+{
+    GetWidgetFromName(TEXT("BTN_Equip"))->SetIsEnabled(!Locked);GetWidgetFromName(TEXT("BTN_Use"))->SetIsEnabled(!Locked);
+    if(AllowLock)Buttons.Insert(TEXT("BTN_Lock"),FMath::Max(0,Buttons.Num()-2));
+    if(AllowSplit&&!Locked&&Count>1)Buttons.Insert(TEXT("BTN_Split"),FMath::Max(0,Buttons.Num()-2));
+    for(const auto* Key:{TEXT("BTN_Lock"),TEXT("BTN_Split")})GetWidgetFromName(Key)->SetVisibility(Buttons.Contains(FName(Key))?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
+    if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Lock"))))if(auto* T=Cast<UTextBlock>(B->GetContent()))T->SetText(Locked?NSLOCTEXT("ICInventory","Unlock","잠금 해제"):NSLOCTEXT("ICInventory","Lock","잠금"));
+    auto* Q=CastChecked<USpinBox>(GetWidgetFromName(TEXT("SplitQuantity")));Q->SetVisibility(AllowSplit&&!Locked&&Count>1?ESlateVisibility::Visible:ESlateVisibility::Collapsed);Q->SetMaxValue(FMath::Max(1,Count-1));Q->SetMaxSliderValue(FMath::Max(1,Count-1));if(Q->GetValue()<1||Q->GetValue()>=Count)Q->SetValue(FMath::Max(1,Count/2));
+    RefreshSelection();
+}
+void UICInventoryItemPopupWidget::Lock(){OnLock.Broadcast();}void UICInventoryItemPopupWidget::Split(){OnSplit.Broadcast();}
 void UICInventoryItemPopupWidget::RefreshSelection()
 {for(int32 I=0;I<Buttons.Num();++I)CastChecked<UButton>(GetWidgetFromName(Buttons[I]))->SetBackgroundColor(I==ActionIndex?Gold:InventoryButtonColor);}
 bool UICInventoryItemPopupWidget::HandleKey(FKey Key,bool Repeat)
 {
-    if(Key==EKeys::Escape||Key==EKeys::Equals||Key==EKeys::Gamepad_FaceButton_Right){if(!Repeat)Back();return true;}
+    if(Key==EKeys::Gamepad_LeftShoulder||Key==EKeys::Gamepad_RightShoulder||Key==EKeys::Add||Key==EKeys::Subtract)
+    {if(auto* Q=Cast<USpinBox>(GetWidgetFromName(TEXT("SplitQuantity")));Q&&Q->IsVisible())Q->SetValue(FMath::Clamp(Q->GetValue()+((Key==EKeys::Gamepad_RightShoulder||Key==EKeys::Add)?1:-1),Q->GetMinValue(),Q->GetMaxValue()));return true;}
+    if(Key==EKeys::Escape||Key==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(Key)){if(!Repeat)Back();return true;}
     if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left)ActionIndex=FMath::Max(0,ActionIndex-1);
     else if(Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right)ActionIndex=FMath::Min(Buttons.Num()-1,ActionIndex+1);
     else if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down)
     {auto* Scroll=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("DescriptionScroll")));Scroll->SetScrollOffset(FMath::Clamp(Scroll->GetScrollOffset()+(Key==EKeys::S||Key==EKeys::Down?60:-60),0.f,Scroll->GetScrollOffsetOfEnd()));}
-    else if(Key==EKeys::Enter||Key==EKeys::SpaceBar||Key==EKeys::Gamepad_FaceButton_Bottom){if(!Repeat&&Buttons.IsValidIndex(ActionIndex)){auto* B=CastChecked<UButton>(GetWidgetFromName(Buttons[ActionIndex]));if(B->GetIsEnabled())B->OnClicked.Broadcast();}}
+    else if(Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Repeat&&Buttons.IsValidIndex(ActionIndex)){auto* B=CastChecked<UButton>(GetWidgetFromName(Buttons[ActionIndex]));if(B->GetIsEnabled())B->OnClicked.Broadcast();}}
     else return false;RefreshSelection();return true;
 }
-void UICInventoryItemPopupWidget::Equip(){OnEquip.Broadcast();}void UICInventoryItemPopupWidget::Quick(){OnQuick.Broadcast();}void UICInventoryItemPopupWidget::Trash(){OnTrash.Broadcast();}void UICInventoryItemPopupWidget::Back(){OnBack.Broadcast();}
+void UICInventoryItemPopupWidget::Equip(){OnEquip.Broadcast();}void UICInventoryItemPopupWidget::Use(){OnUse.Broadcast();}void UICInventoryItemPopupWidget::Quick(){OnQuick.Broadcast();}void UICInventoryItemPopupWidget::Trash(){OnTrash.Broadcast();}void UICInventoryItemPopupWidget::Back(){OnBack.Broadcast();}
 
 bool UICInventoryMenuWidget::BuildLayout(UWidgetTree* T)
 {
@@ -208,7 +236,13 @@ bool UICInventoryMenuWidget::BuildLayout(UWidgetTree* T)
     for(int32 I=0;I<4;++I){auto* Cell=T->ConstructWidget<UICInventorySlotWidget>(CellClass,Indexed(TEXT("QuickSlot"),I));QuickSlots->AddChildToHorizontalBox(Cell)->SetPadding(FMargin(0,0,3,0));}
     InventoryRow(Gear,InventoryButton(T,TEXT("BTN_CancelQuick"),NSLOCTEXT("ICInventory","Cancel","취소")),0);
     auto* Bag=T->ConstructWidget<UVerticalBox>();Top->AddChildToHorizontalBox(Bag)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    auto* GoldLabel=InventoryLabel(T,TEXT("TXT_Gold"),FText::GetEmpty(),22);GoldLabel->SetJustification(ETextJustify::Right);GoldLabel->SetColorAndOpacity(Gold);InventoryRow(Bag,GoldLabel,8);
+    auto* Notice=InventoryLabel(T,TEXT("TXT_InventoryNotice"),FText::GetEmpty(),15);Notice->SetAutoWrapText(true);Notice->SetColorAndOpacity(Gold);InventoryRow(Bag,Notice,4);
     auto* Tabs=T->ConstructWidget<UHorizontalBox>();InventoryRow(Bag,Tabs,8);
+    auto* Search=T->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(),TEXT("InventorySearch"));Search->SetHintText(NSLOCTEXT("ICInventory","Search","아이템 이름 / ID 검색"));auto SearchStyle=Search->GetWidgetStyle();SearchStyle.SetFont(ICFrontendLayout::Font(16));Search->SetWidgetStyle(SearchStyle);InventoryRow(Bag,Search,6);
+    auto* Tools=T->ConstructWidget<UHorizontalBox>();InventoryRow(Bag,Tools,6);
+    Tools->AddChildToHorizontalBox(InventoryButton(T,TEXT("BTN_SortItems"),NSLOCTEXT("ICInventory","Sort","가방 정렬")));
+    Tools->AddChildToHorizontalBox(InventoryButton(T,TEXT("BTN_FilterItems"),NSLOCTEXT("ICInventory","AllFilter","분류: 전체")));
     Tabs->AddChildToHorizontalBox(InventoryButton(T,TEXT("TAB_Normal"),NSLOCTEXT("ICInventory","Normal","일반")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     Tabs->AddChildToHorizontalBox(InventoryButton(T,TEXT("TAB_Quest"),NSLOCTEXT("ICInventory","Quest","퀘스트")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     auto* Scroll=T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("ItemScroll"));Scroll->SetScrollBarVisibility(ESlateVisibility::Visible);
@@ -219,7 +253,9 @@ bool UICInventoryMenuWidget::BuildLayout(UWidgetTree* T)
     Detail->SetVisibility(ESlateVisibility::Collapsed);auto* DetailPlacement=Root->AddChildToOverlay(Detail);DetailPlacement->SetHorizontalAlignment(HAlign_Fill);DetailPlacement->SetVerticalAlignment(VAlign_Fill);
     auto* Confirm=T->ConstructWidget<UICItemConfirmWidget>(WidgetClass(TEXT("WBP_IC_ItemConfirm"),UICItemConfirmWidget::StaticClass()),TEXT("ItemConfirm"));
     Confirm->SetVisibility(ESlateVisibility::Collapsed);auto* ConfirmPlacement=Root->AddChildToOverlay(Confirm);
-    ConfirmPlacement->SetHorizontalAlignment(HAlign_Fill);ConfirmPlacement->SetVerticalAlignment(VAlign_Fill);return true;
+    ConfirmPlacement->SetHorizontalAlignment(HAlign_Fill);ConfirmPlacement->SetVerticalAlignment(VAlign_Fill);
+    auto* Targets=T->ConstructWidget<UICCodexTargetsWidget>(WidgetClass(TEXT("WBP_IC_CodexTargets"),UICCodexTargetsWidget::StaticClass()),TEXT("UseTargets"));
+    Targets->SetVisibility(ESlateVisibility::Collapsed);auto* TargetsPlacement=Root->AddChildToOverlay(Targets);TargetsPlacement->SetHorizontalAlignment(HAlign_Fill);TargetsPlacement->SetVerticalAlignment(VAlign_Fill);return true;
 }
 
 UICInventoryComponent* UICInventoryMenuWidget::Inventory() const
@@ -239,21 +275,27 @@ void UICInventoryMenuWidget::NativeOnInitialized()
     }
     for(int32 I=0;I<4;++I)CastChecked<UICInventorySlotWidget>(GetWidgetFromName(Indexed(TEXT("Equipment"),I)))->OnPicked.AddUniqueDynamic(this,&ThisClass::EquipmentPicked);
     const FName Names[]={TEXT("TAB_Normal"),TEXT("TAB_Quest"),TEXT("BTN_CancelQuick")};
+    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_SortItems")))->OnClicked.AddUniqueDynamic(this,&ThisClass::SortItems);
+    CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_FilterItems")))->OnClicked.AddUniqueDynamic(this,&ThisClass::CycleFilter);
+    CastChecked<UEditableTextBox>(GetWidgetFromName(TEXT("InventorySearch")))->OnTextChanged.AddUniqueDynamic(this,&ThisClass::SearchChanged);
+    auto* Actions=CastChecked<UICInventoryItemPopupWidget>(GetWidgetFromName(TEXT("ItemPopup")));Actions->OnLock.AddUniqueDynamic(this,&ThisClass::LockSelected);Actions->OnSplit.AddUniqueDynamic(this,&ThisClass::SplitSelected);
     const FName Functions[]={TEXT("NormalTab"),TEXT("QuestTab"),TEXT("CancelAction")};
     for(int32 I=0;I<UE_ARRAY_COUNT(Names);++I){FScriptDelegate Click;Click.BindUFunction(this,Functions[I]);CastChecked<UButton>(GetWidgetFromName(Names[I]))->OnClicked.AddUnique(Click);}
     CastChecked<UICItemConfirmWidget>(GetWidgetFromName(TEXT("ItemConfirm")))->OnResolved.AddUniqueDynamic(this,&ThisClass::ResolveConfirmation);
     auto* Detail=CastChecked<UICInventoryItemPopupWidget>(GetWidgetFromName(TEXT("ItemPopup")));Detail->OnEquip.AddUniqueDynamic(this,&ThisClass::EquipAction);Detail->OnQuick.AddUniqueDynamic(this,&ThisClass::QuickAction);Detail->OnTrash.AddUniqueDynamic(this,&ThisClass::TrashAction);Detail->OnBack.AddUniqueDynamic(this,&ThisClass::CloseItem);
+    Detail->OnUse.AddUniqueDynamic(this,&ThisClass::UseAction);
+    auto* Targets=CastChecked<UICCodexTargetsWidget>(GetWidgetFromName(TEXT("UseTargets")));Targets->OnPicked.AddUniqueDynamic(this,&ThisClass::UseTargetPicked);Targets->OnBack.AddUniqueDynamic(this,&ThisClass::CancelUseTarget);
     RefreshInventory();
 }
 void UICInventoryMenuWidget::NativeConstruct()
 {
     Super::NativeConstruct();BoundState=GetGameInstance()?GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr;
-    if(BoundState){BoundState->OnCharacterChanged.AddUniqueDynamic(this,&ThisClass::CharacterChanged);BoundState->OnInventoryChanged.AddUniqueDynamic(this,&ThisClass::RefreshInventory);BoundState->OnWorldRestored.AddUniqueDynamic(this,&ThisClass::RefreshInventory);}
+    if(BoundState){BoundState->OnCharacterChanged.AddUniqueDynamic(this,&ThisClass::CharacterChanged);BoundState->OnInventoryChanged.AddUniqueDynamic(this,&ThisClass::RefreshInventory);BoundState->OnWorldRestored.AddUniqueDynamic(this,&ThisClass::RefreshInventory);BoundState->OnPlayerGoldChanged.AddUniqueDynamic(this,&ThisClass::RefreshInventory);}
     RefreshInventory();
 }
 void UICInventoryMenuWidget::NativeDestruct()
 {
-    if(BoundState){BoundState->OnCharacterChanged.RemoveDynamic(this,&ThisClass::CharacterChanged);BoundState->OnInventoryChanged.RemoveDynamic(this,&ThisClass::RefreshInventory);BoundState->OnWorldRestored.RemoveDynamic(this,&ThisClass::RefreshInventory);BoundState=nullptr;}
+    if(BoundState){BoundState->OnCharacterChanged.RemoveDynamic(this,&ThisClass::CharacterChanged);BoundState->OnInventoryChanged.RemoveDynamic(this,&ThisClass::RefreshInventory);BoundState->OnWorldRestored.RemoveDynamic(this,&ThisClass::RefreshInventory);BoundState->OnPlayerGoldChanged.RemoveDynamic(this,&ThisClass::RefreshInventory);BoundState=nullptr;}
     Super::NativeDestruct();
 }
 void UICInventoryMenuWidget::Activate(){if(!IsBusy()){NavigationArea=0;RefreshInventory();}}
@@ -264,6 +306,7 @@ void UICInventoryMenuWidget::RefreshInventory()
     auto* State=GetGameInstance()?GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr;
     auto* D=GetGameInstance()?GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;
     const auto Data=State?State->ExportState():FICWorldState();Members.Reset();
+    Caption(this,TEXT("TXT_Gold"),FText::Format(NSLOCTEXT("ICInventory","GoldAmount","보유 골드  {0} G"),FText::AsNumber(Data.Gold)));
     if(Data.Characters.Contains(UICWorldStateSubsystem::PlayerId()))Members.Add(UICWorldStateSubsystem::PlayerId());
     for(int32 PartyIndex=0;PartyIndex<3;++PartyIndex)for(const auto& Pair:Data.Characters)
         if(Pair.Value.Kind==EICCharacterKind::Recruitable&&Pair.Value.Mode==EICCharacterMode::Companion&&Pair.Value.PartySlot==PartyIndex){Members.Add(Pair.Key);break;}
@@ -288,7 +331,7 @@ void UICInventoryMenuWidget::RefreshInventory()
     }
     Caption(this,TEXT("TXT_CharacterName"),Name);
     if((bPickingQuickSlot||bConfirming)&&!PendingStillValid())CancelPending();
-    if(bDetailOpen&&(CurrentItem().IsEmpty()||CurrentItem().InstanceID!=DetailInstance)){bDetailOpen=false;NavigationArea=3;}
+    if(bDetailOpen&&(CurrentItem().IsEmpty()||CurrentItem().InstanceID!=DetailInstance)){bDetailOpen=false;bPickingUseTarget=false;NavigationArea=3;}
     RefreshEquipment();RefreshItems();RefreshPresentation();
 }
 void UICInventoryMenuWidget::RefreshEquipment()
@@ -325,8 +368,13 @@ void UICInventoryMenuWidget::RefreshItems()
     auto* Grid=CastChecked<UGridPanel>(GetWidgetFromName(TEXT("ItemGrid")));auto* Inv=Inventory();const auto Data=Inv?Inv->GetSnapshot():FICInventoryState();
     VisibleBagIndices.Reset();
     for(int32 I=0;I<Data.Bag.Slots.Num();++I)
-    {const auto& S=Data.Bag.Slots[I];const auto* D=Inv?Inv->Find(S.ItemID):nullptr;if(ItemTab==EPlayerItemTab::Normal?(!D||D->Tab==EPlayerItemTab::Normal):(D&&D->Tab==EPlayerItemTab::Quest))VisibleBagIndices.Add(I);}
-    if(ItemTab==EPlayerItemTab::Quest)for(int32 I=0;I<Data.QuestItems.Num();++I)VisibleBagIndices.Add(-I-1);
+    {const auto& S=Data.Bag.Slots[I];const auto* D=Inv?Inv->Find(S.ItemID):nullptr;
+     const bool Tab=ItemTab==EPlayerItemTab::Normal?(!D||D->Tab==EPlayerItemTab::Normal):(D&&D->Tab==EPlayerItemTab::Quest);
+     const bool Match=SearchText.IsEmpty()||(D&&(ItemName(S.ItemID).ToString().Contains(SearchText)||S.ItemID.ToString().Contains(SearchText)));
+     const bool Filter=FilterKind==0||(D&&(FilterKind==1?D->Kind==EPlayerItemKind::Equipment:FilterKind==2?D->Kind==EPlayerItemKind::Consumable:FilterKind==3?D->Category==EPlayerItemCategory::Food:FilterKind==4?D->Category==EPlayerItemCategory::Book:FilterKind==5?D->Kind==EPlayerItemKind::Material:S.bLocked));
+     if(Tab&&Match&&Filter)VisibleBagIndices.Add(I);}
+    if(ItemTab==EPlayerItemTab::Quest&&FilterKind==0)for(int32 I=0;I<Data.QuestItems.Num();++I)
+        if(SearchText.IsEmpty()||ItemName(Data.QuestItems[I].ItemID).ToString().Contains(SearchText)||Data.QuestItems[I].ItemID.ToString().Contains(SearchText))VisibleBagIndices.Add(-I-1);
     SelectedItem=FMath::Clamp(SelectedItem,0,FMath::Max(0,VisibleBagIndices.Num()-1));
     if(Grid->GetChildrenCount()!=VisibleBagIndices.Num())
     {
@@ -337,7 +385,8 @@ void UICInventoryMenuWidget::RefreshItems()
     for(int32 I=0;I<VisibleBagIndices.Num();++I)
     {
         const int32 Source=VisibleBagIndices[I];const auto& Item=Source>=0?Data.Bag.Slots[Source]:Data.QuestItems[-Source-1];const auto* D=Inv?Inv->Find(Item.ItemID):nullptr;
-        CastChecked<UICInventorySlotWidget>(Grid->GetChildAt(I))->Present(I,ItemName(Item.ItemID),D?D->Icon.LoadSynchronous():nullptr,Item.Count,I==SelectedItem);
+        const auto Label=Item.bLocked?FText::Format(NSLOCTEXT("ICInventory","LockedName","[잠금] {0}"),ItemName(Item.ItemID)):ItemName(Item.ItemID);
+        CastChecked<UICInventorySlotWidget>(Grid->GetChildAt(I))->Present(I,Label,D?D->Icon.LoadSynchronous():nullptr,Item.Count,I==SelectedItem);
     }
     const auto Item=CurrentItem();Caption(this,TEXT("TXT_SelectedItem"),Item.IsEmpty()?(ItemTab==EPlayerItemTab::Quest?NSLOCTEXT("ICInventory","NoQuestItems","퀘스트 아이템이 없습니다."):FText::GetEmpty()):FText::Format(NSLOCTEXT("ICInventory","SelectedStack","{0}  × {1}"),ItemName(Item.ItemID),FText::AsNumber(Item.Count)));
 }
@@ -360,8 +409,9 @@ bool UICInventoryMenuWidget::CanTrash() const
 void UICInventoryMenuWidget::RefreshPresentation()
 {
     auto* Inv=Inventory();const auto Data=Inv?Inv->GetSnapshot():FICInventoryState();
-    GetWidgetFromName(TEXT("InventoryBody"))->SetIsEnabled(!bConfirming&&(!bDetailOpen||bPickingQuickSlot));
-    GetWidgetFromName(TEXT("ItemPopup"))->SetVisibility(bDetailOpen&&!bPickingQuickSlot?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
+    GetWidgetFromName(TEXT("InventoryBody"))->SetIsEnabled(!bConfirming&&!bPickingUseTarget&&(!bDetailOpen||bPickingQuickSlot));
+    GetWidgetFromName(TEXT("ItemPopup"))->SetVisibility(bDetailOpen&&!bPickingQuickSlot&&!bPickingUseTarget?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
+    GetWidgetFromName(TEXT("UseTargets"))->SetVisibility(bPickingUseTarget?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     GetWidgetFromName(TEXT("ItemPopup"))->SetIsEnabled(!bConfirming);
     if(bDetailOpen)RefreshDetail();
     CastChecked<UButton>(GetWidgetFromName(TEXT("TAB_Normal")))->SetBackgroundColor(ItemTab==EPlayerItemTab::Normal?Gold:InventoryButtonColor);
@@ -392,8 +442,55 @@ void UICInventoryMenuWidget::RefreshDetail()
 {
     auto* Inv=Inventory();const auto Item=CurrentItem();const auto* D=Inv?Inv->Find(Item.ItemID):nullptr;if(!D)return;
     auto* Strings=LoadObject<UStringTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_Definitions.ST_IC_Definitions"));const auto Description=UICTextLibrary::ResolveText(Strings,D->DescriptionKey);
-    CastChecked<UICInventoryItemPopupWidget>(GetWidgetFromName(TEXT("ItemPopup")))->Present(ItemName(Item.ItemID),Description.bSuccess?Description.Text:FText::GetEmpty(),D->Icon.LoadSynchronous(),D->Kind,CanTrash(),CanQuickSlot());
+    FText Info=Description.bSuccess?Description.Text:FText::GetEmpty();
+    if(D->Kind==EPlayerItemKind::Equipment)
+    {
+        FICDefinitionResult Result;const auto* Gear=Inv->GetDefinitions()->Find<FICEquipmentRow>(D->EquipmentID,Result);
+        if(Gear)
+        {
+            double Attack=0;for(const auto& Modifier:Gear->BaseModifiers)if(Modifier.Stat==EICStat::PhysicalAttack||Modifier.Stat==EICStat::MagicAttack)Attack+=Modifier.Flat;
+            Info=FText::Format(NSLOCTEXT("ICInventory","GearInfo","{0}\n기본 공격력 {1}\n요구 능력치: {2} {3}"),Info,FText::AsNumber(Attack),FText::FromString(StaticEnum<EICStat>()->GetNameStringByValue(static_cast<int64>(Gear->RequiredMainStat))),FText::AsNumber(Gear->RequiredMainStatValue));
+            FText Reason;if(!Inv->MeetsEquipmentRequirements(SelectedCharacter,Item.ItemID,Reason))Info=FText::Format(NSLOCTEXT("ICInventory","GearUnavailable","{0}\n{1}"),Info,Reason);
+        }
+    }
+    const bool Usable=D->Kind==EPlayerItemKind::Expansion||(D->Kind==EPlayerItemKind::Consumable&&(D->UseEffect!=EICItemEffect::None||!D->StatusEffectIDs.IsEmpty()));
+    CastChecked<UICInventoryItemPopupWidget>(GetWidgetFromName(TEXT("ItemPopup")))->Present(ItemName(Item.ItemID),Info,D->Icon.LoadSynchronous(),D->Kind,CanTrash(),CanQuickSlot(),Usable);
+    const bool InBag=VisibleBagIndices.IsValidIndex(SelectedItem)&&VisibleBagIndices[SelectedItem]>=0&&D->Kind!=EPlayerItemKind::Quest;
+    CastChecked<UICInventoryItemPopupWidget>(GetWidgetFromName(TEXT("ItemPopup")))->ConfigureStack(Item.bLocked,Item.Count,InBag,InBag&&D->Kind!=EPlayerItemKind::Equipment);
 }
+
+bool UICInventoryMenuWidget::BeginUseSelected()
+{
+    auto* Inv=Inventory();const auto Item=CurrentItem();const auto* Definition=Inv?Inv->Find(Item.ItemID):nullptr;
+    if(Definition&&Definition->Kind==EPlayerItemKind::Expansion&&bDetailOpen&&!bPickingQuickSlot&&!bConfirming&&!bPickingUseTarget&&!Item.IsEmpty()&&!Item.bLocked&&Item.InstanceID==DetailInstance)
+    {
+        const bool Done=Inv->ExpandUsingTicket();
+        if(Done){bDetailOpen=false;DetailInstance.Invalidate();NavigationArea=3;}RefreshInventory();
+        Caption(this,TEXT("TXT_InventoryNotice"),Done?NSLOCTEXT("ICInventory","BagExpanded","가방이 10칸 늘어났습니다."):NSLOCTEXT("ICInventory","BagExpandFailed","가방이 최대 크기이거나 확장권을 사용할 수 없습니다."));NotifyNavigation();return Done;
+    }
+    if(bPickingQuickSlot||bConfirming||bPickingUseTarget||Item.IsEmpty()||Item.bLocked||Item.InstanceID!=DetailInstance||!Definition||Definition->Kind!=EPlayerItemKind::Consumable)return false;
+    bPickingUseTarget=true;auto* Targets=CastChecked<UICCodexTargetsWidget>(GetWidgetFromName(TEXT("UseTargets")));
+    Targets->Present(GetGameInstance()->GetSubsystem<UICCodexSubsystem>());
+    auto* Title=CastChecked<UTextBlock>(Targets->GetWidgetFromName(TEXT("TargetsTitle")));Title->SetAutoWrapText(true);
+    Title->SetText(FText::Format(NSLOCTEXT("ICInventory","UseOnMember","{0}을(를) 사용할 대상"),ItemName(Item.ItemID)));
+    RefreshPresentation();NotifyNavigation();return true;
+}
+
+bool UICInventoryMenuWidget::ChooseUseTarget(int32 Index)
+{
+    auto* Targets=CastChecked<UICCodexTargetsWidget>(GetWidgetFromName(TEXT("UseTargets")));
+    auto* PC=Cast<AICPlayerController>(GetOwningPlayer());const auto Item=CurrentItem();
+    if(!bPickingUseTarget||!PC||!Targets->Members.IsValidIndex(Index)||Item.IsEmpty()||Item.bLocked||Item.InstanceID!=DetailInstance)return false;
+    const FName Target=Targets->Members[Index];FText Reason;
+    if(!PC->UseInventoryItem(Item.ItemID,Target,Reason)){Caption(Targets,TEXT("TargetsTitle"),Reason);return false;}
+    const FText Message=FText::Format(NSLOCTEXT("ICInventory","UsedOnMember","{0}에게 {1} 사용 완료"),GetGameInstance()->GetSubsystem<UICCodexSubsystem>()->CharacterName(Target),ItemName(Item.ItemID));
+    bPickingUseTarget=false;RefreshInventory();Caption(this,TEXT("TXT_InventoryNotice"),Message);
+    CastChecked<UICInventoryItemPopupWidget>(GetWidgetFromName(TEXT("ItemPopup")))->SetMessage(Message);NotifyNavigation();return true;
+}
+
+void UICInventoryMenuWidget::CancelUseTarget(){bPickingUseTarget=false;RefreshPresentation();NotifyNavigation();}
+void UICInventoryMenuWidget::UseAction(){BeginUseSelected();}
+void UICInventoryMenuWidget::UseTargetPicked(int32 Index){ChooseUseTarget(Index);}
 void UICInventoryMenuWidget::NotifyNavigation(){OnNavigationChanged.Broadcast();}
 bool UICInventoryMenuWidget::PendingStillValid() const
 {
@@ -442,7 +539,15 @@ void UICInventoryMenuWidget::EquipmentPicked(int32 Index)
     {if(SelectedCharacter==UICWorldStateSubsystem::PlayerId())Done=Inv->UnequipWeapon(static_cast<EICWeaponFamily>(Index+1));else Done=Inv->UnequipForCharacter(SelectedCharacter,EPlayerEquipSlot::Weapon);}
     RefreshInventory();if(!Done)Caption(this,TEXT("TXT_SelectedItem"),NSLOCTEXT("ICInventory","NoUnequip","빈 장비 슬롯이거나 가방에 빈 공간이 없습니다."));
 }
-void UICInventoryMenuWidget::QuickPicked(int32 Index){if(bPickingQuickSlot)ChooseQuickSlot(Index);else if(!bConfirming){NavigationArea=5;QuickIndex=Index;RefreshPresentation();}}
+void UICInventoryMenuWidget::QuickPicked(int32 Index)
+{
+    if(bPickingQuickSlot){ChooseQuickSlot(Index);return;}if(IsBusy())return;
+    NavigationArea=5;QuickIndex=Index;auto* Inv=Inventory();if(!Inv)return;const auto Data=Inv->GetSnapshot();
+    if(!Data.QuickSlots.IsValidIndex(Index)||Data.QuickSlots[Index].IsNone()){RefreshPresentation();return;}
+    SelectItemTab(EPlayerItemTab::Normal);const FName ItemID=Data.QuickSlots[Index];
+    const int32 Cell=VisibleBagIndices.IndexOfByPredicate([&](int32 BagIndex){return Data.Bag.Slots.IsValidIndex(BagIndex)&&Data.Bag.Slots[BagIndex].ItemID==ItemID&&!Data.Bag.Slots[BagIndex].bLocked;});
+    if(Cell!=INDEX_NONE)OpenItem(Cell);else RefreshPresentation();
+}
 void UICInventoryMenuWidget::NormalTab(){if(IsBusy())return;SelectItemTab(EPlayerItemTab::Normal);NavigationArea=2;RefreshPresentation();}
 void UICInventoryMenuWidget::QuestTab(){if(IsBusy())return;SelectItemTab(EPlayerItemTab::Quest);NavigationArea=2;RefreshPresentation();}
 void UICInventoryMenuWidget::QuickAction(){BeginQuickSlot();}
@@ -451,6 +556,7 @@ void UICInventoryMenuWidget::EquipAction(){EquipSelected();}
 void UICInventoryMenuWidget::CancelAction(){if(bPickingQuickSlot||bConfirming){CancelPending();RefreshInventory();NotifyNavigation();}}
 FText UICInventoryMenuWidget::NavigationHint() const
 {
+    if(bPickingUseTarget)return NSLOCTEXT("ICInventory","UseTargetHint","A / D  대상 선택     Enter  사용     ESC  취소");
     if(bConfirming)return NSLOCTEXT("ICInventory","ConfirmHint","WASD  수락 / 취소 선택     Enter  결정     ESC  취소");
     if(bPickingQuickSlot)return NSLOCTEXT("ICInventory","PickHint","A / D  슬롯 선택     Enter  등록 확인     ESC  취소");
     if(bDetailOpen)return NSLOCTEXT("ICInventory","DetailHint","A / D  버튼 선택     W / S  설명 스크롤     Enter  선택     ESC  뒤로가기");
@@ -458,22 +564,29 @@ FText UICInventoryMenuWidget::NavigationHint() const
     if(NavigationArea==1)return NSLOCTEXT("ICInventory","EquipmentHint","A / D  무기 선택     S  퀵슬롯     Enter  무기 해제");
     if(NavigationArea==2)return NSLOCTEXT("ICInventory","ItemTabsHint","A / D  일반 / 퀘스트     S  아이템     W  상단 탭");
     if(NavigationArea==3)return NSLOCTEXT("ICInventory","ItemsHint","WASD  아이템 이동     Enter  아이템 작업     W  위쪽 탭     A  장비");
-    return NSLOCTEXT("ICInventory","QuickHint","A / D  퀵슬롯 확인     W  무기     D  인벤토리     ESC  닫기");
+    return NSLOCTEXT("ICInventory","QuickHint","A / D  퀵슬롯 선택     Enter  아이템 보기     Delete  등록 해제     W  무기");
 }
 bool UICInventoryMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
 {
+    if(IsSearchFocused())return false;
+    if(!IsBusy()&&(Key==EKeys::V||Key==EKeys::Gamepad_FaceButton_Left)){if(!Repeat)SortItems();return true;}
+    if(!IsBusy()&&(Key==EKeys::C||Key==EKeys::Gamepad_FaceButton_Top)){if(!Repeat)CycleFilter();return true;}
+    if(bPickingUseTarget)return CastChecked<UICCodexTargetsWidget>(GetWidgetFromName(TEXT("UseTargets")))->HandleKey(Key,Repeat);
     if(bConfirming)return CastChecked<UICItemConfirmWidget>(GetWidgetFromName(TEXT("ItemConfirm")))->HandleKey(Key,Repeat);
     const bool Up=Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up,Down=Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down;
     const bool Left=Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left,Right=Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right;
-    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||Key==EKeys::Gamepad_FaceButton_Bottom;
-    const bool Back=Key==EKeys::Escape||Key==EKeys::Equals||Key==EKeys::Gamepad_FaceButton_Right;
+    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key);
+    const bool Back=Key==EKeys::Escape||Key==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(Key);
     if(bPickingQuickSlot)
     {
+        const FKey NumberKeys[]={EKeys::One,EKeys::Two,EKeys::Three,EKeys::Four};
+        for(int32 Index=0;Index<4;++Index)if(Key==NumberKeys[Index]){if(!Repeat)ChooseQuickSlot(Index);return true;}
         if(Left||Right)QuickIndex=FMath::Clamp(QuickIndex+(Right?1:-1),0,3);
         else if(Accept&&!Repeat)ChooseQuickSlot(QuickIndex);else if(Back&&!Repeat)CancelPending();
         RefreshPresentation();NotifyNavigation();return true;
     }
     if(bDetailOpen)return CastChecked<UICInventoryItemPopupWidget>(GetWidgetFromName(TEXT("ItemPopup")))->HandleKey(Key,Repeat);
+    if(NavigationArea==5&&(Key==EKeys::Delete||Key==EKeys::BackSpace)){if(!Repeat&&Inventory())Inventory()->ClearQuickSlot(QuickIndex);RefreshPresentation();NotifyNavigation();return true;}
     if(!Up&&!Down&&!Left&&!Right&&!Accept)return false;
     if(NavigationArea==0)
     {if(Left||(Up&&SelectedMember==0))return false;else if(Up||Down)SelectMember(FMath::Clamp(SelectedMember+(Down?1:-1),0,FMath::Max(0,Members.Num()-1)));else if(Right||Accept)NavigationArea=1;}
@@ -490,6 +603,6 @@ bool UICInventoryMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
         else if(Accept&&!Repeat&&!CurrentItem().IsEmpty())OpenItem(SelectedItem);
     }
     else if(NavigationArea==5)
-    {if(Up)NavigationArea=1;else if(Left&&QuickIndex==0)NavigationArea=0;else if(Right&&QuickIndex==3)NavigationArea=2;else if(Left||Right)QuickIndex=FMath::Clamp(QuickIndex+(Right?1:-1),0,3);}
+    {if(Up)NavigationArea=1;else if(Accept&&!Repeat)QuickPicked(QuickIndex);else if(Left&&QuickIndex==0)NavigationArea=0;else if(Right&&QuickIndex==3)NavigationArea=2;else if(Left||Right)QuickIndex=FMath::Clamp(QuickIndex+(Right?1:-1),0,3);}
     RefreshEquipment();RefreshPresentation();NotifyNavigation();return true;
 }

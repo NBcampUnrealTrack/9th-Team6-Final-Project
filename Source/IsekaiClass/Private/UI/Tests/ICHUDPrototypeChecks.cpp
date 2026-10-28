@@ -278,7 +278,7 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
         auto Card = [QuickSlots](int32 Index) { return CastChecked<UICQuickSlotWidget>(QuickSlots->GetWidgetFromName(FName(*FString::Printf(TEXT("QuickSlot%d"), Index + 1)))); };
         for (int32 Index = 0; Index < 4; ++Index)
         {
-            TestEqual(TEXT("Unregistered slot is hidden"), Card(Index)->GetVisibility(), ESlateVisibility::Collapsed);
+            TestEqual(TEXT("Unregistered slot is visible as an empty frame"), Card(Index)->GetVisibility(), ESlateVisibility::HitTestInvisible);
             TestNull(TEXT("Empty slot has no icon"), Card(Index)->Icon);
         }
 
@@ -315,7 +315,7 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
         Stack(4, IDs[0], 40); Stack(5, IDs[0], 3);
         Snapshot.Bag.Slots[5].bLocked = true;
         TestTrue(TEXT("Own items before registering quick slots"), State->CommitInventoryState(Snapshot));
-        TestEqual(TEXT("Unregistered owned item stays hidden"), Card(0)->GetVisibility(), ESlateVisibility::Collapsed);
+        TestEqual(TEXT("Unregistered owned item stays visible as an empty frame"), Card(0)->GetVisibility(), ESlateVisibility::HitTestInvisible);
         auto* Inventory = NewObject<UICInventoryComponent>(PC);
         Inventory->BindDefinitions(Definitions);
         Inventory->BindWorldState(State);
@@ -331,7 +331,7 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
             TestEqual(TEXT("Occupied slot is visible"), Card(Index)->GetVisibility(), ESlateVisibility::HitTestInvisible);
         };
         Check(0, Inventory->CountItem(IDs[0])); Check(1, 2); Check(2, 7);
-        TestEqual(TEXT("Missing DT icon keeps a registered slot hidden"), Card(3)->GetVisibility(), ESlateVisibility::Collapsed);
+        TestEqual(TEXT("Missing DT icon keeps a registered slot visible as an empty frame"), Card(3)->GetVisibility(), ESlateVisibility::HitTestInvisible);
         Table->FindRow<FICItemRow>(IDs[3], TEXT("HUDTest"))->Icon = Icons[3];
         QuickSlots->RefreshQuickSlots();
         Check(3, 1);
@@ -339,19 +339,19 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
         TestTrue(TEXT("Using an item updates HUD immediately"), Inventory->Consume(IDs[0], 1));
         Check(0, 99);
         TestTrue(TEXT("Consume remaining usable stacks"), Inventory->Consume(IDs[0], 99));
-        TestEqual(TEXT("Exhausted slot hides even with a locked stack remaining"), Card(0)->GetVisibility(), ESlateVisibility::Collapsed);
+        TestEqual(TEXT("Exhausted slot keeps its frame even with a locked stack remaining"), Card(0)->GetVisibility(), ESlateVisibility::HitTestInvisible);
         TestNull(TEXT("Exhaustion clears old image"), Card(0)->Icon);
         TestTrue(TEXT("Reacquire the registered item"), Inventory->AddItem(IDs[0], 3));
         Check(0, 3);
         Snapshot = State->GetInventorySnapshot();
         Snapshot.QuickSlots[0] = NAME_None;
         TestTrue(TEXT("Unregister an occupied quick slot"), State->CommitInventoryState(Snapshot));
-        TestEqual(TEXT("Unregistered slot clears HUD"), Card(0)->GetVisibility(), ESlateVisibility::Collapsed);
+        TestEqual(TEXT("Unregistered slot clears its item and keeps the frame"), Card(0)->GetVisibility(), ESlateVisibility::HitTestInvisible);
         TestTrue(TEXT("Loading restores registered slots and quantities"), State->RestoreState(SavedSlots));
         Check(0, 100); Check(1, 2); Check(2, 7); Check(3, 1);
         Table->RemoveRow(IDs[1]);
         QuickSlots->RefreshQuickSlots();
-        TestEqual(TEXT("Unresolved DT item stays hidden"), Card(1)->GetVisibility(), ESlateVisibility::Collapsed);
+        TestEqual(TEXT("Unresolved DT item stays visible as an empty frame"), Card(1)->GetVisibility(), ESlateVisibility::HitTestInvisible);
         TestNull(TEXT("Missing definition clears old icon"), Card(1)->Icon);
         TestTrue(TEXT("Restore the original inventory after transient tests"), State->RestoreState(OriginalState));
         Definitions->ConfigureCatalog(OriginalCatalog);

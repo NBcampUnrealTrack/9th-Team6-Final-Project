@@ -112,11 +112,26 @@ void UICSpawnSubsystem::RefreshSpawns()
     {
         FTransform Origin;if(!ResolveLoadedAnchor(Slot.OriginAnchorID,Origin))continue;const auto* Monster=D->Find<FICMonsterRow>(Slot.MonsterID,R);if(!Monster)continue;
         if(auto* Player=Cast<AICCharacterBase>(UGameplayStatics::GetPlayerPawn(GetWorld(),0)))if(Player->GetICAbilitySystem()&&!Player->GetICAbilitySystem()->Conditions(Slot.Availability))continue;
-        const FName Key=FName(*(ID.ToString()+TEXT(":")+FString::FromInt(Slot.SpawnSlotIndex)));WantedKeys.Add(Key);if(auto* A=Enemies.Find(Key);A&&A->IsValid())continue;
-        const auto World=S->ExportState();const auto* Saved=World.SpawnSlots.Find(Key);if(Saved&&Saved->bDefeated&&(Saved->bRewardPending||T->GetClock().PlaySecond<Saved->RespawnReadyAtPlaySecond))continue;
+        const FName Key=FName(*(ID.ToString()+TEXT(":")+FString::FromInt(Slot.SpawnSlotIndex)));WantedKeys.Add(Key);
+        auto World=S->ExportState();auto* Saved=World.SpawnSlots.Find(Key);
+        if(Saved&&Saved->bDefeated)
+        {
+            if(Saved->RespawnReadyAtGameMinute<0)
+            {
+                Saved->RespawnReadyAtGameMinute=T->GetClock().GameMinute+FMath::Max(0.,Monster->RespawnGameMinutes);
+                S->ApplyWorldProgress(World);
+            }
+            if(Saved->bRewardPending||T->GetClock().GameMinute<Saved->RespawnReadyAtGameMinute)continue;
+        }
+        if(auto* Existing=Enemies.Find(Key);Existing&&Existing->IsValid())
+        {
+            if(!Saved||!Saved->bDefeated)continue;
+            // Calendar jumps can expire the cooldown before the death animation ends.
+            Existing->Get()->Destroy();Enemies.Remove(Key);
+        }
         UClass* Type=Monster->PawnClass.IsNull()?AICEnemyBase::StaticClass():Monster->PawnClass.LoadSynchronous();if(!Type||!Type->IsChildOf(AICEnemyBase::StaticClass())){UE_LOG(LogICData,Warning,TEXT("[Spawn.EnemyClassInvalid] %s"),*Slot.MonsterID.ToString());continue;}
 
-        auto* Actor=GetWorld()->SpawnActor<AICEnemyBase>(Type,Origin);if(Actor){if(!Actor->InitializeEnemy(ID,Slot,Origin))Actor->Destroy();else {Enemies.Add(Key,Actor);auto Next=S->ExportState();auto& New=Next.SpawnSlots.FindChecked(Key);New.bDefeated=false;New.RespawnReadyAtPlaySecond=0;S->ApplyWorldProgress(Next);}}
+        auto* Actor=GetWorld()->SpawnActor<AICEnemyBase>(Type,Origin);if(Actor){if(!Actor->InitializeEnemy(ID,Slot,Origin))Actor->Destroy();else {Enemies.Add(Key,Actor);auto Next=S->ExportState();auto& New=Next.SpawnSlots.FindChecked(Key);New.bDefeated=false;New.RespawnReadyAtPlaySecond=0;New.RespawnReadyAtGameMinute=0;S->ApplyWorldProgress(Next);}}
     }
     for(auto It=Enemies.CreateIterator();It;++It)if(!WantedKeys.Contains(It.Key())){if(It.Value().IsValid())It.Value()->Destroy();It.RemoveCurrent();}
 }

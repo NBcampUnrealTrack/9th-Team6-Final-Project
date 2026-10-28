@@ -1,4 +1,6 @@
 #include "Character/Base/ICCharacterBase.h"
+#include "Character/Animation/ICCharacterAnimInstance.h"
+#include "Life/Production/ICPlayerLifeComponent.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Combat/GAS/ICGameplayTags.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -10,6 +12,7 @@
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Animation/AnimMontage.h"
+#include "Combat/Party/ICPartyStatus.h"
 void AICCharacterBase::UpdatePresentationTransform(float GroundOffsetCm, const FTransform* BedAnchor)
 {
     auto* CharacterMesh=GetMesh();auto* Profile=GetAnimationProfile();
@@ -33,7 +36,8 @@ void AICCharacterBase::UpdatePresentationTransform(float GroundOffsetCm, const F
         if(EquippedWeaponActor)EquippedWeaponActor->SetActorHiddenInGame(Sleeping||bWeaponSheathed);
         bSleepPresentation=Sleeping;
     }
-    const bool HideWeapon=Sleeping||bWeaponSheathed;
+    const auto* Life=FindComponentByClass<UICPlayerLifeComponent>();
+    const bool HideWeapon=Sleeping||bWeaponSheathed||(Life&&Life->IsWorking());
     if(EquippedWeaponActor&&EquippedWeaponActor->IsHidden()!=HideWeapon)EquippedWeaponActor->SetActorHiddenInGame(HideWeapon);
 }
 AICCharacterBase::AICCharacterBase()
@@ -48,11 +52,12 @@ void AICCharacterBase::RefreshWeaponAppearance()
     const auto* Inventory = FindComponentByClass<UICInventoryComponent>();
     const auto InventoryState = Inventory ? Inventory->GetSnapshot() : FICInventoryState();
     bWeaponSheathed = Inventory && InventoryState.bWeaponSheathed;
+    const auto* Working=FindComponentByClass<UICPlayerLifeComponent>();const bool HideForLife=Working&&(Working->IsWorking()||Working->IsSleeping());
     const auto Items = Inventory ? InventoryState.Equipment : State.Equipment;
     const FName ItemID = Items.IsValidIndex(0) ? Items[0].ItemID : NAME_None;
     if (ItemID == VisualEquipmentID)
     {
-        if (EquippedWeaponActor) EquippedWeaponActor->SetActorHiddenInGame(bSleepPresentation||bWeaponSheathed);
+        if (EquippedWeaponActor) EquippedWeaponActor->SetActorHiddenInGame(bSleepPresentation||bWeaponSheathed||HideForLife);
         return;
     }
     VisualEquipmentID = ItemID;
@@ -70,7 +75,7 @@ void AICCharacterBase::RefreshWeaponAppearance()
         EquippedWeaponActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Gear->AttachSocket);
         EquippedWeaponActor->SetActorRelativeTransform(Gear->AttachmentTransform);
         EquippedWeaponActor->Configure(*Gear);
-        EquippedWeaponActor->SetActorHiddenInGame(bSleepPresentation||bWeaponSheathed);
+        EquippedWeaponActor->SetActorHiddenInGame(bSleepPresentation||bWeaponSheathed||HideForLife);
     }
 }
 UICCharacterAnimationProfile* AICCharacterBase::GetAnimationProfile()
@@ -118,6 +123,7 @@ bool AICCharacterBase::InitializeState(FName ID)
     if (Snapshot.Kind != EICCharacterKind::Player && !State->RegisterStateParticipant(ID, this)) return false;
     CharacterID = ID; bRegisteredState = Snapshot.Kind != EICCharacterKind::Player;
     State->OnCharacterChanged.AddUniqueDynamic(this, &ThisClass::StoredCharacterChanged);
+    State->OnInventoryChanged.AddUniqueDynamic(this,&ThisClass::PartyBuffsChanged);
     if (AbilitySystem) AbilitySystem->Restore(Snapshot);
     RefreshWeaponAppearance();
     bZeroHPHandled = Snapshot.IsDowned();
@@ -143,13 +149,21 @@ bool AICCharacterBase::CanRestoreWorldState_Implementation(const FICWorldState& 
 }
 void AICCharacterBase::RestoreFromWorldState_Implementation(const FICWorldState& Candidate)
 {
+    if(auto* Anim=Cast<UICCharacterAnimInstance>(GetMesh()->GetAnimInstance()))Anim->ResetForLoad();
     IC_TRACE_FUNCTION(); if (const auto* Snapshot = Candidate.Characters.Find(CharacterID))
     { if (AbilitySystem) { AbilitySystem->ResetExecutionForLoad(); AbilitySystem->Restore(*Snapshot); } bZeroHPHandled = Snapshot->IsDowned(); }
 }
 void AICCharacterBase::StoredCharacterChanged(FName ID)
 {
-    IC_TRACE_FUNCTION(); if (ID != CharacterID || !AbilitySystem || !WorldState()) return;
+    IC_TRACE_FUNCTION(); if (!AbilitySystem || !WorldState()) return;
+    if(ID!=CharacterID){PartyBuffsChanged();return;}
     if (const auto* State = WorldState()->GetStoredCharacter(ID)) {AbilitySystem->Restore(*State);bZeroHPHandled=State->IsDowned();RefreshWeaponAppearance();}
+}
+void AICCharacterBase::PartyBuffsChanged()
+{
+    if(!WorldState()||!AbilitySystem)return;
+    const uint32 Key=ICPartyStatus::CompositionKey(WorldState()->ExportState());
+    if(Key!=LastPartyBuffKey){LastPartyBuffKey=Key;AbilitySystem->RebuildDerivedStats();}
 }
 void AICCharacterBase::HandleZeroHP()
 {
@@ -164,13 +178,13 @@ void AICCharacterBase::EndPlay(const EEndPlayReason::Type Reason)
     IC_TRACE_FUNCTION();
     if (bRegisteredState && WorldState())
     { FlushToWorldState_Implementation(WorldState()); WorldState()->UnregisterStateParticipant(CharacterID, this); WorldState()->OnCharacterChanged.RemoveDynamic(this, &ThisClass::StoredCharacterChanged); }
-    if(WorldState())WorldState()->OnCharacterChanged.RemoveDynamic(this,&ThisClass::StoredCharacterChanged);
+    if(WorldState()){WorldState()->OnCharacterChanged.RemoveDynamic(this,&ThisClass::StoredCharacterChanged);WorldState()->OnInventoryChanged.RemoveDynamic(this,&ThisClass::PartyBuffsChanged);}
     if (AbilitySystem) AbilitySystem->Shutdown();
     Super::EndPlay(Reason);
 }
 void AICCharacterBase::ReleaseForLoad()
 {
     IC_TRACE_FUNCTION();bSuppressPersistence=true;
-    if(WorldState()){WorldState()->UnregisterStateParticipant(CharacterID,this);WorldState()->OnCharacterChanged.RemoveDynamic(this,&ThisClass::StoredCharacterChanged);}bRegisteredState=false;
+    if(WorldState()){WorldState()->UnregisterStateParticipant(CharacterID,this);WorldState()->OnCharacterChanged.RemoveDynamic(this,&ThisClass::StoredCharacterChanged);WorldState()->OnInventoryChanged.RemoveDynamic(this,&ThisClass::PartyBuffsChanged);}bRegisteredState=false;
     if(AbilitySystem)AbilitySystem->Shutdown();
 }

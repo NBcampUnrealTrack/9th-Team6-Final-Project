@@ -45,6 +45,10 @@ bool FICInventoryMenuCheck::RunTest(const FString&)
         auto Label=[&](const TCHAR* Key){return CastChecked<UTextBlock>(UI->GetWidgetFromName(Key))->GetText().ToString();};
         auto BagIndex=[&](FName ID){return Inv->GetSnapshot().Bag.Slots.IndexOfByPredicate([&](const auto& Item){return Item.ItemID==ID&&!Item.IsEmpty();});};
         auto SelectBag=[&](FName ID){UI->SelectItemTab(EPlayerItemTab::Normal);return UI->SelectItem(BagIndex(ID));};
+        Inv->AddItem(TEXT("ITM_TKT_001"),1,false);SelectBag(TEXT("ITM_TKT_001"));TestTrue(TEXT("Bag ticket opens its detail"),UI->OpenItem(UI->SelectedItem));
+        const int32 BeforeCapacity=Inv->GetSnapshot().Bag.Slots.Num();TestTrue(TEXT("Inventory detail uses expansion ticket directly"),UI->BeginUseSelected());
+        TestFalse(TEXT("Expansion ticket does not ask for a party target"),UI->bPickingUseTarget);TestEqual(TEXT("Ticket adds ten bag slots"),Inv->GetSnapshot().Bag.Slots.Num(),BeforeCapacity+10);TestEqual(TEXT("Ticket consumes once"),Inv->CountItem(TEXT("ITM_TKT_001")),0);
+        UI->Activate(); // The following roster checks start from the menu's member area.
         TestEqual(TEXT("Only the actual player appears initially"),UI->Members.Num(),1);
         for(int32 I=0;I<4;++I)TestTrue(TEXT("All four player weapon panels visible"),UI->GetWidgetFromName(FName(*FString::Printf(TEXT("WeaponFrame%d"),I)))->IsVisible());
         const FName Weapons[]={TEXT("EQP_WPN_SWORD_001"),TEXT("EQP_WPN_BOW_001"),TEXT("EQP_WPN_STAFF_001"),TEXT("EQP_WPN_WAND_001")};

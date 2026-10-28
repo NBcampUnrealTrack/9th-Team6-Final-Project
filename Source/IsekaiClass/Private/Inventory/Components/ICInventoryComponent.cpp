@@ -74,7 +74,8 @@ int32 UICInventoryComponent::Insert(FPlayerContainer& C, FName ID, int32 Count, 
     const auto* D = Find(ID); if (!D || Count <= 0) return 0;
     const int32 Limit = D->Kind == EPlayerItemKind::Equipment ? 1 : FMath::Clamp(D->StackLimit, 1, 99);
     int32 Left = Count;
-    if (Limit > 1) for (auto& S : C.Slots) if (S.ItemID == ID && !S.bLocked && S.Count < Limit)
+    if (Limit > 1) for (auto& S : C.Slots) if (S.ItemID == ID && !S.bLocked && S.Count < Limit
+        &&(!Original||(S.Grade==Original->Grade&&S.Upgrade==Original->Upgrade&&S.OwnerID==Original->OwnerID&&S.Options.OrderIndependentCompareEqual(Original->Options))))
     { const int32 N = FMath::Min(Left, Limit - S.Count); S.Count += N; Left -= N; if (!Left) return Count; }
     for (auto& S : C.Slots) if (S.IsEmpty())
     {
@@ -252,6 +253,7 @@ bool UICInventoryComponent::Equip(int32 Index)
     FICDefinitionResult Lookup;
     const auto* Gear=GetDefinitions()?GetDefinitions()->Find<FICEquipmentRow>(D->EquipmentID,Lookup):nullptr;
     if(!Gear || Gear->Slot!=D->EquipSlot)return Fail(*ICText::Get(TEXT("Native_6eec833069e7")).ToString());
+    FText Requirement;if(!MeetsEquipmentRequirements(UICWorldStateSubsystem::PlayerId(),S.ItemID,Requirement))return Fail(*Requirement.ToString());
     if (D->EquipSlot == EPlayerEquipSlot::Weapon)
     {
         if (const auto* Player=Cast<AICPlayerCharacter>(GetOwner());Player&&Player->IsSwitchingWeapon()) return false;
@@ -281,6 +283,7 @@ bool UICInventoryComponent::EquipForCharacter(FName ID,int32 Index)
         ||Gear->Slot!=Definition->EquipSlot||Gear->Slot!=EPlayerEquipSlot::Weapon
         ||(Gear->Slot==EPlayerEquipSlot::Weapon&&Gear->WeaponFamily!=Recruit->WeaponFamily)
         ||(Gear->RequiredClass!=EICCharacterClass::None&&Gear->RequiredClass!=Class->CharacterClass))return false;
+    FText Requirement;if(!MeetsEquipmentRequirements(ID,Item.ItemID,Requirement))return Fail(*Requirement.ToString());
     Character.Equipment.SetNum(1);Swap(Item,Character.Equipment[0]);
     return ValidateSnapshot(Next)&&WorldState->CommitCharacterAndInventory(Character,Next);
 }
@@ -470,6 +473,12 @@ bool UICInventoryComponent::BindQuickSlot(int32 Quick, int32 Index)
     Next.QuickSlots[Quick] = D->ItemID; return Commit(Next);
 }
 
+bool UICInventoryComponent::ClearQuickSlot(int32 QuickIndex)
+{
+    auto Next=GetSnapshot();if(!Next.QuickSlots.IsValidIndex(QuickIndex))return false;
+    Next.QuickSlots[QuickIndex]=NAME_None;return Commit(Next);
+}
+
 bool UICInventoryComponent::ExpandUsingTicket()
 {
     IC_TRACE_FUNCTION();
@@ -488,36 +497,38 @@ void UICInventoryComponent::EnsureStorage(FName ID)
 
 bool UICInventoryComponent::Transfer(FName ID, int32 Index, bool bToStorage)
 {
-    IC_TRACE_FUNCTION();
-    UE_LOG(LogICInventory, Verbose, TEXT("[Inventory.Transfer.Request] Container=%s Slot=%d ToStorage=%d"),*ID.ToString(),Index,bToStorage);
-    auto Next = GetSnapshot(); auto* Container = Next.Storage.Find(ID); if (!Container) return false;
-    auto& Source = bToStorage ? Next.Bag : *Container; auto& Destination = bToStorage ? *Container : Next.Bag;
-    if (!Source.Slots.IsValidIndex(Index) || Source.Slots[Index].IsEmpty() || Source.Slots[Index].bLocked) return false;
-    const auto Item = Source.Slots[Index]; FPlayerContainer NewDestination = Destination;
-    // Legacy 160-slot saves stay readable/withdrawable; new deposits use at most 120 home slots.
-    const bool LegacyHome=bToStorage&&ID==TEXT("PlayerHome")&&NewDestination.Slots.Num()>120;
-    FPlayerContainer Deposit=NewDestination;
-    if(LegacyHome)Deposit.Slots.SetNum(120);
-    if (Insert(Deposit, Item.ItemID, Item.Count, &Item) != Item.Count) return Fail(*ICText::Get(TEXT("Native_ce19791ea019")).ToString());
-    if(LegacyHome){for(int32 Slot=0;Slot<120;++Slot)NewDestination.Slots[Slot]=Deposit.Slots[Slot];}
-    else NewDestination=MoveTemp(Deposit);
-    Destination = MoveTemp(NewDestination); Source.Slots[Index] = FPlayerItemInstance(); return Commit(Next);
+    FText Reason;return TransferAmount(ID,Index,GetTransferableCount(ID,Index,bToStorage),bToStorage,Reason);
 }
-
-bool UICInventoryComponent::SetHomeStorageStage(int32 Stage)
+int32 UICInventoryComponent::GetTransferableCount(FName ID,int32 Index,bool bToStorage) const
 {
-    if(Stage<1||Stage>3)return false;
-    if(WorldState&&!WorldState->FlushParticipants())return false;
-    auto Next=GetSnapshot();auto& Storage=Next.Storage.FindOrAdd(TEXT("PlayerHome"));
-    const int32 Capacity=Stage*40;
-    // Do not reduce capacity or overwrite items from older saves.
-    if(Storage.Slots.Num()>Capacity)return false;
-    Storage.Slots.SetNum(Capacity);
-    if(!WorldState)return Commit(Next);
-    auto Candidate=WorldState->ExportState();Candidate.Inventory=Next;
-    Candidate.ProgressionStages.Add(TEXT("Home.Storage"),Stage);
-    return ValidateSnapshot(Next)&&WorldState->CommitGameplayTransaction(Candidate,FGuid::NewGuid());
+    const auto Snapshot=GetSnapshot();const auto* Storage=Snapshot.Storage.Find(ID);if(!Storage||Storage->Slots.Num()!=40)return 0;
+    const auto& Source=bToStorage?Snapshot.Bag:*Storage;if(!Source.Slots.IsValidIndex(Index))return 0;
+    const auto& Item=Source.Slots[Index];const auto* Definition=Find(Item.ItemID);
+    if(Item.IsEmpty()||Item.bLocked||!Definition||Definition->Kind==EPlayerItemKind::Quest)return 0;
+    int32 Reserved=0;
+    if(bToStorage&&WorldState)for(const auto& Pair:WorldState->ExportState().ProductionJobs)
+        if(Pair.Value.Status==EICProductionJobStatus::Running||Pair.Value.Status==EICProductionJobStatus::Ready)
+            for(const auto& Material:Pair.Value.Materials)if(Material.ItemInstanceID==Item.InstanceID&&!(Material.Timing==EICProductionMaterialTiming::ConsumeAtStart&&Pair.Value.bCostsCommitted))Reserved+=Material.Count;
+    return FMath::Max(0,Item.Count-Reserved);
 }
+bool UICInventoryComponent::TransferAmount(FName ID,int32 Index,int32 Count,bool bToStorage,FText& Reason)
+{
+    Reason=FText::GetEmpty();
+    if(WorldState&&!WorldState->FlushParticipants())return false;
+    const int32 Available=GetTransferableCount(ID,Index,bToStorage);
+    if(Count<=0||Count>Available){Reason=NSLOCTEXT("ICStorage","Unavailable","이동할 수량이 부족하거나 잠금·제작 예약된 아이템입니다.");return false;}
+    auto Next=GetSnapshot();auto* Storage=Next.Storage.Find(ID);if(!Storage||Storage->Slots.Num()!=40)return false;
+    auto& Source=bToStorage?Next.Bag:*Storage;auto& Destination=bToStorage?*Storage:Next.Bag;
+    auto& Item=Source.Slots[Index];auto Moving=Item;Moving.Count=Count;
+    if(Count<Item.Count)Moving.InstanceID=FGuid::NewGuid();
+    auto NewDestination=Destination;
+    if(Insert(NewDestination,Moving.ItemID,Count,&Moving)!=Count){Reason=NSLOCTEXT("ICStorage","NoSpace","선택한 수량을 넣을 공간이 부족합니다.");return false;}
+    Destination=MoveTemp(NewDestination);Item.Count-=Count;if(Item.Count==0)Item=FPlayerItemInstance();
+    for(auto& Quick:Next.QuickSlots)if(!Quick.IsNone()&&!Next.Bag.Slots.ContainsByPredicate([&](const auto& Value){return Value.ItemID==Quick&&!Value.IsEmpty();}))Quick=NAME_None;
+    if(!Commit(Next)){Reason=NSLOCTEXT("ICStorage","Changed","아이템 상태가 변경되었습니다. 다시 선택하세요.");return false;}return true;
+}
+bool UICInventoryComponent::SetHomeStorageStage(int32 Stage)
+{return Stage==1&&GetSnapshot().Storage.Contains(TEXT("PlayerHome"))&&GetSnapshot().Storage.FindChecked(TEXT("PlayerHome")).Slots.Num()==40;}
 
 bool UICInventoryComponent::ExchangeItems(const TMap<FName, int32>& Costs, FName ID, int32 Count)
 {
@@ -571,7 +582,7 @@ bool UICInventoryComponent::ValidateSnapshot(const FICInventoryState& Snapshot) 
         if (!Item.IsEmpty() && (!Check(Item,false) || GetItemWeaponFamily(Item)!=static_cast<EICWeaponFamily>(Index+1)
             || SelectedFamily==static_cast<EICWeaponFamily>(Index+1))) return false;
     }
-    for (const auto& C : Snapshot.Storage) for (const auto& S : C.Value.Slots) if (!Check(S, false)) return false;
+    for (const auto& C : Snapshot.Storage){if(C.Value.Slots.Num()!=40)return false;for (const auto& S : C.Value.Slots) if (!Check(S, false)) return false;}
     for (FName ID : Snapshot.QuickSlots) if (!ID.IsNone())
     { const auto* D = Find(ID); if (!D || (D->Kind != EPlayerItemKind::Consumable && D->Kind != EPlayerItemKind::Expansion)) return false; }
     return true;

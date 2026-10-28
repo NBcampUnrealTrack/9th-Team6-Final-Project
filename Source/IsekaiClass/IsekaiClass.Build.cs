@@ -11,6 +11,7 @@ public class IsekaiClass : ModuleRules
             "Core",
             "CoreUObject",
             "Engine",
+            "Json",
             "AnimGraphRuntime",
             "DeveloperSettings",
             "InputCore",
