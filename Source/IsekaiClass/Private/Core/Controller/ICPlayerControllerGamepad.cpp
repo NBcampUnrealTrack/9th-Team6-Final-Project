@@ -9,7 +9,7 @@ namespace
 {
 bool FindGamepadCommand(AICPlayerController* PC,FKey Key,FICInputCommandBinding& Out)
 {
-    // The IMC stores Xbox/PlayStation positions; retain dev's optional Nintendo layout.
+    // The IMC stores Xbox positions; translate the selected Nintendo layout by button position.
     const FKey FaceKeys[]={EKeys::Gamepad_FaceButton_Left,EKeys::Gamepad_FaceButton_Top,
         EKeys::Gamepad_FaceButton_Right,EKeys::Gamepad_FaceButton_Bottom};
     for(int32 I=0;I<4;++I)
