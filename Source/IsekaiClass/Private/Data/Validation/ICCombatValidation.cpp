@@ -403,8 +403,10 @@ void ValidateCombat(const TArray<FICDefinitionTable>& Tables, bool bComplete, TA
     {
         IC_TRACE_FUNCTION();
         if (Row.CombatStats.MaxHP < 1) Issue(Issues, At, TEXT("CombatStats.MaxHP"), TEXT("Monsters use positive direct HP instead of player primary stats."));
-        if (Row.DetectionRangeCm <= 0.0 || Row.AttackRangeCm <= 0.0 || Row.AttackIntervalPlaySeconds <= 0.0)
-            Missing(Issues, At, TEXT("DetectionRangeCm"), TEXT("Author positive detection/attack ranges and attack interval."), bComplete);
+        if (Row.DetectionRangeCm <= 0.0 || Row.ChaseLimitCm <= 0.0
+            || Row.InvestigationAdvanceDistanceCm < 0.0
+            || Row.AttackRangeCm <= 0.0 || Row.AttackIntervalPlaySeconds <= 0.0)
+            Missing(Issues, At, TEXT("DetectionRangeCm"), TEXT("Author valid detection, chase, investigation, and attack ranges plus attack interval."), bComplete);
         if (Row.Kind != EICMonsterKind::Normal && !Row.bImmuneToOrdinaryHitStagger) Issue(Issues, At, TEXT("bImmuneToOrdinaryHitStagger"), TEXT("Bosses are immune to ordinary hit stagger; casting interruption remains separate."));
         TSet<int32> PhaseIndices;
         double PreviousThreshold = 1.0;

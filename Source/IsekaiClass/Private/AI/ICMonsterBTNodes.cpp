@@ -1,12 +1,15 @@
 #include "AI/ICMonsterBTNodes.h"
 
 #include "AI/ICAIController.h"
+#include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
+#include "BehaviorTree/BlackboardData.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Character/Base/ICCharacterBase.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Data/Rows/Combat/ICMonsterRows.h"
+#include "Debug/ICLog.h"
 #include "Enemy/Character/ICEnemyBase.h"
 #include "Engine/GameInstance.h"
 #include "EngineUtils.h"
@@ -20,6 +23,8 @@ namespace
     const FName HomeLocationKey(TEXT("HomeLocation"));
     const FName IsReturningKey(TEXT("IsReturning"));
     const FName IsInAttackRangeKey(TEXT("IsInAttackRange"));
+    const FName LastKnownTargetLocationKey(TEXT("LastKnownTargetLocation"));
+    const FName IsInvestigatingKey(TEXT("IsInvestigating"));
 
     bool IsVisibleHostileTarget(const AICEnemyBase* Enemy, AICCharacterBase* Candidate,
         AICAIController* Controller, const FICMonsterRow& Definition)
@@ -65,26 +70,86 @@ UBTTask_ICMonsterPickWanderLocation::UBTTask_ICMonsterPickWanderLocation()
     WanderLocationKey.AddVectorFilter(this, GET_MEMBER_NAME_CHECKED(UBTTask_ICMonsterPickWanderLocation, WanderLocationKey));
 }
 
+void UBTTask_ICMonsterPickWanderLocation::InitializeFromAsset(UBehaviorTree& Asset)
+{
+    Super::InitializeFromAsset(Asset);
+
+    if (UBlackboardData* BlackboardAsset = GetBlackboardAsset())
+    {
+        HomeLocationKey.ResolveSelectedKey(*BlackboardAsset);
+        WanderLocationKey.ResolveSelectedKey(*BlackboardAsset);
+    }
+}
+
 EBTNodeResult::Type UBTTask_ICMonsterPickWanderLocation::ExecuteTask(
     UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
     UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
     UWorld* World = OwnerComp.GetWorld();
-    if (!Blackboard || !World || !HomeLocationKey.IsSet() || !WanderLocationKey.IsSet()
-        || Blackboard->GetKeyID(HomeLocationKey.SelectedKeyName) == FBlackboard::InvalidKey
-        || Blackboard->GetKeyID(WanderLocationKey.SelectedKeyName) == FBlackboard::InvalidKey)
+    const AAIController* Controller = OwnerComp.GetAIOwner();
+    const APawn* Pawn = Controller ? Controller->GetPawn() : nullptr;
+
+    if (!Blackboard || !World)
+    {
+        UE_LOG(LogICCore, Warning,
+            TEXT("[AI.Wander.Failed] Pawn=%s Reason=MissingContext Blackboard=%s World=%s"),
+            *GetNameSafe(Pawn), Blackboard ? TEXT("Valid") : TEXT("Null"), World ? TEXT("Valid") : TEXT("Null"));
         return EBTNodeResult::Failed;
+    }
+
+    if (!HomeLocationKey.IsSet() || !WanderLocationKey.IsSet())
+    {
+        UE_LOG(LogICCore, Warning,
+            TEXT("[AI.Wander.Failed] Pawn=%s Reason=KeyNotSelected HomeKey=%s WanderKey=%s"),
+            *GetNameSafe(Pawn), *HomeLocationKey.SelectedKeyName.ToString(),
+            *WanderLocationKey.SelectedKeyName.ToString());
+        return EBTNodeResult::Failed;
+    }
+
+    if (Blackboard->GetKeyID(HomeLocationKey.SelectedKeyName) == FBlackboard::InvalidKey
+        || Blackboard->GetKeyID(WanderLocationKey.SelectedKeyName) == FBlackboard::InvalidKey)
+    {
+        UE_LOG(LogICCore, Warning,
+            TEXT("[AI.Wander.Failed] Pawn=%s Reason=BlackboardKeyMissing HomeKey=%s HomeKeyID=%d WanderKey=%s WanderKeyID=%d"),
+            *GetNameSafe(Pawn), *HomeLocationKey.SelectedKeyName.ToString(),
+            static_cast<int32>(Blackboard->GetKeyID(HomeLocationKey.SelectedKeyName)),
+            *WanderLocationKey.SelectedKeyName.ToString(),
+            static_cast<int32>(Blackboard->GetKeyID(WanderLocationKey.SelectedKeyName)));
+        return EBTNodeResult::Failed;
+    }
 
     const FVector Center = Blackboard->GetValueAsVector(HomeLocationKey.SelectedKeyName);
     const float Radius = FMath::Max(0.0f, WanderRadius);
-    if (Radius <= 0.0f) return EBTNodeResult::Failed;
+    if (Radius <= 0.0f)
+    {
+        UE_LOG(LogICCore, Warning,
+            TEXT("[AI.Wander.Failed] Pawn=%s Reason=InvalidRadius Radius=%.1f"),
+            *GetNameSafe(Pawn), WanderRadius);
+        return EBTNodeResult::Failed;
+    }
 
     UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
-    FNavLocation Candidate;
-    if (!Navigation || !Navigation->GetRandomReachablePointInRadius(Center, Radius, Candidate))
+    if (!Navigation)
+    {
+        UE_LOG(LogICCore, Warning,
+            TEXT("[AI.Wander.Failed] Pawn=%s Reason=NavigationSystemUnavailable Center=%s Radius=%.1f"),
+            *GetNameSafe(Pawn), *Center.ToCompactString(), Radius);
         return EBTNodeResult::Failed;
+    }
+
+    FNavLocation Candidate;
+    if (!Navigation->GetRandomReachablePointInRadius(Center, Radius, Candidate))
+    {
+        UE_LOG(LogICCore, Warning,
+            TEXT("[AI.Wander.Failed] Pawn=%s Reason=NoReachablePoint Center=%s Radius=%.1f"),
+            *GetNameSafe(Pawn), *Center.ToCompactString(), Radius);
+        return EBTNodeResult::Failed;
+    }
 
     Blackboard->SetValueAsVector(WanderLocationKey.SelectedKeyName, Candidate.Location);
+    UE_LOG(LogICCore, Log,
+        TEXT("[AI.Wander.Selected] Pawn=%s Center=%s Radius=%.1f Destination=%s"),
+        *GetNameSafe(Pawn), *Center.ToCompactString(), Radius, *Candidate.Location.ToCompactString());
     return EBTNodeResult::Succeeded;
 }
 
@@ -108,10 +173,13 @@ void UBTService_ICMonsterState::TickNode(UBehaviorTreeComponent& OwnerComp, uint
     WriteObject(Blackboard, SelfActorKey, Enemy);
     WriteVector(Blackboard, HomeLocationKey, Enemy->GetOrigin());
 
+    AICCharacterBase* PreviousTarget = Cast<AICCharacterBase>(Blackboard->GetValueAsObject(TargetActorKey));
+    const bool bWasReturning = Blackboard->GetValueAsBool(IsReturningKey);
+    const bool bWasInvestigating = Blackboard->GetValueAsBool(IsInvestigatingKey);
+    bool bInvestigating = bWasInvestigating;
     AICCharacterBase* Target = nullptr;
     if (!Enemy->IsReturning())
     {
-        auto* PreviousTarget = Cast<AICCharacterBase>(Blackboard->GetValueAsObject(TargetActorKey));
         if (IsVisibleHostileTarget(Enemy, PreviousTarget, Controller, Definition))
         {
             Target = PreviousTarget;
@@ -133,22 +201,80 @@ void UBTService_ICMonsterState::TickNode(UBehaviorTreeComponent& OwnerComp, uint
         }
 
         const double HomeDistanceSquared = FVector::DistSquared(Enemy->GetActorLocation(), Enemy->GetOrigin());
-        const double ReturnRadius = FMath::Max(50.0, Definition.ReturnAcceptanceRadiusCm);
-        if (Enemy->OutsideLeash() || (!Target && HomeDistanceSquared > FMath::Square(ReturnRadius)))
+        const double ChaseLimitSquared = FMath::Square(FMath::Max(50.0, Definition.ChaseLimitCm));
+        const bool bEnemyOutsideChaseLimit = HomeDistanceSquared > ChaseLimitSquared;
+        const bool bTargetOutsideChaseLimit = Target
+            && FVector::DistSquared(Target->GetActorLocation(), Enemy->GetOrigin()) > ChaseLimitSquared;
+        const bool bTargetOutsideLeash = Target && Enemy->IsOutsideLeash(Target->GetActorLocation());
+
+        if (Target && !bTargetOutsideChaseLimit && !bTargetOutsideLeash)
+        {
+            FVector PursuitDirection = Target->GetVelocity().GetSafeNormal2D();
+            if (PursuitDirection.IsNearlyZero())
+                PursuitDirection = (Target->GetActorLocation() - Enemy->GetActorLocation()).GetSafeNormal2D();
+
+            FVector InvestigationDestination = Target->GetActorLocation()
+                + PursuitDirection * Definition.InvestigationAdvanceDistanceCm;
+            FVector OriginToDestination = InvestigationDestination - Enemy->GetOrigin();
+            OriginToDestination.Z = 0.0;
+            const double ChaseLimit = FMath::Max(50.0, Definition.ChaseLimitCm);
+            if (OriginToDestination.SizeSquared() > FMath::Square(ChaseLimit))
+            {
+                const FVector ClampedDirection = OriginToDestination.GetSafeNormal();
+                InvestigationDestination.X = Enemy->GetOrigin().X + ClampedDirection.X * ChaseLimit;
+                InvestigationDestination.Y = Enemy->GetOrigin().Y + ClampedDirection.Y * ChaseLimit;
+            }
+            if (Enemy->IsOutsideLeash(InvestigationDestination))
+                InvestigationDestination = Target->GetActorLocation();
+
+            WriteVector(Blackboard, LastKnownTargetLocationKey, InvestigationDestination);
+            bInvestigating = false;
+        }
+
+        const bool bLostTarget = PreviousTarget && !Target;
+        const bool bShouldInvestigate = PreviousTarget
+            && (bTargetOutsideChaseLimit || bTargetOutsideLeash || bLostTarget);
+        if (bTargetOutsideChaseLimit || bTargetOutsideLeash)
+            Target = nullptr;
+        if (bShouldInvestigate)
+        {
+            bInvestigating = true;
+        }
+
+        if (Enemy->OutsideLeash() || bEnemyOutsideChaseLimit)
         {
             Enemy->BeginReturn();
             Target = nullptr;
+            bInvestigating = false;
         }
     }
 
     const bool bReturning = Enemy->IsReturning();
+    if (bReturning) bInvestigating = false;
     const bool bInAttackRange = !bReturning && Target
         && FVector::DistSquared(Enemy->GetActorLocation(), Target->GetActorLocation()) <= FMath::Square(Definition.AttackRangeCm);
 
     WriteObject(Blackboard, TargetActorKey, bReturning ? nullptr : Target);
     WriteBool(Blackboard, IsReturningKey, bReturning);
     WriteBool(Blackboard, IsInAttackRangeKey, bInAttackRange);
+    WriteBool(Blackboard, IsInvestigatingKey, bInvestigating);
     Controller->SetMonsterBehaviorTarget(bReturning ? nullptr : Target);
+
+    AICCharacterBase* CurrentTarget = bReturning ? nullptr : Target;
+    if (PreviousTarget != CurrentTarget || bWasReturning != bReturning
+        || bWasInvestigating != bInvestigating)
+    {
+        const double EnemyHomeDistance = FVector::Distance(Enemy->GetActorLocation(), Enemy->GetOrigin());
+        const double TargetHomeDistance = CurrentTarget
+            ? FVector::Distance(CurrentTarget->GetActorLocation(), Enemy->GetOrigin())
+            : -1.0;
+        UE_LOG(LogICCore, Log,
+            TEXT("[AI.StateChanged] Pawn=%s Target=%s->%s Returning=%s->%s Investigating=%s->%s EnemyHomeDistance=%.1f TargetHomeDistance=%.1f ChaseLimit=%.1f"),
+            *GetNameSafe(Enemy), *GetNameSafe(PreviousTarget), *GetNameSafe(CurrentTarget),
+            bWasReturning ? TEXT("true") : TEXT("false"), bReturning ? TEXT("true") : TEXT("false"),
+            bWasInvestigating ? TEXT("true") : TEXT("false"), bInvestigating ? TEXT("true") : TEXT("false"),
+            EnemyHomeDistance, TargetHomeDistance, Definition.ChaseLimitCm);
+    }
 }
 
 UBTTask_ICMonsterBeginReturn::UBTTask_ICMonsterBeginReturn()
@@ -186,6 +312,35 @@ EBTNodeResult::Type UBTTask_ICMonsterFinishReturn::ExecuteTask(UBehaviorTreeComp
         WriteBool(Blackboard, IsReturningKey, false);
         WriteObject(Blackboard, TargetActorKey, nullptr);
     }
+    Controller->SetMonsterBehaviorTarget(nullptr);
+    return EBTNodeResult::Succeeded;
+}
+
+UBTTask_ICMonsterFinishInvestigation::UBTTask_ICMonsterFinishInvestigation()
+{
+    NodeName = TEXT("Finish Investigation");
+}
+
+EBTNodeResult::Type UBTTask_ICMonsterFinishInvestigation::ExecuteTask(
+    UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+    auto* Controller = Cast<AICAIController>(OwnerComp.GetAIOwner());
+    auto* Enemy = Controller ? Cast<AICEnemyBase>(Controller->GetPawn()) : nullptr;
+    UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+    if (!Enemy || !Blackboard || Enemy->IsReturning()) return EBTNodeResult::Failed;
+
+    WriteBool(Blackboard, IsInvestigatingKey, false);
+    if (Blackboard->GetKeyID(LastKnownTargetLocationKey) != FBlackboard::InvalidKey)
+        Blackboard->ClearValue(LastKnownTargetLocationKey);
+
+    const double AcceptanceRadius = FMath::Max(50.0, Enemy->GetMonsterDefinition().ReturnAcceptanceRadiusCm);
+    if (FVector::DistSquared(Enemy->GetActorLocation(), Enemy->GetOrigin()) > FMath::Square(AcceptanceRadius))
+    {
+        Enemy->BeginReturn();
+        WriteBool(Blackboard, IsReturningKey, true);
+    }
+
+    WriteObject(Blackboard, TargetActorKey, nullptr);
     Controller->SetMonsterBehaviorTarget(nullptr);
     return EBTNodeResult::Succeeded;
 }

@@ -76,7 +76,11 @@ bool AICEnemyBase::FlushToWorldState_Implementation(UICWorldStateSubsystem* Stat
 }
 bool AICEnemyBase::OutsideLeash() const
 {
-    IC_TRACE_FUNCTION();const auto Local=OriginTransform.InverseTransformPosition(GetActorLocation());return SlotDefinition.LeashShape==EICLeashShape::Radius?Local.SizeSquared()>FMath::Square(SlotDefinition.LeashRadiusCm):!SlotDefinition.OriginRelativeLeashBoundsCm.IsInsideOrOn(Local);
+    IC_TRACE_FUNCTION();return IsOutsideLeash(GetActorLocation());
+}
+bool AICEnemyBase::IsOutsideLeash(const FVector& WorldLocation) const
+{
+    IC_TRACE_FUNCTION();const auto Local=OriginTransform.InverseTransformPosition(WorldLocation);return SlotDefinition.LeashShape==EICLeashShape::Radius?Local.SizeSquared()>FMath::Square(SlotDefinition.LeashRadiusCm):!SlotDefinition.OriginRelativeLeashBoundsCm.IsInsideOrOn(Local);
 }
 void AICEnemyBase::BeginReturn()
 {
