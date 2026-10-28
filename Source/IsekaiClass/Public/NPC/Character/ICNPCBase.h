@@ -39,12 +39,15 @@ class ISEKAICLASS_API AICNPCBase : public AICCharacterBase
 public:
     AICNPCBase();
     virtual void BeginPlay() override;
+    virtual void Tick(float DeltaSeconds) override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void HandleZeroHP() override;
     virtual void RestoreFromWorldState_Implementation(const FICWorldState& Candidate) override;
     bool InitializeNPC(FName ID);
     void RefreshExecution();
     void HoldDownedActor();
+    bool IsFollowingPlayerSprint() const;
+    void UpdateMovementSpeed();
     const FICNPCRow& GetNPCDefinition() const { return Definition; }
 
     UFUNCTION(BlueprintPure,Category="IC|NPC")

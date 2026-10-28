@@ -10,6 +10,7 @@
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Debug/ICLog.h"
 #include "Enemy/Character/ICEnemyBase.h"
+#include "Core/Controller/ICPlayerController.h"
 
 FICAttackCapture UICAbilitySystemComponent::CaptureAttack(const FICCombatMagnitude& M, EICDamageType Type, bool PersonalCHA) const
 {
@@ -45,6 +46,10 @@ bool UICAbilitySystemComponent::ApplyDamage(const FICAttackCapture& Attack, UICA
     const float AppliedDamage=PreviousHP-Combat->GetHealth();
     if(AppliedDamage>0)
     {
+        if(Source)
+            if(auto* SourcePawn=Cast<APawn>(Source->GetAvatarActor()))
+                if(auto* PC=Cast<AICPlayerController>(SourcePawn->GetController()))
+                    PC->NotifyPlayerHitEnemy(Cast<AICCharacterBase>(GetAvatarActor()));
         if(auto* Enemy=Cast<AICEnemyBase>(GetAvatarActor()))Enemy->PlayHitReaction();
         if(auto* GI=GetWorld()?GetWorld()->GetGameInstance():nullptr)
             if(auto* State=GI->GetSubsystem<UICWorldStateSubsystem>())State->OnCombatDamageReceived.Broadcast(GetAvatarActor(),AppliedDamage);

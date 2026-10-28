@@ -21,6 +21,7 @@ public:
     UFUNCTION(BlueprintPure,Category="Map") bool IsTraveling() const{return bTraveling;}
     UFUNCTION(BlueprintPure,Category="Map") FVector2D WorldToMapUV(FVector Position) const;
     static void BuildLayout(UWidgetTree* Tree,bool Mini);
+    static float MinimapOpacity(FVector2D UV);
 protected:
     virtual void NativeOnInitialized() override;
     virtual void NativeConstruct() override;

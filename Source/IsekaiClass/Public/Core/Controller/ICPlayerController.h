@@ -197,6 +197,8 @@ public:
     UFUNCTION(BlueprintCallable) void OpenContainer(FName ContainerID,bool bPlayerHome,bool bAccessGranted);
     UFUNCTION(BlueprintCallable,Category="IC|Input") void HandleInputCommand(EICInputCommand Command,int32 Slot=0);
     UFUNCTION(BlueprintPure,Category="IC|Combat") class AICCharacterBase* GetLockedCombatTarget() const;
+    UFUNCTION(BlueprintPure,Category="IC|Combat") class AICCharacterBase* GetHUDCombatTarget() const;
+    void NotifyPlayerHitEnemy(class AICCharacterBase* Target);
     UFUNCTION(BlueprintCallable,Category="IC|Input") void ReleaseInputCommand(EICInputCommand Command,int32 Slot=0);
     UFUNCTION(BlueprintCallable,Category="IC|UI") void ExecuteUI(const FString& Command,int32 Index=0);
     UFUNCTION(BlueprintCallable,Category="IC|UI") void SetMenu(const FString& NewMenu);
@@ -209,6 +211,7 @@ public:
     UFUNCTION(BlueprintCallable,Category="IC|Items") void ConfirmTarget(FName TargetID);
     /** Atomic item use shared by quick slots and the inventory's party picker. */
     UFUNCTION(BlueprintCallable,Category="IC|Items") bool UseInventoryItem(FName ItemID,FName TargetID,FText& Reason);
+    UFUNCTION(BlueprintPure,Category="IC|Items") double GetItemCooldown(FName ItemID) const;
     UFUNCTION(BlueprintCallable,Category="IC|Items") void ConfirmPartyTarget(int32 Slot);
     void SyncSaveSafety();
     void RefreshSaveSlots();
@@ -235,6 +238,8 @@ private:
     TWeakObjectPtr<class AICCharacterBase> PendingSkillCaster;
     FString LastEquipmentKey;
     TWeakObjectPtr<class AICCharacterBase> CombatTarget;
+    TWeakObjectPtr<class AICCharacterBase> LastAttackedHUDTarget;
+    double AttackedHUDTargetUntil = 0;
     double TargetOccludedAt=-1;
     UFUNCTION() void CombatCacheChanged();
     void InitializeMainMenu();

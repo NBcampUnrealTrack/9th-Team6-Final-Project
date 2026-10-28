@@ -23,4 +23,5 @@ protected:
 private:
     bool bGamepadHints=false;
     void RefreshPresentation();
+    void RefreshCooldown();
 };

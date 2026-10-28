@@ -13,6 +13,7 @@ public:
     UFUNCTION(BlueprintPure, Category = "IC|UI") AICPlayerController* GetICPlayerController() const;
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshCurrentScreen();
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshSkillCooldown();
+    UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshTargetInfo();
     UFUNCTION(BlueprintPure,Category="IC|Time") static FText FormatGameClock(double GameMinute);
     UFUNCTION(BlueprintImplementableEvent, Category = "IC|UI") void OnRefreshGameplayUI();
 

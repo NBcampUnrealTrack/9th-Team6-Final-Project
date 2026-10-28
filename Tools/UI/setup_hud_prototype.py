@@ -23,8 +23,9 @@ REPORT.mkdir(parents=True, exist_ok=True)
 specs = (
     ('WBP_IC_PlayerStatus', u.ICCharacterStatusWidget, 'PlayerStatus'),
     ('WBP_IC_CompanionStatus', u.ICCharacterStatusWidget, 'CompanionStatus'),
+    ('WBP_IC_CompanionStatusAlternate', u.ICCharacterStatusWidget, 'CompanionStatusAlternate'),
     ('WBP_IC_CompanionGroup', u.ICCompanionGroupWidget, 'CompanionGroup'),
-    ('WBP_IC_Minimap', u.UserWidget, 'Minimap'),
+    ('WBP_IC_Minimap', u.ICMapWidget, 'Minimap'),
     ('WBP_IC_QuickSlot', u.ICQuickSlotWidget, 'QuickSlot'),
     ('WBP_IC_QuickSlots', u.ICQuickSlotsWidget, 'QuickSlots'),
     ('WBP_IC_GameMenu', u.ICGameMenuWidget, 'GameMenu'),
@@ -35,8 +36,8 @@ assets = {}
 names = {}
 arguments = u.SystemLibrary.get_command_line()
 scopes = (
-    ('-ICUpdateCompanionHUDOnly', ('CompanionStatus', 'CompanionGroup', 'HUD')),
-    ('-ICUpdatePlayerHUDOnly', ('PlayerStatus', 'CompanionStatus', 'CompanionGroup', 'HUD')),
+    ('-ICUpdateCompanionHUDOnly', ('CompanionStatus', 'CompanionStatusAlternate', 'CompanionGroup', 'HUD')),
+    ('-ICUpdatePlayerHUDOnly', ('PlayerStatus', 'CompanionStatus', 'CompanionStatusAlternate', 'CompanionGroup', 'HUD')),
     ('-ICUpdateQuickSlotsOnly', ('QuickSlot', 'QuickSlots', 'HUD')),
     ('-ICUpdateGameMenuOnly', ('GameMenu', 'HUD')),
 )
@@ -60,7 +61,9 @@ for name, parent, kind in specs:
     assert u.ICBlueprintMaintenanceLibrary.build_frontend_widget(bp, kind), path
     u.BlueprintEditorLibrary.compile_blueprint(bp)
     default = u.get_default_object(bp.generated_class())
-    if kind in ('PlayerStatus', 'CompanionStatus'):
+    if kind == 'Minimap':
+        default.set_editor_property('bMinimap', True)
+    if kind in ('PlayerStatus', 'CompanionStatus', 'CompanionStatusAlternate'):
         default.set_editor_property('display_name', '')
         default.set_editor_property('portrait', None)
         for resource in ('hp_percent', 'mp_percent', 'sp_percent'):

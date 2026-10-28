@@ -36,6 +36,7 @@ struct FICInventoryState
     /** The selected weapon stays owned/equipped while put away. Old saves keep their drawn weapon. */
     UPROPERTY(BlueprintReadOnly, SaveGame) bool bWeaponSheathed = false;
     UPROPERTY(BlueprintReadOnly, SaveGame) TArray<FName> QuickSlots;
+    UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, double> ItemReadyAtPlaySecond;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, FPlayerContainer> Storage;
     FICInventoryState()
     {

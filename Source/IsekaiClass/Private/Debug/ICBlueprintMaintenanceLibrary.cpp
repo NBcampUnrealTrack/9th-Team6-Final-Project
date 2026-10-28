@@ -38,6 +38,7 @@
 #include "Misc/FileHelper.h"
 #include "Framework/Application/SlateApplication.h"
 #include "RenderingThread.h"
+#include "AssetCompilingManager.h"
 #include "Engine/Blueprint.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "EdGraph/EdGraph.h"
@@ -165,6 +166,7 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
         }
     }
     FWidgetRenderer Renderer(true);
+    FAssetCompilingManager::Get().FinishAllCompilation();
     TSharedRef<SWidget> Surface=Preview->TakeWidget();
     if(auto* Settings=Cast<UICSettingsWidget>(Preview))Settings->SelectTab(FMath::Clamp(Question,0,4));
     if(BP->GetFName()==TEXT("WBP_GameHUD")||BP->GetFName()==TEXT("WBP_IC_GameMenu"))

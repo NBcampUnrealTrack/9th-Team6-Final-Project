@@ -120,7 +120,7 @@ bool UICStorageWidget::BuildLayout(UWidgetTree* Tree)
     }
     Row(Body,Label(Tree,TEXT("TXT_StorageNotice"),FText::GetEmpty(),18),5);
     Row(Body,Label(Tree,NAME_None,NSLOCTEXT("ICStorage","Keys","클릭 · Enter 정보/이동  |  WASD 이동  |  Tab 양쪽 전환  |  ESC 닫기"),17),0);
-    auto* Popup=Tree->ConstructWidget<UICStorageTransferPopup>(WidgetClass(TEXT("WBP_IC_StorageTransferPopup"),UICStorageTransferPopup::StaticClass()),TEXT("TransferPopup"));Fill(Root,Popup);Popup->SetVisibility(ESlateVisibility::Collapsed);return true;
+    auto* Popup=Tree->ConstructWidget<UICStorageTransferPopup>(ICStorageLayout::WidgetClass(TEXT("WBP_IC_StorageTransferPopup"),UICStorageTransferPopup::StaticClass()),TEXT("TransferPopup"));Fill(Root,Popup);Popup->SetVisibility(ESlateVisibility::Collapsed);return true;
 }
 void UICStorageWidget::NativeOnInitialized()
 {
@@ -171,7 +171,7 @@ void UICStorageWidget::RefreshStorage()
         auto* Grid=CastChecked<UUniformGridPanel>(GetWidgetFromName(Side==0?TEXT("ChestGrid"):TEXT("StorageBagGrid")));const auto& Slots=Side==0?Chest->Slots:Snapshot.Bag.Slots;
         if(Grid->GetChildrenCount()!=Slots.Num())
         {
-            Grid->ClearChildren();for(int32 Index=0;Index<Slots.Num();++Index){auto* Cell=WidgetTree->ConstructWidget<UICInventorySlotWidget>(WidgetClass(TEXT("WBP_IC_InventorySlot"),UICInventorySlotWidget::StaticClass()));Cell->OnPicked.AddUniqueDynamic(this,&ThisClass::CellPicked);Grid->AddChildToUniformGrid(Cell,Index/8,Index%8);}
+            Grid->ClearChildren();for(int32 Index=0;Index<Slots.Num();++Index){auto* Cell=WidgetTree->ConstructWidget<UICInventorySlotWidget>(ICStorageLayout::WidgetClass(TEXT("WBP_IC_InventorySlot"),UICInventorySlotWidget::StaticClass()));Cell->OnPicked.AddUniqueDynamic(this,&ThisClass::CellPicked);Grid->AddChildToUniformGrid(Cell,Index/8,Index%8);}
         }
         for(int32 Index=0;Index<Slots.Num();++Index)
         {

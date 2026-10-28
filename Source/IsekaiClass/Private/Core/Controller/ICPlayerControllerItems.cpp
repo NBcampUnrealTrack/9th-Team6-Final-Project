@@ -28,6 +28,8 @@ void AICPlayerController::BeginItem(FName ID,int32 Quick)
     if(!Definition||Inventory->CountItem(ID)<=0){ShowLocalized(ICText::Get(TEXT("Native_5d5993cc77fe")));return;}
     if(Definition->Kind==EPlayerItemKind::Expansion){Inventory->ExpandUsingTicket();return;}
     if(Definition->Kind!=EPlayerItemKind::Consumable){ShowLocalized(ICText::Get(TEXT("Native_76b3f1a3cd82")));return;}
+    if(GetItemCooldown(ID)>KINDA_SMALL_NUMBER)
+    {ShowLocalized(FText::Format(NSLOCTEXT("ICInventory","ItemCooldown","재사용까지 {0}초 남았습니다."),FText::AsNumber(FMath::CeilToInt(GetItemCooldown(ID)))));return;}
     UE_LOG(LogICInventory, Verbose, TEXT("[Item.TargetSelection] Item=%s Quick=%d"),*ID.ToString(),Quick);
     if(!Menu.IsEmpty())SetMenu(TEXT(""));
     CancelTarget();
@@ -117,6 +119,8 @@ bool AICPlayerController::UseInventoryItem(FName ItemID,FName Target,FText& Reas
     Reason=FText::GetEmpty();auto* Inventory=GetInventory();auto* State=GetWorldState();
     auto Fail=[&](FText Text){Reason=Text;return false;};
     if(ItemID.IsNone()||bItemTransactionInProgress||bDead||!Inventory||!State)return Fail(NSLOCTEXT("ICInventory","UseUnavailable","지금은 아이템을 사용할 수 없습니다."));
+    const double Remaining=GetItemCooldown(ItemID);
+    if(Remaining>KINDA_SMALL_NUMBER)return Fail(FText::Format(NSLOCTEXT("ICInventory","ItemCooldown","재사용까지 {0}초 남았습니다."),FText::AsNumber(FMath::CeilToInt(Remaining))));
     if(!UICWorldStateSubsystem::IsCharacterIdValid(Target)||!State->GetStoredCharacter(Target))
         return Fail(ICText::Get(TEXT("Native_f1e41db0ad98")));
     if(!State->FlushParticipants())return Fail(ICText::Get(TEXT("Native_1878d244a70a")));
@@ -129,6 +133,16 @@ bool AICPlayerController::UseInventoryItem(FName ItemID,FName Target,FText& Reas
     }
     FICItemUseResult Prepared=UICItemUseService::Prepare(Inventory,Inventory->GetDefinitions(),ItemID,State->GetSnapshot(Target));
     if(!Prepared.bSuccess)return Fail(FText::FromString(Prepared.Reason));
+    if(Item)
+    {
+        if(!FMath::IsFinite(Item->CooldownPlaySeconds)||Item->CooldownPlaySeconds<0)
+            return Fail(NSLOCTEXT("ICInventory","InvalidItemCooldown","아이템의 재사용 대기시간 설정이 올바르지 않습니다."));
+        if(Item->CooldownPlaySeconds>0)
+        {
+            const auto* Time=GetTime();
+            Prepared.Inventory.ItemReadyAtPlaySecond.Add(ItemID,(Time?Time->GetClock().PlaySecond:0.)+Item->CooldownPlaySeconds);
+        }
+    }
     if(ReviveActor){Prepared.Character.Position=ReviveActor->GetActorLocation();Prepared.Character.Rotation=ReviveActor->GetActorRotation();}
     FICWorldState Next=State->ExportState();Next.Inventory=Prepared.Inventory;Next.Characters.Add(Target,Prepared.Character);
     bool Applied=false;
@@ -140,6 +154,13 @@ bool AICPlayerController::UseInventoryItem(FName ItemID,FName Target,FText& Reas
     if(Prepared.GrowthAmount>0)OnStatBookApplied.Broadcast(Target,Prepared.GrowthStat,Prepared.GrowthAmount);
     UE_LOG(LogICInventory, Log, TEXT("[Item.Used] Item=%s Target=%s HP=%.2f MP=%.2f SP=%.2f Growth=%d"),*Prepared.ItemID.ToString(),*Target.ToString(),Prepared.Character.HP,Prepared.Character.MP,Prepared.Character.SP,Prepared.GrowthAmount);
     CancelTarget();SyncSaveSafety();return true;
+}
+double AICPlayerController::GetItemCooldown(FName ItemID) const
+{
+    const auto* State=GetWorldState();const auto* Time=GetTime();
+    if(!State||ItemID.IsNone())return 0.;
+    const double Ready=State->GetInventorySnapshot().ItemReadyAtPlaySecond.FindRef(ItemID);
+    return FMath::Max(0.,Ready-(Time?Time->GetClock().PlaySecond:0.));
 }
 void AICPlayerController::PlayerDied()
 {

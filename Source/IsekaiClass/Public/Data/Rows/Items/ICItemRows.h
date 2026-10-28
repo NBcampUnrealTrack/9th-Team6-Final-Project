@@ -28,6 +28,8 @@ struct ISEKAICLASS_API FICItemRow : public FPlayerItemDefinition
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bAllowNonCompanionRecruitUse = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EICItemEffect UseEffect = EICItemEffect::None;
+    /** Shared by every stack/quick slot of this item; measured in unpaused play seconds. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Use", meta=(ClampMin="0")) double CooldownPlaySeconds = 5.0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> StatusEffectIDs;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FGameplayTagContainer DispelTags;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double RestoreMP = 0;
