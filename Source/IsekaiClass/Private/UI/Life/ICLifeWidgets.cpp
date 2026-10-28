@@ -98,7 +98,7 @@ FReply UICSeedPickerWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,con
     const FKey Key=UICGameUserSettings::MenuKey(Event.GetKey());if(Key==EKeys::Escape){ClosePicker();return FReply::Handled();}
     if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down)
     {Selected=FMath::Clamp(Selected+(Key==EKeys::S||Key==EKeys::Down?1:-1),0,FMath::Max(0,CropIDs.Num()-1));auto* List=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("SeedList")));if(List->GetChildAt(Selected)){List->ScrollWidgetIntoView(List->GetChildAt(Selected));List->GetChildAt(Selected)->SetKeyboardFocus();}return FReply::Handled();}
-    if(Key==EKeys::Enter&&!Event.IsRepeat()){PickSeed(Selected);return FReply::Handled();}return Super::NativeOnPreviewKeyDown(Geometry,Event);
+    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)&&!Event.IsRepeat()){PickSeed(Selected);return FReply::Handled();}return Super::NativeOnPreviewKeyDown(Geometry,Event);
 }
 
 bool UICShopWidget::BuildLayout(UWidgetTree* Tree)
@@ -116,7 +116,7 @@ bool UICShopWidget::BuildLayout(UWidgetTree* Tree)
     auto* Actions=Tree->ConstructWidget<UHorizontalBox>();LifeRow(Body,Actions);
     Actions->AddChildToHorizontalBox(LifeButton(Tree,TEXT("BTN_Checkout"),NSLOCTEXT("ICShop","CheckoutBuy","구매하기")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     Actions->AddChildToHorizontalBox(LifeButton(Tree,TEXT("BTN_ShopCancel"),NSLOCTEXT("ICShop","Cancel","취소하고 나가기")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    LifeRow(Body,LifeLabel(Tree,NAME_None,NSLOCTEXT("ICShop","Keys","W/S 선택 · Enter 담기 · A/D 탭 · F 결제 · ESC 취소"),16),0);return true;
+    LifeRow(Body,LifeLabel(Tree,NAME_None,NSLOCTEXT("ICShop","Keys","W/S 선택 · G/F 담기 · A/D 탭 · R 결제 · ESC 취소"),16),0);return true;
 }
 void UICShopWidget::NativeOnInitialized()
 {
@@ -182,10 +182,33 @@ bool UICShopWidget::SubmitCart()
 void UICShopWidget::CloseShop(){if(bSubmitting)return;Cart.Reset();if(auto* UI=ICExpandedLifeUI::LifeUI(this))UI->CloseScreen(this);else RemoveFromParent();}
 FReply UICShopWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event)
 {
-    const FKey Key=UICGameUserSettings::MenuKey(Event.GetKey());if(Key==EKeys::Escape){CloseShop();return FReply::Handled();}
-    if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::D||Key==EKeys::Right){SelectTab(Key==EKeys::D||Key==EKeys::Right);return FReply::Handled();}
-    if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down){Selected=FMath::Clamp(Selected+(Key==EKeys::S||Key==EKeys::Down?1:-1),0,FMath::Max(0,Items.Num()-1));auto* List=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("ShopItems")));if(List->GetChildrenCount()>Selected){List->ScrollWidgetIntoView(List->GetChildAt(Selected));List->GetChildAt(Selected)->SetKeyboardFocus();}return FReply::Handled();}
-    if(Key==EKeys::Enter&&!Event.IsRepeat()){ItemPicked(Selected);return FReply::Handled();}if((Key==EKeys::F||Event.GetKey()==UICGameUserSettings::GamepadFaceKey(0))&&!Event.IsRepeat()){SubmitCart();return FReply::Handled();}
+    const FKey Key=UICGameUserSettings::MenuKey(Event.GetKey());
+    if(Key==EKeys::Escape){if(!Event.IsRepeat())CloseShop();return FReply::Handled();}
+    if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::D||Key==EKeys::Right)
+    {if(!Event.IsRepeat())SelectTab(Key==EKeys::D||Key==EKeys::Right);return FReply::Handled();}
+    if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down)
+    {
+        const bool Down=Key==EKeys::S||Key==EKeys::Down;
+        auto* Checkout=GetWidgetFromName(TEXT("BTN_Checkout"));
+        if(Down&&Selected>=Items.Num()-1&&Checkout&&Checkout->GetIsEnabled())
+        {Checkout->SetUserFocus(GetOwningPlayer());return FReply::Handled();}
+        if(!Down&&Checkout&&Checkout->HasKeyboardFocus())Selected=Items.Num();
+        Selected=FMath::Clamp(Selected+(Down?1:-1),0,FMath::Max(0,Items.Num()-1));
+        auto* List=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("ShopItems")));
+        if(List->GetChildrenCount()>Selected){List->ScrollWidgetIntoView(List->GetChildAt(Selected));List->GetChildAt(Selected)->SetUserFocus(GetOwningPlayer());}
+        return FReply::Handled();
+    }
+    if(Key==EKeys::Enter)
+    {
+        if(!Event.IsRepeat())
+        {
+            UButton* Focused=nullptr;
+            WidgetTree->ForEachWidget([&](UWidget* Widget){if(auto* Button=Cast<UButton>(Widget);Button&&Button->HasKeyboardFocus()&&Button->GetIsEnabled())Focused=Button;});
+            if(Focused)Focused->OnClicked.Broadcast();else ItemPicked(Selected);
+        }
+        return FReply::Handled();
+    }
+    if(Event.GetKey()==EKeys::R||Event.GetKey()==UICGameUserSettings::GamepadFaceKey(0))
+    {if(!Event.IsRepeat())SubmitCart();return FReply::Handled();}
     return Super::NativeOnPreviewKeyDown(Geometry,Event);
 }
-

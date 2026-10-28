@@ -68,7 +68,7 @@ bool UICGameUserSettings::IsGamepadAcceptKey(FKey Key){return Key==GamepadFaceKe
 bool UICGameUserSettings::IsGamepadBackKey(FKey Key){return Key==GamepadFaceKey(2);}
 FKey UICGameUserSettings::MenuKey(FKey Key)
 {
-    if(IsGamepadAcceptKey(Key))return EKeys::Enter;if(IsGamepadBackKey(Key))return EKeys::Escape;
+    if(Key==EKeys::G||Key==EKeys::F||IsGamepadAcceptKey(Key))return EKeys::Enter;if(IsGamepadBackKey(Key))return EKeys::Escape;
     if(Key==EKeys::Gamepad_DPad_Up)return EKeys::Up;if(Key==EKeys::Gamepad_DPad_Down)return EKeys::Down;
     if(Key==EKeys::Gamepad_DPad_Left)return EKeys::Left;if(Key==EKeys::Gamepad_DPad_Right)return EKeys::Right;return Key;
 }

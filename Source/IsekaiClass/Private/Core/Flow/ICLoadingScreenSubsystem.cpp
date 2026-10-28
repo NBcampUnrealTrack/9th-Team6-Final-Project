@@ -76,6 +76,8 @@ void UICLoadingScreenSubsystem::BeforeMap(const FString& MapName)
                      HAlign_Center)[SNew(STextBlock)
                                         .Text(ICText::Get(TEXT("Loading")))
                                         .Font(ICFrontendLayout::Font(20))]]]]];
+    if(GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->bPendingNewGame)
+        Screen.WidgetLoadingScreen=SNew(SBorder).Padding(0).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor::Black);
     GetMoviePlayer()->SetupLoadingScreen(Screen);
 }
 

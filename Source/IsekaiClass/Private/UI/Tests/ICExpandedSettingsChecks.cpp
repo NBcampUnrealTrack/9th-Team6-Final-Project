@@ -1,5 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+#include "Components/CheckBox.h"
 #include "Settings/ICGameUserSettings.h"
 #include "UI/Settings/ICSettingsWidget.h"
 #include "UI/Settings/ICSettingsLayout.h"
@@ -85,6 +86,18 @@ bool FICSettingsWidgetCheck::RunTest(const FString&)
             TestEqual(TEXT("Conflicting key is swapped instead of losing movement"),CastChecked<UInputKeySelector>(Right->Control)->GetSelectedKey().Key,EKeys::W);
         }
         Widget->ResetOptions();TestEqual(TEXT("Reset remains a draft until Apply"),UICGameUserSettings::Get()->CameraSensitivity,Original);
+        Widget->SelectTab(0);
+        auto* AutoTarget=CastChecked<UCheckBox>(Widget->GetWidgetFromName(TEXT("OPTION_bAutoSelectTarget")));
+        const bool Was=AutoTarget->IsChecked();
+        TestTrue(TEXT("F confirms a setting without mouse focus"),Widget->HandleNavigationKey(EKeys::F));
+        TestEqual(TEXT("F toggles the selected first setting"),AutoTarget->IsChecked(),!Was);
+        Widget->HandleNavigationKey(EKeys::F,true);
+        TestEqual(TEXT("Holding F does not toggle again"),AutoTarget->IsChecked(),!Was);
+        Widget->SelectTab(1);Widget->HandleNavigationKey(EKeys::W);Widget->HandleNavigationKey(EKeys::D);
+        TestEqual(TEXT("W then D moves to the next settings category"),Switcher->GetActiveWidgetIndex(),2);
+        Widget->HandleNavigationKey(EKeys::S);
+        TestTrue(TEXT("A/D edit the selected setting"),Widget->HandleNavigationKey(EKeys::D));
+
     }
     Widget->ReleaseSlateResources(true);
     return !HasAnyErrors();

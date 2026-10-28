@@ -548,7 +548,7 @@ FReply UICNPCDialogueWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry, c
     {MoveSelection(-1);return FReply::Handled();}
     if(Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down)
     {MoveSelection(1);return FReply::Handled();}
-    if(Key==EKeys::Enter||Key==EKeys::Virtual_Accept||UICGameUserSettings::IsGamepadAcceptKey(Key))
+    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::Virtual_Accept||UICGameUserSettings::IsGamepadAcceptKey(Key))
     {
         if(!KeyEvent.IsRepeat())
         {

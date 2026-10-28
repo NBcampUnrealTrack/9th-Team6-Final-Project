@@ -208,6 +208,6 @@ FReply UICMapWidget::NativeOnPreviewKeyDown(const FGeometry& G,const FKeyEvent& 
     if(Key==EKeys::Escape||Key==EKeys::M||Key==EKeys::Gamepad_Special_Left){if(!Event.IsRepeat())CloseMap();return FReply::Handled();}
     if(Key==EKeys::Left||Key==EKeys::Right||Key==EKeys::Up||Key==EKeys::Down)
     {if(!Portals.IsEmpty())SelectedPortal=(SelectedPortal+((Key==EKeys::Left||Key==EKeys::Up)?Portals.Num()-1:1))%Portals.Num();return FReply::Handled();}
-    if(Key==EKeys::Enter||Key==EKeys::SpaceBar){if(!Event.IsRepeat()&&Portals.IsValidIndex(SelectedPortal)&&Portals[SelectedPortal].IsValid())RequestTravel(Portals[SelectedPortal]->WarpID);return FReply::Handled();}
+    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar){if(!Event.IsRepeat()&&Portals.IsValidIndex(SelectedPortal)&&Portals[SelectedPortal].IsValid())RequestTravel(Portals[SelectedPortal]->WarpID);return FReply::Handled();}
     return Super::NativeOnPreviewKeyDown(G,Event);
 }

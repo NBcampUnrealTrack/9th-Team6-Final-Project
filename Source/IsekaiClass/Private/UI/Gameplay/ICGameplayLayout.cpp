@@ -8,6 +8,7 @@
 #include "UI/Quest/ICQuestMenuWidget.h"
 #include "UI/Codex/ICCodexMenuWidget.h"
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Framework/ICUITheme.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
@@ -257,11 +258,12 @@ void GameMenu(UWidgetTree* Tree)
     DimSlot->SetOffsets(FMargin(0));
     auto* Card = Frame(Tree, TEXT("MenuCard"), FMargin(28));
     auto* CardSlot = Root->AddChildToCanvas(Card);
-    CardSlot->SetAnchors(FAnchors(0, 0, 1, 1)); CardSlot->SetOffsets(FMargin(0));
+    CardSlot->SetAnchors(FAnchors(0, 0, 1, 1)); CardSlot->SetOffsets(FMargin(64,40,64,40));
     Card->SetBrushColor(FLinearColor(.018f, .027f, .044f, 1.f));
     auto* Column = Tree->ConstructWidget<UVerticalBox>();
     Card->SetContent(Column);
-    Row(Column, Label(Tree, TEXT("TXT_MenuTitle"), ICFrontendLayout::Text(TEXT("Menu")), 28), 20);
+    Row(Column, Label(Tree, TEXT("TXT_MenuTitle"), ICFrontendLayout::Text(TEXT("Menu")), 32), 18);
+    auto* HeaderRule=Frame(Tree,TEXT("MenuHeaderRule"),FMargin(0));HeaderRule->SetBrushColor(FLinearColor(.15f,.5f,.6f,.4f));Row(Column,Size(Tree,HeaderRule,0,1),22);
     auto* Tabs = Tree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("MenuTabs"));
     const FText Captions[] = {ICFrontendLayout::Text(TEXT("Party")), ICFrontendLayout::Text(TEXT("Inventory")),
         ICFrontendLayout::Text(TEXT("Quest")), ICFrontendLayout::Text(TEXT("Codex")), ICFrontendLayout::Text(TEXT("Settings"))};
@@ -269,7 +271,13 @@ void GameMenu(UWidgetTree* Tree)
     {
         const FName Name(*(TEXT("TAB_") + UICGameMenuWidget::Tabs()[Index].ToString()));
         auto* Tab = Button(Tree, Name, Captions[Index], 16);
-        Tab->SetBackgroundColor(Index == 0 ? FLinearColor(.72f, .57f, .31f) : FLinearColor(.29f, .36f, .47f));
+        const TCHAR* Icons[]={TEXT("t_User_512"),TEXT("t_Backpack_512"),TEXT("t_Scroll_512"),TEXT("t_Compass_512"),TEXT("t_Settings_512")};
+        auto* Caption=Tab->GetContent();Tab->RemoveChild(Caption);
+        auto* Content=Tree->ConstructWidget<UHorizontalBox>();Tab->SetContent(Content);
+        auto* Icon=Tree->ConstructWidget<UImage>();const FString Asset=FString::Printf(TEXT("/Game/IsekaiClass/UI/SampleUI/MorpheusGUI/textures/Icons/512/%s.%s"),Icons[Index],Icons[Index]);
+        Icon->SetBrushFromTexture(LoadObject<UTexture2D>(nullptr,*Asset));Icon->SetColorAndOpacity(FLinearColor(.44f,.85f,.95f));
+        Content->AddChildToHorizontalBox(Size(Tree,Icon,32,32))->SetPadding(FMargin(12,10,14,10));
+        Content->AddChildToHorizontalBox(Caption)->SetVerticalAlignment(VAlign_Center);
         auto* Slot = Tabs->AddChildToHorizontalBox(Tab);
         Slot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
         Slot->SetPadding(FMargin(Index > 0 ? 4 : 0, 0, 0, 0));
@@ -309,16 +317,16 @@ void GameMenu(UWidgetTree* Tree)
         {
             auto* Content = Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("SettingsContent"));
             auto* Width = Tree->ConstructWidget<USizeBox>();
-            Width->SetWidthOverride(400);
+            Width->SetWidthOverride(620);
             Width->SetContent(Content);
-            Place(Page, Width, {.5f, .5f}, {.5f, .5f}, {0, 0}, {400, 320})->SetAutoSize(true);
+            Place(Page, Width, {.5f, .5f}, {.5f, .5f}, {0, 0}, {620, 400})->SetAutoSize(true);
             auto* Message = Label(Tree, TEXT("TXT_SessionMessage"), FText::GetEmpty(), 22);
             Message->SetAutoWrapText(true);
             Message->SetVisibility(ESlateVisibility::Collapsed);
             Row(Content, Message, 16);
             auto* Actions = Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("MenuActions"));
             for (const auto* Key : {TEXT("Resume"), TEXT("Save"), TEXT("Load"), TEXT("GameSettings"), TEXT("Quit")})
-                Row(Actions, Button(Tree, FName(*FString::Printf(TEXT("BTN_%s"), Key)), ICFrontendLayout::Text(Key)), 12);
+                Row(Actions, Size(Tree,Button(Tree, FName(*FString::Printf(TEXT("BTN_%s"), Key)), ICFrontendLayout::Text(Key)),620,62), 14);
             Row(Content, Actions, 0);
         }
     }
@@ -423,7 +431,7 @@ bool Build(UWidgetTree* Tree, FName Kind)
         auto* Description=Label(Tree,TEXT("GiftDescription"),FText::GetEmpty(),17);Description->SetAutoWrapText(true);
         auto* DescriptionScroll=Tree->ConstructWidget<UScrollBox>();DescriptionScroll->AddChild(Description);Row(Detail,Size(Tree,DescriptionScroll,290,180),0);
         Row(Content,Button(Tree,TEXT("BTN_GiftBack"),FText::FromString(TEXT("돌아가기"))),12);
-        Row(Content,Label(Tree,TEXT("GiftHelp"),FText::FromString(TEXT("WASD  아이템 이동     Enter  선택     ESC  돌아가기")),16),0);
+        Row(Content,Label(Tree,TEXT("GiftHelp"),FText::FromString(TEXT("WASD  아이템 이동     G/F  선택     ESC  돌아가기")),16),0);
         if(auto* Confirm=Child(Tree,TEXT("WBP_IC_ItemConfirm"),TEXT("GiftConfirm")))
         {auto* Placement=Canvas->AddChildToCanvas(Confirm);Placement->SetAnchors(FAnchors(0,0,1,1));Placement->SetOffsets(FMargin(0));Placement->SetZOrder(10);Confirm->SetVisibility(ESlateVisibility::Collapsed);}
     }

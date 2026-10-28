@@ -274,7 +274,7 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     if (Command==EICInputCommand::Block) return;
     if (Command==EICInputCommand::SprintDodge) Command=EICInputCommand::Dodge;
     if (Command==EICInputCommand::TargetToggle) Command=EICInputCommand::NextTarget;
-    if(IsMainMenuLevel()||Menu==TEXT("Create")||Menu==TEXT("Loading"))return;
+    if(IsMainMenuLevel()||Menu==TEXT("Create")||Menu==TEXT("Loading")||Menu==TEXT("Prologue"))return;
     if(auto* Gathering=GetGameInstance()->GetSubsystem<UICGatheringSubsystem>();Gathering&&Gathering->IsGathering()
         &&Command!=EICInputCommand::Roll&&Command!=EICInputCommand::QuestFollow)
     {

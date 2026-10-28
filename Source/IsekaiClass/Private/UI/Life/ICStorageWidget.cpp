@@ -99,7 +99,7 @@ bool UICStorageTransferPopup::HandleKey(FKey Key,bool Repeat)
     if((Key==EKeys::Escape||UICGameUserSettings::IsGamepadBackKey(Key))){if(!Repeat)Back();return true;}
     if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left){Decrease();return true;}if(Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right){Increase();return true;}
     if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up){Action=0;Highlight();return true;}if(Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down){Action=1;Highlight();return true;}
-    if(Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Repeat){if(Action==0)Move();else Back();}return true;}return false;
+    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Repeat){if(Action==0)Move();else Back();}return true;}return false;
 }
 
 bool UICStorageWidget::BuildLayout(UWidgetTree* Tree)
@@ -223,7 +223,7 @@ FReply UICStorageWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const 
     if(Key==EKeys::Tab||Key==EKeys::Gamepad_LeftShoulder||Key==EKeys::Gamepad_RightShoulder){if(!Event.IsRepeat()){bStorageSide=!bStorageSide;Selected=0;RefreshStorage();}return FReply::Handled();}
     int32 Delta=0;if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up)Delta=-8;else if(Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down)Delta=8;else if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left)Delta=-1;else if(Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right)Delta=1;
     if(Delta){const int32 Count=bStorageSide?40:Inventory->GetSnapshot().Bag.Slots.Num();Selected=FMath::Clamp(Selected+Delta,0,Count-1);RefreshStorage();auto* Grid=CastChecked<UUniformGridPanel>(GetWidgetFromName(bStorageSide?TEXT("ChestGrid"):TEXT("StorageBagGrid")));CastChecked<UScrollBox>(GetWidgetFromName(bStorageSide?TEXT("ChestScroll"):TEXT("StorageBagScroll")))->ScrollWidgetIntoView(Grid->GetChildAt(Selected));return FReply::Handled();}
-    if(Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Event.IsRepeat())OpenItem(bStorageSide,Selected);return FReply::Handled();}
+    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Event.IsRepeat())OpenItem(bStorageSide,Selected);return FReply::Handled();}
     return Super::NativeOnPreviewKeyDown(Geometry,Event);
 }
 

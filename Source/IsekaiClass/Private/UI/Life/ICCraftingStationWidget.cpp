@@ -217,7 +217,7 @@ void UICCraftingStationWidget::NativeTick(const FGeometry& Geometry,float DeltaS
 }
 FReply UICCraftingStationWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event)
 {
-    if(Event.IsRepeat()&&Event.GetKey()==EKeys::Enter)return FReply::Handled();
+    if(Event.IsRepeat()&&UICGameUserSettings::MenuKey(Event.GetKey())==EKeys::Enter)return FReply::Handled();
     return HandleStationKey(UICGameUserSettings::MenuKey(Event.GetKey()))?FReply::Handled():Super::NativeOnPreviewKeyDown(Geometry,Event);
 }
 bool UICCraftingStationWidget::HandleStationKey(FKey Key)
@@ -227,12 +227,12 @@ bool UICCraftingStationWidget::HandleStationKey(FKey Key)
     {if(bEnhancing)CraftTab();else EnhanceTab();return true;}
     if(bEnhancing){if(auto* E=Cast<UICEnhancementWidget>(GetWidgetFromName(TEXT("EnhancementContent")))){if(E->HandleKey(Key))return true;if(Key==EKeys::Escape){CloseStation();return true;}}return false;}
     if(Key==EKeys::Escape){if(bDetails)ShowRecipeList();else CloseStation();return true;}
-    if(bDetails&&Key==EKeys::Enter)
+    if(bDetails&&(Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter))
     {if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Make")));B&&B->GetIsEnabled())MakeRecipe();return true;}
     if(!ActiveJob.IsValid()&&!bDetails)
     {
         if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down){const int32 Step=Key==EKeys::W||Key==EKeys::Up?-1:1;Highlight(FMath::Clamp(Recipes.IndexOfByKey(SelectedRecipe)+Step,0,Recipes.Num()-1));return true;}
-        if(Key==EKeys::Enter){SelectRecipe(SelectedRecipe);return true;}
+        if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)){SelectRecipe(SelectedRecipe);return true;}
     }
     return false;
 }

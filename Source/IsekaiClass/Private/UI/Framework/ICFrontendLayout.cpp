@@ -35,6 +35,10 @@
 #include "Widgets/CommonActivatableWidgetContainer.h"
 #include "Styling/CoreStyle.h"
 #include "Engine/Font.h"
+#include "UI/CharacterCreate/ICNameKeyButton.h"
+#include "Components/UniformGridPanel.h"
+#include "Components/UniformGridSlot.h"
+#include "Engine/Texture2D.h"
 
 namespace ICFrontendLayout
 {
@@ -267,6 +271,11 @@ void Build(UWidgetTree* Tree, FName Kind)
     auto* Box = Card(Tree, Kind == TEXT("Questions") ? 1080.f : 680.f);
     if (Kind == TEXT("Mainmenu"))
     {
+        auto* Emblem=Tree->ConstructWidget<UImage>();
+        Emblem->SetBrushFromTexture(LoadObject<UTexture2D>(nullptr,TEXT("/Game/IsekaiClass/UI/SampleUI/MorpheusGUI/textures/Icons/512/t_Compass_512.t_Compass_512")));
+        Emblem->SetColorAndOpacity(FLinearColor(.9f,.72f,.4f));
+        auto* EmblemSize=Tree->ConstructWidget<USizeBox>();EmblemSize->SetWidthOverride(52);EmblemSize->SetHeightOverride(52);EmblemSize->SetContent(Emblem);
+        Box->AddChildToVerticalBox(EmblemSize)->SetHorizontalAlignment(HAlign_Center);
         auto* Title = Label(Tree, TEXT("TXT_Title"), Text(TEXT("Title")), 46);
         Title->SetJustification(ETextJustify::Center);
         Row(Box, Title, 24);
@@ -294,6 +303,21 @@ void Build(UWidgetTree* Tree, FName Kind)
         NameStyle.SetReadOnlyForegroundColor(FSlateColor(FLinearColor(.12f,.14f,.18f)));
         Name->SetWidgetStyle(NameStyle);
         Row(Box, Name, 20);
+        auto* Keyboard=Tree->ConstructWidget<UUniformGridPanel>(UUniformGridPanel::StaticClass(),TEXT("NameKeyboard"));
+        Keyboard->SetMinDesiredSlotWidth(94);Keyboard->SetMinDesiredSlotHeight(58);Keyboard->SetSlotPadding(FMargin(3));
+        for(int32 I=0;I<40;++I)
+        {
+            auto* Key=Tree->ConstructWidget<UICNameKeyButton>(UICNameKeyButton::StaticClass(),FName(*FString::Printf(TEXT("NameKey%d"),I)));
+            const FString Jamo=TEXT("ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔㅁㄴㅇㄹㅎㅗㅓㅏㅣㅋㅌㅊㅍㅠㅜㅡ");
+            const FString Caption=I<26?FString::Chr(Jamo[I]):I<36?FString::FromInt(I-26):I==36?TEXT("한/EN"):I==37?TEXT("Shift"):I==38?TEXT("지우기"):TEXT("공백");
+            Key->KeyIndex=I;Key->SetContent(Label(Tree,NAME_None,FText::FromString(Caption),19));
+            if(auto* KeyLabel=Cast<UTextBlock>(Key->GetContent())){KeyLabel->SetJustification(ETextJustify::Center);KeyLabel->SetAutoWrapText(false);KeyLabel->SetWrapTextAt(0);}
+            auto* KeySlot=Keyboard->AddChildToUniformGrid(Key,I/10,I%10);
+            KeySlot->SetHorizontalAlignment(HAlign_Fill);KeySlot->SetVerticalAlignment(VAlign_Fill);
+        }
+        Row(Box,Keyboard,14);
+        auto* Help=Label(Tree,TEXT("TXT_CreationHelp"),NSLOCTEXT("ICCreation","Controls","방향키 / WASD / 패드 이동    G · F / 확인 버튼 선택    LB 한·영    RB Shift"),15);
+        Help->SetJustification(ETextJustify::Center);Help->SetAutoWrapText(false);Help->SetWrapTextAt(0);Row(Box,Help,14);
         for (int32 I = 0; I < 4; ++I)
         {
             auto* Choice = Button(Tree, FName(*FString::Printf(TEXT("BTN_Choice%d"), I)), TEXT("Next"));

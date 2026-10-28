@@ -14,6 +14,7 @@
 #include "Sound/SoundMix.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "HAL/PlatformTime.h"
+#include "Core/Flow/ICGameFlowSubsystem.h"
 
 UICBGMSubsystem::UICBGMSubsystem()
 {MusicTable=TSoftObjectPtr<UDataTable>(FSoftObjectPath(TEXT("/Game/IsekaiClass/Data/DataTable/Audio/DT_IC_BGM.DT_IC_BGM")));}
@@ -42,7 +43,11 @@ void UICBGMSubsystem::Tick(float DeltaSeconds)
     if(bDeathMuted){UGameplayStatics::PopSoundMixModifier(GetWorld(),DeathMute);if(auto Audio=GetWorld()->GetAudioDevice())Audio->SetTransientPrimaryVolume(1.f);bDeathMuted=false;RefreshIn=0;}
     if(FPlatformTime::Seconds()<SilentUntil)return;
     RefreshIn-=DeltaSeconds;if(RefreshIn>0)return;RefreshIn=.2f;
-    if(!PC||!PC->bCreated||!PC->GetPawn()||PC->IsMainMenuLevel()){ChangeMusic(NAME_None);return;}
+    const auto* Flow=GetWorld()->GetGameInstance()?GetWorld()->GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>():nullptr;
+    if(Flow&&(Flow->Phase==EICGameFlowPhase::Prologue||Flow->bPendingNewGame)){ChangeMusic(TEXT("BGM_Prologue"));return;}
+    if(PC&&(PC->Menu==TEXT("Create")||(Flow&&Flow->Phase==EICGameFlowPhase::Questions))){ChangeMusic(TEXT("BGM_CharacterCreate"));return;}
+    if(PC&&PC->IsMainMenuLevel()){ChangeMusic(TEXT("BGM_MainMenu"));return;}
+    if(!PC||!PC->bCreated||!PC->GetPawn()){ChangeMusic(NAME_None);return;}
     ChangeMusic(ResolveMusicRow(PC->GetPawn()->GetActorLocation(),PC->bInCombat));
 }
 void UICBGMSubsystem::StopMusic()
@@ -99,7 +104,7 @@ void UICBGMSubsystem::ChangeMusic(FName RowID)
     {
         Current->bIsUISound=true;Current->SoundClassOverride=LoadObject<USoundClass>(nullptr,TEXT("/Game/IsekaiClass/Audio/Settings/SC_Music.SC_Music"));
         Current->OnAudioFinished.AddUniqueDynamic(this,&ThisClass::MusicFinished);
-        Current->FadeIn(FMath::Max(0.f,Row->FadeInSeconds),1.f);
+        Current->FadeIn(FMath::Max(0.f,Row->FadeInSeconds),FMath::Max(0.f,Row->Volume));
     }
 }
 void UICBGMSubsystem::MusicFinished(){if(Current&&bCurrentLoop)Current->Play();}

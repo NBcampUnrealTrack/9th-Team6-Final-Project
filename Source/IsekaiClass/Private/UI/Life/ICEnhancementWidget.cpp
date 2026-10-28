@@ -89,5 +89,5 @@ bool UICEnhancementWidget::HandleKey(FKey Key)
         if(!bDetails){WeaponIndex=FMath::Clamp(WeaponIndex+D,0,FMath::Max(0,Weapons.Num()-1));RefreshWeapons();if(auto* S=Cast<UScrollBox>(GetWidgetFromName(TEXT("EnhanceWeapons")));S&&S->GetChildrenCount()>WeaponIndex)S->ScrollWidgetIntoView(S->GetChildAt(WeaponIndex),true);}
         else if(!Ores.IsEmpty()){OreIndex=SelectedOre.IsNone()?0:FMath::Clamp(OreIndex+D,0,Ores.Num()-1);SelectOre(Ores[OreIndex]);}return true;
     }
-    if(Key==EKeys::Enter||Key==EKeys::SpaceBar){if(bDetails)Attempt();else if(Weapons.IsValidIndex(WeaponIndex))SelectWeapon(Weapons[WeaponIndex].Item.InstanceID);return true;}return false;
+    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar){if(bDetails)Attempt();else if(Weapons.IsValidIndex(WeaponIndex))SelectWeapon(Weapons[WeaponIndex].Item.InstanceID);return true;}return false;
 }

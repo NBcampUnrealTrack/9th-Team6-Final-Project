@@ -1,6 +1,9 @@
 #include "UI/Settings/ICSettingsWidget.h"
 #include "UI/Settings/ICSettingsLayout.h"
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Framework/ICUITheme.h"
+#include "Components/Border.h"
+#include "Components/ScrollBox.h"
 #include "Settings/ICGameUserSettings.h"
 #include "Data/Text/ICLocalization.h"
 #include "Core/Controller/ICPlayerController.h"
@@ -86,7 +89,8 @@ void UICSettingsWidget::SelectTab(int32 Index)
     if(auto* Tabs=Cast<UWidgetSwitcher>(GetWidgetFromName(TEXT("SettingsTabSwitcher"))))Tabs->SetActiveWidgetIndex(ActiveTab);
     for(int32 I=0;I<ICSettingsLayout::Tabs().Num();++I)
         if(auto* Button=Cast<UButton>(GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_SettingsTab_%d"),I)))))
-            Button->SetBackgroundColor(I==ActiveTab?FLinearColor(.32f,.25f,.13f):FLinearColor(.11f,.16f,.23f));
+            ICUITheme::SetSelected(Button,I==ActiveTab);
+    OptionIndex=0;RefreshNavigation();
 }
 void UICSettingsWidget::Status(const FText& Value)
 {if(auto* Label=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_SettingsStatus"))))Label->SetText(Value);}
@@ -150,6 +154,7 @@ void UICSettingsWidget::RefreshControls()
     for(const TCHAR* Name:{TEXT("BTN_KeepDisplay"),TEXT("BTN_RevertDisplay")})if(auto* Button=GetWidgetFromName(Name))if(auto* Parent=Button->GetParent())Parent->SetVisibility(bPreview?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     for(const TCHAR* Name:{TEXT("BTN_Apply"),TEXT("BTN_Reset")})if(auto* Button=GetWidgetFromName(Name))Button->SetIsEnabled(!bPreview);
     if(auto* Body=GetWidgetFromName(TEXT("SettingsBody")))Body->SetIsEnabled(!bPreview);
+    RefreshNavigation();
 }
 void UICSettingsWidget::ChangeOption(FName ID,double Value)
 {
@@ -217,13 +222,16 @@ void UICSettingsWidget::BuildKeyBindings()
         if(!Mapping.Action||Mapping.Key.IsGamepadKey()||Mapping.Key.IsAxis1D()||Mapping.Key.IsAxis2D()||Mapping.Key.IsAxis3D()||Mapping.Action==PC->LookAction)continue;
         bool Roll=false;for(const auto& Binding:PC->CommandActions)if(Binding.Action==Mapping.Action&&Binding.Command==EICInputCommand::Roll)Roll=true;
         if(Roll)continue;
-        auto* Row=WidgetTree->ConstructWidget<UHorizontalBox>();List->AddChildToVerticalBox(Row)->SetPadding(FMargin(18,7,30,7));
+        auto* Frame=WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(),FName(*FString::Printf(TEXT("KeyRow_%d"),KeyBindings.Num())));
+        Frame->SetBrush(ICUITheme::PanelBrush());Frame->SetPadding(FMargin(22,16));List->AddChildToVerticalBox(Frame)->SetPadding(FMargin(0,0,22,10));
+        auto* Row=WidgetTree->ConstructWidget<UHorizontalBox>();Frame->SetContent(Row);
         auto* Label=WidgetTree->ConstructWidget<UTextBlock>();Label->SetFont(ICFrontendLayout::Font(18));Label->SetText(BindingName(PC,Mapping.Action,Mapping.Key));Row->AddChildToHorizontalBox(Label)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
         auto* Width=WidgetTree->ConstructWidget<USizeBox>();Width->SetWidthOverride(280);Width->SetHeightOverride(38);Row->AddChildToHorizontalBox(Width);
         auto* Selector=WidgetTree->ConstructWidget<UInputKeySelector>();Selector->SetAllowModifierKeys(false);Selector->SetAllowGamepadKeys(false);Selector->SetEscapeKeys({EKeys::Escape});
         auto Style=Selector->GetTextStyle();Style.SetFont(ICFrontendLayout::Font(17));Selector->SetTextStyle(Style);
         Selector->SetKeySelectionText(LOCTEXT("PressKey","새 키를 누르세요…"));Width->SetContent(Selector);
         auto* Binding=Bind(Selector,TEXT("Key"));Binding->KeyID=Mapping.Action->GetName()+TEXT(":")+Mapping.Key.GetFName().ToString();Binding->DefaultKey=Mapping.Key;
+        Binding->Label=Label->GetText();
         Selector->SetIsEnabled(Mapping.Key!=EKeys::Escape);Selector->OnKeySelected.AddDynamic(Binding,&UICSettingBinding::KeyChanged);KeyBindings.Add(Binding);
     }
 }
@@ -321,6 +329,123 @@ FReply UICSettingsWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const
                 const FString* Override=UICGameUserSettings::Get()->KeyOverrides.Find(ID);
                 if(Event.GetKey()==(Override?FKey(**Override):Mapping.Key)){if(!Event.IsRepeat())Close();return FReply::Handled();}
             }
+    if(HandleNavigationKey(Event.GetKey(),Event.IsRepeat()))return FReply::Handled();
     return Super::NativeOnPreviewKeyDown(Geometry,Event);
 }
+
+namespace
+{
+TArray<UButton*> SettingsFooter(UICSettingsWidget* Widget)
+{
+    TArray<UButton*> Out;
+    for(const auto* Name:{TEXT("BTN_Reset"),TEXT("BTN_Apply"),TEXT("BTN_KeepDisplay"),TEXT("BTN_RevertDisplay"),TEXT("BTN_Close")})
+        if(auto* Button=Cast<UButton>(Widget->GetWidgetFromName(Name));Button&&Button->IsVisible()&&Button->GetIsEnabled()&&(!Button->GetParent()||Button->GetParent()->IsVisible()))Out.Add(Button);
+    return Out;
+}
+}
+TArray<UWidget*> UICSettingsWidget::NavigationOptions() const
+{
+    TArray<UWidget*> Out;
+    for(const auto& Spec:ICSettingsLayout::Specs())if(Spec.Tab==ActiveTab)
+        if(auto* Control=GetWidgetFromName(FName(*(TEXT("OPTION_")+Spec.ID.ToString())));Control&&Control->GetIsEnabled())Out.Add(Control);
+    if(ActiveTab==1)for(const auto& Binding:KeyBindings)if(Binding->Control&&Binding->Control->GetIsEnabled())Out.Add(Binding->Control);
+    return Out;
+}
+void UICSettingsWidget::RefreshNavigation()
+{
+    const auto Options=NavigationOptions();OptionIndex=FMath::Clamp(OptionIndex,0,FMath::Max(0,Options.Num()-1));
+    UWidget* Selected=Options.IsValidIndex(OptionIndex)?Options[OptionIndex]:nullptr;
+    for(const auto& Spec:ICSettingsLayout::Specs())
+    {
+        auto* Control=GetWidgetFromName(FName(*(TEXT("OPTION_")+Spec.ID.ToString())));
+        const bool Active=NavigationArea==1&&Selected==Control;
+        if(auto* Row=Cast<UBorder>(GetWidgetFromName(FName(*(TEXT("ROW_")+Spec.ID.ToString())))))
+            Row->SetBrushColor(Active?FLinearColor(.258f,.896f,1.f,.28f):FLinearColor(.107f,.175f,.258f,.16f));
+        if(Selected==Control)
+        {
+            if(auto* Text=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_SelectedSetting"))))Text->SetText(Spec.Label);
+            if(auto* Text=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_SelectedSettingHelp"))))Text->SetText(Spec.Help);
+        }
+    }
+    for(int32 I=0;I<ICSettingsLayout::Tabs().Num();++I)
+        ICUITheme::SetSelected(Cast<UButton>(GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_SettingsTab_%d"),I)))),I==ActiveTab);
+    for(int32 I=0;I<KeyBindings.Num();++I)
+    {
+        const bool Active=NavigationArea==1&&Selected==KeyBindings[I]->Control;
+        if(auto* Row=Cast<UBorder>(GetWidgetFromName(FName(*FString::Printf(TEXT("KeyRow_%d"),I)))))
+            Row->SetBrushColor(Active?FLinearColor(.258f,.896f,1.f,.28f):FLinearColor(.107f,.175f,.258f,.16f));
+        if(Selected==KeyBindings[I]->Control)
+        {
+            if(auto* Text=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_SelectedSetting"))))Text->SetText(KeyBindings[I]->Label);
+            if(auto* Text=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_SelectedSettingHelp"))))Text->SetText(NSLOCTEXT("ICSettings","KeyHelp","F로 선택한 뒤 새 키를 누르세요. ESC로 취소할 수 있습니다. 다른 조작과 중복되면 두 키를 서로 바꿉니다."));
+        }
+    }
+    const auto Actions=SettingsFooter(this);FooterIndex=FMath::Clamp(FooterIndex,0,FMath::Max(0,Actions.Num()-1));
+    for(int32 I=0;I<Actions.Num();++I)ICUITheme::SetSelected(Actions[I],NavigationArea==2&&I==FooterIndex);
+}
+void UICSettingsWidget::AdjustSelected(int32 Direction)
+{
+    const auto Options=NavigationOptions();if(!Options.IsValidIndex(OptionIndex))return;
+    auto* Control=Options[OptionIndex];const FString Name=Control->GetName();
+    const FName ID(*Name.RightChop(7));
+    if(auto* Check=Cast<UCheckBox>(Control))ChangeOption(ID,Direction==0?!Check->IsChecked():Direction>0);
+    else if(auto* Slider=Cast<USlider>(Control))ChangeOption(ID,Slider->GetValue()+(Direction==0?1:Direction)*Slider->GetStepSize());
+    else if(auto* Choice=Cast<UComboBoxString>(Control);Choice&&Choice->GetOptionCount()>0)
+    {
+        const int32 Index=(Choice->GetSelectedIndex()+(Direction<0?-1:1)+Choice->GetOptionCount())%Choice->GetOptionCount();
+        const FString Value=Choice->GetOptionAtIndex(Index);Choice->SetSelectedIndex(Index);ChangeChoice(ID,Value);
+    }
+    else if(auto* Selector=Cast<UInputKeySelector>(Control);Selector&&Direction==0)
+    {PendingKeySelector=Selector;}
+    RefreshNavigation();
+}
+bool UICSettingsWidget::HandleNavigationKey(FKey Raw,bool Repeat)
+{
+    const FKey Key=UICGameUserSettings::MenuKey(Raw);
+    const bool Up=Key==EKeys::W||Key==EKeys::Up,Down=Key==EKeys::S||Key==EKeys::Down;
+    const bool Left=Key==EKeys::A||Key==EKeys::Left,Right=Key==EKeys::D||Key==EKeys::Right;
+    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar;
+    if(!Up&&!Down&&!Left&&!Right&&!Accept&&Key!=EKeys::Tab)return false;
+    if(bPreview)NavigationArea=2;
+    if(Key==EKeys::Tab){NavigationArea=(NavigationArea+1)%3;RefreshNavigation();return true;}
+    const auto Options=NavigationOptions();
+    if(NavigationArea==0)
+    {
+        if((Left||Right)&&!Repeat)SelectTab((ActiveTab+(Right?1:ICSettingsLayout::Tabs().Num()-1))%ICSettingsLayout::Tabs().Num());
+        if(Down||Accept){NavigationArea=1;OptionIndex=0;}
+    }
+    else if(NavigationArea==1)
+    {
+        if(Up){if(OptionIndex==0)NavigationArea=0;else --OptionIndex;}
+        if(Down){if(OptionIndex+1>=Options.Num())NavigationArea=2;else ++OptionIndex;}
+        if(Left||Right)AdjustSelected(Right?1:-1);
+        if(Accept&&!Repeat)AdjustSelected(0);
+        if(Options.IsValidIndex(OptionIndex))if(auto* Scroll=Cast<UScrollBox>(GetWidgetFromName(FName(*FString::Printf(TEXT("SettingsScroll_%d"),ActiveTab)))))Scroll->ScrollWidgetIntoView(Options[OptionIndex],true);
+    }
+    else
+    {
+        const auto Actions=SettingsFooter(this);
+        if(Up&&!bPreview)NavigationArea=1;
+        if(Left||Right)FooterIndex=FMath::Clamp(FooterIndex+(Right?1:-1),0,FMath::Max(0,Actions.Num()-1));
+        if(Accept&&!Repeat&&Actions.IsValidIndex(FooterIndex))Actions[FooterIndex]->OnClicked.Broadcast();
+    }
+    RefreshNavigation();return true;
+}
+FReply UICSettingsWidget::NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& Event)
+{
+    if(PendingKeySelector&&(UICGameUserSettings::MenuKey(Event.GetKey())==EKeys::Enter||Event.GetKey()==EKeys::SpaceBar))
+    {
+        auto* Selector=PendingKeySelector.Get();PendingKeySelector=nullptr;
+        // Begin capture after releasing the confirm key, so it cannot bind F/G by accident.
+        if(GetOwningPlayer())Selector->SetUserFocus(GetOwningPlayer());
+        if(auto Slate=Selector->GetCachedWidget();Slate.IsValid())
+        {
+            Slate->OnKeyDown(Selector->GetCachedGeometry(),FKeyEvent(EKeys::Enter,FModifierKeysState(),Event.GetUserIndex(),false,0,0));
+            Slate->OnKeyUp(Selector->GetCachedGeometry(),FKeyEvent(EKeys::Enter,FModifierKeysState(),Event.GetUserIndex(),false,0,0));
+        }
+        return FReply::Handled();
+    }
+    return Super::NativeOnKeyUp(Geometry,Event);
+}
+
 #undef LOCTEXT_NAMESPACE

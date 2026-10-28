@@ -59,6 +59,8 @@ bool AICPlayerController::HandleSessionKey(const FKey& Key,bool bRepeat)
     IC_TRACE_FUNCTION();
     const FString SessionMenu=GetSessionMenu();
     if(SessionMenu!=TEXT("Save")&&SessionMenu!=TEXT("Load"))return false;
+    if(Key==EKeys::G||Key==EKeys::F)
+    {if(!bRepeat)HandleInputCommand(EICInputCommand::Confirm);return true;}
     if(DefaultMappingContext)
         for(const FICInputCommandBinding& Binding:CommandActions)
             if(Binding.Command==EICInputCommand::QuickSlot||Binding.Command==EICInputCommand::Confirm||Binding.Command==EICInputCommand::Menu)

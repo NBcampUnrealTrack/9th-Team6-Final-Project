@@ -379,7 +379,7 @@ bool UICQuestMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
 {
     const bool Up=Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up,Down=Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down;
     const bool Left=Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left,Right=Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right;
-    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key);
+    const bool Accept=(Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key);
     const bool Back=Key==EKeys::Escape||Key==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(Key);
     if(!bShowingDetails)
     {

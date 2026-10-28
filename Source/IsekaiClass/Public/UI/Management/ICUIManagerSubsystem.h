@@ -4,6 +4,7 @@
 #include "Tickable.h"
 #include "ICUIManagerSubsystem.generated.h"
 class UUserWidget;
+class UWidget;
 class APlayerController;
 class UICUIRootWidget;
 UCLASS()
@@ -44,6 +45,7 @@ private:
     TArray<FScreen> Screens;
     TWeakObjectPtr<APlayerController> MenuController;
     TWeakObjectPtr<UUserWidget> MenuFocus;
+    TWeakObjectPtr<UWidget> PendingFocus;
     bool bMenuOpen = false;
     bool bKeyboardNavigationRegistered = false;
     void RefreshContext();
