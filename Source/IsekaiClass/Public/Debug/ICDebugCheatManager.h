@@ -17,6 +17,10 @@ public:
     UFUNCTION(Exec) void ICGiveStarterWeapons();
     UFUNCTION(Exec) void ICEquipStarterWeapons();
     UFUNCTION(Exec) void ICRecruitTestParty();
+    /** Unlock every registered pet by bringing its essence count to at least 100. */
+    UFUNCTION(Exec) void ICGiveAllPetEssence();
+    /** Assign unlocked pets to the player and current companions for a follow preview. */
+    UFUNCTION(Exec) void ICEquipTestPets();
     UFUNCTION(Exec) void ICGiveGold();
     UFUNCTION(Exec) void ICSetAffinity(FName NpcId, int32 Value);
     UFUNCTION(Exec) void ICTeleport(float X, float Y, float Z);

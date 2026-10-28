@@ -13,6 +13,7 @@
 #include "Animation/AnimInstanceProxy.h"
 #include "AlphaBlend.h"
 #include "Animation/AnimSequence.h"
+#include "Animation/BlendSpace.h"
 #include "Animation/AnimNode_SequencePlayer.h"
 #include "AnimNodes/AnimNode_BlendSpacePlayer.h"
 #include "AnimNodes/AnimNode_TwoWayBlend.h"
@@ -174,6 +175,16 @@ void UICCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
         auto* Time = GI ? GI->GetSubsystem<UICTimeSubsystem>() : nullptr;
         auto* State = GI ? GI->GetSubsystem<UICWorldStateSubsystem>() : nullptr;
         const auto* Stored = State ? State->GetStoredCharacter(Character->GetCharacterID()) : nullptr;
+        // NPC profiles already contain their own retargeted run loop. Use it as
+        // the sprint pose when no separate sprint clip was authored.
+        if(!Sprint&&Locomotion)
+        {
+            float Fastest=0.f;
+            for(const auto& Sample:Locomotion->GetBlendSamples())
+                if(Sample.Animation&&Sample.SampleValue.X>Fastest)
+                {Fastest=Sample.SampleValue.X;Sprint=Sample.Animation;}
+        }
+        bSprinting=NPC->IsFollowingPlayerSprint()&&Speed>10.f;
         FICDefinitionResult Result;
         if (Definitions && Time && Stored && Stored->Mode == EICCharacterMode::Scheduled)
             if (const auto* Schedule = Definitions->Find<FICScheduleRow>(NPC->GetNPCDefinition().ScheduleID, Result))

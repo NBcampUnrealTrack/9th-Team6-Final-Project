@@ -152,7 +152,7 @@ def main():
             row["AttachSocket"]="weapon_l" if row["WeaponFamily"]=="Bow" else "weapon_r"
     save("Equipment/DT_IC_Equipment.csv",f,r)
     f,r=load("Settings/DT_IC_PartySettings.csv")
-    for row in r:row.update(MaximumCompanions="3",RequiredRecruitAffinity="300",FormationOffsetsCm="((X=-180,Y=-120,Z=0),(X=-220,Y=0,Z=0),(X=-180,Y=120,Z=0))")
+    for row in r:row.update(MaximumCompanions="3",RequiredRecruitAffinity="300",SearchDistanceCm="800",ChaseDistanceCm="1200",RecoveryDistanceCm="2000",PathFailurePlaySeconds="2",FormationOffsetsCm="((X=-140,Y=-110,Z=0),(X=-180,Y=0,Z=0),(X=-140,Y=110,Z=0))")
     save("Settings/DT_IC_PartySettings.csv",f,r)
     f,r=load("World/DT_IC_Region.csv")
     for row in r:

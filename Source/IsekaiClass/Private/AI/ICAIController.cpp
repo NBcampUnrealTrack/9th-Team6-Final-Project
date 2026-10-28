@@ -36,7 +36,7 @@ bool AICAIController::StartExecution(UStateTree* Tree,UBehaviorTree* Behavior)
     else if(Tree){ScheduleRunner->SetStateTree(Tree);ScheduleRunner->StartLogic();bUsesAuthoredTree=ScheduleRunner->IsRunning();if(!bUsesAuthoredTree)UE_LOG(LogICCore,Warning,TEXT("[AI.StateTreeFailed] %s"),*GetPathNameSafe(Tree));}
     NextDecisionAt=0;return true;
 }
-void AICAIController::StopExecution() { IC_TRACE_FUNCTION();bExecutionReady=false;StopMovement();Target.Reset();OrderedTarget.Reset();ScheduleRunner->StopLogic(TEXT("상태 전환"));if(BrainComponent&&BrainComponent!=ScheduleRunner)BrainComponent->StopLogic(TEXT("상태 전환")); }
+void AICAIController::StopExecution() { IC_TRACE_FUNCTION();bExecutionReady=false;bUsesAuthoredTree=false;ResetCompanionFollow();StopMovement();Target.Reset();OrderedTarget.Reset();ScheduleRunner->StopLogic(TEXT("상태 전환"));if(BrainComponent&&BrainComponent!=ScheduleRunner)BrainComponent->StopLogic(TEXT("상태 전환")); }
 void AICAIController::OrderAttack(AICCharacterBase* Enemy)
 {
     auto* NPC=Cast<AICNPCBase>(GetPawn());auto* State=GetGameInstance()?GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr;
@@ -52,7 +52,9 @@ bool AICAIController::DecideCompanionCombat(AICNPCBase* NPC)
     if(!Target.IsValid()&&OrderedTarget.IsValid()){Target=OrderedTarget;OrderedTarget.Reset();}
     if(!Target.IsValid())
     {
-        double Nearest=FMath::Square(1200.);
+        FICDefinitionResult Lookup;
+        const auto* Rules=ASC->Definitions()->Find<FICPartySettingsRow>(TEXT("CFG_PARTY_001"),Lookup);
+        double Nearest=FMath::Square(Rules?Rules->SearchDistanceCm:800.);
         for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)if(Valid(*It)&&LineOfSightTo(*It)&&(ASC->HasRecentCombat()||It->GetICAbilitySystem()->HasRecentCombat()))
         {const double Distance=FVector::DistSquared(NPC->GetActorLocation(),It->GetActorLocation());if(Distance<Nearest){Nearest=Distance;Target=*It;}}
     }
@@ -103,7 +105,7 @@ void AICAIController::RestoreScheduleFacing()
     }
 }
 void AICAIController::OnUnPossess() { IC_TRACE_FUNCTION();StopExecution();Super::OnUnPossess(); }
-bool AICAIController::TryRecoverCompanion()
+bool AICAIController::TryRecoverCompanion(bool bPathFailure)
 {
     auto* NPC = Cast<AICNPCBase>(GetPawn());
     auto* GI = GetGameInstance();
@@ -116,23 +118,32 @@ bool AICAIController::TryRecoverCompanion()
     if (auto* ASC = NPC->GetICAbilitySystem(); ASC && !ASC->IsAlive()) return false;
     FICDefinitionResult Result;
     const auto* Rules = Definitions ? Definitions->Find<FICPartySettingsRow>(TEXT("CFG_PARTY_001"), Result) : nullptr;
-    const double Distance = Rules ? Rules->RecoveryDistanceCm : 3000.;
-    if (Distance <= 0 || FVector::DistSquared(NPC->GetActorLocation(), Player->GetActorLocation()) <= FMath::Square(Distance)) return false;
+    const double Distance = Rules ? Rules->RecoveryDistanceCm : 2000.;
+    const double Separation=FVector::DistSquared(NPC->GetActorLocation(),Player->GetActorLocation());
+    if (Distance<=0 || Separation<=FMath::Square(bPathFailure?350.:Distance))return false;
     auto* Spawns = GetWorld()->GetSubsystem<UICSpawnSubsystem>();
     FTransform Placement;
     if (!Spawns || !Spawns->FindSafePartyPlacement(NPC->GetCharacterID(), Placement)) return false;
+    if(auto* ASC=NPC->GetICAbilitySystem())ASC->CancelAction();
+    Target.Reset();OrderedTarget.Reset();ClearFocus(EAIFocusPriority::Gameplay);
     StopMovement();
     NPC->GetCharacterMovement()->StopMovementImmediately();
     if (!NPC->TeleportTo(Placement.GetLocation(), Placement.Rotator())) return false;
+    ResetCompanionFollow();bRegrouping=true;
     IICStateParticipant::Execute_FlushToWorldState(NPC, State);
-    UE_LOG(LogICCore, Log, TEXT("[Party.Recovered] NPC=%s Position=%s"), *NPC->GetCharacterID().ToString(), *Placement.GetLocation().ToString());
+    UE_LOG(LogICCore, Log, TEXT("[Party.Recovered] NPC=%s PathFailure=%d Position=%s"), *NPC->GetCharacterID().ToString(),bPathFailure,*Placement.GetLocation().ToString());
     return true;
 }
 
 void AICAIController::Tick(float DeltaSeconds)
 {
     IC_TRACE_FUNCTION();Super::Tick(DeltaSeconds);if(!bExecutionReady||bUsesAuthoredTree)return;auto* T=GetGameInstance()?GetGameInstance()->GetSubsystem<UICTimeSubsystem>():nullptr;
-    if(T&&T->IsRunning()&&T->GetClock().PlaySecond>=NextDecisionAt){NextDecisionAt=T->GetClock().PlaySecond+.25;Decide();}
+    if(T&&T->IsRunning()&&T->GetClock().PlaySecond>=NextDecisionAt)
+    {
+        auto* NPC=Cast<AICNPCBase>(GetPawn());auto* State=GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();
+        const auto* Member=State&&NPC?State->GetStoredCharacter(NPC->GetCharacterID()):nullptr;
+        NextDecisionAt=T->GetClock().PlaySecond+(Member&&Member->Mode==EICCharacterMode::Companion?.1:.25);Decide();
+    }
     if(T&&T->IsRunning())
         if(auto* Enemy=Cast<AICEnemyBase>(GetPawn());Enemy&&!Enemy->IsReturning()&&Enemy->GetICAbilitySystem()&&Enemy->GetICAbilitySystem()->IsAlive()&&Target.IsValid()&&Enemy->IsHostileTo(Target.Get()))
             if(auto* TargetASC=Target->GetICAbilitySystem();TargetASC&&TargetASC->IsAlive())
@@ -145,18 +156,9 @@ void AICAIController::Decide()
     {
         if(bInteractionHold){StopMovement();return;}
         const auto State=S->GetSnapshot(C->GetCharacterID());if(State.IsDowned()){StopExecution();return;}
-        if(State.Mode==EICCharacterMode::Companion&&DecideCompanionCombat(NPC))return;
+        if(State.Mode==EICCharacterMode::Companion){DecideCompanionFollow(NPC);return;}
         constexpr float ArrivalDistanceCm=150.f;
         FVector Goal;FRotator GoalRotation=FRotator::ZeroRotator;bool HasGoal=false;
-        if(State.Mode==EICCharacterMode::Companion)
-        {
-            auto* Player=UGameplayStatics::GetPlayerPawn(GetWorld(),0);if(Player)
-            {
-                TryRecoverCompanion();
-                Goal=Player->GetActorLocation()-Player->GetActorForwardVector()*150+Player->GetActorRightVector()*((State.PartySlot-1.5)*80);HasGoal=true;
-            }
-        }
-        else
         {
             const auto* Schedule=D->Find<FICScheduleRow>(NPC->GetNPCDefinition().ScheduleID,R);const int32 Minute=int32(FMath::FloorToDouble(T->GetClock().GameMinute))%1440;
             if(Schedule)for(const auto& Segment:Schedule->Segments)if(Minute>=Segment.StartGameMinute&&Minute<Segment.EndGameMinute)
@@ -166,9 +168,7 @@ void AICAIController::Decide()
         {
 
             C->GetCharacterMovement()->bOrientRotationToMovement=true;
-            const TSubclassOf<UNavigationQueryFilter> Filter = State.Mode == EICCharacterMode::Companion
-                ? nullptr : GetNonCompanionNavigationFilter();
-            MoveToLocation(Goal, 100.f, true, true, true, false, Filter);
+            MoveToLocation(Goal, 100.f, true, true, true, false, GetNonCompanionNavigationFilter());
         }
         else
         {

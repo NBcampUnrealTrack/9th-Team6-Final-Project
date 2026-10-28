@@ -5,6 +5,9 @@
 #include "ICCharacterStatusWidget.generated.h"
 
 class UTexture2D;
+class UBorder;
+class UICDefinitionSubsystem;
+struct FICWorldState;
 struct FICCharacterState;
 
 // Reusable player/companion presentation, supplied with the owning character's state.
@@ -24,10 +27,12 @@ public:
     UFUNCTION(BlueprintCallable, Category="Status") void RefreshPresentation();
     UFUNCTION(BlueprintCallable, Category="Status") void UpdateSkillCooldown(bool bHasSkill, float Progress, double RemainingSeconds);
     void UpdateVitals(const FICCharacterState& State);
+    void UpdateStatusEffects(const FICCharacterState& State, const FICWorldState& World, UICDefinitionSubsystem* Definitions, double Now);
 protected:
     virtual void NativePreConstruct() override;
     virtual void NativeTick(const FGeometry& Geometry,float DeltaSeconds) override;
 private:
     float StatusRefreshAt=0;
     void EnsureSkillCooldownOverlay();
+    UPROPERTY(Transient) TMap<FName, TObjectPtr<UBorder>> EffectWidgets;
 };

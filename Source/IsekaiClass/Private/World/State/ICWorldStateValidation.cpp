@@ -68,6 +68,8 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
             || (Q.bRewardClaimed && (!Q.bCompleted || !Q.RewardTransactionID.IsValid() || !S.CompletedTransactionIDs.Contains(Q.RewardTransactionID)))) return Fail(TEXT("Quests.") + Pair.Key.ToString());
     }
     TMap<FGuid, const FPlayerItemInstance*> BagItems;
+    for (const auto& Cooldown:S.Inventory.ItemReadyAtPlaySecond)
+        if(Cooldown.Key.IsNone()||!TimeValid(Cooldown.Value))return Fail(TEXT("Inventory.ItemReadyAtPlaySecond"));
     for (const auto& Item : S.Inventory.Bag.Slots) if (!Item.IsEmpty()) BagItems.Add(Item.InstanceID, &Item);
     TMap<FGuid, int64> ReservedCounts;
     int64 ReservedGold = 0;

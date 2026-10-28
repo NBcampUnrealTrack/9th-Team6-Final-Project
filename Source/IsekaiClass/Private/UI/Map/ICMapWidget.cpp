@@ -14,6 +14,8 @@
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Life/Production/ICPlayerLifeComponent.h"
 #include "Rendering/DrawElementTypes.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Rendering/SlateRenderer.h"
 #include "Settings/ICGameUserSettings.h"
 #include "Styling/CoreStyle.h"
 #include "UI/Framework/ICFrontendLayout.h"
@@ -28,8 +30,8 @@ void UICMapWidget::BuildLayout(UWidgetTree* Tree,bool Mini)
     auto* Root=Tree->ConstructWidget<UCanvasPanel>();Tree->RootWidget=Root;
     auto Fill=[&](UWidget* W,FAnchors A=FAnchors(0,0,1,1),FMargin M=FMargin(0))
     {auto* S=Root->AddChildToCanvas(W);S->SetAnchors(A);S->SetOffsets(M);return S;};
-    auto* Background=Tree->ConstructWidget<UBorder>();Background->SetBrushColor(FLinearColor(.018f,.026f,.045f,Mini?1.f:.98f));Fill(Background);
-    auto* Surface=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("MapSurface"));Surface->SetBrushColor(FLinearColor(.045f,.06f,.08f));
+    auto* Background=Tree->ConstructWidget<UBorder>();Background->SetBrushColor(FLinearColor(.018f,.026f,.045f,Mini?0.f:.98f));Fill(Background);
+    auto* Surface=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("MapSurface"));Surface->SetBrushColor(FLinearColor(.045f,.06f,.08f,Mini?0.f:1.f));
     Fill(Surface,Mini?FAnchors(0,0,1,1):FAnchors(.035f,.17f,.965f,.87f));
     if(Mini)return;
     auto AddText=[&](const TCHAR* Name,FVector2D At,int32 Size)
@@ -68,7 +70,7 @@ void UICMapWidget::RefreshMap()
     if(auto* T=PresentationTable.LoadSynchronous())if(auto* R=T->FindRow<FICMapPresentationRow>(TEXT("Default"),TEXT("Map"),false))Rules=*R;
     if(auto* T=MapTable.LoadSynchronous())if(auto* R=T->FindRow<FICMapRow>(Rules.MapID,TEXT("Map"),false);R&&!R->Layers.IsEmpty())
     {Layer=R->Layers[0];MapTexture=Layer.MapTexture.LoadSynchronous();}
-    Portals.Reset();for(TActorIterator<AICWarpStone> It(GetWorld());It;++It)if(!It->WarpID.IsNone())Portals.Add(*It);
+    Portals.Reset();if(auto* World=GetWorld())for(TActorIterator<AICWarpStone> It(World);It;++It)if(!It->WarpID.IsNone())Portals.Add(*It);
     Portals.Sort([](const auto& A,const auto& B){return A->WarpID.LexicalLess(B->WarpID);});
     if(!bRegistered&&Rules.bUnlockPlacedPortals)if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer());PC&&PC->bCreated&&PC->GetWorldState())
     {
@@ -101,12 +103,37 @@ FSlateRect UICMapWidget::ImageRect(const FGeometry& G) const
 }
 FVector2D UICMapWidget::MarkerPosition(const FSlateRect& R,FVector P) const
 {const auto UV=WorldToMapUV(P);return {R.Left+UV.X*(R.Right-R.Left),R.Top+UV.Y*(R.Bottom-R.Top)};}
+float UICMapWidget::MinimapOpacity(FVector2D UV)
+{
+    const double X=FMath::Abs(UV.X*2-1),Y=FMath::Abs(UV.Y*2-1);
+    return FMath::Square(FMath::Clamp(1.-X*X,0.,1.))*FMath::Square(FMath::Clamp(1.-Y*Y,0.,1.));
+}
 int32 UICMapWidget::NativePaint(const FPaintArgs& A,const FGeometry& G,const FSlateRect& Clip,FSlateWindowElementList& E,int32 L,const FWidgetStyle& Style,bool Enabled) const
 {
     int32 Top=Super::NativePaint(A,G,Clip,E,L,Style,Enabled);if(bTraveling)return Top;
     const FSlateRect R=ImageRect(G);const FVector2D Size(R.Right-R.Left,R.Bottom-R.Top);if(Size.X<1||Size.Y<1)return Top;
     FSlateBrush Brush;Brush.SetResourceObject(MapTexture);Brush.DrawAs=ESlateBrushDrawType::Image;
-    if(MapTexture)FSlateDrawElement::MakeBox(E,++Top,G.ToPaintGeometry(Size,FSlateLayoutTransform(FVector2D(R.Left,R.Top))),&Brush);
+    if(MapTexture&&bMinimap)
+    {
+        // Vertex alpha fades the existing map itself; no generated mask texture is needed.
+        constexpr int32 Columns=32,Rows=16;
+        TArray<FSlateVertex> Vertices;TArray<SlateIndex> Indices;
+        const auto Transform=G.GetAccumulatedRenderTransform();
+        const float Opacity=Style.GetColorAndOpacityTint().A;
+        for(int32 Y=0;Y<=Rows;++Y)for(int32 X=0;X<=Columns;++X)
+        {
+            const FVector2D UV(double(X)/Columns,double(Y)/Rows);
+            const FColor Color(255,255,255,FMath::RoundToInt(255*MinimapOpacity(UV)*Opacity));
+            Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(Transform,FVector2f(R.Left+UV.X*Size.X,R.Top+UV.Y*Size.Y),FVector2f(UV),Color));
+        }
+        for(int32 Y=0;Y<Rows;++Y)for(int32 X=0;X<Columns;++X)
+        {
+            const SlateIndex I=Y*(Columns+1)+X;
+            Indices.Append({I,SlateIndex(I+1),SlateIndex(I+Columns+1),SlateIndex(I+1),SlateIndex(I+Columns+2),SlateIndex(I+Columns+1)});
+        }
+        FSlateDrawElement::MakeCustomVerts(E,++Top,FSlateApplication::Get().GetRenderer()->GetResourceHandle(Brush),Vertices,Indices,nullptr,0,0);
+    }
+    else if(MapTexture)FSlateDrawElement::MakeBox(E,++Top,G.ToPaintGeometry(Size,FSlateLayoutTransform(FVector2D(R.Left,R.Top))),&Brush);
     if(bMinimap)
     {
         const auto* White=FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"));
@@ -119,7 +146,7 @@ int32 UICMapWidget::NativePaint(const FPaintArgs& A,const FGeometry& G,const FSl
     {
         const auto UV=WorldToMapUV(P->GetActorLocation());if(UV.X<0||UV.X>1||UV.Y<0||UV.Y>1)continue;
         const auto Pos=MarkerPosition(R,P->GetActorLocation());const bool Unlocked=Player&&Player->PartyWarp&&Player->PartyWarp->IsWarpUnlocked(P->WarpID);
-        const FLinearColor Color=Unlocked?FLinearColor(.25f,.85f,1):FLinearColor(.4f,.4f,.45f);const float Radius=bMinimap?4.f:11.f;
+        FLinearColor Color=Unlocked?FLinearColor(.25f,.85f,1):FLinearColor(.4f,.4f,.45f);if(bMinimap)Color.A=MinimapOpacity(UV);const float Radius=bMinimap?4.f:11.f;
         FSlateDrawElement::MakeBox(E,++Top,G.ToPaintGeometry(FVector2D(Radius*2),FSlateLayoutTransform(Pos-FVector2D(Radius))),White,ESlateDrawEffect::None,I==SelectedPortal&&!bMinimap?FLinearColor(1,.8f,.25f):Color);
         if(!bMinimap)FSlateDrawElement::MakeText(E,++Top,G.ToPaintGeometry(FVector2D(180,30),FSlateLayoutTransform(Pos+FVector2D(17,-14))),Local(P->InteractionText),ICFrontendLayout::Font(20),ESlateDrawEffect::None,FLinearColor::White);
     }
@@ -129,7 +156,7 @@ int32 UICMapWidget::NativePaint(const FPaintArgs& A,const FGeometry& G,const FSl
         {
             const auto Pos=MarkerPosition(R,Player->GetActorLocation());const auto F=Player->GetActorForwardVector();FVector2D Dir(F.X*Layer.WorldAxisU.X+F.Y*Layer.WorldAxisU.Y,F.X*Layer.WorldAxisV.X+F.Y*Layer.WorldAxisV.Y);Dir.Normalize();const FVector2D Side(-Dir.Y,Dir.X);const float N=bMinimap?6.f:13.f;
             TArray<FVector2D> Points={Pos+Dir*N,Pos-Dir*N*.6+Side*N*.65,Pos-Dir*N*.6-Side*N*.65,Pos+Dir*N};
-            FSlateDrawElement::MakeLines(E,++Top,G.ToPaintGeometry(),Points,ESlateDrawEffect::None,FLinearColor(.4f,1,.4f),true,bMinimap?2.f:3.f);
+            FSlateDrawElement::MakeLines(E,++Top,G.ToPaintGeometry(),Points,ESlateDrawEffect::None,FLinearColor(.4f,1,.4f,bMinimap?MinimapOpacity(UV):1.f),true,bMinimap?2.f:3.f);
         }
     }
     return Top;

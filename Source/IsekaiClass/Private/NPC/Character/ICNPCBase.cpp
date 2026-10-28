@@ -24,6 +24,9 @@
 #include "UI/Quest/ICNPCQuestMarkerWidget.h"
 #include "NPC/LifeObject/ICLifeObjectUserComponent.h"
 #include "AI/ICNPCAIController.h"
+#include "Player/Character/ICPlayerCharacter.h"
+#include "Kismet/GameplayStatics.h"
+#include "Combat/GAS/ICGameplayTags.h"
 AICNPCBase::AICNPCBase()
 {
     IC_TRACE_FUNCTION();
@@ -45,6 +48,37 @@ AICNPCBase::AICNPCBase()
     Movement->AvoidanceWeight=.5f;
 }
 void AICNPCBase::BeginPlay() { IC_TRACE_FUNCTION();Super::BeginPlay();if(!bInitialized&&!NPCDefinitionID.IsNone())InitializeNPC(NPCDefinitionID); }
+void AICNPCBase::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    UpdateMovementSpeed();
+}
+bool AICNPCBase::IsFollowingPlayerSprint() const
+{
+    const auto* State=WorldState();const auto* Member=State?State->GetStoredCharacter(CharacterID):nullptr;
+    if(!Member||Member->Kind!=EICCharacterKind::Recruitable||Member->Mode!=EICCharacterMode::Companion
+        ||Member->PartySlot<0||Member->PartySlot>=3||Member->IsDowned()||bInteracting
+        ||!AbilitySystem||!AbilitySystem->IsAlive()||!AbilitySystem->CanAcceptMovementInput()
+        ||AbilitySystem->GetActionID().IsValid()||AbilitySystem->HasMatchingGameplayTag(ICTags::Staggered)
+        ||!GetCharacterMovement()->IsMovingOnGround())return false;
+    const auto* Leader=Cast<AICPlayerCharacter>(UGameplayStatics::GetPlayerPawn(GetWorld(),0));
+    return Leader&&Leader->IsSprinting()&&Leader->GetVelocity().SizeSquared2D()>100.f;
+}
+void AICNPCBase::UpdateMovementSpeed()
+{
+    auto* Movement=GetCharacterMovement();const auto* State=WorldState();
+    const auto* Member=State?State->GetStoredCharacter(CharacterID):nullptr;
+    if(!Member||Member->Mode!=EICCharacterMode::Companion||Member->PartySlot<0)
+    {Movement->MaxWalkSpeed=ScheduleMoveSpeed;return;}
+    if(Member->IsDowned()||!AbilitySystem||!AbilitySystem->IsAlive()||!AbilitySystem->CanAcceptMovementInput())
+    {Movement->MaxWalkSpeed=0;return;}
+    // Read this NPC's current DEX/equipment/buffs, then apply the same sprint multiplier as the leader.
+    float Multiplier=1.f;
+    if(IsFollowingPlayerSprint())
+        if(const auto* Leader=Cast<AICPlayerCharacter>(UGameplayStatics::GetPlayerPawn(GetWorld(),0)))
+            Multiplier=Leader->SprintSpeedMultiplier;
+    Movement->MaxWalkSpeed=FMath::Max(0.f,float(AbilitySystem->Stat(EICStat::MoveSpeed)))*Multiplier;
+}
 void AICNPCBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     IC_TRACE_FUNCTION();
@@ -135,6 +169,7 @@ void AICNPCBase::HandleTimeJumped(double FromGameMinute, double ToGameMinute)
 void AICNPCBase::RefreshExecution()
 {
     IC_TRACE_FUNCTION();if(!bInitialized||!WorldState())return;const auto S=WorldState()->GetSnapshot(CharacterID);
+    UpdateMovementSpeed();
     if(S.IsDowned()){if(auto* AI=Cast<AICAIController>(GetController()))AI->StopExecution();return;}
     GetWorldTimerManager().ClearTimer(DefeatTimer);SetActorEnableCollision(true);
     if(!GetController())SpawnDefaultController();if(auto* AI=Cast<AICAIController>(GetController()))AI->StartExecution(

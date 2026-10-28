@@ -91,6 +91,7 @@ void UICGameplayWidget::NativeTick(const FGeometry& Geometry, float DeltaSeconds
         if(PC&&PC->GetTime())Clock->SetText(FormatGameClock(PC->GetTime()->GetClock().GameMinute));
     }
     RefreshSkillCooldown();
+    RefreshTargetInfo();
 }
 FText UICGameplayWidget::FormatGameClock(double GameMinute)
 {
