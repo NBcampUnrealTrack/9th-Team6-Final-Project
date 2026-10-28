@@ -58,11 +58,18 @@ bool HasKorean(const FString& Value)
 void ICLocalization::ApplyLanguage(int32 Language)
 {
     ICLocalizationState::Load();const FString Culture=Language==1?TEXT("en"):TEXT("ko");
-    FInternationalization::Get().SetCurrentCulture(Culture);
 #if WITH_EDITOR
     if(GIsEditor)
-    {FTextLocalizationManager::Get().ConfigureGameLocalizationPreviewLanguage(Culture);FTextLocalizationManager::Get().EnableGameLocalizationPreview(Culture);}
+    {
+        // Game settings must not change the editor's language or locale.
+        FTextLocalizationManager::Get().ConfigureGameLocalizationPreviewLanguage(Culture);
+        FTextLocalizationManager::Get().EnableGameLocalizationPreview(Culture);
+    }
+    else
 #endif
+    {
+        FInternationalization::Get().SetCurrentCulture(Culture);
+    }
     FTextLocalizationManager::Get().WaitForAsyncTasks();
 }
 FText ICLocalization::Localize(const FText& Text)
