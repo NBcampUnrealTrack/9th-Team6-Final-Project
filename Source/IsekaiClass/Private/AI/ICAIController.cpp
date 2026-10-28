@@ -22,7 +22,7 @@ AICAIController::AICAIController()
 }
 bool AICAIController::StartExecution(UStateTree* Tree,UBehaviorTree* Behavior)
 {
-    IC_TRACE_FUNCTION();if(!GetPawn())return false;StopExecution();bExecutionReady=true;
+    IC_TRACE_FUNCTION();if(!GetPawn())return false;StopExecution();bExecutionReady=true;NextMonsterActionAt=0;
     if(Behavior){bUsesAuthoredTree=RunBehaviorTree(Behavior);if(!bUsesAuthoredTree)UE_LOG(LogICCore,Warning,TEXT("[AI.BehaviorFailed] %s"),*GetPathNameSafe(Behavior));}
     else if(Tree){ScheduleRunner->SetStateTree(Tree);ScheduleRunner->StartLogic();bUsesAuthoredTree=ScheduleRunner->IsRunning();if(!bUsesAuthoredTree)UE_LOG(LogICCore,Warning,TEXT("[AI.StateTreeFailed] %s"),*GetPathNameSafe(Tree));}
     NextDecisionAt=0;return true;
@@ -90,9 +90,10 @@ bool AICAIController::TryRecoverCompanion()
 
 void AICAIController::Tick(float DeltaSeconds)
 {
-    IC_TRACE_FUNCTION();Super::Tick(DeltaSeconds);if(!bExecutionReady||bUsesAuthoredTree)return;auto* T=GetGameInstance()?GetGameInstance()->GetSubsystem<UICTimeSubsystem>():nullptr;
-    if(T&&T->IsRunning()&&T->GetClock().PlaySecond>=NextDecisionAt){NextDecisionAt=T->GetClock().PlaySecond+.25;Decide();}
-    if(T&&T->IsRunning())
+    IC_TRACE_FUNCTION();Super::Tick(DeltaSeconds);if(!bExecutionReady)return;auto* T=GetGameInstance()?GetGameInstance()->GetSubsystem<UICTimeSubsystem>():nullptr;
+    if(!T||!T->IsRunning())return;
+    if(!bUsesAuthoredTree&&T->GetClock().PlaySecond>=NextDecisionAt){NextDecisionAt=T->GetClock().PlaySecond+.25;Decide();}
+    if(T->IsRunning())
         if(auto* Enemy=Cast<AICEnemyBase>(GetPawn());Enemy&&!Enemy->IsReturning()&&Enemy->GetICAbilitySystem()&&Enemy->GetICAbilitySystem()->IsAlive()&&Target.IsValid()&&Enemy->IsHostileTo(Target.Get()))
             if(auto* TargetASC=Target->GetICAbilitySystem();TargetASC&&TargetASC->IsAlive())
             {Enemy->GetICAbilitySystem()->MarkCombat();TargetASC->MarkCombat();}
