@@ -216,7 +216,6 @@ ANC_R01_MON_009,Anchor,R01,None,/Game/IsekaiClass/Data/DataTable/World/DT_IC_Anc
 ANC_R01_MON_010,Anchor,R01,None,/Game/IsekaiClass/Data/DataTable/World/DT_IC_Anchor.DT_IC_Anchor,R01 monster combat prototype.,ANC_R01_MON_010,,,(GameplayTags=),1,False,False
 ANC_R01_MON_011,Anchor,R01,None,/Game/IsekaiClass/Data/DataTable/World/DT_IC_Anchor.DT_IC_Anchor,R01 monster combat prototype.,ANC_R01_MON_011,,,(GameplayTags=),1,False,False
 SPN_R01_TEST_001,Spawner,R01,None,/Game/IsekaiClass/Data/DataTable/World/DT_IC_Spawner.DT_IC_Spawner,R01 monster combat prototype.,SPN_R01_TEST_001,,,(GameplayTags=),1,False,False
-RWD_NPC_TALK_100,Reward,R01,None,/Game/IsekaiClass/Data/DataTable/Rewards/DT_IC_Reward.DT_IC_Reward,NPC dialogue quest prototype.,RWD_NPC_TALK_100,RWD_NPC_TALK_100.NAME,,(GameplayTags=),1,False,False
 ANC_R01_FISH_RANDOM_001,Anchor,R01,None,/Game/IsekaiClass/Data/DataTable/World/DT_IC_Anchor.DT_IC_Anchor,R01 life prototype.,ANC_R01_FISH_RANDOM_001,ANC_R01_FISH_RANDOM_001.NAME,,(GameplayTags=),1,False,False
 FPT_R01_RANDOM_001,FishingPoint,R01,None,/Game/IsekaiClass/Data/DataTable/Life/DT_IC_FishingPoint.DT_IC_FishingPoint,R01 life prototype.,FPT_R01_RANDOM_001,FPT_R01_RANDOM_001.NAME,,(GameplayTags=),1,False,False
 ITM_R01_PLANT_01,Item,R01,None,/Game/IsekaiClass/Data/DataTable/Items/DT_IC_Item.DT_IC_Item,R01 life prototype.,ITM_R01_PLANT_01,ITM_R01_PLANT_01.NAME,,(GameplayTags=),1,False,False

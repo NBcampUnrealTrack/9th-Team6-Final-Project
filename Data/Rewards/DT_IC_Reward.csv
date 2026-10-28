@@ -1,6 +1,4 @@
 ---,Items,Gold,Affinity,UnlockRecipeIDs,Overflow,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
-RWD_RING_001,"((ItemID=""ITM_FOOD_001"",Count=10))",0,,,RejectAll,RWD_RING_001,RWD_RING_001.NAME,RWD_RING_001.DESCRIPTION,(GameplayTags=),1,False,False
-RWD_NPC_TALK_100,,100,,,RejectAll,RWD_NPC_TALK_100,RWD_NPC_TALK_100.NAME,,(GameplayTags=),1,False,False
 RWD_SCN_R01_001,(),0,"((NPCID=""NPC_R01_009"",Amount=10))",(),RejectAll,RWD_SCN_R01_001,RWD_SCN_R01_001.NAME,,(GameplayTags=),1,False,False
 RWD_SCN_R01_002,(),0,"((NPCID=""NPC_R01_010"",Amount=10))",(),RejectAll,RWD_SCN_R01_002,RWD_SCN_R01_002.NAME,,(GameplayTags=),1,False,False
 RWD_SCN_R01_003,(),0,"((NPCID=""NPC_R01_011"",Amount=10))",(),RejectAll,RWD_SCN_R01_003,RWD_SCN_R01_003.NAME,,(GameplayTags=),1,False,False
