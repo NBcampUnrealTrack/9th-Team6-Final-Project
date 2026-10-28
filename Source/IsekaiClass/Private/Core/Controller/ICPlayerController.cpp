@@ -229,8 +229,17 @@ void AICPlayerController::ApplyInputMapping()
             {
                 const UInputAction* Roll=nullptr;for(const auto& Binding:CommandActions)if(Binding.Command==EICInputCommand::Roll)Roll=Binding.Action;
                 UserMappingContext=UICGameUserSettings::Get()->MakeInputMapping(DefaultMappingContext,this,MoveAction,Roll);
+                // Gamepad bindings are owned by the separate IMC, not the keyboard copy.
+                if(!GamepadMappingContext.IsNull())
+                {
+                    TArray<TPair<const UInputAction*,FKey>> PadMappings;
+                    for(const auto& Mapping:UserMappingContext->GetMappings())
+                        if(Mapping.Key.IsGamepadKey())PadMappings.Emplace(Mapping.Action.Get(),Mapping.Key);
+                    for(const auto& Mapping:PadMappings)UserMappingContext->UnmapKey(Mapping.Key,Mapping.Value);
+                }
                 Input->AddMappingContext(UserMappingContext,MappingPriority);
                 AppliedMappingContext=UserMappingContext;
+                if(auto* Gamepad=GamepadMappingContext.LoadSynchronous())Input->AddMappingContext(Gamepad,MappingPriority);
                 if(CameraMappingContext)Input->AddMappingContext(CameraMappingContext,MappingPriority);
     UE_LOG(LogICInput, Log, TEXT("[Input.MappingApplied] Controller=%s IMC=%s Priority=%d"),*GetNameSafe(this),*GetPathNameSafe(DefaultMappingContext),MappingPriority);
             }
@@ -244,6 +253,7 @@ void AICPlayerController::RemoveInputMapping()
         if (auto* Input=LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
         {
             if (AppliedMappingContext) Input->RemoveMappingContext(AppliedMappingContext);
+            if (auto* Gamepad=GamepadMappingContext.Get()) Input->RemoveMappingContext(Gamepad);
             if (CameraMappingContext) Input->RemoveMappingContext(CameraMappingContext);
         }
     if(AppliedMappingContext) UE_LOG(LogICInput, Log, TEXT("[Input.MappingRemoved] Controller=%s IMC=%s"),*GetNameSafe(this),*GetPathNameSafe(AppliedMappingContext));

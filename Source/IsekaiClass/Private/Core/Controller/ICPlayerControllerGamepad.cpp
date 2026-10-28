@@ -3,6 +3,28 @@
 #include "InputKeyEventArgs.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
+#include "InputMappingContext.h"
+
+namespace
+{
+bool FindGamepadCommand(AICPlayerController* PC,FKey Key,FICInputCommandBinding& Out)
+{
+    // The IMC stores Xbox positions; translate the selected Nintendo layout by button position.
+    const FKey FaceKeys[]={EKeys::Gamepad_FaceButton_Left,EKeys::Gamepad_FaceButton_Top,
+        EKeys::Gamepad_FaceButton_Right,EKeys::Gamepad_FaceButton_Bottom};
+    for(int32 I=0;I<4;++I)
+        if(Key==UICGameUserSettings::GamepadFaceKey(I)){Key=FaceKeys[I];break;}
+    if(Key==EKeys::Gamepad_LeftTriggerAxis)Key=EKeys::Gamepad_LeftTrigger;
+    if(Key==EKeys::Gamepad_RightTriggerAxis)Key=EKeys::Gamepad_RightTrigger;
+    const auto* Context=PC->GamepadMappingContext.Get();
+    if(!Context)return false;
+    for(const auto& Mapping:Context->GetMappings())
+        if(Mapping.Key==Key)
+            for(const auto& Binding:PC->CommandActions)
+                if(Binding.Action&&Binding.Action==Mapping.Action){Out=Binding;return true;}
+    return false;
+}
+}
 
 bool AICPlayerController::IsUsingGamepad() const
 {const int32 Mode=UICGameUserSettings::Get()->InputDeviceMode;return Mode==2||(Mode==0&&bLastInputGamepad);}
@@ -28,7 +50,9 @@ bool AICPlayerController::InputKey(const FInputKeyEventArgs& Args)
 bool AICPlayerController::RouteGamepadButton(FKey Key,bool Pressed)
 {
     auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());
-    const bool Modifier=Key==EKeys::Gamepad_LeftTrigger||Key==EKeys::Gamepad_LeftTriggerAxis;
+    FICInputCommandBinding Binding;
+    const bool Mapped=FindGamepadCommand(this,Key,Binding);
+    const bool Modifier=Mapped&&Binding.Command==EICInputCommand::Dodge;
     if(Modifier)
     {
         if(Pressed==bGamepadModifier)return true;
@@ -46,13 +70,13 @@ bool AICPlayerController::RouteGamepadButton(FKey Key,bool Pressed)
         }
         return true;
     }
-    const bool Attack=Key==EKeys::Gamepad_RightTrigger||Key==EKeys::Gamepad_RightTriggerAxis;
+    const bool Attack=Mapped&&Binding.Command==EICInputCommand::Attack;
     if(Attack)
     {
         if(Pressed&&!bGamepadAttackHeld&&CanHandleGameplayInput()&&!HasTargetSelection())HandleInputCommand(EICInputCommand::Attack,0);
         bGamepadAttackHeld=Pressed;return true;
     }
-    if(!Pressed){if(Key==UICGameUserSettings::GamepadFaceKey(3)&&PlayerPawn)PlayerPawn->StopJumping();return false;}
+    if(!Pressed){if(Mapped)ReleaseInputCommand(Binding.Command,Binding.Slot);return Mapped;}
     const auto* Settings=UICGameUserSettings::Get();int32 Face=INDEX_NONE;
     for(int32 I=0;I<4;++I)if(Key==Settings->GamepadFaceKey(I)){Face=I;break;}
     if(HasTargetSelection())
@@ -65,18 +89,11 @@ bool AICPlayerController::RouteGamepadButton(FKey Key,bool Pressed)
         bGamepadChordUsed=true;if(PlayerPawn)PlayerPawn->bSprintHeld=false;
         HandleInputCommand(Face==0?EICInputCommand::Skill:EICInputCommand::CompanionSkill,Face==0?0:Face-1);return true;
     }
-    if(Face==2){HandleInputCommand(EICInputCommand::Menu,0);return true;}
+    if(Mapped&&Binding.Command==EICInputCommand::Menu){HandleInputCommand(Binding.Command,Binding.Slot);return true;}
     if(!CanHandleGameplayInput())return false;
-    if(Face==0){HandleInputCommand(EICInputCommand::Interact,0);return true;}
-    if(Face==1){HandleInputCommand(EICInputCommand::Fishing,0);return true;}
-    if(Face==3){HandleInputCommand(EICInputCommand::Jump,0);return true;}
-    if(Key==EKeys::Gamepad_LeftShoulder){HandleInputCommand(EICInputCommand::NextTarget,0);return true;}
-    if(Key==EKeys::Gamepad_RightShoulder){HandleInputCommand(EICInputCommand::SwitchWeapon,0);return true;}
+    // dev has no separate ClearTarget Input Action; preserve this contextual shortcut.
     if(Key==EKeys::Gamepad_RightThumbstick){HandleInputCommand(EICInputCommand::ClearTarget,0);return true;}
-    if(Key==EKeys::Gamepad_Special_Right){HandleInputCommand(EICInputCommand::Menu,0);return true;}
-    if(Key==EKeys::Gamepad_Special_Left){HandleInputCommand(EICInputCommand::Map,0);return true;}
-    const FKey Direction[]={EKeys::Gamepad_DPad_Up,EKeys::Gamepad_DPad_Right,EKeys::Gamepad_DPad_Down,EKeys::Gamepad_DPad_Left};
-    for(int32 I=0;I<4;++I)if(Key==Direction[I]){HandleInputCommand(EICInputCommand::QuickSlot,I);return true;}
+    if(Mapped){HandleInputCommand(Binding.Command,Binding.Slot);return true;}
     return false;
 }
 
