@@ -42,7 +42,7 @@ public:
 
     void RestoreScheduleFacing();
     bool IsInteractionHeld() const { return bInteractionHold; }
-    bool TryRecoverCompanion();
+    bool TryRecoverCompanion(bool bPathFailure=false);
     /** Used by every non-companion AI path request. Companions intentionally retain the default filter. */
     TSubclassOf<UNavigationQueryFilter> GetNonCompanionNavigationFilter() const;
     UFUNCTION(BlueprintCallable,Category="IC|Party") void OrderAttack(AICCharacterBase* Enemy);
@@ -55,6 +55,12 @@ private:
     double NextDecisionAt=0;
     TWeakObjectPtr<class AICCharacterBase> Target;
     TWeakObjectPtr<AICCharacterBase> OrderedTarget;
+    bool bRegrouping=false,bDirectFollowing=false;
+    double LastFollowProgressAt=-1,LastFollowRequestAt=-1;
+    FVector LastFollowProgressPosition=FVector::ZeroVector,LastFollowRequestGoal=FVector::ZeroVector;
+    void ResetCompanionFollow();
+    void DecideCompanionFollow(AICNPCBase* NPC);
+    bool RequestDirectCompanionMove(AICNPCBase* NPC,const FVector& Goal);
     bool DecideCompanionCombat(AICNPCBase* NPC);
     void Decide();
 };

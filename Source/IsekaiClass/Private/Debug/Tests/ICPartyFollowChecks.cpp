@@ -23,6 +23,16 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Animation/AnimSequence.h"
+#include "AI/ICAIController.h"
+#include "Time/ICTimeSubsystem.h"
+#include "Components/BoxComponent.h"
+#include "Enemy/Character/ICEnemyBase.h"
+#include "Navigation/PathFollowingComponent.h"
+#include "NavigationSystem.h"
+#include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BehaviorTreeComponent.h"
+#include "BehaviorTree/Composites/BTComposite_Sequence.h"
+#include "BehaviorTree/Tasks/BTTask_Wait.h"
 
 namespace ICPartyFollowChecks
 {
@@ -174,6 +184,60 @@ bool FICPetCheatFollowCheck::RunTest(const FString&)
     TestNull(TEXT("Dismissed companion's follower disappears"),Followers->GetFollower(Dismissed));
     F.State->SetPartySlot(Dismissed,0);Followers->RefreshFollowers();TestNotNull(TEXT("Rejoining restores the equipped follower"),Followers->GetFollower(Dismissed));
     TestTrue(TEXT("Pet state remains save-valid"),UICWorldStateSubsystem::ValidateState(F.State->ExportState()));
+    return !HasAnyErrors();
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICCompanionNavigationRecoveryCheck,"IC.PartyFollow.NavigationRecovery",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICCompanionNavigationRecoveryCheck::RunTest(const FString&)
+{
+    ICPartyFollowChecks::FSession F;
+    // Standalone fixtures do not create the AI/navigation systems that maps supply.
+    F.World->CreateAISystem();
+    FNavigationSystem::AddNavigationSystemToWorld(*F.World,FNavigationSystemRunMode::GameMode);
+    if(!TestNotNull(TEXT("Navigation system supports direct movement outside mesh bounds"),FNavigationSystem::GetCurrent<UNavigationSystemV1>(F.World)))return false;
+    auto Box=[&](FVector Location,FVector Extent)
+    {
+        auto* Actor=F.World->SpawnActor<AActor>();auto* Shape=NewObject<UBoxComponent>(Actor);
+        Actor->SetRootComponent(Shape);Actor->AddInstanceComponent(Shape);Shape->SetBoxExtent(Extent);
+        Shape->SetCollisionProfileName(TEXT("BlockAll"));Shape->SetCollisionObjectType(ECC_WorldStatic);Shape->RegisterComponent();Actor->SetActorLocation(Location);
+        return Shape;
+    };
+    Box({0,0,-40},{10000,10000,40});F.Player->SetActorLocation({0,0,96});
+    auto* NPC=F.Companions[0];auto* AI=CastChecked<AICAIController>(NPC->GetController());
+    auto* Time=F.GI->GetSubsystem<UICTimeSubsystem>();Time->SetRunning(true);Time->SetMenuPaused(false);
+    auto Step=[&](int32 Count){for(int32 I=0;I<Count;++I){Time->AdvanceClock(.11,false);AI->Tick(.11f);}};
+
+    // A companion recruited from an authored tree must resume native party following.
+    auto* Tree=NewObject<UBehaviorTree>(AI);auto* Root=NewObject<UBTComposite_Sequence>(Tree);Tree->RootNode=Root;
+    auto& Child=Root->Children.AddDefaulted_GetRef();Child.ChildTask=NewObject<UBTTask_Wait>(Root);
+    AI->StartExecution(nullptr,Tree);
+    TestTrue(TEXT("Authored behavior tree starts"),AI->GetBrainComponent()&&AI->GetBrainComponent()->IsRunning());
+    AI->StartExecution(nullptr,nullptr);NPC->SetActorLocation({-1000,0,96});Step(1);
+    TestEqual(TEXT("Leaving an authored tree resumes movement outside navigation coverage"),AI->GetMoveStatus(),EPathFollowingStatus::Moving);
+
+    // With no physics ticks, a requested path cannot make progress: the watchdog must recover it.
+    Step(28);
+    TestTrue(TEXT("A stalled companion recovers before the long-distance threshold"),NPC->GetDistanceTo(F.Player)<350.f);
+    TestTrue(TEXT("Safe recovery records the new save position"),F.State->GetStoredCharacter(NPC->GetCharacterID())->Position.Equals(NPC->GetActorLocation(),.1f));
+
+    NPC->SetActorLocation({-1000,0,96});AI->StartExecution(nullptr,nullptr);
+    auto* Blocker=Box({0,0,150},{600,600,300});Step(35);
+    TestTrue(TEXT("Blocked ground never teleports a companion into a wall"),NPC->GetDistanceTo(F.Player)>800.f);
+    Blocker->SetCollisionEnabled(ECollisionEnabled::NoCollision);Step(35);
+    TestTrue(TEXT("Recovery retries after safe ground becomes available"),NPC->GetDistanceTo(F.Player)<350.f);
+
+    auto* Enemy=F.World->SpawnActor<AICEnemyBase>(FVector(100,0,96),FRotator::ZeroRotator);Enemy->EnableCombat(false,false);
+    auto* EnemyASC=Enemy->GetICAbilitySystem();EnemyASC->SetCombatBase(10000,0,1,1,0,0,1,0,1);
+    FICCharacterState Monster;Monster.CharacterId=TEXT("FOLLOW_TEST_ENEMY");Monster.Kind=EICCharacterKind::Background;Monster.MaxHP=Monster.HP=10000;
+    TestTrue(TEXT("Combat target initializes"),EnemyASC->Restore(Monster));
+    NPC->SetActorLocation({0,0,96});F.Player->SetActorLocation({3500,0,96});AI->StartExecution(nullptr,nullptr);AI->OrderAttack(Enemy);Step(1);
+    TestTrue(TEXT("Distant combat target cannot bypass companion recovery"),NPC->GetDistanceTo(F.Player)<350.f);
+    TestNull(TEXT("Regroup clears stale combat targets"),AI->GetAttackTarget());TestNull(TEXT("Regroup clears stale orders"),AI->GetQueuedAttackTarget());
+    Enemy->ReleaseForLoad();Enemy->Destroy();
+
+    NPC->SetActorLocation({0,0,96});AI->SetInteractionHold(true,F.Player);Step(30);
+    TestTrue(TEXT("Conversation hold still prevents forced movement"),NPC->GetDistanceTo(F.Player)>3000.f);
+    AI->SetInteractionHold(false,nullptr);F.State->SetPartySlot(NPC->GetCharacterID(),INDEX_NONE);Step(30);
+    TestTrue(TEXT("Scheduled NPC does not use companion recovery"),NPC->GetDistanceTo(F.Player)>3000.f);
     return !HasAnyErrors();
 }
 #endif

@@ -113,10 +113,10 @@ struct ISEKAICLASS_API FICPartySettingsRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="500")) int32 RequiredRecruitAffinity = 300;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double LowHPRatio = 0.20;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double AutoHealHPRatio = 0.50;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double SearchDistanceCm = 1200;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double ChaseDistanceCm = 2000;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double RecoveryDistanceCm = 3000;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double PathFailurePlaySeconds = 5;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double SearchDistanceCm = 800;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double ChaseDistanceCm = 1200;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double RecoveryDistanceCm = 2000;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double PathFailurePlaySeconds = 2;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FVector> FormationOffsetsCm;
 };
 

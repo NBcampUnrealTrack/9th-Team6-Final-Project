@@ -1,2 +1,2 @@
 ---,MaximumCompanions,RequiredRecruitAffinity,LowHPRatio,AutoHealHPRatio,SearchDistanceCm,ChaseDistanceCm,RecoveryDistanceCm,PathFailurePlaySeconds,FormationOffsetsCm,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
-CFG_PARTY_001,3,300,0.200000,0.500000,1200.000000,2000.000000,3000.000000,5.000000,"((X=-180,Y=-120,Z=0),(X=-220,Y=0,Z=0),(X=-180,Y=120,Z=0))",CFG_PARTY_001,,,(GameplayTags=),1,False,False
+CFG_PARTY_001,3,300,0.200000,0.500000,800.000000,1200.000000,2000.000000,2.000000,"((X=-140,Y=-110,Z=0),(X=-180,Y=0,Z=0),(X=-140,Y=110,Z=0))",CFG_PARTY_001,,,(GameplayTags=),1,False,False
