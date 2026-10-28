@@ -1,0 +1,3 @@
+﻿---,DisplayName,DropTableID,RefillGameMinutes
+Bookshelf,"NSLOCTEXT(""DT_IC_FurnitureLoot [ACCF7EDE0B4FC07FE250FBE9A7A23D70]"", ""Bookshelf_DisplayName"", ""책장 보상"")","DRP_FURNITURE_BOOKSHELF","0.000000"
+Wardrobe,"NSLOCTEXT(""DT_IC_FurnitureLoot [ACCF7EDE0B4FC07FE250FBE9A7A23D70]"", ""Wardrobe_DisplayName"", ""옷장 보상"")","DRP_FURNITURE_WARDROBE","0.000000"

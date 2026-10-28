@@ -52,11 +52,15 @@ class ISEKAICLASS_API UICInventoryItemPopupWidget : public UUserWidget
 public:
     UPROPERTY(BlueprintReadOnly) int32 ActionIndex=0;
     UPROPERTY(BlueprintAssignable) FICInventoryAction OnEquip;
+    UPROPERTY(BlueprintAssignable) FICInventoryAction OnUse;
     UPROPERTY(BlueprintAssignable) FICInventoryAction OnQuick;
     UPROPERTY(BlueprintAssignable) FICInventoryAction OnTrash;
     UPROPERTY(BlueprintAssignable) FICInventoryAction OnBack;
-    void Present(FText Name,FText Description,UTexture2D* Icon,EPlayerItemKind Kind,bool CanDiscard,bool CanBind);
+    UPROPERTY(BlueprintAssignable) FICInventoryAction OnLock;
+    UPROPERTY(BlueprintAssignable) FICInventoryAction OnSplit;
+    void Present(FText Name,FText Description,UTexture2D* Icon,EPlayerItemKind Kind,bool CanDiscard,bool CanBind,bool CanUse=true);
     void SetMessage(FText Message);
+    void ConfigureStack(bool Locked,int32 Count,bool AllowLock,bool AllowSplit);
     bool HandleKey(FKey Key,bool Repeat);
     static bool BuildLayout(UWidgetTree* Tree);
 protected:
@@ -65,9 +69,12 @@ private:
     TArray<FName> Buttons;
     void RefreshSelection();
     UFUNCTION() void Equip();
+    UFUNCTION() void Use();
     UFUNCTION() void Quick();
     UFUNCTION() void Trash();
     UFUNCTION() void Back();
+    UFUNCTION() void Lock();
+    UFUNCTION() void Split();
 };
 
 UCLASS(Blueprintable)
@@ -86,6 +93,7 @@ public:
     UPROPERTY(BlueprintReadOnly) int32 ActionIndex=0;
     UPROPERTY(BlueprintReadOnly) int32 QuickIndex=0;
     UPROPERTY(BlueprintReadOnly) bool bPickingQuickSlot=false;
+    UPROPERTY(BlueprintReadOnly) bool bPickingUseTarget=false;
     UPROPERTY(BlueprintReadOnly) bool bConfirming=false;
     UPROPERTY(BlueprintReadOnly) bool bDetailOpen=false;
     UPROPERTY(BlueprintAssignable) FICInventoryAction OnNavigationChanged;
@@ -99,9 +107,17 @@ public:
     UFUNCTION(BlueprintCallable) bool ChooseQuickSlot(int32 Index);
     UFUNCTION(BlueprintCallable) bool BeginTrash();
     UFUNCTION(BlueprintCallable) bool EquipSelected();
+    UFUNCTION(BlueprintCallable) bool BeginUseSelected();
+    UFUNCTION(BlueprintCallable) bool ChooseUseTarget(int32 Index);
+    UFUNCTION(BlueprintCallable) void CancelUseTarget();
+    UFUNCTION(BlueprintCallable) void SortItems();
+    UFUNCTION(BlueprintCallable) void CycleFilter();
+    UFUNCTION(BlueprintCallable) void LockSelected();
+    UFUNCTION(BlueprintCallable) void SplitSelected();
+    bool IsSearchFocused() const;
     UFUNCTION(BlueprintCallable) void ResolveConfirmation(bool bAccept);
     bool HandleMenuKey(FKey Key,bool bRepeat=false);
-    bool IsBusy() const {return bDetailOpen||bPickingQuickSlot||bConfirming;}
+    bool IsBusy() const {return bDetailOpen||bPickingQuickSlot||bConfirming||bPickingUseTarget;}
     FText NavigationHint() const;
     void Activate();
     static bool BuildLayout(UWidgetTree* Tree);
@@ -115,6 +131,9 @@ private:
     TArray<int32> EquipmentCells;
     bool bRefreshing=false;
     bool bTrashPending=false;
+    FString SearchText;
+    int32 FilterKind=0;
+    UFUNCTION() void SearchChanged(const FText& Text);
     int32 PendingBagIndex=INDEX_NONE;
     FPlayerItemInstance PendingItem;
     FName PendingPreviousQuick;
@@ -139,6 +158,8 @@ private:
     UFUNCTION() void NormalTab();
     UFUNCTION() void QuestTab();
     UFUNCTION() void QuickAction();
+    UFUNCTION() void UseAction();
+    UFUNCTION() void UseTargetPicked(int32 Index);
     UFUNCTION() void TrashAction();
     UFUNCTION() void EquipAction();
     UFUNCTION() void CancelAction();

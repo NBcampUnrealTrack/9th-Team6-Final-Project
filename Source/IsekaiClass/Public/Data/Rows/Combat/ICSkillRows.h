@@ -30,6 +30,8 @@ struct ISEKAICLASS_API FICSkillRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill", meta=(ClampMin="0")) int32 MPCost = 0;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill", meta=(ClampMin="0")) double CastPlaySeconds = 0.0;
+    /** The DT clock owns release/repeats; old montage notifies cannot release early. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Skill") bool bUseDataTableTiming=false;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill", meta=(ClampMin="0")) double FirstEffectOffsetPlaySeconds = 0.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Skill") EICFirstEffectEvent FirstEffectEvent = EICFirstEffectEvent::EffectCommit;

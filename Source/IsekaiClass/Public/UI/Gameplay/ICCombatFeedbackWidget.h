@@ -64,5 +64,6 @@ protected:
 private:
     UPROPERTY(Transient) TObjectPtr<class UICWorldStateSubsystem> BoundState;
     UPROPERTY(Transient) TArray<FICCombatFloatingEntry> FloatingEntries;
+    UPROPERTY(Transient) TObjectPtr<class UTextBlock> LockMarker;
     UFUNCTION() void ClearEntries();
 };

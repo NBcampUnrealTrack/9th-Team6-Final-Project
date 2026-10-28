@@ -106,6 +106,9 @@ public:
     /** OwnerNPCID가 있는 침대를 플레이어가 쓰기 위한 호감도(기획: 200). */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="IC|LifeObject|Player", meta=(ClampMin="0", ClampMax="500"))
     int32 PlayerRequiredAffinity = 200;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="IC|LifeObject|Player") FTransform PlayerSleepPoseOffset;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="IC|LifeObject|Player") FVector PlayerWakeOffset=FVector(160,0,0);
+    virtual FText GetInteractionText() const override;
 
     /** 플레이어가 잔 뒤 이 거리 이상 떨어질 때까지 NPC가 침대를 못 쓴다(그동안 NPC는 바닥에서 잔다). */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="IC|LifeObject|Player", meta=(ClampMin="0", Units="cm"))

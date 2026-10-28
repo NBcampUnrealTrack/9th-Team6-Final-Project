@@ -1,0 +1,194 @@
+700|Affinity +{0}
+701|Gold: {0}\n\n
+702|ICPlayerController is required.
+703|Save and Quit
+704|Select a slot.
+705|This slot has no saved data.
+706|This save is damaged or uses an unsupported format.
+707|Name: {0}\nSaved: {1}\nGame Time: {2}\nLocation: {3}\n{4}
+708|Set Confirm Widget Class on WBP_IC_SaveLoad.
+709|{0}\nEmpty
+710|{0}\nUnreadable Save
+711|Camera Sensitivity
+712|Fullscreen
+713|Graphics Quality
+714|Apply
+716|Low
+717|Medium
+718|High
+719|Ultra
+720|5 / 5 - Ready to Begin
+721|You Have Fallen
+722|Quit Game
+723|Day {0} in Another World, {1} {2}:{3}
+724|AM
+725|PM
+726|Autosave
+727|Game time unavailable
+728|Backup Recovery - The date and game time refer to the backup being restored.
+729|Location unavailable
+730|Empty Slot
+731|Autosaves update automatically. Use slots 1-4 for manual saves. Enter: confirm / Esc: back
+732|Delete
+734|The save system is busy. Please try again shortly.
+735|No save to continue.
+736|Check the game map settings.
+737|Unreadable Save
+738|Delete the original Version 1/8 save? Imported manual saves will remain.
+739|Delete {0} / {1} and its backup, temporary and recovery files? This cannot be undone. Play will continue, and a new autosave may be created later.
+740|Delete {0} / {1} and its backup, temporary and recovery files? This cannot be undone. Play will continue.
+741|Another save operation is in progress.
+742|Create a character first.
+743|You cannot save while dead.
+744|You cannot save during combat.
+745|You cannot save during a conversation.
+746|You cannot save during an event.
+747|Unable to verify whether the player is alive.
+748|Autosave delayed because health is low.
+749|Autosave delayed because a debuff is active.
+750|Temporary save writing or validation failed. The existing save was retained.
+751|The save was not replaced because the existing file could not be preserved.
+752|Unable to create a recovery file. The existing save was retained.
+753|Unable to update the autosave backup. The existing save was retained.
+754|Unable to replace the save. Backup and recovery files were preserved.
+755|The replacement save failed validation. The previous state was restored.
+756|Save complete
+757|You cannot delete while saving.
+758|Invalid save slot.
+759|Files that could not be deleted: {0}
+760|Deleted the autosave and recovery files. A new autosave will be created when eligible.
+761|Unable to delete the original Version 1/8 save.
+762|Deleted the original Version 1/8 save. Imported manual saves remain.
+763|Saves from a newer version will not be overwritten.
+764|Unable to validate or apply the state before saving.
+765|Save serialization failed.
+766|Saving...
+767|You cannot load while saving or processing an effect.
+768|The save is missing, damaged, or failed version or data validation.
+769|Loaded from backup. The original file was preserved.
+770|Load complete
+771|The old save can only be imported when manual slot 1 is empty and idle.
+772|Unable to validate the original Version 1/8 save.
+773|Autosaving...
+774|{0} Press Start Game to retry saving.
+775|Autosave: {1}
+776|Manual Slot {0}: {1}
+777|Menu / Cancel
+778|There are no interaction objects on this map.
+779|Move within 250 cm of the object.
+780|Face the object.
+781|The object is obstructed. You cannot use it through a wall.
+782|Self
+783|Unable to safely place the revived target.
+784|F: Talk
+785|Talk
+786|Give Gift
+787|Trade
+788|End Conversation
+789|Crafting Complete
+790|Crafting Started
+791|Task cancelled. Reserved ingredients released.
+792|Unsupported combat request.
+793|You cannot act in your current state.
+794|Your current action has not finished.
+795|This input cannot cancel the skill.
+796|The attack cannot be cancelled at this point.
+797|Unable to activate the GAS ability.
+798|Unable to prepare the action.
+799|The acting character is not ready.
+800|Dodge is on cooldown.
+801|Definition catalogue is missing.
+802|Skill is on cooldown.
+803|This skill has not been unlocked.
+804|Not enough MP.
+805|No valid target.
+806|The target's life state does not match the skill.
+807|The target does not match the skill's ally or enemy rules.
+808|This skill cannot target its caster.
+809|This companion is not in the party.
+810|Target is out of skill range.
+811|The target is obstructed.
+812|Skill targeting conditions are not met.
+813|The custom effect executor is not registered.
+814|Projectile blueprints must inherit from ICProjectile.
+815|Skill effect definition is empty.
+816|Skill cost, cast time or cooldown is invalid.
+817|Skill hit count or timing is invalid.
+818|There is no safe space to revive the target.
+819|The required weapon is not equipped.
+820|The spawn system is missing.
+821|No active target.
+822|The GAS resource snapshot is invalid.
+823|A status effect definition or instance is missing during restoration.
+824|A restored cooldown has an invalid skill definition or end time.
+825|Status effect definition is missing.
+826|Status effect type or duration is invalid.
+827|The item status effect does not match the targeting rules.
+828|The target is immune to this status effect.
+829|This effect cannot be applied in the current state.
+830|Conditional status effect items require their own condition evaluator.
+831|Unable to calculate the item's shield scaling stat.
+832|Periodic effect scaling stat or interval is invalid.
+833|The shop system is unavailable.
+834|Service definition not found.
+835|This service is not a shop.
+836|The shop is closed right now.
+837|The shopkeeper cannot trade right now.
+838|The shopkeeper is away from their workstation.
+839|The shopkeeper is not currently providing this service.
+840|Shop definition is missing or not linked to this service.
+841|A valid player and a quantity of at least one are required.
+842|This shop does not sell that item.
+843|Not enough gold.
+844|Unable to deduct gold.
+845|Not enough bag space.
+846|This item cannot be sold.
+847|Not enough items.
+848|This would exceed the gold limit.
+849|Unable to consume the item.
+850|Unable to grant gold.
+851|Item definition not found. The item was not consumed.
+852|Invalid item or target.
+853|This item cannot be used on a dead target.
+854|This item cannot affect that target.
+855|Effect definition is missing. Nothing changed.
+856|Recovery amount is invalid.
+857|Recovery ratio must be between 0 and 1.
+858|Unable to retrieve the stat specification.
+859|Duplicate stat specification.
+860|Check growth stats and their limits.
+861|The limit cannot be lowered below the current stat value.
+862|This stat is at its maximum. The item was not consumed.
+863|Revival target or recovery ratio is invalid.
+864|The status effect to remove has no definition.
+865|No use effect has been configured.
+866|Already at the limit or no effect to apply. The item was not consumed.
+867|The kill reward receipt is missing.
+868|Drop roll count or gold range is invalid.
+869|Drop item reference, quantity or probability is invalid.
+870|Unable to create a dropped item instance.
+871|Unable to create the selected drop.
+872|Reward gold cannot be negative.
+873|Inventory is invalid before granting rewards.
+874|A reward item definition is missing or the bag is full.
+875|The relationship reward target is missing.
+876|The reward would exceed the gold limit.
+877|The proposed kill reward state is invalid.
+878|The caster is missing.
+879|There are no downed companions to revive.
+880|The NPC execution class is invalid.
+881|Unable to prepare the revival target's state.
+882|The player or save system is not ready.
+883|Saving. Please wait until it finishes.
+884|Wait for item effects to finish, then try again.
+885|Select your gender and starting weapon again.
+886|The name must contain 1-12 non-space characters and no line breaks.
+888|Sword
+890|Magic Staff
+891|Healing Wand
+893|Equipped
+895|Right-click to cycle equipped weapons. After the last weapon, you return to empty hands.
+896|{0} - Ready to Harvest [F]
+897|{0} - Growth {1}/{2}
+898|{0} - Regrows in {1} game minutes
+899|Your bag is full.

@@ -53,4 +53,6 @@ private:
     FTransform StandingMeshTransform;
     bool bSleepPresentation = false;
     bool bWeaponSheathed = false;
+    uint32 LastPartyBuffKey=0;
+    UFUNCTION() void PartyBuffsChanged();
 };

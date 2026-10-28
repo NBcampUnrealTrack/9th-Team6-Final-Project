@@ -1,7 +1,9 @@
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Dialogue/ICNPCDialogueWidget.h"
 
 #include "UI/Dialogue/ICDialogueEntryWidget.h"
 #include "UI/Dialogue/ICNPCGiftWidget.h"
+#include "UI/Life/ICLifeWidgets.h"
 #include "UI/Management/ICUIManagerSubsystem.h"
 #include "Engine/LocalPlayer.h"
 #include "UI/Dialogue/ICAffinityHeartsWidget.h"
@@ -79,6 +81,8 @@ void UICNPCDialogueWidget::ShowInteractionOptions()
             bRecruitEntryShown = !Dismiss;
         }
     AddEntry(DialogueQuestsEntry, QuestsText);
+    if(GetGameInstance())
+    {auto* Definitions=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;for(FName ServiceID:NPC->GetNPCDefinition().ServiceIDs)if(const auto* Service=Definitions->Find<FICServiceRow>(ServiceID,R);Service&&Service->Type==EICServiceType::Shop){AddEntry(DialogueTradeEntry,NSLOCTEXT("ICShop","DialogueEntry","상점 · 구매 / 판매"));break;}}
     for (const FICNPCInteractionOption& Option : Options)
     {
         FName EntryID;
@@ -433,6 +437,8 @@ bool UICNPCDialogueWidget::TryShowNode(FName DialogueID, FName NodeID)
 
 void UICNPCDialogueWidget::HandleEntry(FName EntryID)
 {
+    if(EntryID==DialogueTradeEntry&&NPC)
+    {auto* Definitions=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;for(FName ServiceID:NPC->GetNPCDefinition().ServiceIDs)if(const auto* Service=Definitions->Find<FICServiceRow>(ServiceID,R);Service&&Service->Type==EICServiceType::Shop){UICShopWidget::Open(Cast<AICPlayerController>(GetOwningPlayer()),ServiceID);return;}}
     if (EntryID == DialogueDismissEntry)
     {
         auto* Controller = Cast<AICPlayerController>(GetOwningPlayer());
@@ -537,11 +543,12 @@ void UICNPCDialogueWidget::CloseDialogue()
 FReply UICNPCDialogueWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
 {
     const FKey Key=KeyEvent.GetKey();
+    if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer());PC&&PC->ForwardDialogueMovementKey(Key,true))return FReply::Handled();
     if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up)
     {MoveSelection(-1);return FReply::Handled();}
     if(Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down)
     {MoveSelection(1);return FReply::Handled();}
-    if(Key==EKeys::Enter||Key==EKeys::Virtual_Accept||Key==EKeys::Gamepad_FaceButton_Bottom)
+    if(Key==EKeys::Enter||Key==EKeys::Virtual_Accept||UICGameUserSettings::IsGamepadAcceptKey(Key))
     {
         if(!KeyEvent.IsRepeat())
         {
@@ -550,10 +557,15 @@ FReply UICNPCDialogueWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry, c
         }
         return FReply::Handled();
     }
-    if (Key == EKeys::Escape)
+    if (Key == EKeys::Escape || UICGameUserSettings::IsGamepadBackKey(Key))
     {
         CloseDialogue();
         return FReply::Handled();
     }
     return Super::NativeOnPreviewKeyDown(Geometry, KeyEvent);
+}
+FReply UICNPCDialogueWidget::NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& KeyEvent)
+{
+    if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer());PC&&PC->ForwardDialogueMovementKey(KeyEvent.GetKey(),false))return FReply::Handled();
+    return Super::NativeOnKeyUp(Geometry,KeyEvent);
 }

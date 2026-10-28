@@ -1,5 +1,6 @@
 #include "Life/World/ICLifeActor.h"
 #include "Life/Production/ICGatheringSubsystem.h"
+#include "UI/Life/ICLifeWidgets.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Time/ICTimeSubsystem.h"
@@ -104,7 +105,7 @@ void AICLifeActor::EnsureNaturalCrop()
 {
     if(!GetGameInstance()||LifeType!=EICDefinitionType::Crop)return;FICDefinitionResult Result;
     auto* State=GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();const auto* Crop=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>()->Find<FICCropRow>(DefinitionID,Result);
-    auto Next=State->ExportState();if(!Crop||!Crop->bGrowsNaturally||!Next.bPlayerCreated||Next.Crops.Contains(PointKey()))return;
+    auto Next=State->ExportState();if(bPlantingPlot||!Crop||!Crop->bGrowsNaturally||!Next.bPlayerCreated||Next.Crops.Contains(PointKey()))return;
     auto& Saved=Next.Crops.Add(PointKey());Saved.CropID=DefinitionID;Saved.OwnerCharacterID=UICWorldStateSubsystem::PlayerId();
     Saved.PlantedAtGameMinute=GetGameInstance()->GetSubsystem<UICTimeSubsystem>()->GetClock().GameMinute;
     Saved.HarvestableAtGameMinute=Saved.PlantedAtGameMinute;for(const auto& Stage:Crop->GrowthStages)Saved.HarvestableAtGameMinute+=Stage.DurationGameMinutes;
@@ -122,6 +123,7 @@ FText AICLifeActor::GetInteractionText() const
     }
     if(LifeType==EICDefinitionType::Crop)
     {
+        if(bPlantingPlot){const auto Saved=GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>()->ExportState();if(!Saved.Crops.Contains(PointKey()))return NSLOCTEXT("ICFarm","EmptyPlot","빈 밭 · 씨앗 심기");}
         FICDefinitionResult R;const auto* Crop=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>()->Find<FICCropRow>(DefinitionID,R);
         const int32 Stage=GetGrowthStage();if(!Crop)return Super::GetInteractionText();
         if(IsHarvestable())return ICText::FormatText(TEXT("Life_HarvestReady"),InteractionText);
@@ -137,12 +139,15 @@ void AICLifeActor::RefreshLife()
     auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;
     if(LifeType==EICDefinitionType::Crop)
     {
+        if(bPlantingPlot){const auto Saved=GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>()->ExportState();if(const auto* Crop=Saved.Crops.Find(PointKey()))DefinitionID=Crop->CropID;else DefinitionID=NAME_None;}
         EnsureNaturalCrop();
         const auto* Crop=D->Find<FICCropRow>(DefinitionID,R);const int32 Stage=GetGrowthStage();
         auto* Mesh=Crop&&Crop->GrowthStages.IsValidIndex(Stage)?Crop->GrowthStages[Stage].Mesh.LoadSynchronous():nullptr;
         const auto Saved=GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>()->ExportState();
-        if(Stage==INDEX_NONE&&!Saved.Crops.Contains(PointKey())&&Crop&&!Crop->GrowthStages.IsEmpty()&&(bPreviewUnplantedCrop||Crop->bGrowsNaturally))Mesh=Crop->GrowthStages[0].Mesh.LoadSynchronous();
+        if(!bPlantingPlot&&Stage==INDEX_NONE&&!Saved.Crops.Contains(PointKey())&&Crop&&!Crop->GrowthStages.IsEmpty()&&(bPreviewUnplantedCrop||Crop->bGrowsNaturally))Mesh=Crop->GrowthStages[0].Mesh.LoadSynchronous();
         if(VisualMesh->GetStaticMesh()!=Mesh)VisualMesh->SetStaticMesh(Mesh);
+        if(bPlantingPlot&&Mesh)
+        {const auto Bounds=Mesh->GetBoundingBox();const auto Center=Bounds.GetCenter();const auto Scale=Shape->GetComponentScale();VisualMesh->SetRelativeLocation(FVector(-Center.X/FMath::Max(.01f,Scale.X),-Center.Y/FMath::Max(.01f,Scale.Y),-83.333-Bounds.Min.Z/FMath::Max(.01f,Scale.Z)));}
         VisualMesh->SetVisibility(Mesh!=nullptr);PresentedStage=Stage;
         if(Crop&&!Crop->NameKey.IsEmpty())InteractionText=FText::FromStringTable(TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_Definitions.ST_IC_Definitions"),Crop->NameKey);
     }
@@ -164,9 +169,9 @@ void AICLifeActor::RefreshLife()
 }
 bool AICLifeActor::Plant(AICPlayerController* Controller)
 {
-    if(!Controller||!GetGameInstance()||LifeType!=EICDefinitionType::Crop)return false;
+    if(!Controller||!GetGameInstance()||LifeType!=EICDefinitionType::Crop||!bPlantingPlot)return false;
     auto* GI=GetGameInstance();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;
-    const auto* Crop=D->Find<FICCropRow>(DefinitionID,R);if(!Crop||!State->FlushParticipants())return false;
+    const auto* Crop=D->Find<FICCropRow>(DefinitionID,R);if(!Crop||(!Crop->AllowedPlotAnchorIDs.IsEmpty()&&!Crop->AllowedPlotAnchorIDs.Contains(PointKey()))||!State->FlushParticipants())return false;
     auto Next=State->ExportState();if(Next.Crops.Contains(PointKey()))return false;
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(D,Next.Job);
     if(!Staging->ApplySnapshot(Next.Inventory)||!Staging->Consume(Crop->SeedItemID,1))return false;
@@ -179,16 +184,58 @@ bool AICLifeActor::Plant(AICPlayerController* Controller)
 bool AICLifeActor::TryInteract_Implementation(AICPlayerController* Controller)
 {
     if(!Controller||!GetGameInstance())return false;
-    if(LifeType==EICDefinitionType::Resource)return GetGameInstance()->GetSubsystem<UICGatheringSubsystem>()->StartGather(this,Controller);
+    if(LifeType==EICDefinitionType::FishingPoint)return false; // Fishing is an aimed H cast, never an F interaction.
+    if(LifeType==EICDefinitionType::Crop&&bPlantingPlot&&!GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>()->ExportState().Crops.Contains(PointKey()))return UICSeedPickerWidget::Open(Controller,this);
+    return GetGameInstance()->GetSubsystem<UICGatheringSubsystem>()->StartGather(this,Controller);
+}
+void AICLifeActor::GetFishingSurface(FVector& Center,FVector& Normal) const
+{
+    const auto* Surface=VisualMesh&&VisualMesh->GetStaticMesh()?VisualMesh.Get():Shape.Get();
+    const FBox Bounds=Surface->GetStaticMesh()->GetBoundingBox();
+    const FVector Local=FVector(Bounds.GetCenter().X,Bounds.GetCenter().Y,Bounds.Max.Z);
+    Center=Surface->GetComponentTransform().TransformPosition(Local);Normal=Surface->GetUpVector();
+}
+bool AICLifeActor::ContainsFishingLanding(FVector Point) const
+{
+    if(LifeType!=EICDefinitionType::FishingPoint||IsHidden()||!GetActorEnableCollision())return false;
+    const auto* Surface=VisualMesh&&VisualMesh->GetStaticMesh()?VisualMesh.Get():Shape.Get();
+    if(!Surface||!Surface->GetStaticMesh())return false;
+    const FBox Bounds=Surface->GetStaticMesh()->GetBoundingBox();
+    const FVector Local=Surface->GetComponentTransform().InverseTransformPosition(Point);
+    FVector Center,Normal;GetFishingSurface(Center,Normal);
+    return Local.X>=Bounds.Min.X&&Local.X<=Bounds.Max.X&&Local.Y>=Bounds.Min.Y&&Local.Y<=Bounds.Max.Y
+        &&FMath::Abs(FVector::DotProduct(Point-Center,Normal))<=12.f;
+}
+bool AICLifeActor::CompletePlayerAction(AICPlayerController* Controller,FName CropToPlant,FText& Failure)
+{
+    if(!Controller||!GetGameInstance())return false;
+    if(LifeType==EICDefinitionType::Resource)return CompleteResourceGather(Controller,Failure);
+    if(!CropToPlant.IsNone())
+    {if(!bPlantingPlot)return false;DefinitionID=CropToPlant;const bool Done=Plant(Controller);if(!Done)RefreshLife();return Done;}
+    if(LifeType==EICDefinitionType::FishingPoint)
+    {
+        auto* GI=GetGameInstance();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;
+        const auto* Point=D->Find<FICFishingPointRow>(DefinitionID,R);if(!Point||!State->FlushParticipants())return false;
+        auto Next=State->ExportState();auto* Inventory=NewObject<UICInventoryComponent>();Inventory->BeginStaging(D,Next.Job);if(!Inventory->ApplySnapshot(Next.Inventory))return false;
+        double Weight=0;for(const auto& Fish:Point->FishSelections)Weight+=FMath::Max(0.,Fish.Weight);if(Weight<=0)return false;
+        const FGuid Receipt=FGuid::NewGuid();FRandomStream Random(GetTypeHash(Receipt));
+        if(Random.FRand()>FMath::Clamp(Point->SuccessChance,0.,1.)){Controller->ShowLocalized(NSLOCTEXT("ICFishing","NoCatch","아무것도 낚지 못했습니다. 다시 시도할 수 있습니다."));return true;}
+        double Choice=Random.FRand()*Weight;const FICFishingSelectionEntry* Selected=nullptr;
+        for(const auto& Fish:Point->FishSelections){Choice-=FMath::Max(0.,Fish.Weight);if(Choice<=0){Selected=&Fish;break;}}
+        if(!Selected)return false;const auto* Fish=D->Find<FICFishRow>(Selected->FishID,R);
+        if(!Fish||Selected->CatchCount<=0||!Inventory->AddItem(Fish->ItemID,Selected->CatchCount,false)){Failure=ICText::Get(TEXT("Life_BagFull"));return false;}
+        Next.Inventory=Inventory->GetSnapshot();if(!State->CommitGameplayTransaction(Next,Receipt))return false;
+        FICItemAmount Reward;Reward.ItemID=Fish->ItemID;Reward.Count=Selected->CatchCount;State->OnItemsReceived.Broadcast({Reward});return true;
+    }
     if(LifeType!=EICDefinitionType::Crop)return false;
     auto* GI=GetGameInstance();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;
     if(!State->FlushParticipants())return false;auto Next=State->ExportState();TArray<FICItemAmount> Yields;
     if(LifeType==EICDefinitionType::Crop)
     {
-        if(!Next.Crops.Contains(PointKey()))return Plant(Controller);
+        if(!Next.Crops.Contains(PointKey()))return false;
         const auto* Crop=D->Find<FICCropRow>(DefinitionID,R);if(!Crop||!IsHarvestable())return false;
         Yields=Crop->HarvestYields;
-        if(Crop->bGrowsNaturally)
+        if(Crop->bGrowsNaturally&&!bPlantingPlot)
         {
             auto& Saved=Next.Crops.FindChecked(PointKey());Saved.PlantedAtGameMinute=GI->GetSubsystem<UICTimeSubsystem>()->GetClock().GameMinute;
             Saved.RegrowthAtGameMinute=Saved.PlantedAtGameMinute+Crop->RegrowthGameMinutes;

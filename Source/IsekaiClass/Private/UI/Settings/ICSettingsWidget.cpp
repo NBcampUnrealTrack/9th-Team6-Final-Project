@@ -2,6 +2,7 @@
 #include "UI/Settings/ICSettingsLayout.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "Settings/ICGameUserSettings.h"
+#include "Data/Text/ICLocalization.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Slider.h"
@@ -135,10 +136,13 @@ void UICSettingsWidget::RefreshControls()
         if(auto* Check=Cast<UCheckBox>(Control))Check->SetIsChecked(Value!=0);
         if(auto* Choice=Cast<UComboBoxString>(Control);Choice&&!Spec.Choices.IsEmpty())
         {
-            if(Choice->GetOptionCount()!=Spec.Choices.Num()){Choice->ClearOptions();for(const auto& Text:Spec.Choices)Choice->AddOption(Text.ToString());}
+            bool Rebuild=Choice->GetOptionCount()!=Spec.Choices.Num();
+            for(int32 I=0;!Rebuild&&I<Spec.Choices.Num();++I)Rebuild=Choice->GetOptionAtIndex(I)!=ICLocalization::Localize(Spec.Choices[I]).ToString();
+            if(Rebuild){Choice->ClearOptions();for(const auto& Text:Spec.Choices)Choice->AddOption(ICLocalization::Localize(Text).ToString());}
             Choice->SetSelectedIndex(Spec.Values.IndexOfByPredicate([&](double Candidate){return FMath::IsNearlyEqual(Candidate,Value,.01);}));
         }
     }
+    if(auto* Help=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_ControllerHelp"))))Help->SetText(ICSettingsLayout::ControllerHelp(FMath::RoundToInt(Draft.FindRef(TEXT("GamepadLayout")))));
     RefreshDisplays();
     if(auto* AA=GetWidgetFromName(TEXT("OPTION_AntiAliasing")))AA->SetIsEnabled(Draft.FindRef(TEXT("AntiAliasingMethod"))!=0);
     for(const auto& Binding:KeyBindings)if(auto* Key=Cast<UInputKeySelector>(Binding->Control))
@@ -308,7 +312,7 @@ void UICSettingsWidget::Close(){if(bPreview)RevertDisplay();if(auto* PC=Cast<AIC
 FReply UICSettingsWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event)
 {
     for(const auto& Binding:KeyBindings)if(const auto* Key=Cast<UInputKeySelector>(Binding->Control);Key&&Key->GetIsSelectingKey())return Super::NativeOnPreviewKeyDown(Geometry,Event);
-    if(Event.GetKey()==EKeys::Escape){if(!Event.IsRepeat())Close();return FReply::Handled();}
+    if(Event.GetKey()==EKeys::Escape||UICGameUserSettings::IsGamepadBackKey(Event.GetKey())){if(!Event.IsRepeat())Close();return FReply::Handled();}
     if(const auto* PC=Cast<AICPlayerController>(GetOwningPlayer());PC&&PC->DefaultMappingContext)
         for(const auto& Mapping:PC->DefaultMappingContext->GetMappings())for(const auto& Binding:PC->CommandActions)
             if(Binding.Action==Mapping.Action&&Binding.Command==EICInputCommand::Settings)

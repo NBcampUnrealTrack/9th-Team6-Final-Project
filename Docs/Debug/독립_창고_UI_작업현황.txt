@@ -1,0 +1,32 @@
+독립 창고 UI 작업 (2026-10-28)
+기존 모든 미커밋 변경 보존. 커밋·Push·PR은 사용자가 직접 진행.
+
+요청
+- 메뉴 탭과 분리한 창고 전용 화면. 왼쪽 40칸 고정 창고, 오른쪽 실제 가방.
+- 소모품 사용/장비/퀵슬롯/폐기 기능 없이 아이템 이동만.
+- 팝업: 이름, 설명, < 선택 수량 >, 목적지로 이동, 뒤로.
+
+구현
+- ICStorageWidget/ICStorageTransferPopup 네이티브 UI와 신규 WBP 저작 도구.
+- PlayerController.OpenContainer → 독립 화면. 화면 중 기존 ExecuteUI 사용·장비·확장 명령 차단.
+- TransferAmount/GetTransferableCount: 선택 수량 이동, 부분 분할 GUID 분리, 옵션·등급 보존, 원자적 용량 검사, 제작 예약/잠금 보호.
+- 기존 SetHomeStorageStage 2/3단계 확장 불가. 각 창고는 별도의 40칸.
+- 기존 40칸 초과 저장은 로드 시 빈 40칸에 재배치하고 초과 아이템은 만료되지 않는 복구 드롭에 보존.
+- 기존 ApprovedPlanRules의 옛 120칸 규칙을 새 40칸 규칙·저장 복구 검증으로 변경.
+- IC.Storage 검증 3개 추가(수량·예약·용량, 독립 WBP, 옛 저장 복구 드롭).
+
+상태
+- 1차 빌드 성공: Saved/BuildStorageUI.log.
+- 최종 4차 빌드 성공: Saved/BuildStorageUI4.log.
+- 에셋 저작 성공: Tools/Life/setup_storage_ui.py → StorageUIAssets.log의 STORAGE_UI_ASSETS_OK.
+- 관련 자동화 24개 통과: Saved/StorageReview/Automation2/index.json (실패/미실행 0).
+- 실제 PIE 검증 성공: Saved/StorageReview/Review.json (F 열기/5개 넣기/2개 꺼내기/ESC 뒤로·닫기/재열기).
+- 화면 확인 후 이동 버튼 자동 줄바꿈을 막고 DT 회복 수치를 설명에 추가.
+- 최종 화면 재검증 성공: StorageUILive2.log의 STORAGE_UI_REVIEW_OK.
+- 마지막 창고·인벤토리 UI 4개 재검증 통과: Saved/StorageReview/FinalUIAutomation/index.json.
+- 최종 화면 캡처 확인: Storage_WithdrawQuantity_Final.png (한 줄 이동 버튼, 회복 정보, 수량 선택).
+
+완료
+요청 사항 구현·WBP 저장·빌드·관련 검증·실제 PIE 화면 확인 완료.
+안내 문서: Docs/Life/개인_창고_UI_안내.txt.
+커밋·Push·PR은 실행하지 않았다.

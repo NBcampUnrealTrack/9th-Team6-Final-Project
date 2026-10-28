@@ -69,7 +69,7 @@ class ISEKAICLASS_API UICCodexMenuWidget : public UUserWidget
 {
     GENERATED_BODY()
 public:
-    /** -1 home, 0 skills, 1 pets, 2 products, 3 recipes. */
+    /** -1 home, 0 skills, 1 pets, 2 products, 3 recipes, 4 NPCs. */
     UPROPERTY(BlueprintReadOnly) int32 Category=INDEX_NONE;
     UPROPERTY(BlueprintReadOnly) int32 CategoryFocus=0;
     UPROPERTY(BlueprintReadOnly) int32 SubTab=0;
@@ -114,6 +114,7 @@ private:
     UFUNCTION() void Category1();
     UFUNCTION() void Category2();
     UFUNCTION() void Category3();
+    UFUNCTION() void Category4();
     UFUNCTION() void Tab0();
     UFUNCTION() void Tab1();
     UFUNCTION() void Tab2();

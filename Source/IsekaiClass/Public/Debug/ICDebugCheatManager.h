@@ -15,6 +15,8 @@ public:
     UFUNCTION(Exec) void ICGiveItem(FName ItemId, int32 Count);
     /** Give one of each starter weapon together. Requires room for all four. */
     UFUNCTION(Exec) void ICGiveStarterWeapons();
+    UFUNCTION(Exec) void ICEquipStarterWeapons();
+    UFUNCTION(Exec) void ICRecruitTestParty();
     UFUNCTION(Exec) void ICGiveGold();
     UFUNCTION(Exec) void ICSetAffinity(FName NpcId, int32 Value);
     UFUNCTION(Exec) void ICTeleport(float X, float Y, float Z);

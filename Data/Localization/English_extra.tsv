@@ -1,0 +1,42 @@
+선형 폭발	Line Explosion
+섬광 베기	Flash Slash
+치유의 빛	Healing Light
+마력 화살	Magic Arrow
+원형 충격파	Circular Shockwave
+마력 참격	Arcane Slash
+관통 화살	Piercing Arrow
+별빛 대폭발	Starlight Explosion
+회복의 선율	Healing Melody
+수호의 방패	Guardian Shield
+연속 화살	Rapid Arrows
+기본 공격력	Base Attack
+요구	Requires
+제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.	Recipe. Ingredients and crafting time can be changed in the DT.
+의 피해·회복·상태 효과 수치입니다.	: damage, healing and status effect values.
+범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.	Range, damage and healing values can be changed in the skill/effect DTs.
+고유 스킬. 시전	Unique skill. Cast
+재사용	Cooldown
+지속 효과	Persistent Effect
+효과	Effect
+낚시	Fishing
+레시피	Recipe
+생활 재료를 조합해	Combine life materials to craft
+제작.	.
+기술	Skill
+시작 기술	Starting Skill
+무기 프로필	Weapon Profile
+플레이어	Player
+제작법	Recipe
+회복	Recovery
+자가	Self
+(자는 중)	(Sleeping)
+닭 잡기	Slaughter Chicken
+상호작용	Interact
+마을 밖	Outside the Village
+마을	Village
+전투 중	In Combat
+다른 구역	Other Area
+기본 Xbox 배치 또는 Nintendo 배치를 선택합니다.	Choose the default Xbox layout or Nintendo layout.
+낚시 · 20초  (화면 중앙으로 찌 던지기)	Fish - 20 sec (cast at the centre of the screen)
+L스틱 이동 · R스틱 시점 · RT 공격 · LT 달리기/회피 · RB 무기 변경 · LB 대상 지정\nX 상호작용 · Y 낚시 · A 점프/확인 · B 뒤로 · Start 메뉴 · View 인벤토리\nLT + X/Y/B/A: Q/E/R/T 스킬 · 십자키: 퀵슬롯 · 대상 선택 중 L스틱: 파티원 선택	Left Stick: Move / Right Stick: Look / RT: Attack / LT: Sprint or Dodge / RB: Weapon / LB: Target\nX: Interact / Y: Fish / A: Jump or Confirm / B: Back / Start: Menu / View: Inventory\nLT + X/Y/B/A: Q/E/R/T Skills / D-Pad: Quick Slots / Left Stick: Select Party Member
+L스틱 이동 · R스틱 시점 · ZR 공격 · ZL 달리기/회피 · R 무기 변경 · L 대상 지정\nX 상호작용 · Y 낚시 · A 점프/확인 · B 뒤로 · + 메뉴 · - 인벤토리\nZL + X/Y/B/A: Q/E/R/T 스킬 · 십자키: 퀵슬롯 · 대상 선택 중 L스틱: 파티원 선택	Left Stick: Move / Right Stick: Look / ZR: Attack / ZL: Sprint or Dodge / R: Weapon / L: Target\nX: Interact / Y: Fish / A: Jump or Confirm / B: Back / +: Menu / -: Inventory\nZL + X/Y/B/A: Q/E/R/T Skills / D-Pad: Quick Slots / Left Stick: Select Party Target

@@ -1,0 +1,74 @@
+물리 공격력	Physical attack
+마법 공격력	Magic attack
+전투불능 · 부활서로 소생 가능 · 퇴출 불가	Downed · Revive with a revival scroll · Cannot dismiss
+[파티 버프] {0}\n{1}	[Party buff] {0}\n{1}
+[펫 버프] {0}\n{1}	[Pet buff] {0}\n{1}
+주는 피해 ×{0}	Damage dealt ×{0}
+받는 피해 ×{0}	Damage received ×{0}
+받는 회복 ×{0}	Healing received ×{0}
+보호막 {0}	Shield {0}
+효과량 {0}	Magnitude {0}
+지속	Permanent
+남은 {0}초	{0} sec remaining
+[{0}] {1} · {2}중첩 · {3}\n{4}	[{0}] {1} · {2} stacks · {3}\n{4}
+디버프	Debuff
+버프	Buff
+현재 적용 중인 버프 / 디버프가 없습니다.	No active buffs or debuffs.
+분류: 전체	Filter: All
+분류: 무기	Filter: Weapons
+분류: 소비품	Filter: Consumables
+분류: 음식	Filter: Food
+분류: 성장서	Filter: Growth books
+분류: 재료	Filter: Materials
+분류: 잠금	Filter: Locked
+{0} · 전투불능	{0} · Downed
+분리할 개수	Quantity to split
+잠금	Lock
+잠금 해제	Unlock
+묶음 분할	Split stack
+아이템 이름 / ID 검색	Search item name / ID
+가방 정렬	Sort bag
+[잠금] {0}	[Locked] {0}
+{0}  × {1}	{0}  × {1}
+{0}을(를) 사용할 대상	Use {0} on
+{0}의 퀵슬롯에 {1}을(를) 놓겠습니까?	Assign {1} to {0}'s quick slot?
+{0}을(를) 해제하고 {1}을(를) 놓겠습니까?	Remove {0} and assign {1}?
+강화할 무기를 선택하세요. 장착 중인 무기도 강화할 수 있습니다.	Choose a weapon to enhance. Equipped weapons are also available.
+보유한 광석을 선택하세요. 실패해도 표시된 비용은 소모됩니다.	Choose an ore you own. The displayed cost is consumed even if enhancement fails.
+강화	Enhance
+제작대 · 무기 강화	Workbench · Weapon enhancement
+취소 · 무기 목록	Cancel · Weapon list
+{0} +{1} · {2}{3}	{0} +{1} · {2}{3}
+ · 잠금	 · Locked
+강화할 무기가 없습니다.	No weapons available to enhance.
+{0} · 보유 {1}개 · 소모 {2}개 · 확률 +{3}%	{0} · Owned {1} · Cost {2} · Chance +{3}%
+다음 +{0} · 성공 확률 {1}% · {2}G / 보유 {3}G	Next +{0} · Success {1}% · {2}G / Owned {3}G
+가방에 강화용 광석이 없습니다.	No enhancement ore in your bag.
+가방	Bag
+플레이어 장착	Equipped by player
+플레이어 무기 슬롯	Player weapon slot
+무기가 없거나 잠금 상태입니다.	Weapon missing or locked.
+최대 강화 단계이거나 강화 정보가 없습니다.	Maximum enhancement reached or enhancement data missing.
+강화용 광석 정보를 확인하세요.	Check the enhancement ore data.
+선택한 광석이 부족합니다.	Not enough of the selected ore.
+강화에 필요한 골드가 부족합니다.	Not enough gold to enhance.
+광석이 잠겨 있거나 사용할 수 없습니다.	Ore is locked or unavailable.
+강화 상태가 변경되어 시도하지 못했습니다. 비용은 소비되지 않았습니다.	Enhancement state changed. The attempt was cancelled without spending resources.
+강화 성공! +{0} · 광석 {1}개 / {2}G 사용	Enhancement succeeded! +{0} · Spent {1} ore / {2}G
+강화 실패 · +{0} 유지 · 광석 {1}개 / {2}G 사용	Enhancement failed · Remains +{0} · Spent {1} ore / {2}G
+현재 상태	Current status
+부활서	Revival Scroll
+전투불능인 동료 한 명을 최대 HP의 50%, MP 최소 30%로 소생시킵니다. 살아 있는 대상에게는 사용할 수 없습니다.	Revives one downed companion with 50% maximum HP and at least 30% MP. Cannot be used on a living target.
+검사 3인	Three Warriors
+궁수 3인	Three Archers
+마법사 3인	Three Mages
+힐러 3인	Three Healers
+살아 있는 같은 직업 파티원 3명 이상: 파티 전체 물리·마법 공격력 +20%. 플레이어의 현재 무기 직업을 포함합니다.	At least three living party members of the same class: party physical and magic attack +20%. Includes the player's current weapon class.
+용사파티 더블	Hero Party Double
+용사파티 구성원 2명: 파티 전체 물리·마법 공격력 +10%. 트리플과 중복되지 않습니다.	Two Hero Party members: party physical and magic attack +10%. Does not stack with Triple.
+용사파티 트리플	Hero Party Triple
+용사파티 구성원 3명 이상: 파티 전체 물리·마법 공격력 +30%. 더블을 대체합니다.	At least three Hero Party members: party physical and magic attack +30%. Replaces Double.
+반친구들	Classmates
+R01_09, R01_10, R01_11이 함께 생존 중: 파티 전체 물리·마법 공격력 +30%.	R01_09, R01_10 and R01_11 alive together: party physical and magic attack +30%.
+마을 주민	Village Residents
+R01_05, R01_06, R01_07이 함께 생존 중: 파티 전체 물리·마법 공격력 +20%.	R01_05, R01_06 and R01_07 alive together: party physical and magic attack +20%.

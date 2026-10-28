@@ -115,6 +115,8 @@ bool FICDialogueAffinityCheck::RunTest(const FString& Parameters)
         Definitions->ConfigureCatalog(Catalog);
         FActorSpawnParameters Spawn;
         Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        auto* InteractionPawn=World->SpawnActor<ACharacter>(FVector(0,0,96),FRotator::ZeroRotator,Spawn);
+        PC->SetPawn(InteractionPawn); // F interaction requires an actual nearby player pawn.
         for (int32 Index = 0; Index < 2; ++Index)
         {
             FICCharacterState Resident;
@@ -322,10 +324,11 @@ bool FICDialogueAffinityCheck::RunTest(const FString& Parameters)
         TestEqual(TEXT("Recovery finds the actual player pawn"), UGameplayStatics::GetPlayerPawn(World, 0), static_cast<APawn*>(PlayerPawn));
         Actors[2]->SetActorLocation(PlayerPawn->GetActorLocation() + FVector(200, 0, 0));
         TestFalse(TEXT("Nearby companion is not teleported"), AI->TryRecoverCompanion());
+        TestTrue(TEXT("Nearby companion can enter interaction"), Actors[2]->TryInteract(PC));
         Actors[2]->SetActorLocation(PlayerPawn->GetActorLocation() + FVector(6000, 0, 0));
-        TestTrue(TEXT("Distant companion can still enter interaction"), Actors[2]->TryInteract(PC));
         TestFalse(TEXT("Conversation hold prevents teleporting"), AI->TryRecoverCompanion());
         Actors[2]->EndInteraction();
+        TestFalse(TEXT("Distant companion must recover before F interaction"),Actors[2]->TryInteract(PC));
         const auto BeforeRecovery = State->GetSnapshot(Recruit.CharacterId);
         TestTrue(TEXT("Distant companion returns to safe ground near the player"), AI->TryRecoverCompanion());
         TestTrue(TEXT("Recovered companion is within 5 metres"), Actors[2]->GetDistanceTo(PlayerPawn) < 500.f);

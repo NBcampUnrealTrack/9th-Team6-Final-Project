@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Data/Rows/Common/ICDefinitionTypes.h"
 #include "ICShopSubsystem.generated.h"
 
 class AICPlayerController;
@@ -26,6 +27,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Shop") bool GetOffers(FName ServiceID, TArray<FICShopOffer>& Offers, FString& Reason) const;
     UFUNCTION(BlueprintCallable, Category="IC|Shop") bool Buy(AICPlayerController* Player, FName ServiceID, FName ItemID, int32 Count, FString& Reason);
     UFUNCTION(BlueprintCallable, Category="IC|Shop") bool Sell(AICPlayerController* Player, FName ServiceID, FName ItemID, int32 Count, FString& Reason);
+    UFUNCTION(BlueprintCallable, Category="IC|Shop") bool Checkout(AICPlayerController* Player,FName ServiceID,const TArray<FICItemAmount>& Cart,bool bSell,FText& Reason);
+    UFUNCTION(BlueprintPure, Category="IC|Shop") int32 GetSellableCount(AICPlayerController* Player,FName ItemID) const;
 private:
     bool ResolveService(FName ServiceID, const FICServiceRow*& Service, FString& Reason) const;
     double DiscountRatioFor(const FICServiceRow& Service) const;

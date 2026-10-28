@@ -15,6 +15,7 @@ struct FICSpawnSlotState
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) FName MonsterID;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) bool bDefeated = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) double RespawnReadyAtPlaySecond = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) double RespawnReadyAtGameMinute = -1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) FVector Position = FVector::ZeroVector;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) FRotator Rotation = FRotator::ZeroRotator;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) float HP = 0;
@@ -42,4 +43,5 @@ struct FICDropState
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) TArray<FPlayerItemInstance> Contents;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) FVector Position = FVector::ZeroVector;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) double CreatedPlaySecond = 0;
+    UPROPERTY(SaveGame) bool bStorageRecovery=false;
 };

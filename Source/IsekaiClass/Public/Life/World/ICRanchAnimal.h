@@ -15,8 +15,15 @@ public:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void HandleZeroHP() override;
     UFUNCTION(BlueprintCallable,Category="IC|Life") void RefreshAnimal();
+    UFUNCTION(BlueprintCallable,Category="IC|Life") bool TrySlaughter(class AICPlayerController* Player);
+    UFUNCTION(BlueprintPure,Category="IC|Life") bool IsSlaughtering() const{return bSlaughtering;}
 private:
     FTimerHandle RefreshTimer;
+    FTimerHandle SlaughterTimer;
+    bool bSlaughtering=false;
+    bool BeginSlaughter();
+    void FinishSlaughter();
+    UFUNCTION() void RestoreAnimal();
     bool bRefreshing=false;
     FName PointKey() const;
     UFUNCTION() void PersistVitals();

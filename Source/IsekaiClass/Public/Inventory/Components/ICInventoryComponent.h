@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "Inventory/Enhancement/ICEnhancementTypes.h"
 #include "Debug/ICLog.h"
 #include "Components/ActorComponent.h"
 #include "Engine/DataTable.h"
@@ -46,6 +47,7 @@ public:
     UFUNCTION(BlueprintCallable) bool Discard(int32 Index);
     UFUNCTION(BlueprintCallable) bool Equip(int32 Index);
     UFUNCTION(BlueprintCallable) bool EquipForCharacter(FName CharacterID, int32 BagIndex);
+    UFUNCTION(BlueprintPure,Category="IC|Equipment") bool MeetsEquipmentRequirements(FName CharacterID,FName ItemID,FText& Reason) const;
     UFUNCTION(BlueprintCallable) bool UnequipForCharacter(FName CharacterID, EPlayerEquipSlot Slot);
     /** Permanently removes the selected stack. Quest and locked items are protected. */
     UFUNCTION(BlueprintCallable) bool TrashItem(int32 BagIndex);
@@ -62,14 +64,21 @@ public:
     bool SetWeaponSheathed(bool bSheathed);
     UFUNCTION(BlueprintCallable) bool Unequip(EPlayerEquipSlot Slot);
     UFUNCTION(BlueprintCallable) bool EnhanceEquipment(int32 BagIndex,UPARAM(ref) int32& Gold);
+    UFUNCTION(BlueprintPure,Category="Enhancement") TArray<FICEnhancementTarget> GetEnhancementTargets() const;
+    UFUNCTION(BlueprintPure,Category="Enhancement") bool GetEnhancementOffer(FGuid InstanceID,FName OreID,double& Probability,int32& GoldCost,int32& OreCount,FText& Reason) const;
+    /** Return value means the attempt committed; success is separate so failed rolls still consume the displayed costs. */
+    UFUNCTION(BlueprintCallable,Category="Enhancement") bool TryEnhanceWeapon(FGuid InstanceID,FName OreID,bool& bSucceeded,FText& Message);
     UFUNCTION(BlueprintPure) FPlayerEquipmentStats GetEquipmentStats() const;
     UFUNCTION(BlueprintCallable) void SortBag();
     UFUNCTION(BlueprintCallable) bool BindQuickSlot(int32 QuickIndex, int32 BagIndex);
+    UFUNCTION(BlueprintCallable) bool ClearQuickSlot(int32 QuickIndex);
     UFUNCTION(BlueprintCallable) bool ExpandUsingTicket();
     UFUNCTION(BlueprintCallable) void EnsureStorage(FName ContainerID);
-    /** Called by an approved home upgrade transaction; never shrinks occupied legacy slots. */
+    /** Compatibility entry point. A single chest always has forty slots. */
     UFUNCTION(BlueprintCallable, Category="IC|Home") bool SetHomeStorageStage(int32 Stage);
     UFUNCTION(BlueprintCallable) bool Transfer(FName ContainerID, int32 Index, bool bToStorage);
+    UFUNCTION(BlueprintPure) int32 GetTransferableCount(FName ContainerID,int32 Index,bool bToStorage) const;
+    UFUNCTION(BlueprintCallable) bool TransferAmount(FName ContainerID,int32 Index,int32 Count,bool bToStorage,FText& Reason);
     UFUNCTION(BlueprintCallable) bool ExchangeItems(const TMap<FName, int32>& Costs, FName ResultID, int32 ResultCount);
     UFUNCTION(BlueprintPure) bool ValidateDefinitions() const;
     bool ValidateState() const;

@@ -1,3 +1,4 @@
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
 #include "UI/Gameplay/ICGameMenuWidget.h"
 #include "UI/Gameplay/ICCompanionGroupWidget.h"
@@ -20,6 +21,8 @@
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Rendering/DrawElementTypes.h"
+#include "UI/Gameplay/ICGameplayLayout.h"
+#include "Time/ICTimeSubsystem.h"
 
 AICPlayerController* UICGameplayWidget::GetICPlayerController() const
 {
@@ -32,6 +35,7 @@ void UICGameplayWidget::NativeOnInitialized()
     Super::NativeOnInitialized();
     if (!WidgetTree->RootWidget)
         ICFrontendLayout::Build(WidgetTree, TEXT("HUD"));
+    ICGameplayLayout::EnsureGameClock(WidgetTree);
     RefreshSkillCooldown();
     SetIsFocusable(true);
     if (auto* Menu = Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu"))))
@@ -80,7 +84,19 @@ void UICGameplayWidget::NativeOnInitialized()
 void UICGameplayWidget::NativeTick(const FGeometry& Geometry, float DeltaSeconds)
 {
     Super::NativeTick(Geometry, DeltaSeconds);
+    if(auto* Clock=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_GameClock"))))
+    {
+        const auto* PC=GetICPlayerController();
+        Clock->SetVisibility(PC&&PC->bCreated?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
+        if(PC&&PC->GetTime())Clock->SetText(FormatGameClock(PC->GetTime()->GetClock().GameMinute));
+    }
     RefreshSkillCooldown();
+}
+FText UICGameplayWidget::FormatGameClock(double GameMinute)
+{
+    const int64 Total=FMath::FloorToInt64(FMath::Max(0.,FMath::IsFinite(GameMinute)?GameMinute:0.));
+    return FText::Format(NSLOCTEXT("ICTime","HUDDayClock","{0}일차  {1}:{2}"),FText::AsNumber(Total/1440+1),
+        FText::FromString(FString::Printf(TEXT("%02lld"),(Total%1440)/60)),FText::FromString(FString::Printf(TEXT("%02lld"),Total%60)));
 }
 
 int32 UICGameplayWidget::NativePaint(const FPaintArgs& Args,const FGeometry& Geometry,const FSlateRect& Culling,
@@ -151,11 +167,11 @@ void UICGameplayWidget::RefreshCurrentScreen()
     if (auto* Menu = Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu"))))
     {
         if (auto* Hint = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Hint"))))
-            Hint->SetText(FText::FromString(PC->InteractionHint.IsEmpty() ? TEXT("") : TEXT("[F] ") + PC->InteractionHint));
+            Hint->SetText(FText::FromString(PC->InteractionHint));
         if (auto* Notice = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Notice"))))
             Notice->SetText(PC->NoticeDisplayText);
         const bool Open = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Death") && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
-            PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue") && PC->Menu != TEXT("Station");
+            PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue") && PC->Menu != TEXT("Station") && PC->Menu != TEXT("Map");
         Menu->SetVisibility(Open ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
         Menu->SetSessionPresentation(PC->Menu, PC->Menu == TEXT("Confirm") ? PC->ModalDisplayText : PC->NoticeDisplayText);
         OnRefreshGameplayUI();
@@ -179,11 +195,11 @@ void UICGameplayWidget::RefreshCurrentScreen()
             Bar->SetPercent(Maximums[I] > 0 ? FMath::Clamp(Values[I] / Maximums[I], 0.f, 1.f) : 0);
     }
     const FString CombatHint=PC->bInCombat ? TEXT("전투 중") : TEXT("");
-    SetText(TEXT("TXT_Hint"), CombatHint+(PC->InteractionHint.IsEmpty()?TEXT(""):(CombatHint.IsEmpty()?TEXT("[F] "):TEXT("\n[F] "))+PC->InteractionHint));
+    SetText(TEXT("TXT_Hint"), CombatHint+(PC->InteractionHint.IsEmpty()?TEXT(""):(CombatHint.IsEmpty()?TEXT(""):TEXT("\n"))+PC->InteractionHint));
     if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Notice"))))
         Text->SetText(PC->NoticeDisplayText);
     const bool HasPanel = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Death") && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
-                          PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue") && PC->Menu != TEXT("Station");
+                          PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue") && PC->Menu != TEXT("Station") && PC->Menu != TEXT("Map");
     if (auto* Panel = GetWidgetFromName(TEXT("MenuPanel")))
         Panel->SetVisibility(HasPanel ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     if (HasPanel)
@@ -267,12 +283,23 @@ FReply UICGameplayWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyE
     if(auto* Menu=Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu")));Menu&&Menu->IsVisible())
         if(Menu->HandleMenuKey(Event.GetKey(),Event.IsRepeat()))return FReply::Handled();
     if (PC &&
-        (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::Equals || Event.GetKey() == EKeys::Gamepad_FaceButton_Right))
+        (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::Equals || UICGameUserSettings::IsGamepadBackKey(Event.GetKey())))
     {
         if (!Event.IsRepeat()) PC->HandleInputCommand(EICInputCommand::Menu);
         return FReply::Handled();
     }
     return Super::NativeOnKeyDown(Geometry, Event);
+}
+FReply UICGameplayWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event)
+{
+    // Xbox A is also Slate's default Accept key; gameplay/party targeting must see it before UI navigation.
+    if(!Event.IsRepeat())if(auto* PC=GetICPlayerController();PC&&PC->RouteGameplayGamepadKey(Event.GetKey(),true))return FReply::Handled();
+    return Super::NativeOnPreviewKeyDown(Geometry,Event);
+}
+FReply UICGameplayWidget::NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& Event)
+{
+    if(auto* PC=GetICPlayerController();PC&&PC->RouteGameplayGamepadKey(Event.GetKey(),false))return FReply::Handled();
+    return Super::NativeOnKeyUp(Geometry,Event);
 }
 void UICGameplayWidget::Resume()
 {

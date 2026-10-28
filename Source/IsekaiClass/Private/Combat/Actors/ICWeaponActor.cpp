@@ -15,6 +15,7 @@ void AICWeaponActor::OnConstruction(const FTransform& Transform) { Super::OnCons
 void AICWeaponActor::Configure(const FICEquipmentRow& Definition)
 {
     if (auto* Mesh = Definition.WeaponMesh.LoadSynchronous()) Visual->SetStaticMesh(Mesh);
+    if(Definition.bOverrideWeaponGeometry){Visual->SetRelativeTransform(Definition.WeaponVisualTransform);LengthAxis=Definition.WeaponLengthAxis;}
     RefreshGeometry();
 }
 void AICWeaponActor::GetBladeTrace(FVector& Start, FVector& End) const

@@ -1,4 +1,6 @@
 #include "Enemy/Character/ICEnemyBase.h"
+#include "Audio/ICBGMSubsystem.h"
+#include "Time/ICTimeSubsystem.h"
 #include "Settings/ICGameUserSettings.h"
 #include "Inventory/Rewards/ICRewardService.h"
 #include "AI/ICAIController.h"
@@ -55,6 +57,7 @@ bool AICEnemyBase::InitializeEnemy(FName SpawnerID,const FICSpawnSlotDefinition&
     if(auto* CharacterMesh=Definition.Mesh.LoadSynchronous())GetMesh()->SetSkeletalMesh(CharacterMesh);
     if(auto* Anim=Definition.AnimationClass.LoadSynchronous())GetMesh()->SetAnimInstanceClass(Anim);
     bEnemyInitialized=true;
+    GetMesh()->SetRelativeScale3D(GetMesh()->GetRelativeScale3D()*FMath::Max(.01f,Definition.VisualScaleMultiplier));
     PresentAnimation(Definition.IdleAnimation.LoadSynchronous(),true);
     if(auto* WidgetClass=LoadClass<UICMonsterHealthWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_MonsterHealthBar.WBP_IC_MonsterHealthBar_C")))
     {
@@ -92,6 +95,7 @@ void AICEnemyBase::HandleZeroHP()
     WorldState()->FlushParticipants();
     FlushToWorldState_Implementation(WorldState());auto State=WorldState()->ExportState();auto& S=State.SpawnSlots.FindChecked(SpawnKey);S.bDefeated=true;S.HP=0;
     S.RespawnReadyAtPlaySecond=AbilitySystem->PlaySecond()+(SlotDefinition.bOverrideRespawnTime?SlotDefinition.RespawnPlaySeconds:Definition.RespawnPlaySeconds);
+    S.RespawnReadyAtGameMinute=GetGameInstance()->GetSubsystem<UICTimeSubsystem>()->GetClock().GameMinute+FMath::Max(0.,Definition.RespawnGameMinutes);
     State.MonsterKilledAt.Add(SpawnKey,AbilitySystem->PlaySecond());if(Definition.Kind!=EICMonsterKind::Normal)State.DefeatedBosses.Add(Definition.ID);S.bRewardPending=true;
     if(!WorldState()->ApplyWorldProgress(State)){bDefeatCommitted=false;UE_LOG(LogICWorldState,Error,TEXT("[Enemy.DeathCommitFailed] %s"),*SpawnKey.ToString());return;}
     if (UICQuestSubsystem* Quests = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICQuestSubsystem>() : nullptr)
@@ -120,6 +124,9 @@ void AICEnemyBase::PresentAnimation(UAnimSequence* Animation,bool Loop,float Rat
 void AICEnemyBase::PlayHitReaction()
 {
     if(!bEnemyInitialized)return;
+    if(!UICBGMSubsystem::CanPlayEffects(GetWorld()))
+    {UE_LOG(LogICCore,Verbose,TEXT("[Enemy.HitCue.Suppressed] Actor=%s"),*GetName());return;}
+    UE_LOG(LogICCore,Verbose,TEXT("[Enemy.HitCue.Play] Actor=%s"),*GetName());
     const FVector Impact=GetMesh()->Bounds.Origin;
     if(auto* VFX=Definition.HitVFX.LoadSynchronous())UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(),VFX,Impact);
     if(auto* Sound=Definition.HitSound.LoadSynchronous())UGameplayStatics::PlaySoundAtLocation(this,Sound,GetActorLocation());

@@ -1,0 +1,100 @@
+생활·상점·침대·창고 설정 안내
+
+테스트맵
+/Game/IsekaiClass/World/L_TestMap
+- 중앙 부근에 플레이어 침대와 창고 3개가 있습니다. 처음에는 창고 1개만 보입니다.
+- 밭은 4칸씩 2묶음, 총 8칸입니다. 빈 밭에서 F → 씨앗 선택 → 파종합니다.
+- 각 칸에는 작물 1개만 심을 수 있습니다. 하루마다 DT의 다음 성장 단계로 바뀝니다.
+- 마지막 성장 단계에서 F로 수확합니다. 플레이어 밭은 수확하면 다시 씨앗을 심을 수 있는 빈 밭이 됩니다.
+- 기존 채집물은 F 채집 후 게임 시간 2시간 재생성 규칙을 유지합니다.
+- 기존 랜덤 낚시 구역을 화면 중앙으로 조준하고 H로 낚시합니다. 찌가 구역 안에 닿아야 20초 게이지가 시작되며, 완료 후 대기시간 없이 다시 낚시할 수 있습니다. H를 다시 누르거나 이동·ESC로 취소할 수 있습니다.
+- 채집·수확·파종은 빈손, 채광은 곡괭이, 낚시는 낚싯대를 듭니다. 작업 종료 시 원래 무기를 복구합니다.
+- 작업 중 F/ESC/이동/피격 취소 규칙을 사용합니다. 완료 전에는 씨앗이나 보상을 처리하지 않습니다.
+
+생활 애니메이션·도구
+/Game/IsekaiClass/Animation/Player/MainMale/Life
+/Game/IsekaiClass/Animation/Player/MainFemale/Life
+- Gathering, Harvesting, Planting, Mining, Fishing 몽타주를 남녀 프로필의 LifeActions에 연결했습니다.
+- DT_IC_Production의 WorkMontage는 프로필에 대응 동작이 없을 때 사용하는 대체 몽타주입니다.
+- DurationPlaySeconds: 플레이 기준 작업 시간. 낚시는 20초.
+- WorkToolClass: 임시 손 도구 BP. WorkToolSocket/WorkToolTransform: 손 소켓·부착 보정.
+- 채집 시간·채광 시간은 각 자원에 연결된 ProductionID의 행에서 수정합니다.
+
+블루프린트
+/Game/IsekaiClass/Life/Mining/Blueprints/BP_IC_Pickaxe
+/Game/IsekaiClass/Life/Fishing/Blueprints/FishingPole/BP_IC_FishingPole
+/Game/IsekaiClass/Life/Fishing/Blueprints/Fish/BP_R01_Fish_01 ~ 10
+/Game/IsekaiClass/Life/Fishing/Blueprints/BP_R01_RandomFishingZone
+/Game/IsekaiClass/Life/Farming/Blueprints/BP_IC_FarmPlot
+/Game/IsekaiClass/Life/Home/Blueprints/BP_IC_PlayerBed
+/Game/IsekaiClass/Life/Home/Blueprints/BP_IC_PlayerStorage
+- 기존 물고기 BP 경로는 리다이렉터를 유지했습니다.
+- 낚싯대 원본 메시·머티리얼은 요청한 Fishing/Fishing_Pole 폴더에 보존합니다.
+
+생활 DT: /Game/IsekaiClass/Data/DataTable/Life
+- DT_IC_Resource: 자원/채광물, ProductionID, Yields, RegenerationGameMinutes 등.
+- DT_IC_Production: 작업 시간, 동작, 도구 등.
+- DT_IC_Crop: SeedItemID, PlantingProductionID, HarvestProductionID, GrowthStages, HarvestYields.
+  GrowthStages의 Mesh/DurationGameMinutes가 성장 순서·게임 시간 단계입니다.
+  AllowedPlotAnchorIDs에 ANC_PLAYER_PLOT_01 ~ 08을 연결했습니다.
+- DT_IC_FishingPoint: FPT_R01_RANDOM_001.
+  FishSelections의 FishID/Weight/CatchCount로 물고기 종류·비중·수량을 조정합니다.
+  SuccessChance=1, FishingRodItemID=None으로 현재는 장비 아이템 없이 낚싯대 외형을 자동 사용합니다.
+- DT_IC_Fish: 물고기 아이템·메시·애니메이션·이동한 FishActorClass를 연결합니다.
+
+NPC R01_06 상점
+- 대화의 [상점 · 구매 / 판매]에서 진입합니다.
+- 구매/판매 탭에서 아이템을 클릭하면 장바구니에 1개씩 쌓입니다.
+- 장바구니 항목 클릭은 1개씩 제외합니다. 구매하기/판매하기로 한 번에 결제합니다.
+- 취소/ESC는 장바구니를 비우고 창을 닫습니다. 탭 변경도 장바구니를 비웁니다.
+- W/S 선택, Enter 담기, A/D 탭, F 결제, ESC 취소를 지원합니다.
+- 잠긴 아이템·퀘스트 물품·제작 예약 재료는 판매할 수 없습니다.
+NPC 폴더 DT
+- DT_IC_NPC: NPC_R01_006.ServiceIDs에 SRV_R01_006_SHOP.
+- DT_IC_Service: SRV_R01_006_SHOP → SHOP_R01_006_SEEDS.
+  bRequireWorkSchedule=False이므로 스케줄의 근무 장소와 무관하게 이용합니다.
+- DT_IC_Shop: SHOP_R01_006_SEEDS. 현재 씨앗 5종.
+- Items/DT_IC_Item의 BuyPrice/SellPrice/bCanSell에서 가격·판매 가능 여부를 수정합니다.
+
+창고 제작
+Recipes/DT_IC_Recipe
+- RCP_PLAYER_STORAGE_01: 체력(CON) 10, 광석1×1 + 광석2×1, 5초, 추가 창고 1.
+- RCP_PLAYER_STORAGE_02: 체력(CON) 20, 광석1×1 + 광석2×1, 5초, 추가 창고 2.
+- RequiredMainStat/RequiredMainStatValue: 요구 능력치.
+- Ingredients/WorkDurationPlaySeconds/SPCost: 재료·시간·SP.
+- RequiredExtraStorage: 기존 추가 창고 수, 0 → 1 순서입니다.
+- InstalledContainerID/HomeID/InstallationAnchorIDs: 독립 저장소·집·배치 앵커 연결.
+- 창고는 각각 40칸입니다. 두 개를 추가하면 두 레시피 모두 제작 목록에서 숨깁니다.
+- 창고는 메뉴와 분리된 전용 WBP로 열립니다. 왼쪽 40칸 창고/오른쪽 가방에서 수량을 골라 이동만 합니다.
+- 각 창고의 40칸은 확장되지 않습니다. 상세 안내: 개인_창고_UI_안내.txt.
+- World/DT_IC_Home의 HOME_PLAYER_001과 DT_IC_Anchor의 ANC_PLAYER_* 행에 생활 공간을 기록합니다.
+
+수면
+- 침대 F로 잠자기 → 서서히 어두워짐 → 기존 수면 시간 경과/회복 → 서서히 밝아짐 → 침대 옆에서 일어남.
+- 수면 중 이동·공격 입력을 막고 완료 후 복구합니다.
+- WBP_IC_SleepFade로 검은 화면을 표시하며 시간 처리는 기존 Sleep 함수를 사용합니다.
+- BP_IC_PlayerBed의 SleepPoseOffset으로 침대 모델에 맞는 누운 방향·위치·높이를 보정할 수 있습니다.
+
+몬스터·도감
+Combat/DT_IC_Monster
+- RespawnGameMinutes=60: 처치 후 게임 시간 1시간 재생성. 수면·시간 치트도 반영됩니다.
+- VisualScaleMultiplier: 일반 몬스터 1, 보스 3. 외형 메시 크기만 변경하며 능력치는 유지합니다.
+- PetCodexIndex: 정수와 펫을 구별하는 고유 번호. 기존 번호를 임의로 바꾸면 저장된 정수 대응도 달라집니다.
+- 펫 도감은 실제 몬스터 DT 행 수만 표시합니다. 처치 정수 1~10개 누적, 100개부터 파티에 설정할 수 있습니다.
+- 장착 중인 펫은 사용중과 적용 대상을 표시합니다.
+- 스킬 도감은 실제 플레이어 획득 가능 스킬 DT 목록을 표시하며, 미획득은 ?입니다.
+- 상단 검/활/마법스태프/치유완드 4개 스킬 설정을 유지합니다.
+- 제작물 도감은 무기·요리 2분류입니다.
+- 가방 확장권은 인벤토리 상세의 [사용]으로 즉시 소비하여 가방을 확장합니다.
+
+WBP (C++ 기반 레이아웃, 에디터에서 열어 편집 가능)
+/Game/IsekaiClass/UI/Widget/WBP_IC_Shop
+/Game/IsekaiClass/UI/Widget/WBP_IC_SeedPicker
+/Game/IsekaiClass/UI/Widget/WBP_IC_SleepFade
+기존 WBP_IC_GatherProgress, WBP_IC_CraftingStation, WBP_IC_CodexMenu, WBP_IC_InventoryItemPopup도 연동합니다.
+
+검증
+- C++ 에디터 빌드 성공.
+- 생활·상점·창고·도감·인벤토리·저장 호환·전투·NPC·입력 관련 자동화 49개 통과.
+- 남녀 플레이어 실제 PIE에서 5종 작업 동작, 낚싯대·곡괭이, 20초 낚시·즉시 반복, 파종·성장·수확,
+  상점 장바구니·구매·판매·취소, 확장권, 도감, 창고 제작 두 단계, 수면 페이드·침대 옆 기상을 확인했습니다.

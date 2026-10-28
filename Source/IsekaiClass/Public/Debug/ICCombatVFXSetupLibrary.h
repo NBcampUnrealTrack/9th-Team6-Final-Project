@@ -17,6 +17,8 @@ public:
     static UNiagaraSystem* DuplicateCombatNiagara(const FString& Path,UNiagaraSystem* Source);
     UFUNCTION(BlueprintPure,Category="IC|Editor")
     static bool IsCombatNiagaraReady(UNiagaraSystem* System);
+    UFUNCTION(BlueprintCallable,Category="IC|Editor") static bool CompileCombatNiagara(UNiagaraSystem* System);
+    UFUNCTION(BlueprintCallable,Category="IC|Editor") static bool RepairCombatNiagaraColor(UNiagaraSystem* System);
     UFUNCTION(BlueprintCallable,Category="IC|Editor") static bool DumpCombatNiagara(UNiagaraSystem* System);
     UFUNCTION(BlueprintCallable,Category="IC|Editor") static int32 GetCombatParticleCount(UNiagaraComponent* Component);
     UFUNCTION(BlueprintCallable,Category="IC|Editor") static FString DescribeCombatParticles(UNiagaraComponent* Component);

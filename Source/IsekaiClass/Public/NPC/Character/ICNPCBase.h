@@ -63,6 +63,7 @@ public:
 
     UFUNCTION(BlueprintPure,Category="IC|NPC")
     FText GetInteractionText() const;
+    UFUNCTION(BlueprintPure,Category="IC|NPC") bool IsSleepingForInteraction() const;
 
     UFUNCTION(BlueprintPure,Category="IC|NPC")
     TArray<FICNPCInteractionOption> GetInteractionOptions() const;

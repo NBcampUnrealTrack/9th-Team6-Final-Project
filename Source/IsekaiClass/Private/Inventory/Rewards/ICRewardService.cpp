@@ -115,7 +115,7 @@ bool FICRewardService::PrepareMonsterDefeat(FICWorldState& Candidate,FName Key,c
         }
         Next.Inventory=Staging->GetSnapshot();Ground.Contents=MoveTemp(Overflow);
     }
-    if(Monster.PetCodexIndex>=0&&Monster.PetCodexIndex<55)
+    if(Monster.PetCodexIndex>=0)
     {
         int32& Essence=Next.Codex.PetEssence.FindOrAdd(Monster.PetCodexIndex);
         Essence=static_cast<int32>(FMath::Min<int64>(MAX_int32,static_cast<int64>(Essence)+Random.RandRange(1,10)));

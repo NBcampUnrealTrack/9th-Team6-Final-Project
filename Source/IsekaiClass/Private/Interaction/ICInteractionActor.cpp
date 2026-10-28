@@ -4,6 +4,8 @@
 #include "Components/TextRenderComponent.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Inventory/Components/ICInventoryComponent.h"
+#include "Player/Character/ICPlayerCharacter.h"
+#include "Life/Production/ICPlayerLifeComponent.h"
 
 AICInteractionActor::AICInteractionActor()
 {
@@ -33,7 +35,7 @@ bool AICInteractionActor::TryInteract_Implementation(AICPlayerController* Contro
         if(!bAccessGranted||(!bHome&&ContainerID.IsNone()))return false;
         Controller->OpenContainer(ContainerID,bHome,bAccessGranted);bSuccess=true;
     }
-    else if(Action==TEXT("Sleep"))bSuccess=Controller->Sleep();
+    else if(Action==TEXT("Sleep")){if(auto* Player=Cast<AICPlayerCharacter>(Controller->GetPawn());Player&&Player->LifeActions)bSuccess=Player->LifeActions->BeginSleep(this);}
     else if(Action==TEXT("Kitchen")||Action==TEXT("Forge"))
     { if(WorkAnchorID.IsNone())return false;Controller->ActiveStation=Action;Controller->ActiveWorkAnchor=WorkAnchorID;Controller->SetMenu(TEXT("Craft"));bSuccess=true; }
     else if(Action==TEXT("Loot")||Action==TEXT("Quest"))

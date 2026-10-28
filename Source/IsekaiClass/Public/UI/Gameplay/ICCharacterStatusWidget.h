@@ -14,6 +14,8 @@ class ISEKAICLASS_API UICCharacterStatusWidget : public UUserWidget
     GENERATED_BODY()
 public:
     UPROPERTY(BlueprintReadOnly, Category="Status") FName CharacterID;
+    UPROPERTY(BlueprintReadOnly, Category="Status") bool bDowned=false;
+    UPROPERTY(BlueprintReadOnly, Category="Status") bool bHasBuff=false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Status") FText DisplayName;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Status") TObjectPtr<UTexture2D> Portrait;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Status", meta=(ClampMin="0", ClampMax="1")) float HPPercent = 1.f;
@@ -24,6 +26,8 @@ public:
     void UpdateVitals(const FICCharacterState& State);
 protected:
     virtual void NativePreConstruct() override;
+    virtual void NativeTick(const FGeometry& Geometry,float DeltaSeconds) override;
 private:
+    float StatusRefreshAt=0;
     void EnsureSkillCooldownOverlay();
 };

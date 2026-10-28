@@ -1,4 +1,7 @@
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Life/ICCraftingStationWidget.h"
+#include "UI/Life/ICEnhancementWidget.h"
+#include "Components/HorizontalBox.h"
 #include "Life/Crafting/ICCraftingStation.h"
 #include "Life/Production/ICProductionSubsystem.h"
 #include "Data/Rows/Life/ICRecipeRow.h"
@@ -60,6 +63,9 @@ void UICCraftingStationWidget::BuildLayout(UWidgetTree* T)
     auto* Card=T->ConstructWidget<UBorder>();Card->SetPadding(FMargin(32));Card->SetBrushColor(FLinearColor(.025f,.045f,.065f,.99f));Size->SetContent(Card);
     auto* Body=T->ConstructWidget<UVerticalBox>();Card->SetContent(Body);
     Add(Body,Caption(T,TEXT("TXT_StationTitle"),NSLOCTEXT("ICCraft","Recipes","만들 수 있는 레시피"),30));
+    auto* Tabs=T->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("StationTabs"));
+    Tabs->AddChildToHorizontalBox(ActionButton(T,TEXT("TAB_Craft"),NSLOCTEXT("ICCraft","CraftTab","제작")));
+    Tabs->AddChildToHorizontalBox(ActionButton(T,TEXT("TAB_Enhance"),NSLOCTEXT("ICCraft","EnhanceTab","강화")));Add(Body,Tabs,8);
     auto* Pages=T->ConstructWidget<UWidgetSwitcher>(UWidgetSwitcher::StaticClass(),TEXT("StationPages"));
     auto* PageSlot=Body->AddChildToVerticalBox(Pages);PageSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     auto* List=T->ConstructWidget<UVerticalBox>();Pages->AddChild(List);
@@ -83,6 +89,8 @@ void UICCraftingStationWidget::BuildLayout(UWidgetTree* T)
     Add(Progress,Caption(T,TEXT("TXT_WorkTime"),FText::GetEmpty(),23));
     Add(Progress,Caption(T,NAME_None,NSLOCTEXT("ICCraft","Continue","창을 닫아도 제작은 계속됩니다."),17));
     Add(Progress,ActionButton(T,TEXT("BTN_Collect"),NSLOCTEXT("ICCraft","Retry","완료 아이템 다시 받기")));
+    auto* EnhanceClass=LoadClass<UICEnhancementWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Enhancement.WBP_IC_Enhancement_C"));
+    Pages->AddChild(T->ConstructWidget<UICEnhancementWidget>(EnhanceClass?EnhanceClass:UICEnhancementWidget::StaticClass(),TEXT("EnhancementContent")));
     Add(Body,Caption(T,TEXT("TXT_Error"),FText::GetEmpty(),18),8);
     Add(Body,ActionButton(T,TEXT("BTN_CloseStation"),NSLOCTEXT("ICCraft","Close","닫기")),0);
 }
@@ -93,11 +101,14 @@ void UICCraftingStationWidget::NativeConstruct()
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Back"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::ShowRecipeList);
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_CloseStation"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::CloseStation);
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Collect"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::MakeRecipe);
+    if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("TAB_Craft"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::CraftTab);
+    if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("TAB_Enhance"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::EnhanceTab);
 }
 void UICCraftingStationWidget::OpenStation(AICCraftingStation* Station)
 {
     auto* PC=Cast<AICPlayerController>(GetOwningPlayer());if(!Station||!PC||!PC->GetLocalPlayer())return;
-    Workstation=Station;bOpen=true;ActiveJob.Invalidate();PC->ActiveStation=Station->RecipeType==EPlayerRecipeType::Cook?TEXT("Kitchen"):TEXT("Forge");PC->ActiveWorkAnchor=Station->WorkAnchorID;
+    Workstation=Station;bOpen=true;bEnhancing=false;ActiveJob.Invalidate();PC->ActiveStation=Station->RecipeType==EPlayerRecipeType::Cook?TEXT("Kitchen"):TEXT("Forge");PC->ActiveWorkAnchor=Station->WorkAnchorID;
+    if(auto* Tabs=GetWidgetFromName(TEXT("StationTabs")))Tabs->SetVisibility(Station->RecipeType==EPlayerRecipeType::Craft?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     PC->SetMenu(TEXT("Station"));
     auto* Manager=PC->GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>();
     if(!Manager||!Manager->OpenScreen(this,false,500)){bOpen=false;PC->SetMenu(TEXT(""));return;}
@@ -109,13 +120,15 @@ void UICCraftingStationWidget::OpenStation(AICCraftingStation* Station)
     SetKeyboardFocus();
 }
 void UICCraftingStationWidget::SetPage(int32 Page)
-{bDetails=Page==1;if(auto* W=Cast<UWidgetSwitcher>(GetWidgetFromName(TEXT("StationPages"))))W->SetActiveWidgetIndex(Page);}
+{bDetails=Page==1;if(auto* W=Cast<UWidgetSwitcher>(GetWidgetFromName(TEXT("StationPages"))))W->SetActiveWidgetIndex(Page);if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("TAB_Craft"))))B->SetBackgroundColor(Page!=3?FLinearColor(.2f,.5f,.45f):FLinearColor(.08f,.13f,.2f));if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("TAB_Enhance"))))B->SetBackgroundColor(Page==3?FLinearColor(.2f,.5f,.45f):FLinearColor(.08f,.13f,.2f));}
+void UICCraftingStationWidget::CraftTab(){bEnhancing=false;if(ActiveJob.IsValid())SetPage(2);else ShowRecipeList();}
+void UICCraftingStationWidget::EnhanceTab(){if(!Workstation||Workstation->RecipeType!=EPlayerRecipeType::Craft||ActiveJob.IsValid())return;bEnhancing=true;SetPage(3);ICCraftingLayout::Text(this,TEXT("TXT_StationTitle"),NSLOCTEXT("ICCraft","EnhanceTitle","제작대 · 무기 강화"));if(auto* W=Cast<UICEnhancementWidget>(GetWidgetFromName(TEXT("EnhancementContent"))))W->Activate();}
 void UICCraftingStationWidget::RefreshList()
 {
     using namespace ICCraftingLayout;auto* PC=Cast<AICPlayerController>(GetOwningPlayer());if(!PC||!Workstation||!PC->GetCrafting())return;
     Recipes=PC->GetCrafting()->GetRecipes(Workstation->RecipeType);
     const auto State=PC->GetWorldState()->ExportState();
-    Recipes.RemoveAll([&](FName ID){const auto* R=PC->GetCrafting()->Find(ID);return !R||R->ResultKind!=EICProductionResultKind::BagItems||(!R->bUnlockedByDefault&&!State.UnlockedRecipeIDs.Contains(ID));});
+    Recipes.RemoveAll([&](FName ID){const auto* R=PC->GetCrafting()->Find(ID);return !R||(R->ResultKind!=EICProductionResultKind::BagItems&&R->ResultKind!=EICProductionResultKind::InstallStorage)||(!R->bUnlockedByDefault&&!State.UnlockedRecipeIDs.Contains(ID));});
     auto* Scroll=Cast<UScrollBox>(GetWidgetFromName(TEXT("RecipeScroll")));if(!Scroll)return;Scroll->ClearChildren();
     for(FName ID:Recipes)
     {
@@ -152,9 +165,16 @@ void UICCraftingStationWidget::RefreshDetails()
     if(!R->DescriptionKey.IsEmpty()){const auto Found=UICTextLibrary::ResolveText(Strings,R->DescriptionKey);if(Found.bSuccess)Info=Found.Text;}
     if(Info.IsEmpty())Info=R->Type==EPlayerRecipeType::Cook?NSLOCTEXT("ICCraft","DefaultCookInfo","재료를 조리해 음식을 만듭니다."):NSLOCTEXT("ICCraft","DefaultCraftInfo","재료를 조합해 아이템을 만듭니다.");
     FString Output;for(const auto& I:R->Results)Output+=FText::Format(NSLOCTEXT("ICCraft","ResultLine","{0} × {1}  "),ItemName(PC,I.ItemID),FText::AsNumber(I.Count)).ToString();
+    if(R->ResultKind==EICProductionResultKind::InstallStorage)Output=NSLOCTEXT("ICCraft","StorageResult","개인 창고 1개 설치 · 40칸").ToString();
     Text(this,TEXT("TXT_RecipeInfo"),FText::Format(NSLOCTEXT("ICCraft","Info","{0}\n결과: {1}\n제작 시간 {2}초 · SP {3}"),Info,FText::FromString(Output),FText::AsNumber(R->WorkDurationPlaySeconds),FText::AsNumber(R->SPCost)));
     FString Materials=TEXT("필요 재료\n");bool Ready=true;
+    if(R->RequiredMainStatValue>0){const int32 Have=PC->GetPlayerSnapshot().MainStats.Get(R->RequiredMainStat);Ready&=Have>=R->RequiredMainStatValue;Materials+=FText::Format(NSLOCTEXT("ICCraft","StatRequirement","요구 능력치 {0}  {1} / {2}\n"),FText::FromString(StaticEnum<EICMainStat>()->GetNameStringByValue(int64(R->RequiredMainStat))),FText::AsNumber(Have),FText::AsNumber(R->RequiredMainStatValue)).ToString();}
     for(const auto& I:R->Ingredients){const int32 Have=PC->GetInventory()->CountItem(I.ItemID);Ready&=Have>=I.Count;Materials+=FText::Format(NSLOCTEXT("ICCraft","MaterialLine","{0}  {1} / {2}\n"),ItemName(PC,I.ItemID),FText::AsNumber(Have),FText::AsNumber(I.Count)).ToString();}
+    for(const auto& Group:R->IngredientGroups)
+    {
+        int32 Have=0;for(FName ID:Group.ItemIDs)Have+=PC->GetInventory()->CountItem(ID);
+        Ready&=Have>=Group.Count;Materials+=FText::Format(NSLOCTEXT("ICCraft","GroupLine","{0} (종류 혼합 가능)  {1} / {2}\n"),Group.DisplayName,FText::AsNumber(Have),FText::AsNumber(Group.Count)).ToString();
+    }
     for(const auto& I:R->Tools){const int32 Have=PC->GetInventory()->CountItem(I.ItemID);Ready&=Have>=I.Count;Materials+=FText::Format(NSLOCTEXT("ICCraft","ToolLine","도구: {0}  {1} / {2}\n"),ItemName(PC,I.ItemID),FText::AsNumber(Have),FText::AsNumber(I.Count)).ToString();}
     Text(this,TEXT("TXT_Ingredients"),FText::FromString(Materials));Ready&=PC->GetPlayerSnapshot().SP>=R->SPCost;
     Text(this,TEXT("TXT_Requirements"),Ready?FText::GetEmpty():NSLOCTEXT("ICCraft","Missing","재료, 도구 또는 SP가 부족합니다."));
@@ -198,11 +218,14 @@ void UICCraftingStationWidget::NativeTick(const FGeometry& Geometry,float DeltaS
 FReply UICCraftingStationWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event)
 {
     if(Event.IsRepeat()&&Event.GetKey()==EKeys::Enter)return FReply::Handled();
-    return HandleStationKey(Event.GetKey())?FReply::Handled():Super::NativeOnPreviewKeyDown(Geometry,Event);
+    return HandleStationKey(UICGameUserSettings::MenuKey(Event.GetKey()))?FReply::Handled():Super::NativeOnPreviewKeyDown(Geometry,Event);
 }
 bool UICCraftingStationWidget::HandleStationKey(FKey Key)
 {
     if(!bOpen)return false;
+    if(Workstation&&Workstation->RecipeType==EPlayerRecipeType::Craft&&(Key==EKeys::Left||Key==EKeys::Right||Key==EKeys::Gamepad_LeftShoulder||Key==EKeys::Gamepad_RightShoulder))
+    {if(bEnhancing)CraftTab();else EnhanceTab();return true;}
+    if(bEnhancing){if(auto* E=Cast<UICEnhancementWidget>(GetWidgetFromName(TEXT("EnhancementContent")))){if(E->HandleKey(Key))return true;if(Key==EKeys::Escape){CloseStation();return true;}}return false;}
     if(Key==EKeys::Escape){if(bDetails)ShowRecipeList();else CloseStation();return true;}
     if(bDetails&&Key==EKeys::Enter)
     {if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Make")));B&&B->GetIsEnabled())MakeRecipe();return true;}

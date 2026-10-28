@@ -1,0 +1,71 @@
+NPC 대화 / H 낚시 / NPC 개인 보관함
+작성: 2026-10-28
+
+1. NPC 얼굴 카메라
+- NPC와 F 상호작용으로 대화를 열면 NPC 머리를 실시간 추적하는 근접 카메라를 사용합니다.
+- 사진이나 고정 화면을 사용하지 않습니다. 월드·시간·NPC 애니메이션이 계속 움직입니다.
+- 대화 중에도 이동 키를 사용할 수 있으며, NPC에게서 기본 500cm 이상 멀어지면 대화가 닫힙니다.
+- 선택지는 방향키/Enter 또는 마우스로 조작합니다. 이동 키를 UI가 잡고 있어도 플레이 이동 입력으로 전달합니다.
+- 대화를 닫거나 다른 메뉴로 전환하면 이전 플레이 카메라로 복귀합니다.
+- 플레이어 위치와 원래 시선 방향은 보존합니다.
+- 대화 카메라에서 플레이어 몸과 장비가 NPC 얼굴을 가리지 않도록 처리하며, 종료하면 원래 표시 상태로 복구합니다.
+- 구현: ICPlayerControllerDialogueCamera.cpp. 머리 본 J_Bip_C_Head / head, 거리 220cm, FOV 40. 카메라 전환 시 잔상을 방지합니다.
+
+대화 카메라 DT
+- /Game/IsekaiClass/Data/DataTable/NPC/DT_IC_DialoguePresentation
+- Default 행이 기본값입니다. NPC_R01_001 같은 NPC ID 행을 추가하면 해당 NPC에만 적용됩니다.
+- CameraDistanceCm: 카메라 거리. CameraHeightCm: 카메라 높이. CameraSideOffsetCm: 좌우 이동.
+- FocusOffset: 머리 본에서 시선 중심까지의 오프셋. Z를 낮추면 얼굴이 화면 위쪽으로 올라갑니다.
+- FieldOfView: 시야각. FollowSpeed: NPC 추적 속도. CameraCollisionRadiusCm: 벽 충돌 검사 반지름.
+- CloseDistanceCm: 대화가 자동 종료되는 거리. 기본 500cm, 최소 250cm.
+- bUseCloseUpCamera: 얼굴 근접 카메라 사용. 끄면 플레이 시점을 유지합니다.
+- bAllowPlayerMovement: 대화 중 이동 허용. bHidePlayerInCamera: 플레이어 몸이 얼굴을 가리지 않도록 숨김.
+- NPC가 자고 있으면 상호작용 안내에 '(자는 중)'만 표시하고 대화는 열리지 않습니다.
+
+시간 HUD / NPC 침대
+- HUD 미니맵 위에 '1일차  08:00' 형식의 실제 게임 시간이 표시됩니다.
+- /Game/IsekaiClass/NPC/Blueprints/Interaction/BP_IC_NPCBed: NPC 침대 상호작용 BP.
+- 테스트 맵의 NPC 11명 침대에 소유자와 수면 슬롯을 연결했습니다.
+- 해당 NPC 호감도 200 초과(기본값 기준 201 이상)이고, NPC 점유·예약이 없는 빈 침대에서만 플레이어가 잘 수 있습니다.
+- NPC가 사용하는 침대나 다른 사용자가 잠근 침대는 사용할 수 없습니다.
+- 기존 플레이어 침대와 같은 수면 애니메이션·화면 암전·시간 경과·회복을 사용합니다.
+- BP의 PlayerRequiredAffinity / PlayerSleepPoseOffset / PlayerWakeOffset으로 기준과 자세·기상 위치를 조절할 수 있습니다.
+
+2. 낚시 조작
+- 물고기 랜덤 구역을 화면 중앙으로 조준한 뒤 H를 누릅니다. F는 낚시를 시작하지 않습니다.
+- 화면 중앙 방향이 수면에 닿는 위치를 찌의 착수 지점으로 사용합니다. 찌가 구역 밖이거나 장애물이 있으면 시작하지 않습니다.
+- 낚싯대 끝에서 찌까지 실제 줄이 표시되며, 기존 낚시 애니메이션과 20초 게이지를 유지합니다.
+- H 재입력 / 이동 / ESC / 피격 시 취소합니다. 취소하면 물고기가 지급되지 않습니다.
+- 완료하면 기존 획득 알림으로 랜덤 물고기를 지급합니다. 쿨타임 없이 바로 재시도할 수 있습니다.
+- 진행 중 구역이 사라지거나 찌가 구역을 벗어나면 취소됩니다.
+
+설정 위치
+- DT_IC_Production / PRD_R01_FISH_RANDOM_001: DurationPlaySeconds=20, WorkMontage, WorkToolClass.
+- DT_IC_FishingPoint / FPT_R01_RANDOM_001: FishSelections의 물고기·가중치·수량, SuccessChance.
+- 배치한 물고기 구역의 VisualMesh 크기: 실제 찌 착수 허용 범위. 기본 물 평면 외에 상자 메시도 윗면을 사용합니다.
+- 플레이어 LifeActions 컴포넌트의 FishingCastRangeCm: 기본 1200cm.
+- /Game/IsekaiClass/Life/Fishing/Blueprints/FishingPole/BP_IC_FishingPole: 낚싯대.
+- /Game/IsekaiClass/Life/Fishing/Blueprints/FishingPole/BP_IC_FishingLine: 줄 두께(LineRadiusCm), 처짐(SagCm), 찌 크기(FloatDiameterCm).
+- /Game/IsekaiClass/Life/Fishing/Materials/M_IC_FishingLine: 줄 재질.
+- /Game/IsekaiClass/Life/Fishing/Materials/M_IC_FishingFloat: 찌 재질.
+- IMC_Gameplay / IA_Fishing: H.
+
+3. NPC 상자 / 옷장 / 책장
+- 기존 팀원의 AICNPCContainerActor C++ 구현을 사용합니다. 기존 전용 블루프린트는 없어서 아래 3종을 생성했습니다.
+  /Game/IsekaiClass/NPC/Blueprints/Containers/BP_IC_NPCChest
+  /Game/IsekaiClass/NPC/Blueprints/Containers/BP_IC_NPCWardrobe
+  /Game/IsekaiClass/NPC/Blueprints/Containers/BP_IC_NPCBookshelf
+- L_TestMap의 NPC 11명 각각의 침대 뒤에 세 종류를 1개씩, 총 33개 배치했습니다.
+- 침대는 AICNPCTestLayout이 플레이 시작 때 생성합니다. 보관함은 해당 BedTransform을 기준으로 맵에 저장했습니다.
+- 각 배치 액터의 OwnerNPCID는 해당 NPC, ContainerID는 서로 다른 CNT_NPC_R01_XXX_CHEST / WARDROBE / BOOKSHELF입니다.
+- NPC 호감도 200 이상에서 F로 열 수 있습니다. 기존 호감도 조건은 유지합니다.
+- 세 종류 모두 기존 독립 창고 UI로 물건을 보관·이동하는 기능을 공유합니다. 각 40칸, 내용물과 저장 ID는 각각 독립입니다.
+- 외형은 프로젝트의 SM_chest_01 / SM_commode_01 / SM_bookcase_01 메시를 사용합니다.
+- 테스트 배치 초기 내용물은 비어 있습니다. 플레이어 침대 옆의 개인 창고와 별개입니다.
+- 테스트 맵 아웃라이너 폴더: IC_NPC_Containers.
+
+저작 / 검증 도구
+- Tools/Life/setup_npc_fishing.py
+- Tools/Life/setup_npc_containers.py
+- Tools/Life/review_npc_fishing.py (별도 테스트 세이브에서 실제 PIE 검증)
+- 자동 테스트: IC.Life.Fishing.AimedLineAndTwentySecondCatch / IC.UI.DialogueFaceCamera.

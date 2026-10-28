@@ -16,6 +16,7 @@ class ISEKAICLASS_API UICCharacterSetupLibrary : public UBlueprintFunctionLibrar
 {
     GENERATED_BODY()
 public:
+    UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool SetUIReviewAnalog(UWorld* World,FKey Key,float Value);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool PrepareCharacterMesh(USkeletalMesh* Mesh);
     UFUNCTION(BlueprintPure, Category="IC|Editor") static TArray<FName> GetCharacterBones(USkeletalMesh* Mesh);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static UBlendSpace1D* CreateLocomotion(const FString& Path, UAnimSequence* Idle, UAnimSequence* Walk, UAnimSequence* Run);
@@ -42,5 +43,6 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool BeginMonsterTestReview();
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool CaptureMonsterTestHUD(UWorld* World,const FString& File);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool PressUIReviewKey(UWorld* World,FKey Key);
+    UFUNCTION(BlueprintCallable,Category="IC|Editor") static bool SetUIReviewKey(UWorld* World,FKey Key,bool Pressed);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static void CaptureLiveCharacterReview(UWorld* World, const FString& Name);
 };

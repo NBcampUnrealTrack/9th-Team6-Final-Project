@@ -5,6 +5,8 @@
 class UStateTreeAIComponent;
 class UStateTree;
 class UBehaviorTree;
+class AICCharacterBase;
+class AICNPCBase;
 UCLASS(Blueprintable)
 class ISEKAICLASS_API AICAIController : public AAIController
 {
@@ -21,11 +23,16 @@ public:
     void RestoreScheduleFacing();
     bool IsInteractionHeld() const { return bInteractionHold; }
     bool TryRecoverCompanion();
+    UFUNCTION(BlueprintCallable,Category="IC|Party") void OrderAttack(AICCharacterBase* Enemy);
+    UFUNCTION(BlueprintPure,Category="IC|Party") AICCharacterBase* GetAttackTarget() const{return Target.Get();}
+    UFUNCTION(BlueprintPure,Category="IC|Party") AICCharacterBase* GetQueuedAttackTarget() const{return OrderedTarget.Get();}
 protected:
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="IC|AI") TObjectPtr<UStateTreeAIComponent> ScheduleRunner;
 private:
     bool bExecutionReady=false,bUsesAuthoredTree=false,bInteractionHold=false;
     double NextDecisionAt=0;
     TWeakObjectPtr<class AICCharacterBase> Target;
+    TWeakObjectPtr<AICCharacterBase> OrderedTarget;
+    bool DecideCompanionCombat(AICNPCBase* NPC);
     void Decide();
 };

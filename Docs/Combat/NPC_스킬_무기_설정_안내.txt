@@ -1,0 +1,116 @@
+NPC 스킬·무기·인벤토리 설정 안내
+2026-10-27
+
+NPC와 플레이어는 같은 SKL_NPC_R01_001~011 행을 사용한다.
+원본 SampleVFX는 보존하고 새 Niagara는 /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC에 저장한다.
+
+스킬별 기본값 (범위는 cm, 시전·쿨타임은 실제 플레이 초)
+피해·회복 계산은 DT_IC_SkillEffect.Magnitude의 SourceStat × Coefficient + FlatAmount이다.
+R01_09는 10초 동안 2초마다 회복, R01_10은 12초 보호막이다.
+R01_08은 대상 중심 반경 600cm에 3회 피해와 여러 Niagara 레이어를 사용한다.
+
+SKL_NPC_R01_001 | 선형 폭발 | 시전 0.45 | 쿨타임 9 | MP 12 | Cone 1000 | 기본값 25 + 계수 1.8 | 1회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/ToonExplosionsVol2/Particles/NiagaraSystems/NS_LineExplosion_02
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_01/NS_R01_01_Skill.NS_R01_01_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_01/NS_R01_01_Hit.NS_R01_01_Hit
+SKL_NPC_R01_002 | 섬광 베기 | 시전 0.12 | 쿨타임 6 | MP 8 | Cone 340 | 기본값 18 + 계수 1.7 | 1회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/MagicProjectilesVol5/Particles/NiagaraSystems/Muzzles/NS_Muzzle_Slash01
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_02/NS_R01_02_Skill.NS_R01_02_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_02/NS_R01_02_Hit.NS_R01_02_Hit
+SKL_NPC_R01_003 | 치유의 빛 | 시전 0.6 | 쿨타임 8 | MP 14 | Direct 1600 | 기본값 45 + 계수 1.8 | 1회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/Free/Free_Spells/VFX_Niagara/NS_Free_Spells_Buff_Healing
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_03/NS_R01_03_Skill.NS_R01_03_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_03/NS_R01_03_Hit.NS_R01_03_Hit
+SKL_NPC_R01_004 | 마력 화살 | 시전 0.25 | 쿨타임 5 | MP 7 | Projectile 2400 | 기본값 16 + 계수 1.5 | 1회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/Free/Free_Magic/VFX_Niagara/NS_Free_Magic_Projectile1_Base
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_04/NS_R01_04_Skill.NS_R01_04_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_04/NS_R01_04_Hit.NS_R01_04_Hit
+SKL_NPC_R01_005 | 원형 충격파 | 시전 0.4 | 쿨타임 11 | MP 14 | Sphere 430 | 기본값 28 + 계수 1.7 | 1회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/ToonExplosionVol1/Particles/NiagaraSystems/NS_ExplosionsCircle_06
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_05/NS_R01_05_Skill.NS_R01_05_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_05/NS_R01_05_Hit.NS_R01_05_Hit
+SKL_NPC_R01_006 | 마력 참격 | 시전 0.25 | 쿨타임 7 | MP 9 | Cone 600 | 기본값 20 + 계수 2.1 | 1회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/Free/Free_Magic/VFX_Niagara/NS_Free_Magic_Slash
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_06/NS_R01_06_Skill.NS_R01_06_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_06/NS_R01_06_Hit.NS_R01_06_Hit
+SKL_NPC_R01_007 | 관통 화살 | 시전 0.3 | 쿨타임 7 | MP 9 | Projectile 3200 | 기본값 24 + 계수 1.8 | 1회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/MagicProjectilesVol4/Particles/NiagaraSystems/NS_Projectile_Arrow01
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_07/NS_R01_07_Skill.NS_R01_07_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_07/NS_R01_07_Hit.NS_R01_07_Hit
+SKL_NPC_R01_008 | 별빛 대폭발 | 시전 0.9 | 쿨타임 25 | MP 30 | GroundArea 600 | 기본값 85 + 계수 3.5 | 3회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/Free/Free_Magic/VFX_Niagara/NS_Free_Magic_Attack1
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_08/NS_R01_08_Skill.NS_R01_08_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_08/NS_R01_08_Hit.NS_R01_08_Hit
+SKL_NPC_R01_009 | 회복의 선율 | 시전 0.5 | 쿨타임 15 | MP 18 | Sphere 650 | 기본값 0 + 계수 0 | 1회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/Free/Free_Spells/VFX_Niagara/NS_Free_Spells_Aura_Notes
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_09/NS_R01_09_Skill.NS_R01_09_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_09/NS_R01_09_Hit.NS_R01_09_Hit
+SKL_NPC_R01_010 | 수호의 방패 | 시전 0.35 | 쿨타임 18 | MP 15 | Direct 0 | 기본값 0 + 계수 0 | 1회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/ProtectionFX/FX/NS_Shield
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_10/NS_R01_10_Skill.NS_R01_10_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_10/NS_R01_10_Hit.NS_R01_10_Hit
+SKL_NPC_R01_011 | 연속 화살 | 시전 0.25 | 쿨타임 9 | MP 12 | Projectile 3200 | 기본값 12 + 계수 1.0 | 3회
+  원본: /Game/IsekaiClass/VFX/SampleVFX/MagicProjectilesVol4/Particles/NiagaraSystems/NS_Projectile_Arrow05
+  새 본체: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_11/NS_R01_11_Skill.NS_R01_11_Skill
+  새 명중: /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC/R01_11/NS_R01_11_Hit.NS_R01_11_Hit
+
+스킬 DT 편집
+DT_IC_Skill: MPCost, CastPlaySeconds, FirstEffectOffsetPlaySeconds, RecoveryPlaySeconds, CooldownPlaySeconds, Hits, Presentation.CastSound/ImpactSound.
+bUseDataTableTiming=True인 새 NPC 스킬은 DT 시각이 발동을 결정한다. 애니메이션 알림이 시전을 앞당기지 않는다.
+Hits: RadiusCm/Shape/MaximumTargets/RepeatCount/RepeatIntervalPlaySeconds/ProjectileSpeedCmPerSecond/ProjectileMaxDistanceCm.
+DT_IC_SkillEffect: Magnitude, DamageType, AppliedStatusEffectIDs.
+DT_IC_StatusEffect: 지속 회복·보호막의 DurationPlaySeconds, PeriodicMagnitude, InitialShieldMagnitude.
+DT_IC_CombatVFX NPC_R01_001~011: Cast/Projectile/Impact, Color/Intensity/Scale/Duration/Offset/Rotation, CastLayers/ImpactLayers.
+가져온 NPC 이펙트는 bUseComponentScale=True로 Scale을 실제 Niagara 컴포넌트 크기에 적용한다.
+bImpactFollowsTarget=True이면 명중 이펙트가 피격 대상에 붙어 이동을 따라간다.
+색상은 현재 NPC 초상화의 머리색을 참고했다. 검은 머리는 효과가 보이도록 청회색 빛으로 보정했다.
+샘플 VFX 폴더에 사운드가 없어 짧은 합성 효과음 6종을 /Game/IsekaiClass/Audio/Combat에 추가했다.
+효과음 WAV 원본은 Data/Audio/Sources에 있으며 스킬 DT에서 다른 SoundWave/SoundCue로 바꿀 수 있다.
+
+무기 DT 편집
+초보자/시골 마을/단단한/물고기 비늘/무지개 공격력은 각각 10/20/30/40/50이다.
+요구 주능력치는 각각 0/10/20/30/40이다. 기존 초보 무기는 처음부터 장착할 수 있도록 0을 유지한다.
+검 STR, 활 DEX, 마법스태프 INT, 치유완드 CON. 장비 보너스를 제외한 영구 능력치를 검사한다.
+DT_IC_Equipment: BaseModifiers, RequiredMainStat, RequiredMainStatValue, WeaponMesh, WeaponVisualTransform, WeaponLengthAxis.
+새 메시의 손잡이와 크기는 DT의 bOverrideWeaponGeometry로 보정한다. 기존 초보 무기 BP 외형은 유지한다.
+바닥 드롭은 기존 기본 큐브 설정을 유지한다.
+
+EQP_WPN_SWORD_002 | 시골 마을 검 | 공격력 20 | 요구 STR 10 | RCP_WPN_SWORD_002
+EQP_WPN_SWORD_003 | 단단한 검 | 공격력 30 | 요구 STR 20 | RCP_WPN_SWORD_003
+EQP_WPN_SWORD_004 | 물고기 비늘 검 | 공격력 40 | 요구 STR 30 | RCP_WPN_SWORD_004
+EQP_WPN_SWORD_005 | 무지개 검 | 공격력 50 | 요구 STR 40 | RCP_WPN_SWORD_005
+EQP_WPN_BOW_002 | 시골 마을 활 | 공격력 20 | 요구 DEX 10 | RCP_WPN_BOW_002
+EQP_WPN_BOW_003 | 단단한 활 | 공격력 30 | 요구 DEX 20 | RCP_WPN_BOW_003
+EQP_WPN_BOW_004 | 물고기 비늘 활 | 공격력 40 | 요구 DEX 30 | RCP_WPN_BOW_004
+EQP_WPN_BOW_005 | 무지개 활 | 공격력 50 | 요구 DEX 40 | RCP_WPN_BOW_005
+EQP_WPN_STAFF_002 | 시골 마을 마법스태프 | 공격력 20 | 요구 INT 10 | RCP_WPN_STAFF_002
+EQP_WPN_STAFF_003 | 단단한 마법스태프 | 공격력 30 | 요구 INT 20 | RCP_WPN_STAFF_003
+EQP_WPN_STAFF_004 | 물고기 비늘 마법스태프 | 공격력 40 | 요구 INT 30 | RCP_WPN_STAFF_004
+EQP_WPN_STAFF_005 | 무지개 마법스태프 | 공격력 50 | 요구 INT 40 | RCP_WPN_STAFF_005
+EQP_WPN_WAND_002 | 시골 마을 치유완드 | 공격력 20 | 요구 CON 10 | RCP_WPN_WAND_002
+EQP_WPN_WAND_003 | 단단한 치유완드 | 공격력 30 | 요구 CON 20 | RCP_WPN_WAND_003
+EQP_WPN_WAND_004 | 물고기 비늘 치유완드 | 공격력 40 | 요구 CON 30 | RCP_WPN_WAND_004
+EQP_WPN_WAND_005 | 무지개 치유완드 | 공격력 50 | 요구 CON 40 | RCP_WPN_WAND_005
+
+제작 재료 (종류별 네 무기 공통)
+시골 마을: 광석1 2개 + 들꽃 줄기 2개.
+단단한: 광석1 1개 + 광석2 2개 + 광석3 2개.
+물고기 비늘: 물고기 종류를 섞어 합계 10개 + 광석4 4개.
+무지개: 물고기10 1개 + 광석6 2개 + 달걀 1개 + 해바라기 1개 + 분홍꽃 1개.
+DT_IC_Recipe.IngredientGroups로 임의 재료 묶음을 설정한다. 시작 시 실제 종류별 수량을 예약하므로 중복 차감하지 않는다.
+
+새 치트
+ICRecruitTestParty: NPC_R01_001/002/003의 호감도를 300으로 설정하고 파티 1/2/3번에 바로 편성한다.
+ICEquipStarterWeapons: 초보 무기 4종을 지급하고 각 무기 슬롯에 장착한다. 가방 빈칸 4개가 필요하다.
+기존 ICGiveStarterWeapons는 가방 지급만 하는 명령으로 유지한다.
+
+UI와 조작
+Tab: 화면 전방 몬스터 락온/다음 대상. 마지막 대상 다음은 해제, 다시 누르면 첫 대상으로 돌아간다.
+락온 중 카메라와 원거리 발사는 지정 몬스터를 향한다. 사망·거리·가림 조건은 기존 전투 설정 DT를 사용한다.
+인벤토리 우측에 보유 골드를 표시한다. 아이템 상세의 사용을 누르면 플레이어와 현재 동료를 선택한다.
+회복이 필요 없거나 DT가 허용하지 않는 대상이면 사용하지 않고 이유를 표시한다.
+퀵슬롯 클릭/Enter로 아이템 상세를 열고, Delete/Backspace로 등록을 해제한다.
+퀵슬롯 등록 중 1~4로 슬롯을 선택할 수 있다. 같은 아이템을 여러 슬롯에 등록할 수도 있다.
+도감 NPC 분류에서 초상화·현재 호감도·동료 편입 상태·고유 스킬을 확인한다.
+
+주의: 이 스크립트는 초기 설정 도구다. 이후 밸런스를 편집한 뒤 전체 재실행하면 이 기본값이 다시 적용된다.
