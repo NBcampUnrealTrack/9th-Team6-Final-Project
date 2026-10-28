@@ -59,3 +59,9 @@
 - 기존 에셋 백업: Saved/PartyForge/Before.
 
 커밋/PR은 사용자가 직접 진행하는 기존 방침을 유지. 이 작업에서 실행하지 않음.
+
+후속 커밋 후 빌드 수정 (2026-10-28)
+- 번역 Cache/Loaded와 강화 UI Add의 Unity 묶음 내 이름 충돌 수정.
+- UI 첫 헤더 순서 정리. BuildProject.ps1 -FullUnity 검증 옵션 추가.
+- 전체 Unity 빌드 및 관련 테스트 10개 통과.
+- 자세한 원인/검증: Docs/Debug/커밋후_Unity_빌드_오류_수정.txt.

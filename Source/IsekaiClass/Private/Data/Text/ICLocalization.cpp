@@ -10,7 +10,8 @@
 #include "Internationalization/StringTable.h"
 #include "Internationalization/StringTableCore.h"
 
-namespace
+// Keep translation state out of the shared anonymous namespace used by Unity builds.
+namespace ICLocalizationState
 {
 bool Loaded=false;
 TMap<FString,FString> English;
@@ -56,7 +57,7 @@ bool HasKorean(const FString& Value)
 }
 void ICLocalization::ApplyLanguage(int32 Language)
 {
-    Load();const FString Culture=Language==1?TEXT("en"):TEXT("ko");
+    ICLocalizationState::Load();const FString Culture=Language==1?TEXT("en"):TEXT("ko");
     FInternationalization::Get().SetCurrentCulture(Culture);
 #if WITH_EDITOR
     if(GIsEditor)
@@ -66,16 +67,16 @@ void ICLocalization::ApplyLanguage(int32 Language)
 }
 FText ICLocalization::Localize(const FText& Text)
 {
-    Load();
+    ICLocalizationState::Load();
     const FString* Native=FTextInspector::GetSourceString(Text);
     const FString Source=Native?*Native:Text.ToString();
-    if(!HasKorean(Source))return Text;
-    if(const auto* Existing=Cache.Find(Source))return *Existing;
-    const FString Translation=Translate(Source);if(Translation==Source){Cache.Add(Source,Text);return Text;}
+    if(!ICLocalizationState::HasKorean(Source))return Text;
+    if(const auto* Existing=ICLocalizationState::Cache.Find(Source))return *Existing;
+    const FString Translation=ICLocalizationState::Translate(Source);if(Translation==Source){ICLocalizationState::Cache.Add(Source,Text);return Text;}
     FTCHARToUTF8 Bytes(*Source);const FString Key=FMD5::HashBytes(reinterpret_cast<const uint8*>(Bytes.Get()),Bytes.Length());
     FPolyglotTextData Data(ELocalizedTextSourceCategory::Game,TEXT("IC.Runtime"),Key,Source,TEXT("ko"));
     Data.AddLocalizedString(TEXT("en"),Translation);
     FTextLocalizationManager::Get().RegisterPolyglotTextData(Data,true);
     // GetText is available in cooked builds, unlike the editor-only ChangeKey API.
-    FText Result=Data.GetText();Cache.Add(Source,Result);return Result;
+    FText Result=Data.GetText();ICLocalizationState::Cache.Add(Source,Result);return Result;
 }

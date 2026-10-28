@@ -1,5 +1,5 @@
-#include "Settings/ICGameUserSettings.h"
 #include "UI/Life/ICCraftingStationWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Life/ICEnhancementWidget.h"
 #include "Components/HorizontalBox.h"
 #include "Life/Crafting/ICCraftingStation.h"
