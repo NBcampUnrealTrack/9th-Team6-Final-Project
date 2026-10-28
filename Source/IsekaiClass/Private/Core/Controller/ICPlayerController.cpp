@@ -228,6 +228,7 @@ void AICPlayerController::ApplyInputMapping()
                 UserMappingContext=UICGameUserSettings::Get()->MakeInputMapping(DefaultMappingContext,this,MoveAction,Roll);
                 Input->AddMappingContext(UserMappingContext,MappingPriority);
                 AppliedMappingContext=UserMappingContext;
+                if(auto* Gamepad=GamepadMappingContext.LoadSynchronous())Input->AddMappingContext(Gamepad,MappingPriority);
                 if(CameraMappingContext)Input->AddMappingContext(CameraMappingContext,MappingPriority);
     UE_LOG(LogICInput, Log, TEXT("[Input.MappingApplied] Controller=%s IMC=%s Priority=%d"),*GetNameSafe(this),*GetPathNameSafe(DefaultMappingContext),MappingPriority);
             }
@@ -241,6 +242,7 @@ void AICPlayerController::RemoveInputMapping()
         if (auto* Input=LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
         {
             if (AppliedMappingContext) Input->RemoveMappingContext(AppliedMappingContext);
+            if (auto* Gamepad=GamepadMappingContext.Get()) Input->RemoveMappingContext(Gamepad);
             if (CameraMappingContext) Input->RemoveMappingContext(CameraMappingContext);
         }
     if(AppliedMappingContext) UE_LOG(LogICInput, Log, TEXT("[Input.MappingRemoved] Controller=%s IMC=%s"),*GetNameSafe(this),*GetPathNameSafe(AppliedMappingContext));

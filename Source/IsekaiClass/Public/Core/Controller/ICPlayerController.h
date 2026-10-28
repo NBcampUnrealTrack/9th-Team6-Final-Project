@@ -67,6 +67,7 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="IC|UI") TSoftClassPtr<UICQuestTrackerWidget> QuestTrackerWidgetClass;
     UPROPERTY(EditDefaultsOnly, Category="IC|UI") TSubclassOf<UICNPCDialogueWidget> DialogueWidgetClass;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input") TObjectPtr<UInputMappingContext> DefaultMappingContext;
+    UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input") TSoftObjectPtr<UInputMappingContext> GamepadMappingContext = TSoftObjectPtr<UInputMappingContext>(FSoftObjectPath(TEXT("/Game/IsekaiClass/Input/Contexts/IMC_Gamepad.IMC_Gamepad")));
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input") int32 MappingPriority=0;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input") TObjectPtr<UInputAction> MoveAction;
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Input") TObjectPtr<UInputAction> LookAction;
