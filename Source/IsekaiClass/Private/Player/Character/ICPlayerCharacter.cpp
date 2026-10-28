@@ -17,6 +17,46 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "Character/Animation/ICCharacterAnimationProfile.h"
+#include "Engine/World.h"
+
+void AICPlayerCharacter::RestoreJumpPhysics()
+{
+    if(!bUsingProfileJumpPhysics)return;
+    GetCharacterMovement()->JumpZVelocity=SavedJumpZVelocity;
+    GetCharacterMovement()->GravityScale=SavedJumpGravityScale;
+    bUsingProfileJumpPhysics=false;
+}
+
+void AICPlayerCharacter::Jump()
+{
+    auto* Move=GetCharacterMovement();
+    if(Move->IsMovingOnGround()&&CanJump())
+    {
+        RestoreJumpPhysics();
+        const auto* Profile=GetAnimationProfile();
+        const auto* Set=Profile&&Inventory?Profile->FindSet(Inventory->GetEquippedWeaponFamily()):nullptr;
+        const float WorldGravity=GetWorld()?FMath::Abs(GetWorld()->GetGravityZ()):0.f;
+        if(Set&&FMath::IsFinite(Set->JumpHeightCm)&&Set->JumpHeightCm>0.f
+            &&FMath::IsFinite(Set->JumpAirTimeSeconds)&&Set->JumpAirTimeSeconds>=.2f&&WorldGravity>UE_SMALL_NUMBER)
+        {
+            SavedJumpZVelocity=Move->JumpZVelocity;
+            SavedJumpGravityScale=Move->GravityScale;
+            // Ballistic arc: height = v*T/4, gravity = 8*height/(T*T).
+            Move->JumpZVelocity=4.f*Set->JumpHeightCm/Set->JumpAirTimeSeconds;
+            Move->GravityScale=8.f*Set->JumpHeightCm/(FMath::Square(Set->JumpAirTimeSeconds)*WorldGravity);
+            bUsingProfileJumpPhysics=true;
+        }
+    }
+    Super::Jump();
+}
+
+void AICPlayerCharacter::OnMovementModeChanged(EMovementMode PreviousMovementMode,uint8 PreviousCustomMode)
+{
+    Super::OnMovementModeChanged(PreviousMovementMode,PreviousCustomMode);
+    // A weapon switch in midair keeps the current arc; landing or cancelling flight restores defaults.
+    if(!GetCharacterMovement()->IsFalling())RestoreJumpPhysics();
+}
 
 void AICPlayerCharacter::AdjustCameraDistance(float Axis)
 {

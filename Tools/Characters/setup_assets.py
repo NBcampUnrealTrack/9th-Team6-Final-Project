@@ -195,7 +195,7 @@ def setup_character(identifier,mesh_path,rig_path,folder,families,sets):
         sprint=previous[family_key].get_editor_property('sprint') if family_key in previous else None
         mapped[family_key]=u.ICCharacterAnimationSet(locomotion=blend,jump=clips['jump'],sprint=sprint,attack=actions['attack'],skill=actions['skill'],hit=actions['hit'],dodge=dash,ground_offset_cm=offset)
         if family_key in previous:
-            for prop in ['jump_start','fall_loop','land','combat_locomotion','directional_dodges','attack_combo']:
+            for prop in ['jump_start','fall_loop','land','jump_height_cm','jump_air_time_seconds','jump_start_duration_seconds','landing_duration_seconds','combat_locomotion','directional_dodges','attack_combo']:
                 mapped[family_key].set_editor_property(prop,previous[family_key].get_editor_property(prop))
     sleep=retarget('Sleep_Animation',{'sleep':sequence('Sleep_Animation','anim_Sleep_06_L')},mesh,rig,folder+'/Sleep')['sleep']
     profile.set_editor_property('weapon_sets',mapped);profile.set_editor_property('sleep',sleep)
