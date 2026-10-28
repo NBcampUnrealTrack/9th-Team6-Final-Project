@@ -67,7 +67,10 @@ AICPlayerCharacter::AICPlayerCharacter()
     bUseControllerRotationYaw=false;
     GetCharacterMovement()->bOrientRotationToMovement=true;
     GetCharacterMovement()->RotationRate=FRotator(0,540,0);
+    // Small floor lips may be stepped over; the test platforms require a jump.
+    GetCharacterMovement()->MaxStepHeight=20.f;
     GetCharacterMovement()->JumpZVelocity=600;
+    GetCharacterMovement()->GravityScale=1.6f;
     GetCharacterMovement()->AirControl=.3f;
     JumpMaxCount=1;
     GetCapsuleComponent()->SetCapsuleSize(34,88);
