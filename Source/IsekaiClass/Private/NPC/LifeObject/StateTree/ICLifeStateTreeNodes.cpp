@@ -4,6 +4,7 @@
 #include "NPC/LifeObject/ICLifeObjectActor.h"
 #include "StateTreeExecutionContext.h"
 #include "AIController.h"
+#include "AI/ICAIController.h"
 #include "AITypes.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "GameFramework/Character.h"
@@ -49,6 +50,8 @@ namespace ICLifeNodes
         Request.SetAllowPartialPath(true);
         Request.SetProjectGoalLocation(true);
         Request.SetCanStrafe(false);
+        if (const AICAIController* ICController = Cast<AICAIController>(AI))
+            Request.SetNavigationFilter(ICController->GetNonCompanionNavigationFilter());
         return AI->MoveTo(Request).Code;
     }
 }
