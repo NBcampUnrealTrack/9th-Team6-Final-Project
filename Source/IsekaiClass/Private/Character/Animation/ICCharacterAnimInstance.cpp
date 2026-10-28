@@ -69,8 +69,10 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
         CombatBlend.Alpha=FMath::FInterpTo(CombatBlend.Alpha,IC->bCombatMovement&&IC->CombatLocomotion?1.f:0.f,DeltaSeconds,10.f);
         Air.SetSequence(IC->Jump); Bed.SetSequence(IC->Sleep);
         Launch.SetSequence(IC->JumpStart?IC->JumpStart:IC->Jump);
+        Launch.SetPlayRate(IC->JumpStartPlayRate);
         Fall.SetSequence(IC->FallLoop?IC->FallLoop:IC->Jump);
         Landing.SetSequence(IC->Land);
+        Landing.SetPlayRate(IC->LandingPlayRate);
         if(PreviousAirState!=IC->AirState)
         {
             if(IC->AirState==EICAirAnimationState::JumpStart)Launch.SetAccumulatedTime(0);
@@ -117,6 +119,12 @@ void UICCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     Locomotion = Set->Locomotion; Jump = Set->Jump; Sleep = Profile->Sleep;
     Speed = Character->GetVelocity().Size2D(); bAirborne = Character->GetCharacterMovement()->IsFalling(); bSleeping = false;
     JumpStart=Set->JumpStart;FallLoop=Set->FallLoop;Land=Set->Land;
+    const auto FitClip=[](const UAnimSequence* Clip,float Seconds)
+    {
+        return Clip&&Seconds>0.f?Clip->GetPlayLength()/(Seconds*FMath::Max(FMath::Abs(Clip->RateScale),UE_SMALL_NUMBER)):1.f;
+    };
+    JumpStartPlayRate=FitClip(JumpStart,Set->JumpStartDurationSeconds);
+    LandingPlayRate=FitClip(Land,Set->LandingDurationSeconds);
     const float VerticalSpeed=Character->GetVelocity().Z;
     const bool Teleported=bHasPreviousPosition&&FVector::DistSquared(Character->GetActorLocation(),PreviousPosition)>FMath::Square(1000.f);
     auto ChangeAirState=[this](EICAirAnimationState State){if(AirState!=State){AirState=State;AirStateSeconds=0;}};
@@ -131,14 +139,14 @@ void UICCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
         if(!bWasAirborne){AirborneSeconds=0;ChangeAirState(VerticalSpeed>10&&JumpStart?EICAirAnimationState::JumpStart:EICAirAnimationState::Falling);}
         AirborneSeconds+=FMath::Max(0.f,DeltaSeconds);
         if(VerticalSpeed<=0)ChangeAirState(EICAirAnimationState::Falling);
-        else if(AirState==EICAirAnimationState::JumpStart&&AirStateSeconds>=FMath::Min(.2f,JumpStart?JumpStart->GetPlayLength():0.f))ChangeAirState(EICAirAnimationState::Rising);
+        else if(AirState==EICAirAnimationState::JumpStart&&AirStateSeconds>=(Set->JumpStartDurationSeconds>0.f?Set->JumpStartDurationSeconds:FMath::Min(.2f,JumpStart?JumpStart->GetPlayLength():0.f)))ChangeAirState(EICAirAnimationState::Rising);
     }
     else if(bWasAirborne)
         ChangeAirState(Land&&AirborneSeconds>.08f&&Character->GetCharacterMovement()->IsMovingOnGround()?EICAirAnimationState::Landing:EICAirAnimationState::Grounded);
     else if(AirState==EICAirAnimationState::Landing)
     {
         // Let an idle landing straighten up before handing over; moving landings stay responsive.
-        const float ClipSeconds=Land?Land->GetPlayLength()/FMath::Max(FMath::Abs(Land->RateScale),UE_SMALL_NUMBER):0.f;
+        const float ClipSeconds=Land?Land->GetPlayLength()/FMath::Max(FMath::Abs(Land->RateScale)*LandingPlayRate,UE_SMALL_NUMBER):0.f;
         const float RecoverySeconds=FMath::Max(0.f,ClipSeconds-LandingBlendOutSeconds);
         const float HoldSeconds=Speed>10.f?FMath::Min(MovingLandingHoldSeconds,RecoverySeconds):RecoverySeconds;
         if(AirStateSeconds>=HoldSeconds)ChangeAirState(EICAirAnimationState::Grounded);
