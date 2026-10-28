@@ -119,6 +119,8 @@ struct ISEKAICLASS_API FICMonsterRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Monster") FName RegionID;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Monster") FICMonsterCombatStats CombatStats;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin="0")) double DetectionRangeCm = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin="0", Units="cm")) double ChaseLimitCm = 2000.0;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin="0", Units="cm")) double InvestigationAdvanceDistanceCm = 400.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin="0", ClampMax="360")) double SightAngleDegrees = 0.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI") bool bRequiresLineOfSight = true;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin="0")) double AttackRangeCm = 0.0;
