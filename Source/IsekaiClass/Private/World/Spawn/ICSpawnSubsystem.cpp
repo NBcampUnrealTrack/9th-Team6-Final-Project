@@ -91,10 +91,13 @@ void UICSpawnSubsystem::RefreshSpawns()
         }
         auto* Existing=Cast<AICNPCBase>(FindCharacter(ID));if(Existing){NPCs.Add(ID,Existing);if(!Wanted&&!Existing->IsActorBeingDestroyed())Existing->Destroy();continue;}if(!Wanted)continue;
         UClass* Type=Row->ActorClass.IsNull()?AICNPCBase::StaticClass():Row->ActorClass.LoadSynchronous();if(!Type||!Type->IsChildOf(AICNPCBase::StaticClass())){UE_LOG(LogICData,Warning,TEXT("[Spawn.NPCClassInvalid] %s"),*ID.ToString());continue;}
-        auto* Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Position);
+        // 앵커가 바닥·벽에 살짝 겹쳐 있어도 근처 빈 자리로 옮겨 생성한다(완전히 막혀 있으면 생성하지 않는다).
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+        auto* Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Position,SpawnParams);
         if(!Actor)
         {
-            UE_LOG(LogICWorldState,Warning,TEXT("[Spawn.NPCCreateFailed] NPC=%s Class=%s"),*ID.ToString(),*GetNameSafe(Type));
+            UE_LOG(LogICWorldState,Warning,TEXT("[Spawn.NPCCreateFailed] NPC=%s Class=%s Location=%s 앵커 위치가 바닥/벽/다른 오브젝트에 막혀 있습니다. 앵커를 바닥에서 약 100cm 위, 빈 공간으로 옮겨 주세요."),*ID.ToString(),*GetNameSafe(Type),*Position.GetLocation().ToCompactString());
         }
         else if(!Actor->InitializeNPC(ID))
         {

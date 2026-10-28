@@ -20,6 +20,15 @@ AICAIController::AICAIController()
 {
     IC_TRACE_FUNCTION();PrimaryActorTick.bCanEverTick=true;ScheduleRunner=CreateDefaultSubobject<UStateTreeAIComponent>(TEXT("ScheduleRunner"));ScheduleRunner->SetStartLogicAutomatically(false);bStartAILogicOnPossess=false;
 }
+UICNonCompanionNavigationFilter::UICNonCompanionNavigationFilter(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
+{
+    AddExcludedArea(UICCompanionOnlyNavArea::StaticClass());
+}
+TSubclassOf<UNavigationQueryFilter> AICAIController::GetNonCompanionNavigationFilter() const
+{
+    return UICNonCompanionNavigationFilter::StaticClass();
+}
 bool AICAIController::StartExecution(UStateTree* Tree,UBehaviorTree* Behavior)
 {
     IC_TRACE_FUNCTION();if(!GetPawn())return false;StopExecution();bExecutionReady=true;
@@ -157,7 +166,9 @@ void AICAIController::Decide()
         {
 
             C->GetCharacterMovement()->bOrientRotationToMovement=true;
-            MoveToLocation(Goal,100);
+            const TSubclassOf<UNavigationQueryFilter> Filter = State.Mode == EICCharacterMode::Companion
+                ? nullptr : GetNonCompanionNavigationFilter();
+            MoveToLocation(Goal, 100.f, true, true, true, false, Filter);
         }
         else
         {
@@ -175,7 +186,7 @@ void AICAIController::Decide()
     auto* Enemy=Cast<AICEnemyBase>(C);if(!Enemy||!ASC||!ASC->IsAlive())return;const auto& M=Enemy->GetMonsterDefinition();
     if(Enemy->OutsideLeash())Enemy->BeginReturn();
     if(Enemy->IsReturning())
-    {Target.Reset();ClearFocus(EAIFocusPriority::Gameplay);if(FVector::DistSquared(C->GetActorLocation(),Enemy->GetOrigin())<=FMath::Square(FMath::Max(50.,M.ReturnAcceptanceRadiusCm))){StopMovement();Enemy->FinishReturn();}else MoveToLocation(Enemy->GetOrigin(),FMath::Max(20.,M.ReturnAcceptanceRadiusCm*.6),false);return;}
+    {Target.Reset();ClearFocus(EAIFocusPriority::Gameplay);if(FVector::DistSquared(C->GetActorLocation(),Enemy->GetOrigin())<=FMath::Square(FMath::Max(50.,M.ReturnAcceptanceRadiusCm))){StopMovement();Enemy->FinishReturn();}else MoveToLocation(Enemy->GetOrigin(),FMath::Max(20.,M.ReturnAcceptanceRadiusCm*.6),false,true,true,false,GetNonCompanionNavigationFilter());return;}
     if(!Target.IsValid()||!Target->GetICAbilitySystem()||!Target->GetICAbilitySystem()->IsAlive())
     {
         Target.Reset();double Distance=FMath::Square(M.DetectionRangeCm);
@@ -190,7 +201,7 @@ void AICAIController::Decide()
     }
     SetFocus(Target.Get());const double Distance=FVector::Distance(C->GetActorLocation(),Target->GetActorLocation());
     if(Distance>M.DetectionRangeCm||(M.bRequiresLineOfSight&&!LineOfSightTo(Target.Get()))){StopMovement();Enemy->BeginReturn();return;}
-    if(Distance>M.AttackRangeCm){MoveToActor(Target.Get(),FMath::Max(20.,M.AttackRangeCm*.7),false);return;}StopMovement();
+    if(Distance>M.AttackRangeCm){MoveToActor(Target.Get(),FMath::Max(20.,M.AttackRangeCm*.7),false,true,false,GetNonCompanionNavigationFilter());return;}StopMovement();
     C->GetCharacterMovement()->StopMovementImmediately();
     const FVector Facing=(Target->GetActorLocation()-C->GetActorLocation()).GetSafeNormal2D();
     if(!Facing.IsNearlyZero())
