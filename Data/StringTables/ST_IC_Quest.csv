@@ -53,3 +53,197 @@ QST_NPC_TALK_009.OBJECTIVE,10번 NPC와 대화하기
 QST_NPC_TALK_010.NAME,퀘스트 10
 QST_NPC_TALK_010.DESCRIPTION,10번 NPC의 부탁입니다. 11번 NPC와 대화하세요.
 QST_NPC_TALK_010.OBJECTIVE,11번 NPC와 대화하기
+SCN.R01.Q001.Objective.01,친구1과 이야기하기
+SCN.R01.Q001.Title,이세계에 온 친구
+SCN.R01.Q001.Description,메시지에서 확인한 친구1이 이 마을에 있다. 직접 만나 무사한지 확인하자.
+SCN.R01.Q002.Objective.01,친구2와 이야기하기
+SCN.R01.Q002.Title,여전한 녀석
+SCN.R01.Q002.Description,친구2도 여관 근처에 있다. 그동안의 일을 들어 보자.
+SCN.R01.Q003.Objective.01,친구3과 이야기하기
+SCN.R01.Q003.Title,다시 만난 우리
+SCN.R01.Q003.Description,마지막으로 친구3의 안부를 확인하자.
+SCN.R01.Q004.Objective.01,숲버섯 2개 전달하기
+SCN.R01.Q004.Objective.02,둥근버섯 2개 전달하기
+SCN.R01.Q004.Title,친구들의 숙박비
+SCN.R01.Q004.Description,"친구들은 여관 일을 돕고, 플레이어는 식재료를 보태기로 했다. 여관에서 필요한 버섯을 구하자."
+SCN.R01.Q005.Objective.01,빵 1개 전달하기
+SCN.R01.Q005.Title,빈방의 규칙
+SCN.R01.Q005.Description,새 손님들의 아침을 준비할 빵이 모자란다. 주방에서 빵을 만들어 가져가자.
+SCN.R01.Q006.Objective.01,DragonSD_07 처치하기
+SCN.R01.Q006.Objective.02,DragonSD_03 처치하기
+SCN.R01.Q006.Objective.03,DragonSD_164 처치하기
+SCN.R01.Q006.Objective.04,DragonSD_153 처치하기
+SCN.R01.Q006.Title,착한 일에도 순서가 있어
+SCN.R01.Q006.Description,친구1이 숲길을 살펴보자고 한다. 마을 주변에 나타난 몬스터를 확인하고 처리하자.
+SCN.R01.Q007.Objective.01,상점주인과 이야기하기
+SCN.R01.Q007.Title,비용부터 계산하자
+SCN.R01.Q007.Description,길을 떠나기 전에 식비와 물품 가격을 알아보자.
+SCN.R01.Q008.Objective.01,산딸기 절임 1개 전달하기
+SCN.R01.Q008.Title,달콤한 협상
+SCN.R01.Q008.Description,친구3이 여관에서 신세 진 마음을 간식으로 전하려 한다.
+SCN.R01.Q009.Objective.01,친구1과 이야기하기
+SCN.R01.Q009.Title,장부에 없는 이름
+SCN.R01.Q009.Description,장부의 낯선 서명 때문에 방 배정을 확인하기 어렵다. 친구1에게 물어보자.
+SCN.R01.Q010.Objective.01,기본 체력(CON) 2 이상 달성하기
+SCN.R01.Q010.Objective.02,DragonSD_07 2마리 처치하기
+SCN.R01.Q010.Title,내가 지킬 수 있는 것
+SCN.R01.Q010.Description,무리해서 앞장서는 것보다 돌아올 수 있는 힘을 기르는 것이 먼저다.
+SCN.R01.Q011.Objective.01,마을 길목 방문하기
+SCN.R01.Q011.Title,틀린 지도의 진실
+SCN.R01.Q011.Description,두 지도에서 길의 방향이 다르다. 마을 길목에서 실제 표지판을 확인하자.
+SCN.R01.Q012.Objective.01,상점주인과 이야기하기
+SCN.R01.Q012.Title,여관의 인기 메뉴
+SCN.R01.Q012.Description,여관 일을 돕기 시작한 친구3이 손님들이 좋아하는 음식을 알아보려 한다.
+SCN.R01.Q013.Objective.01,학생과 이야기하기
+SCN.R01.Q013.Title,소문은 조심히
+SCN.R01.Q013.Description,Y에 대해 알고 있을지도 모른다는 손님 이야기가 들린다. 학생에게 사실을 확인하자.
+SCN.R01.Q014.Objective.01,여관주인과 이야기하기
+SCN.R01.Q014.Title,친구의 좋은 거짓말
+SCN.R01.Q014.Description,친구1이 전투 이야기를 부풀렸다. 직접 사과할 수 있도록 여관주인에게 사실을 전하자.
+SCN.R01.Q015.Objective.01,흰꽃 차 1개 전달하기
+SCN.R01.Q015.Title,겁이 난다는 말
+SCN.R01.Q015.Description,밝게 지내던 친구3이 밤마다 불안해한다. 따뜻한 차를 가져가자.
+SCN.R01.Q016.Objective.01,전직 용사와 이야기하기
+SCN.R01.Q016.Title,영웅 소문의 주인공
+SCN.R01.Q016.Description,친구1이 마을에 사는 전직 용사의 이야기를 궁금해한다. 조용히 인사를 전하자.
+SCN.R01.Q017.Objective.01,숲버섯 1개 전달하기
+SCN.R01.Q017.Objective.02,둥근버섯 1개 전달하기
+SCN.R01.Q017.Title,버섯은 비밀이야
+SCN.R01.Q017.Description,마법사가 마탑에서 먹던 버섯 요리를 떠올린다. 두 종류의 버섯을 구해 주자.
+SCN.R01.Q018.Objective.01,DragonSD_150 처치하기
+SCN.R01.Q018.Objective.02,DragonSD_114 처치하기
+SCN.R01.Q018.Objective.03,DragonSD_107 처치하기
+SCN.R01.Q018.Title,왕녀님의 비밀 연습
+SCN.R01.Q018.Description,왕녀가 실전 감각을 점검하려 한다. 연습 구간의 몬스터를 처리하고 결과를 전하자.
+SCN.R01.Q019.Objective.01,분홍꽃 차 1개 전달하기
+SCN.R01.Q019.Title,성녀님의 작은 비밀
+SCN.R01.Q019.Description,성녀가 쉬지 않는 전직 용사에게 차를 권하려 한다.
+SCN.R01.Q020.Objective.01,DragonSD_10 처치하기
+SCN.R01.Q020.Objective.02,DragonSD_38 처치하기
+SCN.R01.Q020.Objective.03,DragonSD_08 처치하기
+SCN.R01.Q020.Objective.04,DragonSD_07 처치하기
+SCN.R01.Q020.Title,엘프의 사냥 내기
+SCN.R01.Q020.Description,엘프가 사냥 내기를 제안한다. 무리하지 않고 지정한 몬스터를 처리해 보자.
+SCN.R01.Q021.Objective.01,밀 3개 전달하기
+SCN.R01.Q021.Title,안경 너머의 밭
+SCN.R01.Q021.Description,학생이 책의 재배 기록을 실제 작물과 비교하려 한다.
+SCN.R01.Q022.Objective.01,상점주인과 이야기하기
+SCN.R01.Q022.Title,한정 판매의 함정
+SCN.R01.Q022.Description,행사 안내의 색 때문에 손님들이 가격을 오해하고 있다. 안내 내용을 함께 확인하자.
+SCN.R01.Q023.Objective.01,친구3과 이야기하기
+SCN.R01.Q023.Title,미끼를 훔친 범인
+SCN.R01.Q023.Description,여관 앞에 두었던 미끼가 사라졌다. 근처를 지났던 친구3에게 물어보자.
+SCN.R01.Q024.Objective.01,초보자 검 1개 보유하기 (제출하지 않음)
+SCN.R01.Q024.Title,첫 번째 검
+SCN.R01.Q024.Description,친구2가 길을 떠나기 전 무기의 상태를 점검하려 한다.
+SCN.R01.Q025.Objective.01,마을 길목 방문하기
+SCN.R01.Q025.Title,하루치의 지도
+SCN.R01.Q025.Description,확인한 정보만 모아 영주성으로 이어지는 길을 정리하자.
+SCN.R01.Q026.Objective.01,둥근버섯 2개 전달하기
+SCN.R01.Q026.Objective.02,분홍꽃 2개 전달하기
+SCN.R01.Q026.Title,마법사의 비밀 선물
+SCN.R01.Q026.Description,마법사가 전직 용사에게 줄 작은 향주머니를 준비한다.
+SCN.R01.Q027.Objective.01,흰꽃 2개 전달하기
+SCN.R01.Q027.Objective.02,밀 3개 전달하기
+SCN.R01.Q027.Title,왕녀의 우아한 선물
+SCN.R01.Q027.Description,왕녀가 격식에 맞는 감사 선물을 준비한다.
+SCN.R01.Q028.Objective.01,흰꽃 3개 전달하기
+SCN.R01.Q028.Objective.02,분홍꽃 2개 전달하기
+SCN.R01.Q028.Title,성녀의 정성
+SCN.R01.Q028.Description,성녀가 전직 용사의 방에 놓을 꽃을 준비한다.
+SCN.R01.Q029.Objective.01,산딸기 3개 전달하기
+SCN.R01.Q029.Objective.02,숲버섯 1개 전달하기
+SCN.R01.Q029.Title,엘프의 깜짝 선물
+SCN.R01.Q029.Description,엘프가 숲에서 구한 재료로 소박한 선물을 준비한다.
+SCN.R01.Q030.Objective.01,분홍꽃 3개 전달하기
+SCN.R01.Q030.Objective.02,흰꽃 1개 전달하기
+SCN.R01.Q030.Title,마법사의 실험 화장수
+SCN.R01.Q030.Description,마법사가 평소와 다른 향을 내보려 한다. 실험 재료를 모으자.
+SCN.R01.Q031.Objective.01,흰꽃 3개 전달하기
+SCN.R01.Q031.Objective.02,산딸기 1개 전달하기
+SCN.R01.Q031.Title,왕녀님의 품격 있는 향
+SCN.R01.Q031.Description,왕녀가 예복 대신 평소 옷에 어울릴 향을 고민한다.
+SCN.R01.Q032.Objective.01,분홍꽃 2개 전달하기
+SCN.R01.Q032.Objective.02,흰꽃 2개 전달하기
+SCN.R01.Q032.Title,성녀의 꽃 화장수
+SCN.R01.Q032.Description,성녀가 꽃을 우려 손에 남는 약초 향을 누그러뜨리려 한다.
+SCN.R01.Q033.Objective.01,산딸기 2개 전달하기
+SCN.R01.Q033.Objective.02,분홍꽃 2개 전달하기
+SCN.R01.Q033.Title,엘프의 숲 향기
+SCN.R01.Q033.Description,엘프가 익숙한 숲의 향을 다른 사람에게도 전해 보고 싶어 한다.
+SCN.R01.Q034.Objective.01,모둠 버섯볶음 1개 전달하기
+SCN.R01.Q034.Title,마법사가 차린 한 상
+SCN.R01.Q034.Description,마법사가 익숙한 버섯 요리로 저녁 자리를 준비한다.
+SCN.R01.Q035.Objective.01,밀빵 1개 전달하기
+SCN.R01.Q035.Objective.02,유채나물 1개 전달하기
+SCN.R01.Q035.Title,왕녀의 저녁 약속
+SCN.R01.Q035.Description,왕녀가 격식을 덜어낸 저녁을 준비한다.
+SCN.R01.Q036.Objective.01,양배추 구이 1개 전달하기
+SCN.R01.Q036.Title,성녀의 따뜻한 밥상
+SCN.R01.Q036.Description,성녀가 부담 없이 먹을 수 있는 소박한 저녁을 준비한다.
+SCN.R01.Q037.Objective.01,산딸기 절임 1개 전달하기
+SCN.R01.Q037.Objective.02,둥근버섯 구이 1개 전달하기
+SCN.R01.Q037.Title,엘프의 야외 저녁
+SCN.R01.Q037.Description,엘프가 복잡한 준비 없이 밖에서 먹을 저녁을 챙긴다.
+SCN.R01.Q038.Objective.01,둥근버섯 3개 전달하기
+SCN.R01.Q038.Title,마법사의 하루 연구
+SCN.R01.Q038.Description,마법사가 휴일에도 연구 생각을 멈추지 못한다. 준비를 일찍 마치도록 도와주자.
+SCN.R01.Q039.Objective.01,DragonSD_153 처치하기
+SCN.R01.Q039.Objective.02,DragonSD_150 처치하기
+SCN.R01.Q039.Objective.03,DragonSD_114 처치하기
+SCN.R01.Q039.Objective.04,DragonSD_107 처치하기
+SCN.R01.Q039.Title,왕녀와 짧은 검술 산책
+SCN.R01.Q039.Description,왕녀가 평온하게 걸을 수 있는 길을 찾는다. 길목의 몬스터를 먼저 처리하자.
+SCN.R01.Q040.Objective.01,흰꽃 차 1개 전달하기
+SCN.R01.Q040.Title,성녀의 조용한 휴식
+SCN.R01.Q040.Description,성녀가 쉴 때에는 아무것도 하지 않아도 되는 자리를 마련하려 한다.
+SCN.R01.Q041.Objective.01,산딸기 3개 전달하기
+SCN.R01.Q041.Title,엘프의 숲속 소풍
+SCN.R01.Q041.Description,엘프가 서두르지 않고 걸을 짧은 소풍을 준비한다.
+SCN.R01.Q042.Objective.01,숲버섯 2개 전달하기
+SCN.R01.Q042.Title,마법사의 보호 주문
+SCN.R01.Q042.Description,마법사가 숲길 점검에 나서는 전직 용사에게 작은 준비물을 챙겨 주려 한다.
+SCN.R01.Q043.Objective.01,초보자 검 1개 보유하기 (제출하지 않음)
+SCN.R01.Q043.Title,왕녀의 마지막 점검
+SCN.R01.Q043.Description,왕녀가 숲길에 나설 사람들의 준비를 다시 살핀다. 기본 무기를 보여주자.
+SCN.R01.Q044.Objective.01,모둠 버섯볶음 1개 전달하기
+SCN.R01.Q044.Title,성녀의 회복식
+SCN.R01.Q044.Description,성녀가 길을 나서기 전에 먹을 수 있는 음식을 준비한다.
+SCN.R01.Q045.Objective.01,흰꽃 3개 전달하기
+SCN.R01.Q045.Title,엘프의 행운 표시
+SCN.R01.Q045.Description,엘프가 길을 떠나는 사람에게 눈에 잘 띄는 꽃을 건네려 한다.
+SCN.R01.Q046.Objective.01,숲 가장자리 방문하기
+SCN.R01.Q046.Title,숲이 조용해진 날
+SCN.R01.Q046.Description,숲 가장자리에서 평소와 다른 흔적이 보인다고 한다. 무리해서 깊이 들어가지 말고 확인하자.
+SCN.R01.Q047.Objective.01,광석1 2개 전달하기
+SCN.R01.Q047.Title,잊힌 광맥의 흔적
+SCN.R01.Q047.Description,마법사가 숲의 광석에 남은 마력을 비교하려 한다. 표본을 구해 주자.
+SCN.R01.Q048.Objective.01,마을 길목 방문하기
+SCN.R01.Q048.Title,거짓 대피 안내
+SCN.R01.Q048.Description,예전에 쓰던 대피 안내가 지금 길과 맞지 않는다. 사람들을 잘못된 길로 보내지 않도록 확인하자.
+SCN.R01.Q049.Objective.01,DragonSD_114 처치하기
+SCN.R01.Q049.Objective.02,DragonSD_107 처치하기
+SCN.R01.Q049.Objective.03,DragonSD_10 처치하기
+SCN.R01.Q049.Objective.04,DragonSD_38 처치하기
+SCN.R01.Q049.Objective.05,DragonSD_08 처치하기
+SCN.R01.Q049.Title,겁 없이 나서지 마
+SCN.R01.Q049.Description,큰 몬스터를 상대하기 전에 돌아올 길부터 확보하자.
+SCN.R01.Q050.Objective.01,R01 보스 처치하기
+SCN.R01.Q050.Title,산길의 주인
+SCN.R01.Q050.Description,산길에 자리 잡은 큰 몬스터가 마을을 위협한다. 준비를 마쳤다면 상대하고 돌아오자.
+SCN.R01.Q051.Objective.01,밀빵 1개 전달하기
+SCN.R01.Q051.Title,평범한 저녁으로
+SCN.R01.Q051.Description,큰 위협을 막아낸 뒤 여관주인이 평소처럼 저녁을 준비한다. 마지막으로 부족한 빵을 가져가자.
+SCN.R01.Q052.Objective.01,서쪽 옛집 방문하기
+SCN.R01.Q052.Objective.02,낡은 상자 1개 전달하기
+SCN.R01.Q052.Title,그 집에 두고 온 것
+SCN.R01.Q052.Description,전직 용사가 서쪽 옛집에 남아 있는 상자를 찾아 달라고 부탁한다.
+SCN.R01.Q053.Objective.01,빛바랜 목걸이 1개 전달하기
+SCN.R01.Q053.Title,빛바랜 목걸이
+SCN.R01.Q053.Description,지난번 확인하지 못한 서랍을 다시 살펴보자. 남아 있는 물건이 있다면 전직 용사에게 돌려주자.
+SCN.R01.Q054.Objective.01,친구2와 이야기하기
+SCN.R01.Q054.Title,서로 다른 방식으로
+SCN.R01.Q054.Description,친구2가 지금까지 모은 정보를 정리했다. Y를 찾기 위한 다음 행선지를 확인하자.
+SCN.R01.Q055.Objective.01,영주성 방향 경계 방문하기
+SCN.R01.Q055.Title,영주성으로 향하는 길
+SCN.R01.Q055.Description,Y의 단서를 찾기 위해 다음 길을 확인할 때다. 준비가 되면 영주성 방향의 경계로 가자.
