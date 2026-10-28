@@ -23,6 +23,14 @@ struct ISEKAICLASS_API FICCharacterAnimationSet
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> JumpStart;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> FallLoop;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> Land;
+    /** Player jump height above the takeoff point. Zero keeps CharacterMovement defaults. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Jump", meta=(ClampMin="0", Units="cm")) float JumpHeightCm=0.f;
+    /** Time from takeoff back to the same height; used when JumpHeightCm is positive. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Jump", meta=(ClampMin="0.2", Units="s", EditCondition="JumpHeightCm > 0")) float JumpAirTimeSeconds=.75f;
+    /** Fit the whole takeoff clip into this time. Zero preserves its existing timing. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Jump", meta=(ClampMin="0", Units="s")) float JumpStartDurationSeconds=0.f;
+    /** Fit landing recovery into this time. Zero uses the clip's own duration. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Jump", meta=(ClampMin="0", Units="s")) float LandingDurationSeconds=0.f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> Sprint;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimMontage> Attack;
     /** Three consecutive normal attacks, authored for this character's skeleton. */

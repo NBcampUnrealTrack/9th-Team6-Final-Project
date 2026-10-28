@@ -7,21 +7,64 @@
 #include "Data/Text/ICLocalization.h"
 #include "Internationalization/Internationalization.h"
 #include "Internationalization/Culture.h"
+#include "Internationalization/TextLocalizationManager.h"
+#include "Misc/ScopeExit.h"
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICLanguageRoundTrip,"IC.Polish.LanguageRoundTrip",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICLanguageRoundTrip,"IC.Polish.LanguageRoundTrip",EAutomationTestFlags::EditorContext|EAutomationTestFlags::ClientContext|EAutomationTestFlags::EngineFilter)
 bool FICLanguageRoundTrip::RunTest(const FString&)
 {
-    const FString Previous=FInternationalization::Get().GetCurrentCulture()->GetName();
+    auto& Internationalization=FInternationalization::Get();
+    auto& Localization=FTextLocalizationManager::Get();
+    const FString PreviousLanguage=Internationalization.GetCurrentLanguage()->GetName();
+    const FString PreviousLocale=Internationalization.GetCurrentLocale()->GetName();
+#if WITH_EDITOR
+    const FString PreviousPreviewLanguage=Localization.GetConfiguredGameLocalizationPreviewLanguage();
+    const bool WasPreviewEnabled=Localization.IsGameLocalizationPreviewEnabled();
+#endif
+    ON_SCOPE_EXIT
+    {
+        Internationalization.SetCurrentLanguage(PreviousLanguage);
+        Internationalization.SetCurrentLocale(PreviousLocale);
+#if WITH_EDITOR
+        if(GIsEditor)
+        {
+            Localization.ConfigureGameLocalizationPreviewLanguage(PreviousPreviewLanguage);
+            if(WasPreviewEnabled)Localization.EnableGameLocalizationPreview(PreviousPreviewLanguage);
+            else Localization.DisableGameLocalizationPreview();
+        }
+#endif
+        Localization.WaitForAsyncTasks();
+    };
+#if WITH_EDITOR
+    if(GIsEditor)
+    {
+        Internationalization.SetCurrentLanguage(TEXT("en"));
+        Internationalization.SetCurrentLocale(TEXT("ko-KR"));
+        Localization.WaitForAsyncTasks();
+    }
+#endif
+    auto CheckCulture=[&](const FString& GameCulture)
+    {
+        FString ExpectedLanguage=GameCulture,ExpectedLocale=GameCulture;
+#if WITH_EDITOR
+        if(GIsEditor){ExpectedLanguage=TEXT("en");ExpectedLocale=TEXT("ko-KR");}
+#endif
+        TestEqual(FString::Printf(TEXT("Language after selecting %s"),*GameCulture),Internationalization.GetCurrentLanguage()->GetName(),ExpectedLanguage);
+        TestEqual(FString::Printf(TEXT("Locale after selecting %s"),*GameCulture),Internationalization.GetCurrentLocale()->GetName(),ExpectedLocale);
+    };
     ICLocalization::ApplyLanguage(0);
+    CheckCulture(TEXT("ko"));
     FText Label=ICLocalization::Localize(FText::FromString(TEXT("체력 포션")));
     TestEqual(TEXT("Korean remains the source language"),Label.ToString(),FString(TEXT("체력 포션")));
     ICLocalization::ApplyLanguage(1);
+    CheckCulture(TEXT("en"));
     TestEqual(TEXT("An existing label updates to English"),Label.ToString(),FString(TEXT("Health Potion")));
     TestEqual(TEXT("String table resolves in English"),ICText::Get(TEXT("Save_Complete")).ToString(),FString(TEXT("Save complete")));
     const FText Format=NSLOCTEXT("ICInventoryMenu","GoldBalance","보유 골드  {0} G");
     TestFalse(TEXT("Formatted native text translates before its arguments are applied"),FText::Format(ICLocalization::Localize(Format),42).ToString().Contains(TEXT("골드")));
     ICLocalization::ApplyLanguage(0);TestEqual(TEXT("Switching back restores the Korean text"),Label.ToString(),FString(TEXT("체력 포션")));
-    FInternationalization::Get().SetCurrentCulture(Previous);return !HasAnyErrors();
+    CheckCulture(TEXT("ko"));
+    return !HasAnyErrors();
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICLocalizationAssetsCheck,"IC.UI.LocalizationAssets",

@@ -30,6 +30,8 @@ public:
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UAnimSequence> JumpStart;
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UAnimSequence> FallLoop;
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UAnimSequence> Land;
+    UPROPERTY(Transient, BlueprintReadOnly) float JumpStartPlayRate=1.f;
+    UPROPERTY(Transient, BlueprintReadOnly) float LandingPlayRate=1.f;
     UPROPERTY(Transient, BlueprintReadOnly) EICAirAnimationState AirState=EICAirAnimationState::Grounded;
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UAnimSequence> Sprint;
     UPROPERTY(Transient, BlueprintReadOnly) bool bSprinting = false;
