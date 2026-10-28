@@ -24,6 +24,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "SmartObjects",
+			"Enabled": true
+		},
+		{
 			"Name": "CommonUI",
 			"Enabled": true
 		},

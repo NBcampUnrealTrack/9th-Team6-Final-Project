@@ -383,8 +383,12 @@ void ValidateCombat(const TArray<FICDefinitionTable>& Tables, bool bComplete, TA
     EachRow<FICSynergyRow>(Tables, [&](const FICSynergyRow& Row, const FLocation& At)
     {
         IC_TRACE_FUNCTION();
-        if (Row.MemberNPCIDs.IsEmpty()) Missing(Issues, At, TEXT("MemberNPCIDs"), TEXT("Author two to four distinct recruit NPC IDs."), bComplete);
-        else if (Row.MemberNPCIDs.Num() < 2 || Row.MemberNPCIDs.Num() > 4) Issue(Issues, At, TEXT("MemberNPCIDs"), TEXT("Synergy combinations contain exactly two to four NPCs."));
+        if(Row.RequiredWeaponFamily==EICWeaponFamily::None&&Row.MinimumMembers==0)
+        {
+            if (Row.MemberNPCIDs.IsEmpty()) Missing(Issues, At, TEXT("MemberNPCIDs"), TEXT("Author distinct recruit NPC IDs."), bComplete);
+            else if (Row.MemberNPCIDs.Num() < 2 || Row.MemberNPCIDs.Num() > 4) Issue(Issues, At, TEXT("MemberNPCIDs"), TEXT("Legacy synergy combinations contain two to four NPCs."));
+        }
+        if(Row.MinimumMembers<0||Row.MinimumMembers>4||(Row.RequiredWeaponFamily!=EICWeaponFamily::None&&Row.MinimumMembers<1)||(Row.RequiredWeaponFamily==EICWeaponFamily::None&&Row.MinimumMembers>Row.MemberNPCIDs.Num()))Issue(Issues,At,TEXT("MinimumMembers"),TEXT("Invalid party member threshold."));
         TSet<FName> Seen;
         for (int32 Index = 0; Index < Row.MemberNPCIDs.Num(); ++Index)
         {

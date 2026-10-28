@@ -17,6 +17,12 @@
 #include "Components/WidgetSwitcher.h"
 #define LOCTEXT_NAMESPACE "ICSettings"
 
+FText ICSettingsLayout::ControllerHelp(int32 Layout)
+{
+    if(Layout==1)return LOCTEXT("ControllerHelpXbox","L스틱 이동 · R스틱 시점 · RT 공격 · LT 달리기/회피 · RB 무기 변경 · LB 대상 지정\nX 상호작용 · Y 낚시 · A 점프/확인 · B 뒤로 · Start 메뉴 · View 인벤토리\nLT + X/Y/B/A: Q/E/R/T 스킬 · 십자키: 퀵슬롯 · 대상 선택 중 L스틱: 파티원 선택");
+    return LOCTEXT("ControllerHelpNintendo","L스틱 이동 · R스틱 시점 · ZR 공격 · ZL 달리기/회피 · R 무기 변경 · L 대상 지정\nX 상호작용 · Y 낚시 · A 점프/확인 · B 뒤로 · + 메뉴 · - 인벤토리\nZL + X/Y/B/A: Q/E/R/T 스킬 · 십자키: 퀵슬롯 · 대상 선택 중 L스틱: 파티원 선택");
+}
+
 const TArray<FText>& ICSettingsLayout::Tabs()
 {
     static const TArray<FText> Values={LOCTEXT("TabCombat","전투"),LOCTEXT("TabControls","조작 · 키 설정"),LOCTEXT("TabGraphics","그래픽 · 화면"),LOCTEXT("TabAudio","오디오"),LOCTEXT("TabOther","기타")};return Values;
@@ -76,6 +82,9 @@ const TArray<FICSettingSpec>& ICSettingsLayout::Specs()
         Toggle(TEXT("bMuteUnfocused"),3,LOCTEXT("MuteUnfocused","백그라운드에서 음소거"),LOCTEXT("MuteUnfocusedHelp","다른 창으로 전환하면 게임 소리를 끕니다."));
         Slider(TEXT("UIScale"),4,LOCTEXT("UIScale","HUD · 메뉴 글자 크기"),LOCTEXT("UIScaleHelp","HUD와 메뉴 안내 문구를 75%~130% 크기로 조절합니다."),.75,1.3,.05);
         Toggle(TEXT("bShowFPS"),4,LOCTEXT("FPS","FPS 표시"),LOCTEXT("FPSHelp","현재 렌더링 프레임 수를 표시합니다."));
+        Choice(TEXT("LanguageIndex"),4,LOCTEXT("Language","언어"),LOCTEXT("LanguageHelp","한국어와 영어 표시를 전환합니다."),{LOCTEXT("Korean","한국어"),LOCTEXT("English","English")},{0,1});
+        Choice(TEXT("InputDeviceMode"),1,LOCTEXT("InputDevice","조작 장치 표시"),LOCTEXT("InputDeviceHelp","자동 전환 또는 키보드/컨트롤러 안내를 선택합니다."),{LOCTEXT("AutoInput","자동"),LOCTEXT("KeyboardMouse","키보드 / 마우스"),LOCTEXT("GamepadInput","컨트롤러")},{0,1,2});
+        Choice(TEXT("GamepadLayout"),1,LOCTEXT("GamepadLayout","컨트롤러 버튼 배치"),LOCTEXT("GamepadLayoutHelpXbox","기본 Xbox 배치 또는 Nintendo 배치를 선택합니다."),{FText::FromString(TEXT("Xbox")),FText::FromString(TEXT("Nintendo"))},{1,0});
         return Out;
     }();return Result;
 }
@@ -139,6 +148,7 @@ void ICSettingsLayout::Build(UWidgetTree* Tree)
         }
         if(Tab==1)
         {
+            Content->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_ControllerHelp"),ControllerHelp(1),16,FLinearColor(.56f,.64f,.73f)))->SetPadding(FMargin(4,12,14,15));
             Content->AddChildToVerticalBox(SettingsText(Tree,NAME_None,LOCTEXT("BindingsTitle","키 변경"),25))->SetPadding(FMargin(4,24,14,10));
             Content->AddChildToVerticalBox(SettingsText(Tree,NAME_None,LOCTEXT("BindingsHelp","키 버튼을 선택한 뒤 새 키를 누르세요. ESC는 취소 및 메뉴 복귀용으로 유지됩니다. 중복 키는 적용 전에 확인합니다."),16,FLinearColor(.56f,.64f,.73f)))->SetPadding(FMargin(4,0,14,15));
             Content->AddChildToVerticalBox(Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("LIST_KeyBindings")));

@@ -1,4 +1,5 @@
 #include "UI/Gameplay/ICDeathWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
@@ -19,7 +20,7 @@ UWidget* UICDeathWidget::NativeGetDesiredFocusTarget() const
 {return GetWidgetFromName(TEXT("BTN_Load"));}
 FReply UICDeathWidget::NativeOnKeyDown(const FGeometry& Geometry,const FKeyEvent& Event)
 {
-    if(Event.GetKey()==EKeys::Escape||Event.GetKey()==EKeys::Equals||Event.GetKey()==EKeys::Gamepad_FaceButton_Right)return FReply::Handled();
+    if(Event.GetKey()==EKeys::Escape||Event.GetKey()==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(Event.GetKey()))return FReply::Handled();
     return Super::NativeOnKeyDown(Geometry,Event);
 }
 void UICDeathWidget::GoBack() {}

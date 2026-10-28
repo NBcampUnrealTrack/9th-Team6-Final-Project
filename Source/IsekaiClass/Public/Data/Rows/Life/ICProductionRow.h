@@ -64,6 +64,9 @@ struct ISEKAICLASS_API FICProductionRow : public FICDefinitionRow
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation")
     TSoftObjectPtr<UAnimMontage> WorkMontage;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") TSoftClassPtr<AActor> WorkToolClass;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") FName WorkToolSocket=TEXT("weapon_r");
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") FTransform WorkToolTransform;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation")
     TSoftObjectPtr<USoundBase> CompletionSound;

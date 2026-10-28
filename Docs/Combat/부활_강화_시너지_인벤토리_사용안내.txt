@@ -1,0 +1,64 @@
+부활서 · 무기 강화 · 파티 시너지 · 인벤토리 정리
+
+1. 부활서
+- 일반 상점과 R01_06 상점에서 5,000G로 구매.
+- 인벤토리에서 부활서 > 사용 > 전투불능 동료 선택.
+- 기본 효과: 최대 HP 50%, MP 최소 30%로 소생.
+- 살아 있는 대상에게 사용하거나 소생할 자리가 없으면 소비하지 않음.
+- 전투불능 동료의 HUD 초상화, 이름, HP·MP를 회색 처리하고, 퇴출은 금지.
+- /Game/IsekaiClass/Data/DataTable/Items/DT_IC_Item
+  ITM_CONS_REVIVE_SCROLL 행의 BuyPrice, RevivalHPRatio, RevivalMinimumMPRatio로 변경.
+- /Game/IsekaiClass/Data/DataTable/NPC/DT_IC_Shop: 상점별 Entries에서 판매 품목 설정.
+
+2. 제작대 > 강화
+- 제작 / 강화 탭 제공. 요리대는 기존 요리 목록을 사용.
+- 가방, 플레이어 무기 슬롯, 현재 동료가 장착한 무기 목록에서 무기 선택.
+- 광석 선택 후 표시된 성공 확률, 소모 개수와 골드를 확인하고 강화.
+- 성공하면 +1, 실패하면 현재 강화 단계 유지. 성공/실패 모두 표시 비용 소비.
+- 취소하면 비용 없이 무기 목록으로 돌아감. 잠긴 무기는 강화 불가.
+- 기존 단계별 강화 설정 유지: 첫 단계 100G / 100%, 최대 +10.
+- /Game/IsekaiClass/Data/DataTable/Equipment/DT_IC_Enhancement
+  MaximumLevel, EnhancedStats, Steps의 GoldCost / SuccessProbability / OriginalBaseBonusRatio.
+- /Game/IsekaiClass/Data/DataTable/Equipment/DT_IC_EnhancementOre (신규)
+  ItemID: 사용할 광석, Count: 1회 소모 개수, SuccessBonus: 성공 확률 추가치.
+  광석1~6 기본값: 각각 1개 소모 / 확률 +0, +5, +10, +15, +20, +25%p.
+  최종 확률은 0~100% 범위로 제한.
+- /Game/IsekaiClass/UI/Widget/WBP_IC_Enhancement
+- /Game/IsekaiClass/Life/Crafting/WBP_IC_CraftingStation
+- 키보드: 좌우로 제작/강화 탭 전환, W/S 선택, Enter 상세/강화, Esc 취소.
+
+3. 파티 시너지
+- 살아 있는 플레이어 및 현재 파티 동료만 계산.
+- 플레이어는 현재 선택한 무기의 직업을 기준으로 계산. 무기 미지정 시 생성 직업 사용.
+- 같은 직업 3명 이상: 파티 전체 물리·마법 공격력 +20%.
+- NPC_R01_001, 002, 003, 004, 008 중 2명: 용사파티 더블 +10%.
+- 위 구성원 중 3명 이상: 용사파티 트리플 +30%, 더블 대체.
+- NPC_R01_009, 010, 011 모두: 반친구들 +30%.
+- NPC_R01_005, 006, 007 모두: 마을 주민 +20%.
+- 서로 다른 시너지는 합산. 직업 +20%와 용사 트리플 +30%는 총 +50%.
+- 가입, 이탈, 전투불능, 부활, 플레이어 무기 변경 시 실시간 갱신.
+- /Game/IsekaiClass/Data/DataTable/Combat/DT_IC_Synergy
+  MinimumMembers, RequiredWeaponFamily, MemberNPCIDs로 조건 설정.
+  ExclusiveGroup / Priority로 같은 그룹 중 높은 단계만 적용.
+  bAdditiveWithOtherGroups=True인 행의 StatModifiers.Percent를 합산.
+- HUD 버프는 초록 네모의 +만 표시.
+- 메뉴 > 파티 > 현재 상태: 선택 인원의 시너지, 펫 버프, 버프/디버프 수치,
+  중첩 및 남은 시간 표시.
+
+4. 인벤토리 정리
+- 이름 / 아이템 ID 검색.
+- 전체, 무기, 소비품, 음식, 성장서, 재료, 잠금 분류 순환.
+- 가방 정렬: 아이템 ID 순으로 정렬. 잠긴 아이템은 원래 칸 유지.
+- 아이템 팝업 > 잠금 / 잠금 해제.
+- 묶음 아이템은 개수 입력 후 묶음 분할. 빈 칸 필요, 장비/잠금 아이템 제외.
+- 퀘스트 물건은 잠금/분할 기능 대상에서 제외.
+- 키보드 V: 가방 정렬, C: 분류 전환. Xbox X: 정렬, Y: 분류 전환.
+- 묶음 분할 개수는 마우스/숫자 입력 또는 Xbox LB/RB로 조절.
+- WBP_IC_InventoryMenu, WBP_IC_InventoryItemPopup에서 외형 수정 가능.
+
+5. 문자열
+- 아이템 및 시너지 이름/설명: ST_IC_Definitions.
+- 신규 UI 문구는 FText로 작성하고 기존 한국어/영어 번역 카탈로그에 연결.
+- Data/Localization/English_PartyForge.tsv에서 신규 영문 문구 관리.
+- Tools/Combat/setup_party_forge.py: 지정된 신규 DT 행과 WBP 재생성 도구.
+  수동으로 DT 값을 조정한 뒤 이 스크립트를 다시 실행하면 기본값으로 돌아갈 수 있음.

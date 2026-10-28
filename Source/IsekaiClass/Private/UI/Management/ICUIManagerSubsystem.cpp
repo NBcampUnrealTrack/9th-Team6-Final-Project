@@ -14,6 +14,8 @@
 #include "Components/WidgetSwitcher.h"
 #include "Components/TextBlock.h"
 #include "Settings/ICGameUserSettings.h"
+#include "Data/Text/ICLocalization.h"
+#include "HAL/IConsoleManager.h"
 namespace
 {
 struct FICScaledFont {float Base=0,Applied=0;};
@@ -23,6 +25,8 @@ void ApplyUserTextScale(UWidget* Widget,float Scale)
     if(!Widget)return;
     if(auto* Text=Cast<UTextBlock>(Widget))
     {
+        const FText Localized=ICLocalization::Localize(Text->GetText());
+        if(!Localized.IdenticalTo(Text->GetText()))Text->SetText(Localized);
         auto Font=Text->GetFont();auto& Size=ScaledFonts.FindOrAdd(TWeakObjectPtr<UTextBlock>(Text),FICScaledFont{Font.Size,Font.Size});
         if(!FMath::IsNearlyEqual(Font.Size,Size.Applied))Size.Base=Font.Size;
         const float Desired=FMath::Max(8.f,Size.Base*Scale);
@@ -61,21 +65,27 @@ public:
         return Fallback->GetNavigationDirectionFromKey(Event);
     }
     virtual EUINavigation GetNavigationDirectionFromAnalog(const FAnalogInputEvent& Event) override {return Fallback->GetNavigationDirectionFromAnalog(Event);}
-    virtual EUINavigationAction GetNavigationActionFromKey(const FKeyEvent& Event) const override {return Fallback->GetNavigationActionFromKey(Event);}
+    virtual EUINavigationAction GetNavigationActionFromKey(const FKeyEvent& Event) const override
+    {
+        if(UICGameUserSettings::IsGamepadAcceptKey(Event.GetKey()))return EUINavigationAction::Accept;
+        if(UICGameUserSettings::IsGamepadBackKey(Event.GetKey()))return EUINavigationAction::Back;
+        return Fallback->GetNavigationActionFromKey(Event);
+    }
 private:
     TSharedRef<FNavigationConfig> Fallback;
 };
 int32 KeyboardNavigationUsers=0;
+int32 PreviousVirtualAcceptMouse=1;
 TSharedPtr<FNavigationConfig> PreviousKeyboardNavigation,KeyboardNavigation;
 void RegisterKeyboardNavigation()
 {
     if(KeyboardNavigationUsers++==0)
-    {PreviousKeyboardNavigation=FSlateApplication::Get().GetNavigationConfig();KeyboardNavigation=MakeShared<FICKeyboardNavigation>(PreviousKeyboardNavigation.ToSharedRef());FSlateApplication::Get().SetNavigationConfig(KeyboardNavigation.ToSharedRef());}
+    {if(auto* Variable=IConsoleManager::Get().FindConsoleVariable(TEXT("CommonUI.ShouldVirtualAcceptSimulateMouseButton")))PreviousVirtualAcceptMouse=Variable->GetInt();PreviousKeyboardNavigation=FSlateApplication::Get().GetNavigationConfig();KeyboardNavigation=MakeShared<FICKeyboardNavigation>(PreviousKeyboardNavigation.ToSharedRef());FSlateApplication::Get().SetNavigationConfig(KeyboardNavigation.ToSharedRef());}
 }
 void UnregisterKeyboardNavigation()
 {
     if(--KeyboardNavigationUsers==0)
-    {if(FSlateApplication::IsInitialized()&&FSlateApplication::Get().GetNavigationConfig()==KeyboardNavigation)FSlateApplication::Get().SetNavigationConfig(PreviousKeyboardNavigation.ToSharedRef());KeyboardNavigation.Reset();PreviousKeyboardNavigation.Reset();}
+    {if(auto* Variable=IConsoleManager::Get().FindConsoleVariable(TEXT("CommonUI.ShouldVirtualAcceptSimulateMouseButton")))Variable->Set(PreviousVirtualAcceptMouse,ECVF_SetByGameOverride);if(FSlateApplication::IsInitialized()&&FSlateApplication::Get().GetNavigationConfig()==KeyboardNavigation)FSlateApplication::Get().SetNavigationConfig(PreviousKeyboardNavigation.ToSharedRef());KeyboardNavigation.Reset();PreviousKeyboardNavigation.Reset();}
 }
 }
 bool UICUIManagerSubsystem::EnsureRoot()
@@ -166,6 +176,9 @@ void UICUIManagerSubsystem::RefreshContext()
             Z = S.Z;
         }
     PC->bShowMouseCursor = bMenuOpen || !Screens.IsEmpty();
+    // These screens use focused-widget key navigation. A synthetic mouse click bypasses their A-key handlers.
+    if(auto* Variable=IConsoleManager::Get().FindConsoleVariable(TEXT("CommonUI.ShouldVirtualAcceptSimulateMouseButton")))
+        Variable->Set(0,ECVF_SetByGameOverride);
     if (PC->bShowMouseCursor)
     {
         FInputModeGameAndUI Mode;

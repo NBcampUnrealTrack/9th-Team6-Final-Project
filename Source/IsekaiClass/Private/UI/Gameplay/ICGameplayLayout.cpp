@@ -1,4 +1,5 @@
 #include "UI/Gameplay/ICGameplayLayout.h"
+#include "UI/Gameplay/ICFirefightHUDLayout.h"
 #include "UI/Gameplay/ICCharacterStatusWidget.h"
 #include "UI/Gameplay/ICGameMenuWidget.h"
 #include "UI/Gameplay/ICMovementCooldownWidget.h"
@@ -130,6 +131,7 @@ void Resource(UWidgetTree* Tree, UVerticalBox* Parent, const TCHAR* Key, FLinear
 
 void Status(UWidgetTree* Tree, bool Player)
 {
+    if (ICFirefightHUDLayout::Status(Tree, Player)) return;
     auto* Card = Frame(Tree, TEXT("StatusCard"), FMargin(Player ? 16 : 12));
     Tree->RootWidget = Card;
     auto* Content = Tree->ConstructWidget<UVerticalBox>();
@@ -157,12 +159,12 @@ void CompanionGroup(UWidgetTree* Tree)
     auto* Stack = Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("CompanionStack"));
     Tree->RootWidget = Stack;
     for (int32 Index = 0; Index < 3; ++Index)
-        if (auto* Widget = Cast<UICCharacterStatusWidget>(Child(Tree, TEXT("WBP_IC_CompanionStatus"), FName(*FString::Printf(TEXT("Companion%d"), Index + 1)))))
+        if (auto* Widget = Cast<UICCharacterStatusWidget>(Child(Tree, Index == 1 ? TEXT("WBP_IC_CompanionStatusAlternate") : TEXT("WBP_IC_CompanionStatus"), FName(*FString::Printf(TEXT("Companion%d"), Index + 1)))))
         {
             Widget->DisplayName = FText::GetEmpty();
             Widget->Portrait = nullptr;
             Widget->SetVisibility(ESlateVisibility::Collapsed);
-            auto* Wrapper = Size(Tree, Widget, 350, 88);
+            auto* Wrapper = Size(Tree, Widget, 223, 130);
             Wrapper->SetVisibility(ESlateVisibility::Collapsed);
             Row(Stack, Wrapper, 0);
         }
@@ -170,6 +172,7 @@ void CompanionGroup(UWidgetTree* Tree)
 
 void QuickSlot(UWidgetTree* Tree)
 {
+    if (ICFirefightHUDLayout::QuickSlot(Tree)) return;
     auto* Square = Frame(Tree, TEXT("QuickSlotFrame"), FMargin(3));
     Tree->RootWidget = Size(Tree, Square, 64, 64);
     auto* Content = Tree->ConstructWidget<UOverlay>();
@@ -184,16 +187,20 @@ void QuickSlot(UWidgetTree* Tree)
     auto* CountSlot = Content->AddChildToOverlay(Count);
     CountSlot->SetHorizontalAlignment(HAlign_Right);
     CountSlot->SetVerticalAlignment(VAlign_Bottom);
+    auto* Key=Label(Tree,TEXT("TXT_SlotKey"),FText::FromString(TEXT("1")),14);
+    Key->SetShadowColorAndOpacity(FLinearColor::Black);Key->SetShadowOffset(FVector2D(1,1));
+    auto* KeySlot=Content->AddChildToOverlay(Key);KeySlot->SetHorizontalAlignment(HAlign_Left);KeySlot->SetVerticalAlignment(VAlign_Top);
 }
 
 void QuickSlots(UWidgetTree* Tree)
 {
+    if (ICFirefightHUDLayout::QuickSlots(Tree)) return;
     auto* Bar = Tree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("QuickSlotBar"));
     Tree->RootWidget = Bar;
     for (int32 Index = 0; Index < 4; ++Index)
         if (auto* Widget = Child(Tree, TEXT("WBP_IC_QuickSlot"), FName(*FString::Printf(TEXT("QuickSlot%d"), Index + 1))))
         {
-            Widget->SetVisibility(ESlateVisibility::Collapsed);
+            Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
             // Transparent cells preserve each registered slot's position when another slot is empty.
             Bar->AddChildToHorizontalBox(Size(Tree, Widget, 64, 64))->SetPadding(FMargin(Index > 0 ? 10 : 0, 0, 0, 0));
         }
@@ -249,7 +256,9 @@ void GameMenu(UWidgetTree* Tree)
     DimSlot->SetAnchors(FAnchors(0, 0, 1, 1));
     DimSlot->SetOffsets(FMargin(0));
     auto* Card = Frame(Tree, TEXT("MenuCard"), FMargin(28));
-    Place(Root, Card, {.5f, .5f}, {.5f, .5f}, {0, 0}, {1120, 680});
+    auto* CardSlot = Root->AddChildToCanvas(Card);
+    CardSlot->SetAnchors(FAnchors(0, 0, 1, 1)); CardSlot->SetOffsets(FMargin(0));
+    Card->SetBrushColor(FLinearColor(.018f, .027f, .044f, 1.f));
     auto* Column = Tree->ConstructWidget<UVerticalBox>();
     Card->SetContent(Column);
     Row(Column, Label(Tree, TEXT("TXT_MenuTitle"), ICFrontendLayout::Text(TEXT("Menu")), 28), 20);
@@ -328,13 +337,14 @@ void HUD(UWidgetTree* Tree)
             Place(Canvas, Widget, Anchor, Alignment, Position, Extent);
         }
     };
-    Add(TEXT("WBP_IC_Minimap"), TEXT("HUD_Minimap"), {0, 0}, {0, 0}, {32, 32}, {240, 240});
-    Add(TEXT("WBP_IC_PlayerStatus"), TEXT("HUD_PlayerStatus"), {0, 1}, {0, 1}, {32, -32}, {350, 200});
-    Add(TEXT("WBP_IC_CompanionGroup"), TEXT("HUD_Companions"), {0, 1}, {0, 1}, {32, -248}, {350, 280});
+    Add(TEXT("WBP_IC_Minimap"), TEXT("HUD_Minimap"), {0, 0}, {0, 0}, {32, 32}, {240, 140});
+    Add(TEXT("WBP_IC_PlayerStatus"), TEXT("HUD_PlayerStatus"), {0, 1}, {0, 1}, {45, -28}, {223, 194});
+    Add(TEXT("WBP_IC_CompanionGroup"), TEXT("HUD_Companions"), {0, 1}, {0, 1}, {46, -232}, {223, 390});
     if (auto* Companions = Tree->FindWidget(TEXT("HUD_Companions")))
         if (auto* Slot = Cast<UCanvasPanelSlot>(Companions->Slot)) Slot->SetAutoSize(true);
     Add(TEXT("WBP_IC_QuestTracker"), TEXT("HUD_QuestTracker"), {1, 0}, {1, 0}, {-32, 32}, {350, 240});
-    Add(TEXT("WBP_IC_QuickSlots"), TEXT("HUD_QuickSlots"), {1, 1}, {1, 1}, {-32, -32}, {286, 64});
+    Add(TEXT("WBP_IC_QuickSlots"), TEXT("HUD_QuickSlots"), {.5f, 1}, {.5f, 1}, {0, -28}, {580, 140});
+    ICFirefightHUDLayout::Target(Tree, Canvas);
     Add(TEXT("WBP_IC_MovementCooldown"), TEXT("HUD_MovementCooldown"), {0, 0}, {.5f, .5f}, {0, 0},
         FVector2D(UICRadialCooldownBar::Diameter));
     if(auto* Feedback=Child(Tree,TEXT("WBP_IC_CombatFeedback"),TEXT("HUD_CombatFeedback")))
@@ -359,6 +369,7 @@ bool Build(UWidgetTree* Tree, FName Kind)
 {
     if (Kind == TEXT("PlayerStatus")) Status(Tree, true);
     else if (Kind == TEXT("CompanionStatus")) Status(Tree, false);
+    else if (Kind == TEXT("CompanionStatusAlternate")) return ICFirefightHUDLayout::Status(Tree, false, true);
     else if (Kind == TEXT("CompanionGroup")) CompanionGroup(Tree);
     else if (Kind == TEXT("QuickSlot")) QuickSlot(Tree);
     else if (Kind == TEXT("QuickSlots")) QuickSlots(Tree);
@@ -471,6 +482,12 @@ bool Build(UWidgetTree* Tree, FName Kind)
     else if (Kind == TEXT("QuestTracker"))
     {
         auto* Card = Frame(Tree, TEXT("QuestTrackerCard"));
+        if (auto* Texture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/IsekaiClass/UI/SampleUI/FirefightUI/Textures/06Panel/T_Panel_Bg.T_Panel_Bg")))
+        {
+            FSlateBrush Brush; Brush.SetResourceObject(Texture); Brush.DrawAs=ESlateBrushDrawType::Box;
+            Brush.ImageSize=FVector2D(Texture->GetSizeX(),Texture->GetSizeY()); Brush.Margin=FMargin(.15f);
+            Card->SetBrush(Brush); Card->SetBrushColor(FLinearColor::White); Card->SetPadding(FMargin(24));
+        }
         Tree->RootWidget = Card;
         auto* Content = Tree->ConstructWidget<UVerticalBox>();
         Card->SetContent(Content);
@@ -480,8 +497,20 @@ bool Build(UWidgetTree* Tree, FName Kind)
         Row(Content, Text, 0);
     }
     else if (Kind == TEXT("GameMenu")) GameMenu(Tree);
-    else if (Kind == TEXT("HUD")) HUD(Tree);
+    else if (Kind == TEXT("HUD")) {HUD(Tree);EnsureGameClock(Tree);}
     else return false;
+    return true;
+}
+bool EnsureGameClock(UWidgetTree* Tree)
+{
+    auto* Canvas=Tree?Cast<UCanvasPanel>(Tree->FindWidget(TEXT("HUDCanvas"))):nullptr;if(!Canvas)return false;
+    if(!Tree->FindWidget(TEXT("TXT_GameClock")))
+    {
+        auto* Clock=Label(Tree,TEXT("TXT_GameClock"),FText::GetEmpty(),18);
+        Clock->SetJustification(ETextJustify::Center);Clock->SetVisibility(ESlateVisibility::HitTestInvisible);
+        Place(Canvas,Clock,{0,0},{0,0},{32,20},{240,30});
+    }
+    if(auto* Map=Tree->FindWidget(TEXT("HUD_Minimap")))if(auto* Slot=Cast<UCanvasPanelSlot>(Map->Slot)){Slot->SetPosition(FVector2D(32,58));Slot->SetSize(FVector2D(240,140));}
     return true;
 }
 }

@@ -1,4 +1,6 @@
 #include "World/State/ICWorldStateSubsystem.h"
+#include "Audio/ICBGMSubsystem.h"
+#include "Engine/World.h"
 #include "Combat/GAS/Simulation/ICCombatSimulation.h"
 #include "Time/ICTimeSubsystem.h"
 #include "World/Spawn/ICSpawnSubsystem.h"
@@ -281,6 +283,9 @@ bool UICWorldStateSubsystem::ValidateState(const FICWorldState& Candidate)
     }
     for (const auto& Entry : Candidate.MonsterKilledAt) if (Entry.Key.IsNone() || !FMath::IsFinite(Entry.Value) || Entry.Value < 0) return false;
     for (const auto& Entry : Candidate.ResourceReadyAt) if (Entry.Key.IsNone() || !FMath::IsFinite(Entry.Value) || Entry.Value < 0) return false;
+    for (const auto& Entry : Candidate.ResourceReadyAtGameMinute) if (Entry.Key.IsNone() || !FMath::IsFinite(Entry.Value) || Entry.Value < 0) return false;
+    for(const auto& Entry:Candidate.RanchAnimals)
+        if(Entry.Key.IsNone()||Entry.Value.DefinitionID.IsNone()||!Entry.Value.IncarnationID.IsValid()||!FMath::IsFinite(Entry.Value.HP)||Entry.Value.HP<0||!FMath::IsFinite(Entry.Value.RespawnAtGameMinute)||Entry.Value.RespawnAtGameMinute<0)return false;
     for (FName ID : Candidate.UnlockedWarps) if (ID.IsNone()) return false;
     for (FName ID : Candidate.DefeatedBosses) if (ID.IsNone()) return false;
     TSet<FGuid> Drops;
@@ -415,8 +420,10 @@ bool UICWorldStateSubsystem::CanRestoreState(const FICWorldState& Candidate) con
 bool UICWorldStateSubsystem::RestoreState(const FICWorldState& Candidate)
 {
     IC_TRACE_FUNCTION();
-    FICWorldState Normalized=Candidate;ICSaveDataMigration::NormalizeWeaponOnly(Normalized);
+    FICWorldState Normalized=Candidate;ICSaveDataMigration::NormalizeInventoryIDs(Normalized);
     if (!CanRestoreState(Normalized)){UE_LOG(LogICWorldState, Verbose, TEXT("[State.Restore.Rejected] Characters=%d Jobs=%d Gold=%d: 규격/활성 참여자 검사 실패"),Candidate.Characters.Num(),Candidate.ProductionJobs.Num(),Candidate.Gold);return false;}
+    TGuardValue<bool> RestoringGuard(bRestoringState,true);
+    if(GetWorld())if(auto* Audio=GetWorld()->GetSubsystem<UICBGMSubsystem>())Audio->ResetForRestore();
     State = MoveTemp(Normalized);
     RecordAcquiredItems(State);
     UE_LOG(LogICWorldState, Log, TEXT("[State.Restored] PlayerCreated=%d Characters=%d Jobs=%d Quests=%d Gold=%d"),State.bPlayerCreated,State.Characters.Num(),State.ProductionJobs.Num(),State.Quests.Num(),State.Gold);
@@ -442,6 +449,7 @@ bool UICWorldStateSubsystem::ApplyWorldProgress(const FICWorldState& Candidate)
     Next.Quests = Candidate.Quests; Next.UnlockedWarps = Candidate.UnlockedWarps;
     Next.MonsterKilledAt = Candidate.MonsterKilledAt; Next.DefeatedBosses = Candidate.DefeatedBosses;
     Next.ResourceReadyAt = Candidate.ResourceReadyAt; Next.Drops = Candidate.Drops;
+    Next.ResourceReadyAtGameMinute=Candidate.ResourceReadyAtGameMinute;Next.RanchAnimals=Candidate.RanchAnimals;
     Next.bEndingCleared = Candidate.bEndingCleared; Next.EndingKind = Candidate.EndingKind;
     Next.ProductionJobs = Candidate.ProductionJobs; Next.Crops = Candidate.Crops;
     Next.SpawnSlots = Candidate.SpawnSlots; Next.ResourcePoints = Candidate.ResourcePoints;

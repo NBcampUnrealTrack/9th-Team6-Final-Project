@@ -1,5 +1,9 @@
 #include "Debug/ICBlueprintMaintenanceLibrary.h"
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Gameplay/ICGameplayLayout.h"
+#include "NPC/LifeObject/ICLifeObjectActor.h"
+#include "SmartObjectComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Internationalization/StringTable.h"
 #include "Internationalization/StringTableCore.h"
 #include "Engine/Font.h"
@@ -34,6 +38,7 @@
 #include "Misc/FileHelper.h"
 #include "Framework/Application/SlateApplication.h"
 #include "RenderingThread.h"
+#include "AssetCompilingManager.h"
 #include "Engine/Blueprint.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "EdGraph/EdGraph.h"
@@ -161,6 +166,7 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
         }
     }
     FWidgetRenderer Renderer(true);
+    FAssetCompilingManager::Get().FinishAllCompilation();
     TSharedRef<SWidget> Surface=Preview->TakeWidget();
     if(auto* Settings=Cast<UICSettingsWidget>(Preview))Settings->SelectTab(FMath::Clamp(Question,0,4));
     if(BP->GetFName()==TEXT("WBP_GameHUD")||BP->GetFName()==TEXT("WBP_IC_GameMenu"))
@@ -197,6 +203,27 @@ bool UICBlueprintMaintenanceLibrary::BuildFrontendWidget(UBlueprint* Blueprint,F
 #endif
 }
 
+bool UICBlueprintMaintenanceLibrary::SetLifeObjectDefinition(AICLifeObjectActor* Object,USmartObjectDefinition* Definition)
+{
+    if(!Object||!Object->SmartObject||!Definition)return false;Object->SmartObject->Modify();Object->SmartObject->SetDefinition(Definition);
+    if(Object->ObjectType==EICLifeObjectType::Bed&&Object->Shape)
+    {
+        Object->Shape->SetCollisionEnabled(ECollisionEnabled::QueryOnly);Object->Shape->SetCollisionResponseToAllChannels(ECR_Ignore);
+        Object->Shape->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);
+    }
+    return true;
+}
+bool UICBlueprintMaintenanceLibrary::AddGameClockHUD(UBlueprint* Blueprint)
+{
+#if WITH_EDITOR
+    auto* BP=Cast<UWidgetBlueprint>(Blueprint);if(!BP||!ICGameplayLayout::EnsureGameClock(BP->WidgetTree))return false;
+    if(auto* Clock=BP->WidgetTree->FindWidget(TEXT("TXT_GameClock")))
+    {Clock->bIsVariable=true;BP->WidgetVariableNameToGuidMap.FindOrAdd(Clock->GetFName(),FGuid::NewGuid());}
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);return true;
+#else
+    return false;
+#endif
+}
 bool UICBlueprintMaintenanceLibrary::AddDialogueAffinityHearts(UBlueprint* Blueprint)
 {
 #if WITH_EDITOR

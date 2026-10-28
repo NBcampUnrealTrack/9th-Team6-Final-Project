@@ -26,6 +26,7 @@ protected:
     virtual void NativeDestruct() override;
     virtual void NativeTick(const FGeometry& Geometry, float DeltaSeconds) override;
     virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
+    virtual FReply NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& KeyEvent) override;
 
 private:
     UPROPERTY(meta=(BindWidget))
@@ -84,6 +85,8 @@ private:
 
     void ShowInteractionOptions();
     void ShowInitialDialogue();
+    void ResetDialogue();
+    bool TryShowNode(FName DialogueID, FName NodeID = NAME_None);
     void ShowGiftPicker();
     UFUNCTION() void GiftPickerClosed(const FText& Message);
     void ShowQuestList();

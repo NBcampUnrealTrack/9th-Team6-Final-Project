@@ -18,8 +18,9 @@ public:
     AICAttackEffect();
     virtual void Tick(float Seconds) override;
     static FLinearColor FamilyColor(EICWeaponFamily Family);
-    static void SpawnSlash(AICCharacterBase* Character,double Radius,double Angle,int32 Stage);
+    static void SpawnSlash(AICCharacterBase* Character,double Radius,double Angle,int32 Stage,const FICCombatPresentation& Presentation=FICCombatPresentation());
     static void SpawnImpact(UWorld* World,const FVector& Location,EICWeaponFamily Family);
+    void UseNiagaraLifetime(float Seconds);
 private:
     UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Pieces;
     UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> Glow;
@@ -27,6 +28,7 @@ private:
     FLinearColor Color;
     float Age=0, Duration=.24f;
     bool bImpact=false;
+    bool bNiagara=false;
     void SetColor(FLinearColor Value);
     void Line(int32 Index,FVector Start,FVector End,float Width);
 };

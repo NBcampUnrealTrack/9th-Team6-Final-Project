@@ -6,11 +6,14 @@
 #include "Combat/GAS/Attributes/ICAttributeSets.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "NPC/Character/ICNPCBase.h"
+#include "Life/Production/ICPlayerLifeComponent.h"
 #include "Time/ICTimeSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "World/Spawn/ICSpawnSubsystem.h"
 #include "Animation/AnimInstanceProxy.h"
+#include "AlphaBlend.h"
 #include "Animation/AnimSequence.h"
+#include "Animation/BlendSpace.h"
 #include "Animation/AnimNode_SequencePlayer.h"
 #include "AnimNodes/AnimNode_BlendSpacePlayer.h"
 #include "AnimNodes/AnimNode_TwoWayBlend.h"
@@ -22,6 +25,10 @@
 
 namespace
 {
+constexpr float LandingBlendInSeconds=.08f;
+constexpr float LandingBlendOutSeconds=.20f;
+constexpr float MovingLandingHoldSeconds=.14f;
+
 struct FICCharacterAnimProxy : FAnimInstanceProxy
 {
     FAnimNode_BlendSpacePlayer_Standalone Ground, CombatGround;
@@ -29,6 +36,8 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
     FAnimNode_SequencePlayer_Standalone Air, Bed, Sprint, Launch, Fall, Landing;
     FAnimNode_TwoWayBlend AirBlend, SleepBlend, SprintBlend, LaunchBlend, FallBlend, LandingBlend;
     EICAirAnimationState PreviousAirState=EICAirAnimationState::Grounded;
+    FAlphaBlend LandingWeight;
+    bool bLandingActive=false;
     FAnimNode_Slot Slot;
 
     explicit FICCharacterAnimProxy(UAnimInstance* Instance) : FAnimInstanceProxy(Instance)
@@ -44,6 +53,9 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
         Air.SetLoopAnimation(true); Bed.SetLoopAnimation(true);
         Sprint.SetLoopAnimation(true);
         Launch.SetLoopAnimation(false);Fall.SetLoopAnimation(true);Landing.SetLoopAnimation(false);
+        LandingWeight.SetBlendOption(EAlphaBlendOption::Cubic);
+        LandingWeight.SetValueRange(0.f,0.f);
+        LandingWeight.Reset();
     }
     virtual FAnimNode_Base* GetCustomRootNode() override { return &Slot; }
     virtual void GetCustomNodes(TArray<FAnimNode_Base*>& Out) override
@@ -58,8 +70,10 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
         CombatBlend.Alpha=FMath::FInterpTo(CombatBlend.Alpha,IC->bCombatMovement&&IC->CombatLocomotion?1.f:0.f,DeltaSeconds,10.f);
         Air.SetSequence(IC->Jump); Bed.SetSequence(IC->Sleep);
         Launch.SetSequence(IC->JumpStart?IC->JumpStart:IC->Jump);
+        Launch.SetPlayRate(IC->JumpStartPlayRate);
         Fall.SetSequence(IC->FallLoop?IC->FallLoop:IC->Jump);
         Landing.SetSequence(IC->Land);
+        Landing.SetPlayRate(IC->LandingPlayRate);
         if(PreviousAirState!=IC->AirState)
         {
             if(IC->AirState==EICAirAnimationState::JumpStart)Launch.SetAccumulatedTime(0);
@@ -70,7 +84,17 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
         }
         LaunchBlend.Alpha=FMath::FInterpTo(LaunchBlend.Alpha,IC->AirState==EICAirAnimationState::JumpStart?1.f:0.f,DeltaSeconds,20.f);
         FallBlend.Alpha=FMath::FInterpTo(FallBlend.Alpha,IC->AirState==EICAirAnimationState::Falling?1.f:0.f,DeltaSeconds,12.f);
-        LandingBlend.Alpha=FMath::FInterpTo(LandingBlend.Alpha,IC->AirState==EICAirAnimationState::Landing&&IC->Land?1.f:0.f,DeltaSeconds,20.f);
+        const bool bLanding=IC->AirState==EICAirAnimationState::Landing&&IC->Land;
+        if(bLanding!=bLandingActive)
+        {
+            // Keep the current pose weight when movement or another jump interrupts recovery.
+            LandingWeight.SetBlendTime(bLanding?LandingBlendInSeconds:(IC->bAirborne?LandingBlendInSeconds:LandingBlendOutSeconds));
+            LandingWeight.SetValueRange(LandingBlend.Alpha,bLanding?1.f:0.f);
+            LandingWeight.Reset();
+            bLandingActive=bLanding;
+        }
+        LandingWeight.Update(FMath::Max(0.f,DeltaSeconds));
+        LandingBlend.Alpha=LandingWeight.GetBlendedValue();
         Sprint.SetSequence(IC->Sprint);
         SprintBlend.Alpha = FMath::FInterpTo(SprintBlend.Alpha, IC->bSprinting && IC->Sprint ? 1.f : 0.f, DeltaSeconds, 10.f);
         AirBlend.Alpha = FMath::FInterpTo(AirBlend.Alpha, IC->bAirborne && IC->Jump ? 1.f : 0.f, DeltaSeconds, 12.f);
@@ -96,6 +120,12 @@ void UICCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     Locomotion = Set->Locomotion; Jump = Set->Jump; Sleep = Profile->Sleep;
     Speed = Character->GetVelocity().Size2D(); bAirborne = Character->GetCharacterMovement()->IsFalling(); bSleeping = false;
     JumpStart=Set->JumpStart;FallLoop=Set->FallLoop;Land=Set->Land;
+    const auto FitClip=[](const UAnimSequence* Clip,float Seconds)
+    {
+        return Clip&&Seconds>0.f?Clip->GetPlayLength()/(Seconds*FMath::Max(FMath::Abs(Clip->RateScale),UE_SMALL_NUMBER)):1.f;
+    };
+    JumpStartPlayRate=FitClip(JumpStart,Set->JumpStartDurationSeconds);
+    LandingPlayRate=FitClip(Land,Set->LandingDurationSeconds);
     const float VerticalSpeed=Character->GetVelocity().Z;
     const bool Teleported=bHasPreviousPosition&&FVector::DistSquared(Character->GetActorLocation(),PreviousPosition)>FMath::Square(1000.f);
     auto ChangeAirState=[this](EICAirAnimationState State){if(AirState!=State){AirState=State;AirStateSeconds=0;}};
@@ -110,11 +140,18 @@ void UICCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
         if(!bWasAirborne){AirborneSeconds=0;ChangeAirState(VerticalSpeed>10&&JumpStart?EICAirAnimationState::JumpStart:EICAirAnimationState::Falling);}
         AirborneSeconds+=FMath::Max(0.f,DeltaSeconds);
         if(VerticalSpeed<=0)ChangeAirState(EICAirAnimationState::Falling);
-        else if(AirState==EICAirAnimationState::JumpStart&&AirStateSeconds>=FMath::Min(.2f,JumpStart?JumpStart->GetPlayLength():0.f))ChangeAirState(EICAirAnimationState::Rising);
+        else if(AirState==EICAirAnimationState::JumpStart&&AirStateSeconds>=(Set->JumpStartDurationSeconds>0.f?Set->JumpStartDurationSeconds:FMath::Min(.2f,JumpStart?JumpStart->GetPlayLength():0.f)))ChangeAirState(EICAirAnimationState::Rising);
     }
     else if(bWasAirborne)
         ChangeAirState(Land&&AirborneSeconds>.08f&&Character->GetCharacterMovement()->IsMovingOnGround()?EICAirAnimationState::Landing:EICAirAnimationState::Grounded);
-    else if(AirState==EICAirAnimationState::Landing&&AirStateSeconds>=FMath::Min(Speed>10?.12f:.3f,Land?Land->GetPlayLength():0.f))ChangeAirState(EICAirAnimationState::Grounded);
+    else if(AirState==EICAirAnimationState::Landing)
+    {
+        // Let an idle landing straighten up before handing over; moving landings stay responsive.
+        const float ClipSeconds=Land?Land->GetPlayLength()/FMath::Max(FMath::Abs(Land->RateScale)*LandingPlayRate,UE_SMALL_NUMBER):0.f;
+        const float RecoverySeconds=FMath::Max(0.f,ClipSeconds-LandingBlendOutSeconds);
+        const float HoldSeconds=Speed>10.f?FMath::Min(MovingLandingHoldSeconds,RecoverySeconds):RecoverySeconds;
+        if(AirStateSeconds>=HoldSeconds)ChangeAirState(EICAirAnimationState::Grounded);
+    }
     bWasAirborne=bAirborne;
     Sprint = Set->Sprint;
     const auto* Player = Cast<AICPlayerCharacter>(Character);
@@ -138,6 +175,16 @@ void UICCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
         auto* Time = GI ? GI->GetSubsystem<UICTimeSubsystem>() : nullptr;
         auto* State = GI ? GI->GetSubsystem<UICWorldStateSubsystem>() : nullptr;
         const auto* Stored = State ? State->GetStoredCharacter(Character->GetCharacterID()) : nullptr;
+        // NPC profiles already contain their own retargeted run loop. Use it as
+        // the sprint pose when no separate sprint clip was authored.
+        if(!Sprint&&Locomotion)
+        {
+            float Fastest=0.f;
+            for(const auto& Sample:Locomotion->GetBlendSamples())
+                if(Sample.Animation&&Sample.SampleValue.X>Fastest)
+                {Fastest=Sample.SampleValue.X;Sprint=Sample.Animation;}
+        }
+        bSprinting=NPC->IsFollowingPlayerSprint()&&Speed>10.f;
         FICDefinitionResult Result;
         if (Definitions && Time && Stored && Stored->Mode == EICCharacterMode::Scheduled)
             if (const auto* Schedule = Definitions->Find<FICScheduleRow>(NPC->GetNPCDefinition().ScheduleID, Result))
@@ -155,6 +202,8 @@ void UICCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
                     }
                 }
     }
+    const bool PlayerInBed=Player&&Player->LifeActions&&Player->LifeActions->IsSleeping();
+    if(PlayerInBed){bSleeping=Player->LifeActions->IsSleepPoseActive();BedAnchor=Player->LifeActions->GetSleepAnchor();}
     Character->UpdatePresentationTransform(Set->GroundOffsetCm,bSleeping?&BedAnchor:nullptr);
     if (ASC)
     {

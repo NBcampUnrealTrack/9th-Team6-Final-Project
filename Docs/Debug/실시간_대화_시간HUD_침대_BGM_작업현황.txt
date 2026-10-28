@@ -1,0 +1,40 @@
+2026-10-28 작업 완료
+
+현재 사용자 요청
+- HUD 미니맵 위 게임시간.
+- 수면 NPC는 '(자는 중)'만 표시, 대화 불가.
+- NPC 호감도 200 초과이고 비어 있는 NPC 침대 사용.
+- 얼굴 근접 카메라는 실시간으로 유지. 월드가 움직이고 플레이어도 이동 가능, 멀어지면 대화 종료.
+- 대화 카메라 조절 DT.
+- 마을/마을 밖/다른 구역 1/다른 구역 2/전투 BGM을 DT로 관리.
+
+반영
+- DT_IC_DialoguePresentation: Default 및 NPC별 ID 행, 거리/높이/좌우/시선/FOV/추적속도/종료거리 등.
+- 대화 UI를 비모달 화면으로 변경. 월드와 게임시계는 계속 흐르며 플레이어 이동 키를 Enhanced Input으로 전달.
+- 대화 중 카메라는 NPC 머리를 매 프레임 추적. 500cm 이상 떨어지면 종료하고 시점/표시 상태 복구.
+- NPC 수면 판정은 생활 컴포넌트와 실제 수면 애니메이션 모두 확인.
+- 기존 장식용 NPC 침대 11개에 소유자/슬롯/상호작용 BP 추가.
+- 호감도 200에서는 잠김, 201부터 사용 가능. 점유/예약/플레이어 잠금 동안 다른 사용 차단.
+- 플레이어 수면 연출/암전/기상 후 잠금 해제 연결.
+- WBP_GameHUD에 TXT_GameClock 추가, 미니맵 위 날짜·시분 표시.
+- DT_IC_BGM: 곡/이름/볼륨/반복/페이드. 프로젝트 음악 5곡 우선 연결.
+- BP_IC_BGMZone 박스로 지역 지정. Priority와 구역 크기로 겹침 처리, 밖은 BGM_Outside.
+- 전투가 최우선. 전투 종료 시 현재 구역으로 복귀. SC_Music 및 전체 볼륨 적용.
+
+검증
+- Saved/BuildLiveDialogueMusic4.log 빌드 성공.
+- Saved/LiveDialogueMusic/Automation/index.json: 10개 전부 성공, 오류 0.
+- 실제 PIE 검증 완료: Saved/LiveDialogueMusic/LiveReview.json, 모든 체크 true.
+- 실제 S키 이동 및 거리 종료, 계속 흐르는 게임시계, 실시간 머리 추적, BGM 오디오 재생/음악 볼륨 채널/전투 전환 확인.
+- 수면 NPC의 '(자는 중)' 단독 표시와 대화/사용중 침대 거부 확인.
+- 호감도 200 거부, 201 빈 침대 수면/암전/120분 경과/기상 및 예약 해제 확인.
+
+안내 문서
+- Docs/Audio/BGM_DT_관리_안내.txt
+- Docs/Life/NPC_대화_낚시_보관함_안내.txt
+
+작성/검증 도구
+- Tools/Life/setup_live_dialogue_music.py (DT·WBP·침대·BGM 구역 저작, 기존 설정 보존).
+- Tools/Life/review_live_dialogue_music.py (별도 IC_Visual 세이브에서 검증).
+
+이전 작업 변경분 보존. 사용자 커밋·푸시·PR은 실행하지 않음.

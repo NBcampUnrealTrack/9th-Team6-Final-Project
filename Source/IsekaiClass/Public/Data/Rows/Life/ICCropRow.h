@@ -35,6 +35,10 @@ struct ISEKAICLASS_API FICCropRow : public FICDefinitionRow
 {
     GENERATED_BODY()
 
+    /** Wild/test-map crops start growing without consuming a seed. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crop") bool bGrowsNaturally=false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crop", meta=(ClampMin="0",Units="min")) double RegrowthGameMinutes=120;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Crop")
     FName SeedItemID;
 

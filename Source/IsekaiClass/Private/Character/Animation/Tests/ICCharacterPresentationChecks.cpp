@@ -51,7 +51,7 @@ bool FICGiftTransactionCheck::RunTest(const FString&)
     auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* World=GI->GetWorld();
     auto* Definitions=GI->GetSubsystem<UICDefinitionSubsystem>();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(Definitions,0);
-    TestTrue(TEXT("Gift item is a valid inventory item"),Staging->AddItem(TEXT("ITEM_P0_01"),3,false));
+    TestTrue(TEXT("Gift item is a valid inventory item"),Staging->AddItem(TEXT("ITM_R01_FOOD_15"),3,false));
     FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("선물 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");Initial.Inventory=Staging->GetSnapshot();
     FICCharacterState PlayerState;PlayerState.CharacterId=UICWorldStateSubsystem::PlayerId();PlayerState.Kind=EICCharacterKind::Player;
     PlayerState.UnlockedSkillIDs.Add(Initial.FirstSkill);Initial.Characters.Add(PlayerState.CharacterId,PlayerState);
@@ -63,17 +63,17 @@ bool FICGiftTransactionCheck::RunTest(const FString&)
     if(TestNotNull(TEXT("Equipment restoration creates weapon actor after mesh is ready"),NPC->EquippedWeaponActor.Get()))
         TestEqual(TEXT("Bow attaches to configured hand socket"),NPC->EquippedWeaponActor->GetRootComponent()->GetAttachSocketName(),FName(TEXT("weapon_l")));
     NPC->SetActorLocation(Player->GetActorLocation()+FVector(100,0,0));
-    TestTrue(TEXT("Preferred gift succeeds"),NPC->TryGiveGift(Controller,TEXT("ITEM_P0_01")));
+    TestTrue(TEXT("Preferred gift succeeds"),NPC->TryGiveGift(Controller,TEXT("ITM_R01_FOOD_15")));
     TestEqual(TEXT("Gift adds 20 affinity"),State->GetSnapshot(TEXT("NPC_R01_004")).Affinity,20);
-    TestEqual(TEXT("Gift consumes exactly one item"),Player->Inventory->CountItem(TEXT("ITEM_P0_01")),2);
+    TestEqual(TEXT("Gift consumes exactly one item"),Player->Inventory->CountItem(TEXT("ITM_R01_FOOD_15")),2);
     State->SetAffinity(TEXT("NPC_R01_004"),480);
-    TestTrue(TEXT("Gift reaches upper bound"),NPC->TryGiveGift(Controller,TEXT("ITEM_P0_01")));
-    TestFalse(TEXT("No-effect gift at 500 rejected"),NPC->TryGiveGift(Controller,TEXT("ITEM_P0_01")));
-    TestEqual(TEXT("Rejected gift does not consume"),Player->Inventory->CountItem(TEXT("ITEM_P0_01")),1);
+    TestTrue(TEXT("Gift reaches upper bound"),NPC->TryGiveGift(Controller,TEXT("ITM_R01_FOOD_15")));
+    TestFalse(TEXT("No-effect gift at 500 rejected"),NPC->TryGiveGift(Controller,TEXT("ITM_R01_FOOD_15")));
+    TestEqual(TEXT("Rejected gift does not consume"),Player->Inventory->CountItem(TEXT("ITM_R01_FOOD_15")),1);
     State->SetAffinity(TEXT("NPC_R01_004"),80);
-    TestTrue(TEXT("Last item reaches skill threshold"),NPC->TryGiveGift(Controller,TEXT("ITEM_P0_01")));
+    TestTrue(TEXT("Last item reaches skill threshold"),NPC->TryGiveGift(Controller,TEXT("ITM_R01_FOOD_15")));
     TestTrue(TEXT("100 affinity unlocks NPC skill"),State->GetSnapshot(PlayerState.CharacterId).UnlockedSkillIDs.Contains(TEXT("SKL_NPC_R01_004")));
-    TestFalse(TEXT("Insufficient gift rejected"),NPC->TryGiveGift(Controller,TEXT("ITEM_P0_01")));
+    TestFalse(TEXT("Insufficient gift rejected"),NPC->TryGiveGift(Controller,TEXT("ITM_R01_FOOD_15")));
     TestEqual(TEXT("Failed gift preserves affinity"),State->GetSnapshot(TEXT("NPC_R01_004")).Affinity,100);
     Player->ReleaseForLoad();NPC->ReleaseForLoad();GI->Shutdown();GEngine->DestroyWorldContext(World);World->DestroyWorld(false);return true;
 }

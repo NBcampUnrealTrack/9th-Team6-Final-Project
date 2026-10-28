@@ -39,17 +39,19 @@ bool UICProductionSubsystem::StartRecipe(FName RecipeID,FName WorkAnchorID,UICIn
     const auto* Production=Recipe?Definitions->Find<FICProductionRow>(Recipe->ProductionID,R):nullptr;
     const auto* Anchor=Definitions->Find<FICAnchorRow>(WorkAnchorID,R);
     if(!Recipe||!Production||!Anchor)return Fail(*ICText::Get(TEXT("Native_da3541bc00b0")).ToString());
-    if(Recipe->ResultKind!=EICProductionResultKind::BagItems || Production->ResultKind!=EICProductionResultKind::BagItems)
+    const bool Storage=Recipe->ResultKind==EICProductionResultKind::InstallStorage;
+    if((!Storage&&Recipe->ResultKind!=EICProductionResultKind::BagItems)||Production->ResultKind!=Recipe->ResultKind)
         return Fail(*ICText::Get(TEXT("Native_ed13b90bdcba")).ToString());
     if(!Recipe->UnlockConditions.IsEmpty()||!Production->StartConditions.IsEmpty())
         return Fail(*ICText::Get(TEXT("Native_adde31bc12cb")).ToString());
     if(!Production->WorkAnchorIDs.IsEmpty()&&!Production->WorkAnchorIDs.Contains(WorkAnchorID))return Fail(*ICText::Get(TEXT("Native_fb46dc569135")).ToString());
-    if(Production->DurationPlaySeconds!=Recipe->WorkDurationPlaySeconds || Production->SPCost!=Recipe->SPCost)
-        return Fail(*ICText::Get(TEXT("Native_73708968b76d")).ToString());
+    // Recipe DT owns the duration and SP cost of recipe jobs. Production rows
+    // also serve other life activities and must not override these settings.
     if(!FMath::IsFinite(Recipe->WorkDurationPlaySeconds)||Recipe->WorkDurationPlaySeconds<0||!FMath::IsFinite(Recipe->SPCost)||Recipe->SPCost<0)
         return Fail(*ICText::Get(TEXT("Native_8420321993ee")).ToString());
     if(!State->FlushParticipants())return Fail(*ICText::Get(TEXT("Native_ed7cb0d52fdb")).ToString());
     FICWorldState Next=State->ExportState();
+    if(Storage&&(Recipe->RequiredExtraStorage<0||Recipe->RequiredExtraStorage>=2||Next.ProgressionStages.FindRef(TEXT("PLAYER_STORAGE"))!=Recipe->RequiredExtraStorage||Recipe->InstalledContainerID.IsNone()||Next.Inventory.Storage.Contains(Recipe->InstalledContainerID)||Recipe->InstallationAnchorIDs.Num()!=1||Recipe->HomeID.IsNone()))return Fail(TEXT("현재 설치할 수 없는 창고입니다."));
     if(!Next.bPlayerCreated)return Fail(*ICText::Get(TEXT("Native_44dad2d7eb9d")).ToString());
     if(!Recipe->bUnlockedByDefault&&!Next.UnlockedRecipeIDs.Contains(RecipeID))return Fail(*ICText::Get(TEXT("Native_3186c7959639")).ToString());
     for(const auto& Pair:Next.ProductionJobs)
@@ -57,12 +59,13 @@ bool UICProductionSubsystem::StartRecipe(FName RecipeID,FName WorkAnchorID,UICIn
             return Fail(*ICText::Get(TEXT("Native_c6ffb67d4c4b")).ToString());
     auto* Player=Next.Characters.Find(UICWorldStateSubsystem::PlayerId());
     if(!Player||Player->HP<=0||Player->IsDowned()||Player->SP<Recipe->SPCost)return Fail(*ICText::Get(TEXT("Native_f17087bb7433")).ToString());
+    if(Recipe->RequiredMainStatValue>0&&Player->MainStats.Get(Recipe->RequiredMainStat)<Recipe->RequiredMainStatValue)return Fail(TEXT("제작에 필요한 능력치가 부족합니다."));
     for(const auto& Tool:Recipe->Tools)if(!Definitions->Find<FICItemRow>(Tool.ItemID,R)||Tool.Count<=0||Inventory->CountItem(Tool.ItemID)<Tool.Count)
         return Fail(*ICText::Get(TEXT("Native_b6a433a1e2f6")).ToString());
     for(const auto& Tool:Production->Tools)if(!Definitions->Find<FICItemRow>(Tool.ItemID,R)||Tool.Count<=0||Inventory->CountItem(Tool.ItemID)<Tool.Count)
         return Fail(*ICText::Get(TEXT("Native_7cfdcdab4ecb")).ToString());
 
-    if(Recipe->Ingredients.IsEmpty()||Recipe->Results.IsEmpty())return Fail(*ICText::Get(TEXT("Native_adb58b3f2cfa")).ToString());
+    if((Recipe->Ingredients.IsEmpty()&&Recipe->IngredientGroups.IsEmpty())||(!Storage&&Recipe->Results.IsEmpty()))return Fail(*ICText::Get(TEXT("Native_adb58b3f2cfa")).ToString());
     TMap<FName,int64> Costs;
     for(const auto& Cost:Recipe->Ingredients)
     {
@@ -71,6 +74,24 @@ bool UICProductionSubsystem::StartRecipe(FName RecipeID,FName WorkAnchorID,UICIn
     }
     FICInventoryState Preview=Next.Inventory;
     for(const auto& Cost:Costs)if(!Inventory->Remove(Preview.Bag,Cost.Key,Cost.Value))return Fail(*ICText::Get(TEXT("Native_1a362c4b1158")).ToString());
+    for(const auto& Group:Recipe->IngredientGroups)
+    {
+        if(Group.Count<=0||Group.ItemIDs.IsEmpty())return Fail(TEXT("재료 그룹 설정을 확인하세요."));
+        int32 Remaining=Group.Count;TSet<FName> Seen;
+        for(FName ID:Group.ItemIDs)
+        {
+            if(Seen.Contains(ID)||!Definitions->Find<FICItemRow>(ID,R))return Fail(TEXT("재료 그룹의 아이템 설정을 확인하세요."));
+            Seen.Add(ID);int64 Available=0;
+            for(const auto& Item:Preview.Bag.Slots)if(!Item.IsEmpty()&&!Item.bLocked&&Item.ItemID==ID)Available+=Item.Count;
+            const int32 Take=static_cast<int32>(FMath::Min<int64>(Remaining,Available));
+            if(Take>0)
+            {
+                Costs.FindOrAdd(ID)+=Take;if(Costs[ID]>MAX_int32||!Inventory->Remove(Preview.Bag,ID,Take))return Fail(TEXT("재료 수량 설정을 확인하세요."));
+                Remaining-=Take;
+            }
+        }
+        if(Remaining>0)return Fail(*FText::Format(NSLOCTEXT("ICCraft","GroupMissing","{0} 재료가 부족합니다. 합계 {1}개가 필요합니다."),Group.DisplayName,FText::AsNumber(Group.Count)).ToString());
+    }
     for(const auto& Result:Recipe->Results)
     {
         const auto* Item=Definitions->Find<FICItemRow>(Result.ItemID,R);
@@ -108,9 +129,16 @@ bool UICProductionSubsystem::CompleteJob(FGuid JobID,UICInventoryComponent* Inve
     if(Clock->GetClock().PlaySecond<Job->CompletesAtPlaySecond)return Fail(*ICText::Get(TEXT("Native_b7ee8700f83d")).ToString());
     const auto* Recipe=Definitions->Find<FICRecipeRow>(Job->RecipeID,R);
     const auto* Production=Definitions->Find<FICProductionRow>(Job->ProductionID,R);
-    if(!Recipe||!Production||Recipe->ProductionID!=Job->ProductionID||Recipe->ResultKind!=EICProductionResultKind::BagItems||Recipe->Results.IsEmpty())
+    if(!Recipe||!Production||Recipe->ProductionID!=Job->ProductionID||(Recipe->ResultKind!=EICProductionResultKind::BagItems&&Recipe->ResultKind!=EICProductionResultKind::InstallStorage)||(Recipe->ResultKind==EICProductionResultKind::BagItems&&Recipe->Results.IsEmpty()))
         return Fail(*ICText::Get(TEXT("Native_9bd6a6be260b")).ToString());
     if(Job->OwnerCharacterID!=UICWorldStateSubsystem::PlayerId())return Fail(*ICText::Get(TEXT("Native_0b3335415e48")).ToString());
+    if(Recipe->ResultKind==EICProductionResultKind::InstallStorage)
+    {
+        if(Recipe->RequiredExtraStorage<0||Recipe->RequiredExtraStorage>=2||Next.ProgressionStages.FindRef(TEXT("PLAYER_STORAGE"))!=Recipe->RequiredExtraStorage||Next.Inventory.Storage.Contains(Recipe->InstalledContainerID)||Recipe->InstallationAnchorIDs.Num()!=1||Recipe->StorageCapacityAdded!=40)return Fail(TEXT("창고 설치 상태가 변경되었습니다."));
+        Next.Inventory.Storage.Add(Recipe->InstalledContainerID).Slots.SetNum(40);
+        auto& Installed=Next.StorageInstallations.Add(Recipe->InstallationAnchorIDs[0]);Installed.HomeID=Recipe->HomeID;Installed.ContainerID=Recipe->InstalledContainerID;Installed.ProductionID=Recipe->ProductionID;
+        Next.ProgressionStages.Add(TEXT("PLAYER_STORAGE"),Recipe->RequiredExtraStorage+1);
+    }
     if(!Job->bCostsCommitted)
     {
         auto* Owner=Next.Characters.Find(Job->OwnerCharacterID);
@@ -135,8 +163,9 @@ bool UICProductionSubsystem::CompleteJob(FGuid JobID,UICInventoryComponent* Inve
     if (UICQuestSubsystem* Quests = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICQuestSubsystem>() : nullptr)
     {
         Quests->ReportObjectiveEvent(EICQuestObjectiveType::Craft, Job->RecipeID, 1, JobID,
-            Production->Activity, Recipe->Results[0].ItemID);
+            Production->Activity, Recipe->Results.IsEmpty()?NAME_None:Recipe->Results[0].ItemID);
     }
+    if(!Recipe->Results.IsEmpty())State->OnItemsReceived.Broadcast(Recipe->Results);
     OnProductionChanged.Broadcast(JobID,ICText::Get(TEXT("Production_Complete")).ToString());return true;
 }
 

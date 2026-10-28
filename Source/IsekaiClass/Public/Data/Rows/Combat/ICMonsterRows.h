@@ -131,6 +131,9 @@ struct ISEKAICLASS_API FICMonsterRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI") TSoftObjectPtr<UBehaviorTree> BehaviorTree;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI") TSoftObjectPtr<UBlackboardData> Blackboard;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Respawn", meta=(ClampMin="0")) double RespawnPlaySeconds = 90.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Respawn", meta=(ClampMin="0")) double RespawnGameMinutes = 60.0;
+    /** Presentation only: does not alter capsule, attack ranges or statistics. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation", meta=(ClampMin="0.01")) float VisualScaleMultiplier = 1.f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Reward") FName DropTableID;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Reward") FName FirstKillRewardID;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Reward") FName RepeatKillRewardID;
@@ -149,7 +152,7 @@ struct ISEKAICLASS_API FICMonsterRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<USoundBase> HitSound;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UNiagaraSystem> HitVFX;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UTexture2D> Portrait;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pet", meta=(ClampMin="-1",ClampMax="54")) int32 PetCodexIndex=INDEX_NONE;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pet", meta=(ClampMin="-1")) int32 PetCodexIndex=INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pet") FText PetName;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pet", meta=(MultiLine=true)) FText PetBuffDescription;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pet") TArray<FICStatModifier> PetBuffs;

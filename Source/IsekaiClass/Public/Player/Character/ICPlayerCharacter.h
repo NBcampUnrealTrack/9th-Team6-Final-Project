@@ -7,8 +7,10 @@ class UCameraComponent;
 class UICInventoryComponent;
 class UICCraftingComponent;
 class UICQuestGuideComponent;
+class UICPartyWarpComponent;
 class USpringArmComponent;
 class USkeletalMesh;
+class UICPlayerLifeComponent;
 USTRUCT(BlueprintType)
 struct FICPlayerAppearancePreset
 {
@@ -37,13 +39,18 @@ public:
     virtual bool InitializeState(FName ID) override;
     virtual void RestoreFromWorldState_Implementation(const FICWorldState& Candidate) override;
     virtual void HandleZeroHP() override;
+    virtual void Jump() override;
+    virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode,uint8 PreviousCustomMode=0) override;
     UFUNCTION(BlueprintCallable, Category="IC|Weapons") bool RequestCycleWeapon();
     UFUNCTION(BlueprintPure, Category="IC|Weapons") bool IsSwitchingWeapon() const;
     void CancelWeaponTransition();
     bool NotifyWeaponVisibility(int32 MontageInstanceID, bool bDraw);
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UICInventoryComponent> Inventory;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UICCraftingComponent> Crafting;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="IC|Life") TObjectPtr<UICPlayerLifeComponent> LifeActions;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="IC|Quest Guide") TObjectPtr<UICQuestGuideComponent> QuestGuide;
+    /** Handles paid Warp Stone travel for this player and their active party. */
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="IC|Warp") TObjectPtr<UICPartyWarpComponent> PartyWarp;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<USpringArmComponent> CameraArm;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<UCameraComponent> Camera;
 
@@ -53,6 +60,10 @@ public:
     UFUNCTION(BlueprintCallable) void ApplyPreset(int32 Preset);
 private:
     float DesiredCameraDistance=-1.f;
+    bool bUsingProfileJumpPhysics=false;
+    float SavedJumpZVelocity=0.f;
+    float SavedJumpGravityScale=0.f;
+    void RestoreJumpPhysics();
     enum class EWeaponTransition : uint8 { Idle, Sheathing, Drawing };
     EWeaponTransition WeaponTransition = EWeaponTransition::Idle;
     FGuid PendingWeaponID, TransitionWeaponID;

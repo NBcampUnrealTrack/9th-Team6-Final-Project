@@ -20,6 +20,7 @@ public:
     virtual void NativeUpdateAnimation(float DeltaSeconds) override;
     virtual FAnimInstanceProxy* CreateAnimInstanceProxy() override;
     virtual void DestroyAnimInstanceProxy(FAnimInstanceProxy* Proxy) override;
+    void ResetForLoad(){PreviousHP=-1;bHasPreviousPosition=false;bAirStateInitialized=false;StopAllMontages(0.f);}
 
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UBlendSpace> Locomotion;
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UBlendSpace> CombatLocomotion;
@@ -29,6 +30,8 @@ public:
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UAnimSequence> JumpStart;
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UAnimSequence> FallLoop;
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UAnimSequence> Land;
+    UPROPERTY(Transient, BlueprintReadOnly) float JumpStartPlayRate=1.f;
+    UPROPERTY(Transient, BlueprintReadOnly) float LandingPlayRate=1.f;
     UPROPERTY(Transient, BlueprintReadOnly) EICAirAnimationState AirState=EICAirAnimationState::Grounded;
     UPROPERTY(Transient, BlueprintReadOnly) TObjectPtr<UAnimSequence> Sprint;
     UPROPERTY(Transient, BlueprintReadOnly) bool bSprinting = false;

@@ -1,0 +1,212 @@
+900|In Use: {0}
+901|Pet {0}
+902|No buff ability assigned
+903|The required weapon is not equipped.
+904|You have not obtained this skill yet.
+905|\n{0}: {1} x {2}% + {3} / {4} sec
+906|Shield
+907|Healing Over Time
+908|Affinity {0} / 500
+909|Current Companion
+910|Available to Recruit
+911|300 affinity required to recruit
+912|{0}\n\n{1}\n{2}\nUnique Skill: {3}
+913|{0}\n\n{1}\nVillager
+914|\n\nMP %d / Cooldown %.1f sec / Cast %.1f sec
+915|\nRevive HP %.1f%%
+916|\nTravel Distance %.1fm
+917|\n\nCrafting Time %.1f sec / SP %.1f
+918|[F] Slaughter Chicken
+919|Aim at a fishing area with the centre of the screen and press H. The float must land inside the area.
+920|Unable to cast the line. Check for obstacles and aim at a fishing area.
+921|You cannot use items right now.
+922|Enter a valid non-negative duration. Example: ICAddGameHours 2
+923|Advanced {0} game hours
+924|Create a player character first.
+925|Not enough bag space for four beginner weapons or an item definition is missing.
+926|Granted four beginner weapons: one sword, bow, magic staff and healing wand
+927|Unable to grant gold because it would exceed the limit.
+928|Granted 10,000G
+929|Item grant: stored %d, remaining %d
+930|Completed %d active quests
+931|Interaction started: NPC=%s Service=%s\nChoices: %s
+932|Shop lookup failed: %s
+933|[%s] %d items for sale / %.0f%% discount
+934|\n%s Price %d -> %d (Buyback %d)
+935|Purchase complete. Gold: %d
+936|Purchase failed: %s
+937|Sale complete. Gold: %d
+938|Sale failed: %s
+939|Printed %d life object states to Output Log (LogICLifeObject).
+940|Removed %s. Use ICLifeObjectDump to check remaining occupancy.
+941|Not enough items, or the items are locked or reserved for crafting.
+942|Not enough space for the selected quantity.
+943|The item state changed. Please select it again.
+949|Gacha settings are unavailable.
+951|{0} - {1}G per draw
+952|You won {0} x{1}! The bag was full, so it was placed on the ground.
+953|You won {0} x{1}!
+954|A fishing rod is required.
+955|Move / H / ESC: Cancel Fishing
+956|Not enough {0}. A total of {1} is required.
+957|Empty Plot - Plant Seeds
+958|You caught nothing. You can try again immediately.
+960|Player Bed - Sleep
+961|Move closer to the NPC to give a gift.
+962|Select an item to give.
+963|You cannot give gifts to this NPC.
+964|This item cannot be given as a gift.
+965|The item state changed. Please select it again.
+966|They cannot receive gifts right now.
+967|Affinity is already at its maximum.
+968|The gift item is missing or locked.
+969|Unable to give the gift. Please try again.
+970|Gave one {0}.
+971|Gave one {0}. Affinity {1}
+972|This NPC cannot be recruited right now.
+973|They joined your party.
+974|Up to three companions can join you.
+975|Companion dismissed.
+976|Dismiss Companion
+977|Recruit Companion
+978|You cannot use this bed yet.
+979|Bed - Occupied
+980|Empty Bed - Sleep
+981|Someone else is using this bed.
+982|Someone else is using it.
+983|[Life] %s -> %s Slot %d reserved
+984|[Life] %s -> %s started (%s, slot %d, activity %s)
+985|[Life] %s: %s animation missing (presentation skipped)
+986|[Life] %s: Playing %s
+987|[Life] %s released (%s, reason: %s)
+988|[Life] %s activity interrupted (dialogue/mode change)
+989|[Life] %s schedule: %s (%s, anchor %s)
+990|[Life] %s no free object -> %s (%s)
+991|[Life] %s fell asleep on the ground
+992|Open Personal Storage
+993|Requires at least 200 affinity.
+994|You have already searched this furniture.
+995|Furniture - Empty
+996|The selected monitor does not support this resolution or refresh rate.
+997|Unable to apply display settings. Restoring the previous settings.
+998|This platform cannot change the monitor refresh rate.
+999|Affinity {0}
+1000|{0}\n\nEssence {1}/100\n{2}
+1001|Shop - Buy / Sell
+1002|Hello. What brings you here?
+1003|You have no items that can be given as gifts.
+1004|Select an item to confirm the gift.
+1005|Owned: {0}
+1006|Give {0} to {1}?
+1007|You have died.
+1008|Main Menu
+1009|+ {0} Gold
+1010|+ {0} x{1} obtained
+1011|+ {0} Essence x{1} obtained
+1012|A / D: Switch Tab / S / Enter: Open / ESC: Close
+1013|W / S: Scroll Story / A: Characters / D: Top Tabs / ESC: Close
+1014|W / S: Select Character / D: Read Story / A: Top Tabs / ESC: Close
+1015|W / S: Select Button / Enter / Space: Confirm / A / D: Top Tabs / ESC: Close
+1016|A / D: Top Tabs / ESC: Close
+1017|Gift Inventory
+1018|Select an item to give as a gift.
+1019|WASD: Select Item / Enter: Confirm / ESC: Back
+1020|Gathering
+1021|Move / F / ESC: Cancel
+1022|Day {0}  {1}:{2}
+1023|{0} - In Progress
+1024|Accept
+1025|Equip
+1027|Assign Quick Slot
+1028|Discard
+1032|Gold  {0} G
+1033|No quest items.
+1034|Select a quick slot.
+1035|Slot {0}
+1036|{0}\nBase Attack {1}\nRequired Stat: {2} {3}
+1037|Your bag gained 10 slots.
+1038|The bag is already at its limit or this ticket cannot be used.
+1039|Used {1} on {0}
+1040|Discard {0} x{1}?
+1041|The item state changed. Please select it again.
+1042|This character cannot equip that item.
+1043|The equipment slot is empty or there is no bag space.
+1044|A / D or Left Stick: Select Target / Enter or A: Use / ESC or B: Cancel
+1045|WASD: Select Accept / Cancel / Enter: Confirm / ESC: Cancel
+1046|A / D: Select Slot / Enter: Confirm Assignment / ESC: Cancel
+1047|A / D: Select Button / W / S: Scroll / Enter: Confirm / ESC: Back
+1048|W / S: Select Character / D: Equipment / A: Top Tabs / ESC: Close
+1049|A / D: Select Weapon / S: Quick Slots / Enter: Unequip
+1050|A / D: Normal / Quest / S: Items / W: Top Tabs
+1051|WASD: Select Item / Enter: Item Actions / W: Top Tabs / A: Equipment
+1052|A / D: Select Quick Slot / Enter: View Item / Delete: Unassign / W: Weapons
+1055|Stats
+1057|Luck
+1058|Physical ATK
+1059|Magic ATK
+1060|Move Speed
+1061|Available Recipes
+1062|W / S or Up / Down: Select / Enter: Details / Esc: Close
+1063|Craft
+1064|Cancel - Back to List
+1065|Crafting continues even if you close this window.
+1066|Collect Completed Item
+1067|No recipes are available yet.
+1068|Kitchen - Cooking Recipes
+1069|Crafting Bench - Available Recipes
+1070|Cook ingredients to make food.
+1071|Combine materials to craft items.
+1072|Place One Personal Storage Chest - 40 Slots
+1073|{0}\nResult: {1}\nCrafting Time {2} sec / SP {3}
+1074|Required Stat {0}  {1} / {2}\n
+1075|Tool: {0}  {1} / {2}\n
+1076|Not enough ingredients, tools or SP.
+1077|Ready to collect - Check bag space and ingredients.
+1078|Crafting... {0} / {1} sec
+1079|Select Seeds to Plant
+1080|Use one seed to plant at the centre of this plot.
+1081|{0}   Owned: {1}
+1084|Cart - Click to remove one
+1085|Buy Items
+1086|Cancel and Leave
+1087|W/S: Select / Enter: Add to Cart / A/D: Tabs / F: Checkout / ESC: Cancel
+1088|{0}   {1} G   Owned: {2}
+1089|Gold {0} G
+1090|Total {0} G
+1091|Sell Items
+1092|Trade complete.
+1093|Move to Storage
+1095|{0} / {1}
+1096|Move to Inventory
+1097|Click / Enter: Info or Transfer / WASD: Select / Tab: Switch Side / ESC: Close
+1098|Storage - 40 Fixed Slots
+1099|Inventory - {0} Slots
+1100|No description available.
+1101|{0}\nRestores HP {1} / SP {2}
+1102|{0}\nBase Attack {1} / Upgrade +{2}
+1103|Locked items or items reserved for crafting cannot be moved.
+1104|Transferred the selected quantity.
+1105|Unable to load reward information.
+1106|{0} Gold
+1107|Items
+1108|{0} Affinity {1}
+1109|Affinity
+1110|Unlocked {0} Recipe
+1113|Objectives
+1115|Starting another quest resets progress on the previous quest.
+1116|Abandon
+1117|Start
+1118|Stop Tracking
+1119|In Progress
+1120|Pending
+1121|Available
+1122|Complete Any One
+1123|Track Route
+1124|Quest List
+1125|No accepted quests.
+1126|This quest cannot be started.
+1127|This quest cannot be abandoned.
+1128|W / S: Select Quest / Enter / D: Details / A: Top Tabs / ESC: Close
+1129|W / S: Scroll / D / Enter: Buttons / A / ESC: Back to List
+1130|A / D: Abandon / Start / W / S: Track / Back / Enter: Confirm / ESC: List
+1131|  and %d more

@@ -7,6 +7,8 @@
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Character/Base/ICCharacterBase.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
+#include "Combat/Party/ICPartyStatus.h"
+#include "Time/ICTimeSubsystem.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
@@ -96,7 +98,12 @@ bool UICPartyMenuWidget::BuildLayout(UWidgetTree* Tree)
     auto* Story=Tree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("StoryScroll"));
     Story->SetScrollBarVisibility(ESlateVisibility::Collapsed);
     auto* StoryText=Text(Tree,TEXT("TXT_Story"),FText::GetEmpty(),17);StoryText->SetAutoWrapText(true);Story->AddChild(StoryText);
-    auto* StorySlot=Details->AddChildToVerticalBox(Story);StorySlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));StorySlot->SetPadding(FMargin(0,0,0,14));
+    auto* Reading=Tree->ConstructWidget<UHorizontalBox>();auto* ReadingSlot=Details->AddChildToVerticalBox(Reading);ReadingSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));ReadingSlot->SetPadding(FMargin(0,0,0,14));
+    auto* StorySlot=Reading->AddChildToHorizontalBox(Story);StorySlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));StorySlot->SetPadding(FMargin(0,0,20,0));
+    auto* StatusColumn=Tree->ConstructWidget<UVerticalBox>();Reading->AddChildToHorizontalBox(StatusColumn)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    Add(StatusColumn,Text(Tree,TEXT("StatusHeading"),NSLOCTEXT("ICParty","CurrentStatuses","현재 상태"),18),6);
+    auto* StatusList=Tree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("CurrentStatusScroll"));
+    auto* StatusText=Text(Tree,TEXT("TXT_CurrentStatuses"),FText::GetEmpty(),16);StatusText->SetAutoWrapText(true);StatusList->AddChild(StatusText);StatusColumn->AddChildToVerticalBox(StatusList)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     auto* Bottom=Tree->ConstructWidget<UHorizontalBox>();Add(Details,Bottom,0);
     auto* PetColumn=Tree->ConstructWidget<UVerticalBox>();
     Add(PetColumn,Text(Tree,TEXT("PetHeading"),NSLOCTEXT("ICParty","Pet","펫"),16),8);
@@ -152,6 +159,8 @@ void UICPartyMenuWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 void UICPartyMenuWidget::CharacterChanged(FName){RefreshParty();}
+void UICPartyMenuWidget::NativeTick(const FGeometry& Geometry,float DeltaSeconds)
+{Super::NativeTick(Geometry,DeltaSeconds);StatusRefreshAt-=DeltaSeconds;if(StatusRefreshAt<=0){StatusRefreshAt=.25f;RefreshDetails();}}
 void UICPartyMenuWidget::PortraitPicked(int32 Index){SelectMember(Index);}
 void UICPartyMenuWidget::RefreshParty()
 {
@@ -213,6 +222,8 @@ void UICPartyMenuWidget::RefreshDetails()
      Image->SetBrushFromTexture(Texture);Image->SetVisibility(Texture?ESlateVisibility::HitTestInvisible:ESlateVisibility::Hidden);}
     const UICAbilitySystemComponent* ASC=nullptr;
     for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)if(It->GetCharacterID()==SelectedCharacter){ASC=It->GetICAbilitySystem();break;}
+    const auto* Clock=GI?GI->GetSubsystem<UICTimeSubsystem>():nullptr;
+    SetText(this,TEXT("TXT_CurrentStatuses"),ICPartyStatus::Describe(ASC?ASC->Capture():Snapshot,Data,D,Clock?Clock->GetClock().PlaySecond:0,ASC));
     const double Main[]={double(Snapshot.MainStats.STR),double(Snapshot.MainStats.DEX),double(Snapshot.MainStats.INT),double(Snapshot.MainStats.CON),double(Snapshot.MainStats.LUK)};
     const EICStat Stats[]={EICStat::STR,EICStat::DEX,EICStat::INT,EICStat::CON,EICStat::LUK,EICStat::PhysicalAttack,EICStat::MagicAttack,EICStat::Defense,EICStat::MoveSpeed};
     for(int32 Index=0;Index<UE_ARRAY_COUNT(StatKeys);++Index)

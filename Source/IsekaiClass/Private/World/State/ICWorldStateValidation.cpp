@@ -68,6 +68,8 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
             || (Q.bRewardClaimed && (!Q.bCompleted || !Q.RewardTransactionID.IsValid() || !S.CompletedTransactionIDs.Contains(Q.RewardTransactionID)))) return Fail(TEXT("Quests.") + Pair.Key.ToString());
     }
     TMap<FGuid, const FPlayerItemInstance*> BagItems;
+    for (const auto& Cooldown:S.Inventory.ItemReadyAtPlaySecond)
+        if(Cooldown.Key.IsNone()||!TimeValid(Cooldown.Value))return Fail(TEXT("Inventory.ItemReadyAtPlaySecond"));
     for (const auto& Item : S.Inventory.Bag.Slots) if (!Item.IsEmpty()) BagItems.Add(Item.InstanceID, &Item);
     TMap<FGuid, int64> ReservedCounts;
     int64 ReservedGold = 0;
@@ -111,7 +113,7 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
         const auto& Crop = Pair.Value;
         if (Pair.Key.IsNone() || Crop.CropID.IsNone() || !S.Characters.Contains(Crop.OwnerCharacterID)
             || !TimeValid(Crop.PlantedAtGameMinute) || !TimeValid(Crop.HarvestableAtGameMinute)
-            || Crop.HarvestableAtGameMinute < Crop.PlantedAtGameMinute) return Fail(TEXT("Crops.") + Pair.Key.ToString());
+            || !TimeValid(Crop.RegrowthAtGameMinute) || Crop.HarvestableAtGameMinute < FMath::Max(Crop.PlantedAtGameMinute,Crop.RegrowthAtGameMinute)) return Fail(TEXT("Crops.") + Pair.Key.ToString());
     }
     TSet<FString> SpawnKeys;
     for (const auto& Pair : S.SpawnSlots)
@@ -119,7 +121,7 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
         const auto& Slot = Pair.Value;
         const FString Key = Slot.SpawnerID.ToString() + TEXT(":") + FString::FromInt(Slot.SlotIndex);
         if (Pair.Key.IsNone() || Slot.SpawnerID.IsNone() || Slot.MonsterID.IsNone() || Slot.SlotIndex < 0
-            || SpawnKeys.Contains(Key) || !TimeValid(Slot.RespawnReadyAtPlaySecond) || !TimeValid(Slot.LastSimPlaySecond)
+            || SpawnKeys.Contains(Key) || !TimeValid(Slot.RespawnReadyAtPlaySecond) || !FMath::IsFinite(Slot.RespawnReadyAtGameMinute) || Slot.RespawnReadyAtGameMinute < -1 || !TimeValid(Slot.LastSimPlaySecond)
             || Slot.Position.ContainsNaN() || Slot.Rotation.ContainsNaN()
             || !FMath::IsFinite(Slot.HP) || !FMath::IsFinite(Slot.MP) || !FMath::IsFinite(Slot.MaxHP) || !FMath::IsFinite(Slot.MaxMP)
             || Slot.MaxHP <= 0 || Slot.MaxMP < 0 || Slot.HP < 0 || Slot.HP > Slot.MaxHP || Slot.MP < 0 || Slot.MP > Slot.MaxMP
@@ -147,11 +149,11 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
     }
     if (!NamesValid(S.DiscoveredRegionIDs) || !NamesValid(S.DiscoveredAnchorIDs) || !NamesValid(S.CodexEntryIDs) || !NamesValid(S.UnlockedRecipeIDs)) return Fail(TEXT("WorldProgress.IDs"));
     if(!NamesValid(S.Codex.AcquiredItemIDs))return Fail(TEXT("Codex.AcquiredItemIDs"));
-    for(const auto& Pair:S.Codex.PetEssence)if(Pair.Key<0||Pair.Key>=55||Pair.Value<0)return Fail(TEXT("Codex.PetEssence"));
+    for(const auto& Pair:S.Codex.PetEssence)if(Pair.Key<0||Pair.Value<0)return Fail(TEXT("Codex.PetEssence"));
     for(const auto& Pair:S.Codex.CharacterPets)
     {
         const auto* Character=S.Characters.Find(Pair.Key);
-        if(!Character||!Character->HasStats()||Pair.Value<0||Pair.Value>=55||S.Codex.PetEssence.FindRef(Pair.Value)<100)return Fail(TEXT("Codex.CharacterPets"));
+        if(!Character||!Character->HasStats()||Pair.Value<0||S.Codex.PetEssence.FindRef(Pair.Value)<100)return Fail(TEXT("Codex.CharacterPets"));
     }
     for (const auto& Pair : S.ProgressionStages) if (Pair.Key.IsNone() || Pair.Value < 0) return Fail(TEXT("ProgressionStages"));
     for (const auto& Pair : S.Flags) if (Pair.Key.IsNone()) return Fail(TEXT("Flags"));

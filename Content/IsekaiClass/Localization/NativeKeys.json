@@ -1,0 +1,2252 @@
+[
+  {
+    "namespace": "ICCodex",
+    "key": "PetInUse",
+    "source": "사용중: {0}"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "PetSlotName",
+    "source": "펫 {0}"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "NoPetBuff",
+    "source": "버프 능력 미등록"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "WeaponMissing",
+    "source": "해당 무기가 장착 안되어있습니다."
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "SkillLocked",
+    "source": "아직 획득하지 않은 스킬입니다."
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "StatusMagnitude",
+    "source": "\n{0}: {1} × {2}% + {3} · {4}초"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "Shield",
+    "source": "보호막"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "PeriodicRecovery",
+    "source": "지속 회복"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "NPCAffinity",
+    "source": "호감도 {0} / 500"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "NPCInParty",
+    "source": "현재 동료"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "NPCRecruitReady",
+    "source": "동료 편입 가능"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "NPCRecruitNeedsAffinity",
+    "source": "동료 편입에 호감도 300 필요"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "NPCRecruitDetail",
+    "source": "{0}\n\n{1}\n{2}\n고유 스킬: {3}"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "NPCResidentDetail",
+    "source": "{0}\n\n{1}\n마을 주민"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Physical",
+    "source": "물리 공격력"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Magical",
+    "source": "마법 공격력"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Flat",
+    "source": "{0} {1}{2}"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Percent",
+    "source": "{0} {1}{2}%"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Downed",
+    "source": "전투불능 · 부활서로 소생 가능 · 퇴출 불가"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Synergy",
+    "source": "[파티 버프] {0}\n{1}"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Pet",
+    "source": "[펫 버프] {0}\n{1}"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "DamageDealt",
+    "source": "주는 피해 ×{0}"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "DamageReceived",
+    "source": "받는 피해 ×{0}"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Healing",
+    "source": "받는 회복 ×{0}"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Shield",
+    "source": "보호막 {0}"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Magnitude",
+    "source": "효과량 {0}"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Permanent",
+    "source": "지속"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Remaining",
+    "source": "남은 {0}초"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Effect",
+    "source": "[{0}] {1} · {2}중첩 · {3}\n{4}"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Debuff",
+    "source": "디버프"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "Buff",
+    "source": "버프"
+  },
+  {
+    "namespace": "ICPartyStatus",
+    "key": "None",
+    "source": "현재 적용 중인 버프 / 디버프가 없습니다."
+  },
+  {
+    "namespace": "ICRanch",
+    "key": "ChickenSlaughterHint",
+    "source": "[F] 닭 잡기"
+  },
+  {
+    "namespace": "ICFishing",
+    "key": "AimWater",
+    "source": "화면 중앙으로 물고기 구역을 조준한 뒤 H를 누르세요. 찌가 구역에 닿아야 낚시할 수 있습니다."
+  },
+  {
+    "namespace": "ICFishing",
+    "key": "BlockedCast",
+    "source": "낚싯줄을 던질 수 없습니다. 장애물과 낚시 구역을 확인하세요."
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "UseUnavailable",
+    "source": "지금은 아이템을 사용할 수 없습니다."
+  },
+  {
+    "namespace": "ICCheat",
+    "key": "InvalidGameHours",
+    "source": "0 이상의 유효한 시간을 입력하세요. 예: ICAddGameHours 2"
+  },
+  {
+    "namespace": "ICCheat",
+    "key": "GameHoursAdded",
+    "source": "게임시간 {0}시간 경과"
+  },
+  {
+    "namespace": "ICCheat",
+    "key": "PlayerNotReady",
+    "source": "플레이어를 생성한 뒤 사용하세요."
+  },
+  {
+    "namespace": "ICCheat",
+    "key": "StarterWeaponsNoRoom",
+    "source": "초보 무기 4종을 넣을 가방 공간이 부족하거나 아이템 정의를 확인할 수 없습니다."
+  },
+  {
+    "namespace": "ICCheat",
+    "key": "StarterWeaponsGranted",
+    "source": "초보 무기 4종 지급 완료 · 검, 활, 마법스태프, 치유완드 각 1개"
+  },
+  {
+    "namespace": "ICCheat",
+    "key": "PlayerNotReady",
+    "source": "플레이어를 생성한 뒤 사용하세요."
+  },
+  {
+    "namespace": "ICCheat",
+    "key": "GoldLimit",
+    "source": "보유 골드 한도를 초과하여 지급할 수 없습니다."
+  },
+  {
+    "namespace": "ICCheat",
+    "key": "GoldGranted",
+    "source": "10,000G 지급 완료"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "DropLabel",
+    "source": "{0} ×{1}"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Unavailable",
+    "source": "이동할 수량이 부족하거나 잠금·제작 예약된 아이템입니다."
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "NoSpace",
+    "source": "선택한 수량을 넣을 공간이 부족합니다."
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Changed",
+    "source": "아이템 상태가 변경되었습니다. 다시 선택하세요."
+  },
+  {
+    "namespace": "ICEquipment",
+    "key": "STR",
+    "source": "근력"
+  },
+  {
+    "namespace": "ICEquipment",
+    "key": "DEX",
+    "source": "민첩"
+  },
+  {
+    "namespace": "ICEquipment",
+    "key": "INT",
+    "source": "지력"
+  },
+  {
+    "namespace": "ICEquipment",
+    "key": "CON",
+    "source": "체력"
+  },
+  {
+    "namespace": "ICEquipment",
+    "key": "LUK",
+    "source": "운"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Bag",
+    "source": "가방"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Player",
+    "source": "플레이어 장착"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Loadout",
+    "source": "플레이어 무기 슬롯"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Unavailable",
+    "source": "무기가 없거나 잠금 상태입니다."
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Max",
+    "source": "최대 강화 단계이거나 강화 정보가 없습니다."
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "BadOre",
+    "source": "강화용 광석 정보를 확인하세요."
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "NeedOre",
+    "source": "선택한 광석이 부족합니다."
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "NeedGold",
+    "source": "강화에 필요한 골드가 부족합니다."
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "OreLocked",
+    "source": "광석이 잠겨 있거나 사용할 수 없습니다."
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "CommitFailed",
+    "source": "강화 상태가 변경되어 시도하지 못했습니다. 비용은 소비되지 않았습니다."
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Success",
+    "source": "강화 성공! +{0} · 광석 {1}개 / {2}G 사용"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Failure",
+    "source": "강화 실패 · +{0} 유지 · 광석 {1}개 / {2}G 사용"
+  },
+  {
+    "namespace": "ICGacha",
+    "key": "InvalidDefinition",
+    "source": "뽑기 설정을 확인할 수 없습니다."
+  },
+  {
+    "namespace": "ICGacha",
+    "key": "NotEnoughGold",
+    "source": "골드가 부족합니다."
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Workbench",
+    "source": "제작대"
+  },
+  {
+    "namespace": "ICGacha",
+    "key": "MachineName",
+    "source": "뽑기 기계"
+  },
+  {
+    "namespace": "ICGacha",
+    "key": "NamedPrompt",
+    "source": "{0} · {1}G / 1회"
+  },
+  {
+    "namespace": "ICGacha",
+    "key": "DroppedResult",
+    "source": "{0} ×{1} 당첨! 가방이 가득 차 바닥에 놓였습니다."
+  },
+  {
+    "namespace": "ICGacha",
+    "key": "Result",
+    "source": "{0} ×{1} 당첨!"
+  },
+  {
+    "namespace": "ICFishing",
+    "key": "NeedRod",
+    "source": "낚싯대가 필요합니다."
+  },
+  {
+    "namespace": "ICFishing",
+    "key": "CancelHint",
+    "source": "이동 / H / ESC  낚시 취소"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "GroupMissing",
+    "source": "{0} 재료가 부족합니다. 합계 {1}개가 필요합니다."
+  },
+  {
+    "namespace": "ICFarm",
+    "key": "EmptyPlot",
+    "source": "빈 밭 · 씨앗 심기"
+  },
+  {
+    "namespace": "ICFishing",
+    "key": "NoCatch",
+    "source": "아무것도 낚지 못했습니다. 다시 시도할 수 있습니다."
+  },
+  {
+    "namespace": "ICFarm",
+    "key": "EmptyPlot",
+    "source": "빈 밭 · 씨앗 심기"
+  },
+  {
+    "namespace": "ICHome",
+    "key": "Storage",
+    "source": "개인 창고"
+  },
+  {
+    "namespace": "ICHome",
+    "key": "Bed",
+    "source": "플레이어 침대 · 잠자기"
+  },
+  {
+    "namespace": "ICGift",
+    "key": "TooFar",
+    "source": "NPC 가까이에서 선물해 주세요."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "ChooseItem",
+    "source": "선물할 아이템을 선택해 주세요."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "Unavailable",
+    "source": "이 NPC에게는 선물할 수 없습니다."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "ItemUnavailable",
+    "source": "선물할 수 없는 아이템입니다."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "StateChanged",
+    "source": "아이템 상태가 변경되었습니다. 다시 선택해 주세요."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "NPCUnavailable",
+    "source": "지금은 선물을 받을 수 없습니다."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "MaxAffinity",
+    "source": "호감도가 이미 최대입니다."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "MissingItem",
+    "source": "선물할 아이템이 없거나 잠겨 있습니다."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "CommitFailed",
+    "source": "선물을 전달하지 못했습니다. 다시 시도해 주세요."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "Given",
+    "source": "{0} 1개를 선물했습니다."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "GivenAffinity",
+    "source": "{0} 1개를 선물했습니다. 호감도 {1}"
+  },
+  {
+    "namespace": "ICNPC",
+    "key": "RecruitUnavailable",
+    "source": "현재는 동료로 영입할 수 없습니다."
+  },
+  {
+    "namespace": "ICNPC",
+    "key": "Recruited",
+    "source": "동료가 되었습니다."
+  },
+  {
+    "namespace": "ICNPC",
+    "key": "PartyFull",
+    "source": "동료는 최대 3명까지 함께할 수 있습니다."
+  },
+  {
+    "namespace": "ICNPC",
+    "key": "Dismissed",
+    "source": "동료를 해제했습니다."
+  },
+  {
+    "namespace": "ICNPC",
+    "key": "Dismiss",
+    "source": "동료 해제하기"
+  },
+  {
+    "namespace": "ICNPC",
+    "key": "Recruit",
+    "source": "동료 영입하기"
+  },
+  {
+    "namespace": "ICLifeObject",
+    "key": "BedAffinity",
+    "source": "아직 이 침대를 사용할 수 없습니다."
+  },
+  {
+    "namespace": "ICLifeObject",
+    "key": "BedBusyHint",
+    "source": "침대 · 사용 중"
+  },
+  {
+    "namespace": "ICLifeObject",
+    "key": "BedFreeHint",
+    "source": "빈 침대 · 잠자기"
+  },
+  {
+    "namespace": "ICLifeObject",
+    "key": "BedAlreadyUsed",
+    "source": "다른 사람이 사용 중인 침대입니다."
+  },
+  {
+    "namespace": "ICLifeObject",
+    "key": "InUseByNPC",
+    "source": "다른 사람이 사용 중입니다."
+  },
+  {
+    "namespace": "ICNPCContainer",
+    "key": "Interaction",
+    "source": "개인 보관함 열기"
+  },
+  {
+    "namespace": "ICNPCContainer",
+    "key": "Locked",
+    "source": "호감도 200 이상에서 사용할 수 있습니다."
+  },
+  {
+    "namespace": "ICFurniture",
+    "key": "Empty",
+    "source": "이미 확인한 가구입니다."
+  },
+  {
+    "namespace": "ICFurniture",
+    "key": "EmptyHint",
+    "source": "가구 · 비어 있음"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "UnsupportedMode",
+    "source": "선택한 모니터에서 지원하지 않는 해상도 또는 주사율입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "DisplayApplyFailed",
+    "source": "화면 설정을 적용할 수 없습니다. 이전 설정으로 돌아갑니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "NoDisplayControl",
+    "source": "이 플랫폼에서는 모니터 주사율을 변경할 수 없습니다."
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "NPCGridAffinity",
+    "source": "호감도 {0}"
+  },
+  {
+    "namespace": "ICCodex",
+    "key": "PetDetailProgress",
+    "source": "{0}\n\n정수 {1}/100\n{2}"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "DialogueEntry",
+    "source": "상점 · 구매 / 판매"
+  },
+  {
+    "namespace": "ICDialogue",
+    "key": "Greeting",
+    "source": "안녕하세요. 무슨 일로 오셨나요?"
+  },
+  {
+    "namespace": "ICGift",
+    "key": "Empty",
+    "source": "선물할 수 있는 아이템이 없습니다."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "GridPrompt",
+    "source": "아이템을 선택하면 선물 확인창이 열립니다."
+  },
+  {
+    "namespace": "ICGift",
+    "key": "Owned",
+    "source": "보유 {0}개"
+  },
+  {
+    "namespace": "ICGift",
+    "key": "Confirm",
+    "source": "{0}을 {1}에게 선물하시겠습니까?"
+  },
+  {
+    "namespace": "ICDeath",
+    "key": "Title",
+    "source": "사망하였습니다."
+  },
+  {
+    "namespace": "ICDeath",
+    "key": "Load",
+    "source": "불러오기"
+  },
+  {
+    "namespace": "ICDeath",
+    "key": "MainMenu",
+    "source": "메인메뉴"
+  },
+  {
+    "namespace": "ICDeath",
+    "key": "Quit",
+    "source": "그만하기"
+  },
+  {
+    "namespace": "ICStatus",
+    "key": "Downed",
+    "source": "{0} · 전투불능"
+  },
+  {
+    "namespace": "ICCombat",
+    "key": "GoldReceived",
+    "source": "+ {0} 골드"
+  },
+  {
+    "namespace": "ICCombat",
+    "key": "ItemReceived",
+    "source": "+ {0} {1}개 획득"
+  },
+  {
+    "namespace": "ICCombat",
+    "key": "EssenceReceived",
+    "source": "+ {0} {1} 정수 획득"
+  },
+  {
+    "namespace": "ICCombat",
+    "key": "LockOnMarker",
+    "source": "◎"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "TabsHint",
+    "source": "A / D  탭 이동     S / Enter  열기     ESC  닫기"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "StoryHint",
+    "source": "W / S  이야기 스크롤     A  인물 목록     D  상단 탭     ESC  닫기"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "PartyHint",
+    "source": "W / S  인물 선택     D  이야기 읽기     A  상단 탭     ESC  닫기"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "SettingsHint",
+    "source": "W / S  버튼 이동     Enter / Space  선택     A / D  상단 탭     ESC  닫기"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "EmptyHint",
+    "source": "A / D  상단 탭     ESC  닫기"
+  },
+  {
+    "namespace": "ICTime",
+    "key": "HUDDayClock",
+    "source": "{0}일차  {1}:{2}"
+  },
+  {
+    "namespace": "ICLife",
+    "key": "Working",
+    "source": "{0} · 진행 중"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Accept",
+    "source": "수락"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Cancel",
+    "source": "취소"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "SplitCount",
+    "source": "분리할 개수"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Equip",
+    "source": "장비 착용"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Use",
+    "source": "사용"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Quick",
+    "source": "퀵슬롯 설정"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Lock",
+    "source": "잠금"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Split",
+    "source": "묶음 분할"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Trash",
+    "source": "휴지통"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Back",
+    "source": "뒤로가기"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Unlock",
+    "source": "잠금 해제"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Lock",
+    "source": "잠금"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Weapons",
+    "source": "무기"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "QuickSlots",
+    "source": "퀵슬롯"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Cancel",
+    "source": "취소"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Search",
+    "source": "아이템 이름 / ID 검색"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Sort",
+    "source": "가방 정렬"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "AllFilter",
+    "source": "분류: 전체"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Normal",
+    "source": "일반"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Quest",
+    "source": "퀘스트"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "GoldAmount",
+    "source": "보유 골드  {0} G"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "Empty",
+    "source": "비어 있음"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "LockedName",
+    "source": "[잠금] {0}"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "NoQuestItems",
+    "source": "퀘스트 아이템이 없습니다."
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "SelectedStack",
+    "source": "{0}  × {1}"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "ChooseQuick",
+    "source": "등록할 퀵슬롯을 선택하세요."
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "QuickSlots",
+    "source": "퀵슬롯"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "EmptyQuick",
+    "source": "슬롯 {0}"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "GearInfo",
+    "source": "{0}\n기본 공격력 {1}\n요구 능력치: {2} {3}"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "GearUnavailable",
+    "source": "{0}\n{1}"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "BagExpanded",
+    "source": "가방이 10칸 늘어났습니다."
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "BagExpandFailed",
+    "source": "가방이 최대 크기이거나 확장권을 사용할 수 없습니다."
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "UsedOnMember",
+    "source": "{0}에게 {1} 사용 완료"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "TrashConfirm",
+    "source": "{0} {1}개를 버리겠습니까?"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "ChangedItem",
+    "source": "아이템 상태가 변경되어 처리할 수 없습니다. 다시 선택하세요."
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "WrongEquipment",
+    "source": "해당 캐릭터가 착용할 수 없는 장비입니다."
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "NoUnequip",
+    "source": "빈 장비 슬롯이거나 가방에 빈 공간이 없습니다."
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "UseTargetHint",
+    "source": "A / D  대상 선택     Enter  사용     ESC  취소"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "ConfirmHint",
+    "source": "WASD  수락 / 취소 선택     Enter  결정     ESC  취소"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "PickHint",
+    "source": "A / D  슬롯 선택     Enter  등록 확인     ESC  취소"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "DetailHint",
+    "source": "A / D  버튼 선택     W / S  설명 스크롤     Enter  선택     ESC  뒤로가기"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "RosterHint",
+    "source": "W / S  캐릭터 선택     D  장비     A  상단 탭     ESC  닫기"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "EquipmentHint",
+    "source": "A / D  무기 선택     S  퀵슬롯     Enter  무기 해제"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "ItemTabsHint",
+    "source": "A / D  일반 / 퀘스트     S  아이템     W  상단 탭"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "ItemsHint",
+    "source": "WASD  아이템 이동     Enter  아이템 작업     W  위쪽 탭     A  장비"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "QuickHint",
+    "source": "A / D  퀵슬롯 선택     Enter  아이템 보기     Delete  등록 해제     W  무기"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "FilterAll",
+    "source": "분류: 전체"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "FilterEquipment",
+    "source": "분류: 무기"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "FilterConsumable",
+    "source": "분류: 소비품"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "FilterFood",
+    "source": "분류: 음식"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "FilterBook",
+    "source": "분류: 성장서"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "FilterMaterial",
+    "source": "분류: 재료"
+  },
+  {
+    "namespace": "ICInventory",
+    "key": "FilterLocked",
+    "source": "분류: 잠금"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "CurrentStatuses",
+    "source": "현재 상태"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "Pet",
+    "source": "펫"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "Stats",
+    "source": "스탯"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "HP",
+    "source": "HP"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "MP",
+    "source": "MP"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "SP",
+    "source": "SP"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "STR",
+    "source": "근력"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "DEX",
+    "source": "민첩"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "INT",
+    "source": "지능"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "CON",
+    "source": "체력"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "LUK",
+    "source": "행운"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "Physical",
+    "source": "물공"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "Magic",
+    "source": "마공"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "Defense",
+    "source": "방어력"
+  },
+  {
+    "namespace": "ICParty",
+    "key": "Speed",
+    "source": "이속"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Recipes",
+    "source": "만들 수 있는 레시피"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "CraftTab",
+    "source": "제작"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "EnhanceTab",
+    "source": "강화"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Keys",
+    "source": "W / S · ↑ / ↓ 선택     Enter 상세 보기     Esc 닫기"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Make",
+    "source": "만들기"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Cancel",
+    "source": "취소 · 목록으로"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Continue",
+    "source": "창을 닫아도 제작은 계속됩니다."
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Retry",
+    "source": "완료 아이템 다시 받기"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Close",
+    "source": "닫기"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "EnhanceTitle",
+    "source": "제작대 · 무기 강화"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "NoRecipes",
+    "source": "아직 사용할 수 있는 레시피가 없습니다."
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "CookingRecipes",
+    "source": "주방 · 요리 레시피"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "CraftRecipes",
+    "source": "제작대 · 만들 수 있는 레시피"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "DefaultCookInfo",
+    "source": "재료를 조리해 음식을 만듭니다."
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "DefaultCraftInfo",
+    "source": "재료를 조합해 아이템을 만듭니다."
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "ResultLine",
+    "source": "{0} × {1}  "
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "StorageResult",
+    "source": "개인 창고 1개 설치 · 40칸"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Info",
+    "source": "{0}\n결과: {1}\n제작 시간 {2}초 · SP {3}"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "StatRequirement",
+    "source": "요구 능력치 {0}  {1} / {2}\n"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "MaterialLine",
+    "source": "{0}  {1} / {2}\n"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "ToolLine",
+    "source": "도구: {0}  {1} / {2}\n"
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Missing",
+    "source": "재료, 도구 또는 SP가 부족합니다."
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Ready",
+    "source": "완료 대기 · 가방 공간과 재료를 확인해 주세요."
+  },
+  {
+    "namespace": "ICCraft",
+    "key": "Remaining",
+    "source": "제작 중… {0} / {1}초"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "PickWeapon",
+    "source": "강화할 무기를 선택하세요. 장착 중인 무기도 강화할 수 있습니다."
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "PickOre",
+    "source": "보유한 광석을 선택하세요. 실패해도 표시된 비용은 소모됩니다."
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Attempt",
+    "source": "강화"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Cancel",
+    "source": "취소 · 무기 목록"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "WeaponRow",
+    "source": "{0} +{1} · {2}{3}"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Locked",
+    "source": " · 잠금"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "NoWeapons",
+    "source": "강화할 무기가 없습니다."
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Selected",
+    "source": "{0} +{1}"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "OreRow",
+    "source": "{0} · 보유 {1}개 · 소모 {2}개 · 확률 +{3}%"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "Offer",
+    "source": "다음 +{0} · 성공 확률 {1}% · {2}G / 보유 {3}G"
+  },
+  {
+    "namespace": "ICEnhance",
+    "key": "NoOres",
+    "source": "가방에 강화용 광석이 없습니다."
+  },
+  {
+    "namespace": "ICFarm",
+    "key": "ChooseSeed",
+    "source": "심을 씨앗 선택"
+  },
+  {
+    "namespace": "ICFarm",
+    "key": "SeedInfo",
+    "source": "씨앗 1개를 사용해 이 칸의 중앙에 심습니다."
+  },
+  {
+    "namespace": "ICFarm",
+    "key": "SeedCancel",
+    "source": "취소"
+  },
+  {
+    "namespace": "ICFarm",
+    "key": "SeedCount",
+    "source": "{0}   보유 {1}개"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "Title",
+    "source": "씨앗 상점"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "BuyTab",
+    "source": "구매"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "SellTab",
+    "source": "판매"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "Cart",
+    "source": "장바구니 · 클릭하면 1개씩 제외"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "CheckoutBuy",
+    "source": "구매하기"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "Cancel",
+    "source": "취소하고 나가기"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "Keys",
+    "source": "W/S 선택 · Enter 담기 · A/D 탭 · F 결제 · ESC 취소"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "OfferLine",
+    "source": "{0}   {1} G   보유 {2}개"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "CartLine",
+    "source": "{0} × {1}   {2} G"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "Gold",
+    "source": "보유 골드 {0} G"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "Total",
+    "source": "합계 {0} G"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "CheckoutSell",
+    "source": "판매하기"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "CheckoutBuy",
+    "source": "구매하기"
+  },
+  {
+    "namespace": "ICShop",
+    "key": "Done",
+    "source": "거래가 완료됐습니다."
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Deposit",
+    "source": "창고로 이동"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Back",
+    "source": "뒤로"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Amount",
+    "source": "{0} / {1}개"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Deposit",
+    "source": "창고로 이동"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Withdraw",
+    "source": "인벤토리로 이동"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Title",
+    "source": "개인 창고"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Close",
+    "source": "닫기"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Keys",
+    "source": "클릭 · Enter 정보/이동  |  WASD 이동  |  Tab 양쪽 전환  |  ESC 닫기"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "FortySlots",
+    "source": "창고 · 40칸 고정"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "BagCapacity",
+    "source": "인벤토리 · {0}칸"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "NoDescription",
+    "source": "등록된 설명이 없습니다."
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "RecoveryInfo",
+    "source": "{0}\nHP {1} · SP {2} 회복"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "EquipmentInfo",
+    "source": "{0}\n기본 공격력 {1} · 강화 +{2}"
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "ReservedItem",
+    "source": "잠금·제작 예약된 아이템은 이동할 수 없습니다."
+  },
+  {
+    "namespace": "ICStorage",
+    "key": "Moved",
+    "source": "선택한 수량을 이동했습니다."
+  },
+  {
+    "namespace": "ICMap",
+    "key": "Close",
+    "source": "닫기"
+  },
+  {
+    "namespace": "ICMap",
+    "key": "Loading",
+    "source": "이동 중 · 로딩 중…"
+  },
+  {
+    "namespace": "ICMap",
+    "key": "Title",
+    "source": "테스트맵 · 포탈 이동"
+  },
+  {
+    "namespace": "ICMap",
+    "key": "Help",
+    "source": "포탈 클릭 / 방향키 선택 + 확인: {0}G로 이동 · 보유 {1}G · M / B: 닫기"
+  },
+  {
+    "namespace": "ICMap",
+    "key": "MiniHelp",
+    "source": "M · 지도"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "RewardsUnavailable",
+    "source": "보상 정보를 불러올 수 없습니다."
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "GoldReward",
+    "source": "{0} 골드"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "ItemReward",
+    "source": "{0} × {1}"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "RewardItemTooltip",
+    "source": "{0}\n{1}"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "ItemBadge",
+    "source": "물품"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "PositiveAffinity",
+    "source": "+{0}"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "AffinityRewardPreview",
+    "source": "{0} 호감도 {1}"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "AffinityBadge",
+    "source": "호감"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "RecipeRewardPreview",
+    "source": "{0} 제작법 해금"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "RecipeBadge",
+    "source": "제작"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "NoRewards",
+    "source": "없음"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Objectives",
+    "source": "목표"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Rewards",
+    "source": "보상"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "SwitchNotice",
+    "source": "다른 퀘스트를 시작하면 이전 퀘스트의 진행도가 초기화됩니다."
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Abandon",
+    "source": "포기"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Start",
+    "source": "시작하기"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "StopGuide",
+    "source": "경로 안내 중지"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Back",
+    "source": "뒤로가기"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Running",
+    "source": "진행 중"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Waiting",
+    "source": "대기 중"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Available",
+    "source": "수락 가능"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "AnyObjective",
+    "source": "다음 중 하나 달성"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Objectives",
+    "source": "목표"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "StopGuide",
+    "source": "경로 안내 중지"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "StartGuide",
+    "source": "경로 안내 시작"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Journal",
+    "source": "퀘스트 목록"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "Empty",
+    "source": "수락한 퀘스트가 없습니다."
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "StartFailed",
+    "source": "이 퀘스트를 시작할 수 없습니다."
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "AbandonFailed",
+    "source": "이 퀘스트는 포기할 수 없습니다."
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "ListHint",
+    "source": "W / S  퀘스트 선택     Enter / D  상세 보기     A  상단 탭     ESC  닫기"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "ReadHint",
+    "source": "W / S  설명 스크롤     D / Enter  버튼 이동     A / ESC  목록으로"
+  },
+  {
+    "namespace": "ICQuestMenu",
+    "key": "DetailHint",
+    "source": "A / D  포기 / 시작하기     W / S  경로 안내 / 뒤로가기     Enter  실행     ESC  목록으로"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ControllerHelpXbox",
+    "source": "L스틱 이동 · R스틱 시점 · RT 공격 · LT 달리기/회피 · RB 무기 변경 · LB 대상 지정\nX 상호작용 · Y 낚시 · A 점프/확인 · B 뒤로 · Start 메뉴 · View 인벤토리\nLT + X/Y/B/A: Q/E/R/T 스킬 · 십자키: 퀵슬롯 · 대상 선택 중 L스틱: 파티원 선택"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ControllerHelpNintendo",
+    "source": "L스틱 이동 · R스틱 시점 · ZR 공격 · ZL 달리기/회피 · R 무기 변경 · L 대상 지정\nX 상호작용 · Y 낚시 · A 점프/확인 · B 뒤로 · + 메뉴 · - 인벤토리\nZL + X/Y/B/A: Q/E/R/T 스킬 · 십자키: 퀵슬롯 · 대상 선택 중 L스틱: 파티원 선택"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "TabCombat",
+    "source": "전투"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "TabControls",
+    "source": "조작 · 키 설정"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "TabGraphics",
+    "source": "그래픽 · 화면"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "TabAudio",
+    "source": "오디오"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "TabOther",
+    "source": "기타"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AutoTarget",
+    "source": "공격 시 대상 자동 선택"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AutoTargetHelp",
+    "source": "대상이 없을 때 카메라 앞의 적을 선택합니다. 끄면 바라보는 방향으로 자유롭게 공격합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "CombatFacing",
+    "source": "전투 중 조준 방향 유지"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "CombatFacingHelp",
+    "source": "전투 이동 중 근접 무기는 선택한 적, 원거리 무기는 화면 중앙을 바라봅니다. 끄면 이동 방향으로 회전합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AimAssist",
+    "source": "조준점 거리 보정"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AimAssistHelp",
+    "source": "화면 중앙의 적이나 장애물까지 거리를 계산해 손과 카메라의 위치 차이를 보정합니다. 끄면 최대 사거리의 화면 중앙을 조준합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "DamageNumbers",
+    "source": "피해량 숫자 표시"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "DamageNumbersHelp",
+    "source": "플레이어와 적에게 가한 피해량을 화면에 표시합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "EnemyHealth",
+    "source": "적 체력 막대 표시"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "EnemyHealthHelp",
+    "source": "몬스터 머리 위 체력 막대를 표시합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Sensitivity",
+    "source": "마우스 감도"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "SensitivityHelp",
+    "source": "마우스의 수평·수직 카메라 회전 속도입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "InvertX",
+    "source": "카메라 좌우 반전"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "InvertXHelp",
+    "source": "마우스의 수평 회전 방향을 반대로 바꿉니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "InvertY",
+    "source": "카메라 상하 반전"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "InvertYHelp",
+    "source": "마우스의 수직 회전 방향을 반대로 바꿉니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "FOV",
+    "source": "시야각"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "FOVHelp",
+    "source": "플레이어 카메라의 시야각입니다. 넓을수록 주변이 더 많이 보입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ZoomStep",
+    "source": "휠 확대·축소 속도"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ZoomStepHelp",
+    "source": "마우스 휠 한 칸으로 변경하는 카메라 거리입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Monitor",
+    "source": "화면 / 모니터"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "MonitorHelp",
+    "source": "연결된 디스플레이 중 게임을 표시할 화면을 선택합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "DisplayMode",
+    "source": "디스플레이 모드"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "DisplayModeHelp",
+    "source": "전체 화면, 전체 창, 창 모드를 선택합니다. 전체 창은 바탕 화면 해상도를 사용합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Fullscreen",
+    "source": "전체 화면"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Borderless",
+    "source": "전체 창"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Windowed",
+    "source": "창 모드"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Resolution",
+    "source": "해상도"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ResolutionHelp",
+    "source": "선택한 모니터가 지원하는 해상도입니다. 전체 창 모드에서는 변경할 수 없습니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "RefreshRate",
+    "source": "화면 주사율"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "VSync",
+    "source": "수직 동기화"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "VSyncHelp",
+    "source": "화면 찢어짐을 줄입니다. 모니터 주사율에 따라 프레임이 제한될 수 있습니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "FrameLimit",
+    "source": "최대 프레임"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "FrameLimitHelp",
+    "source": "게임 렌더링의 초당 프레임 상한입니다. 실제 모니터 주사율은 변경하지 않습니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Unlimited",
+    "source": "제한 없음"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Low",
+    "source": "낮음"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Medium",
+    "source": "보통"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "High",
+    "source": "높음"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Epic",
+    "source": "매우 높음"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Custom",
+    "source": "사용자 지정"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Quality",
+    "source": "그래픽 프리셋"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "QualityHelp",
+    "source": "아래 세부 품질을 한 번에 변경합니다. 개별 변경 시 사용자 지정으로 표시됩니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ResolutionScaleHelp",
+    "source": "3D 화면의 내부 해상도 비율입니다. 낮추면 성능이 개선되고 화면이 흐려집니다. UI 해상도는 유지됩니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "DynamicResolution",
+    "source": "동적 해상도"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "DynamicResolutionHelp",
+    "source": "엔진과 그래픽 장치가 지원할 때 부하에 따라 내부 렌더링 해상도를 조절합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ViewDistance",
+    "source": "시야 거리"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ViewDistanceHelp",
+    "source": "멀리 있는 물체의 표시 거리입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Texture",
+    "source": "텍스처 품질"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "TextureHelp",
+    "source": "표면 이미지의 선명도와 그래픽 메모리 사용량입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Shadow",
+    "source": "그림자 품질"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ShadowHelp",
+    "source": "그림자 해상도와 표시 거리입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "GI",
+    "source": "간접 조명 품질"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "GIHelp",
+    "source": "주변에서 반사되어 들어오는 빛의 품질입니다. 높은 단계는 성능에 영향을 줍니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Reflection",
+    "source": "반사 품질"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ReflectionHelp",
+    "source": "물과 금속 등 반사 표면의 품질입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AAQuality",
+    "source": "안티앨리어싱 품질"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AAQualityHelp",
+    "source": "물체 가장자리의 계단 현상을 줄이는 품질입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AAMethod",
+    "source": "안티앨리어싱 방식"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AAMethodHelp",
+    "source": "TSR은 낮은 내부 해상도를 복원합니다. TAA는 시간 기반 보정, FXAA는 가벼운 화면 후처리입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Off",
+    "source": "끄기"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Effects",
+    "source": "이펙트 품질"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "EffectsHelp",
+    "source": "파티클과 전투 효과의 세부 품질입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "PostProcessing",
+    "source": "후처리 품질"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "PostProcessingHelp",
+    "source": "화면 보정과 피사계 심도 등 후처리 품질입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Foliage",
+    "source": "풀 · 수목 품질"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "FoliageHelp",
+    "source": "풀과 식생의 표시 밀도 및 거리입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Shading",
+    "source": "셰이딩 품질"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ShadingHelp",
+    "source": "표면 재질과 조명의 세부 표현입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Landscape",
+    "source": "지형 품질"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "LandscapeHelp",
+    "source": "지형의 세부 표현과 품질입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "MotionBlur",
+    "source": "모션 블러"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "MotionBlurHelp",
+    "source": "빠르게 움직일 때의 잔상 효과입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Bloom",
+    "source": "빛 번짐"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "BloomHelp",
+    "source": "밝은 조명과 공격 이펙트의 빛 번짐 효과입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "DOF",
+    "source": "피사계 심도"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "DOFHelp",
+    "source": "초점 밖 영역의 흐림 효과를 허용합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AO",
+    "source": "주변광 차폐"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AOHelp",
+    "source": "물체가 접하는 구석의 입체감을 강조합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "GammaHelp",
+    "source": "게임 화면의 중간 밝기를 조절합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "MasterVolume",
+    "source": "전체 음량"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "MasterVolumeHelp",
+    "source": "모든 소리의 전체 음량입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "MusicVolume",
+    "source": "배경 음악"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "MusicVolumeHelp",
+    "source": "배경 음악 사운드 클래스의 음량입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "EffectsVolume",
+    "source": "효과음"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "EffectsVolumeHelp",
+    "source": "공격, 피격, 채집 등 게임 효과음의 음량입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AmbientVolume",
+    "source": "환경음"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AmbientVolumeHelp",
+    "source": "바람, 물소리 등 환경 사운드의 음량입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "VoiceVolume",
+    "source": "음성"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "VoiceVolumeHelp",
+    "source": "음성 사운드 클래스의 음량입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "UIVolume",
+    "source": "UI 효과음"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "UIVolumeHelp",
+    "source": "메뉴 선택과 버튼 사운드의 음량입니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "MuteUnfocused",
+    "source": "백그라운드에서 음소거"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "MuteUnfocusedHelp",
+    "source": "다른 창으로 전환하면 게임 소리를 끕니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "UIScale",
+    "source": "HUD · 메뉴 글자 크기"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "UIScaleHelp",
+    "source": "HUD와 메뉴 안내 문구를 75%~130% 크기로 조절합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "FPS",
+    "source": "FPS 표시"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "FPSHelp",
+    "source": "현재 렌더링 프레임 수를 표시합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Language",
+    "source": "언어"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "LanguageHelp",
+    "source": "한국어와 영어 표시를 전환합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Korean",
+    "source": "한국어"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "English",
+    "source": "English"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "InputDevice",
+    "source": "조작 장치 표시"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "InputDeviceHelp",
+    "source": "자동 전환 또는 키보드/컨트롤러 안내를 선택합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "AutoInput",
+    "source": "자동"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "KeyboardMouse",
+    "source": "키보드 / 마우스"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "GamepadInput",
+    "source": "컨트롤러"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "GamepadLayout",
+    "source": "컨트롤러 버튼 배치"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "GamepadLayoutHelpXbox",
+    "source": "기본 Xbox 배치 또는 Nintendo 배치를 선택합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Settings",
+    "source": "설정"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Description",
+    "source": "플레이 환경을 조정하세요. 변경 사항은 적용한 뒤 저장됩니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "BindingsTitle",
+    "source": "키 변경"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "BindingsHelp",
+    "source": "키 버튼을 선택한 뒤 새 키를 누르세요. ESC는 취소 및 메뉴 복귀용으로 유지됩니다. 중복 키는 적용 전에 확인합니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Reset",
+    "source": "기본값"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Apply",
+    "source": "적용 · 저장"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Keep",
+    "source": "변경 유지"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Revert",
+    "source": "되돌리기"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Close",
+    "source": "닫기"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "KeyboardHelp",
+    "source": "Tab  이동     방향키  변경     Space / Enter  선택     ESC  닫기"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Ready",
+    "source": "변경 후 적용 · 저장을 눌러주세요. 닫으면 미적용 변경 사항은 취소됩니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Changed",
+    "source": "변경 사항이 있습니다. 적용 · 저장을 눌러 반영하세요."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Forward",
+    "source": "이동 · 앞으로"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Backward",
+    "source": "이동 · 뒤로"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Left",
+    "source": "이동 · 왼쪽"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Right",
+    "source": "이동 · 오른쪽"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "CompanionBinding",
+    "source": "동료 스킬 {0}"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "QuickBinding",
+    "source": "퀵 슬롯 {0}"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "GameBinding",
+    "source": "게임 조작"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "PressKey",
+    "source": "새 키를 누르세요…"
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "ReservedKey",
+    "source": "이 키는 사용할 수 없습니다. ESC는 메뉴 복귀용으로 유지됩니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "KeyChanged",
+    "source": "키가 변경되었습니다. 중복 키는 기존 키와 교환됩니다. 적용 · 저장으로 반영하세요."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Saved",
+    "source": "설정을 적용하고 저장했습니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Reverted",
+    "source": "화면 변경을 취소하고 이전 설정으로 돌아왔습니다."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "Defaults",
+    "source": "화면 모드와 해상도를 유지하고 옵션·키 설정을 기본값으로 되돌렸습니다. 적용 · 저장으로 반영하세요."
+  },
+  {
+    "namespace": "ICSettings",
+    "key": "KeepCountdown",
+    "source": "현재 화면 설정을 유지할까요? {0}초 후 이전 설정으로 돌아갑니다."
+  },
+  {
+    "namespace": "ICInventoryMenu",
+    "key": "GoldBalance",
+    "source": "보유 골드  {0} G"
+  },
+  {
+    "namespace": "ICWarpStone",
+    "key": "Interaction",
+    "source": "워프 돌 조사하기"
+  },
+  {
+    "namespace": "ICWarp",
+    "key": "StoneRegistered",
+    "source": "워프 돌이 활성화되었습니다."
+  }
+]

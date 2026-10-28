@@ -161,13 +161,13 @@ bool FICMonsterPrototypeCheck::RunTest(const FString& Parameters)
         TestTrue(TEXT("Actual monster has its own codex essence index"),EssenceIndex>=0&&EssenceIndex<55);
         const int32 Essence=Awarded.Codex.PetEssence.FindRef(EssenceIndex);
         TestTrue(TEXT("Killing the monster grants 1..10 matching essences"),Essence>=1&&Essence<=10);
-        int32 ItemKinds=0,Count=0;for(const auto& Item:Awarded.Inventory.Bag.Slots)if(!Item.IsEmpty()&&Item.ItemID.ToString().StartsWith(TEXT("ITEM_R01_"))){++ItemKinds;Count+=Item.Count;}
+        int32 ItemKinds=0,Count=0;for(const auto& Item:Awarded.Inventory.Bag.Slots)if(!Item.IsEmpty()&&Item.ItemID.ToString().StartsWith(TEXT("ITM_R01_"))){++ItemKinds;Count+=Item.Count;}
         TestEqual(TEXT("One item kind is received"),ItemKinds,1);TestTrue(TEXT("1..5 items are received"),Count>=1&&Count<=5);
         TestTrue(TEXT("Actual reward adds HUD toast"),Canvas->GetChildrenCount()>FeedBefore);
         bool FoundToast=false;for(auto* Child:Canvas->GetAllChildren())if(auto* Toast=Cast<UICRewardNoticeWidget>(Child))
         {
             FoundToast=true;TestTrue(TEXT("Gold toast has localized unit"),CastChecked<UTextBlock>(Toast->GetWidgetFromName(TEXT("TXT_Gold")))->GetText().ToString().Contains(TEXT("골드")));
-            TestTrue(TEXT("Item toast has displayed R01 item name"),CastChecked<UTextBlock>(Toast->GetWidgetFromName(TEXT("TXT_Items")))->GetText().ToString().Contains(TEXT("R01_")));
+            TestTrue(TEXT("Item toast has the real acquired item name"),CastChecked<UTextBlock>(Toast->GetWidgetFromName(TEXT("TXT_Items")))->GetText().ToString().Contains(TEXT("획득")));
             const FString EssenceText=CastChecked<UTextBlock>(Toast->GetWidgetFromName(TEXT("TXT_Essence")))->GetText().ToString();
             TestTrue(TEXT("Essence toast uses the actual monster name and acquisition text"),EssenceText.Contains(Enemy->GetMonsterDefinition().PetName.ToString())&&EssenceText.Contains(TEXT("정수 획득")));
         }
@@ -186,7 +186,7 @@ bool FICMonsterPrototypeCheck::RunTest(const FString& Parameters)
                 if(!Prepared){AddError(Reason);continue;}
                 TestTrue(TEXT("Every gold roll is within bounds"),Candidate.Gold-Initial.Gold>=100&&Candidate.Gold-Initial.Gold<=1000);
                 TestTrue(TEXT("Normal and boss essences always roll 1..10"),Candidate.Codex.PetEssence.FindRef(Definition.PetCodexIndex)>=1&&Candidate.Codex.PetEssence.FindRef(Definition.PetCodexIndex)<=10);
-                int32 Kinds=0,Quantity=0;for(const auto& Item:Candidate.Inventory.Bag.Slots)if(!Item.IsEmpty()&&Item.ItemID.ToString().StartsWith(TEXT("ITEM_R01_"))){++Kinds;Quantity+=Item.Count;}
+                int32 Kinds=0,Quantity=0;for(const auto& Item:Candidate.Inventory.Bag.Slots)if(!Item.IsEmpty()&&Item.ItemID.ToString().StartsWith(TEXT("ITM_R01_"))){++Kinds;Quantity+=Item.Count;}
                 TestEqual(TEXT("Every roll picks one kind"),Kinds,1);TestTrue(TEXT("Every roll yields 1..5"),Quantity>=1&&Quantity<=5);
                 const auto Once=Candidate;FICRewardService::PrepareMonsterDefeat(Candidate,Monster->GetSpawnKey(),Definition,D,Time->GetClock().PlaySecond,Reason);
                 TestEqual(TEXT("Receipt makes reward retry idempotent"),Candidate.Gold,Once.Gold);
@@ -194,7 +194,7 @@ bool FICMonsterPrototypeCheck::RunTest(const FString& Parameters)
             }
             auto Full=Initial;
             Full.Codex.PetEssence.Add(Definition.PetCodexIndex,MAX_int32-1);
-            for(auto& Item:Full.Inventory.Bag.Slots){Item=FPlayerItemInstance();Item.ItemID=TEXT("ITEM_R01_01");Item.InstanceID=FGuid::NewGuid();Item.Count=99;}
+            for(auto& Item:Full.Inventory.Bag.Slots){Item=FPlayerItemInstance();Item.ItemID=TEXT("ITM_R01_PLANT_01");Item.InstanceID=FGuid::NewGuid();Item.Count=99;}
             auto& FullSlot=Full.SpawnSlots.Add(Monster->GetSpawnKey());FullSlot.SpawnerID=Spawner->ID;FullSlot.SlotIndex=MonsterIndex;FullSlot.MonsterID=Definition.ID;FullSlot.bDefeated=true;FullSlot.HP=0;FullSlot.MaxHP=Definition.CombatStats.MaxHP;FullSlot.IncarnationID=FGuid::NewGuid();FullSlot.bRewardPending=true;
             FString OverflowReason;
             TestTrue(TEXT("A full bag does not block the kill reward transaction"),FICRewardService::PrepareMonsterDefeat(Full,Monster->GetSpawnKey(),Definition,D,Time->GetClock().PlaySecond,OverflowReason));

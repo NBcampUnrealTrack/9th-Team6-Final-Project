@@ -13,6 +13,9 @@
 #include "Data/Text/ICTextLibrary.h"
 #include "Internationalization/StringTable.h"
 #include "Settings/ICGameUserSettings.h"
+#include "Core/Controller/ICPlayerController.h"
+#include "Character/Base/ICCharacterBase.h"
+#include "UI/Framework/ICFrontendLayout.h"
 
 void UICDamageNumberWidget::SetDamage(float Value)
 {
@@ -49,7 +52,7 @@ void UICRewardNoticeWidget::SetReward(int32 Gold,const TArray<FICItemAmount>& It
         FICDefinitionResult R;const auto* Definition=D?D->Find<FICItemRow>(Item.ItemID,R):nullptr;
         const FText Name=Definition&&!Definition->DisplayName.IsEmpty()?Definition->DisplayName:FText::FromName(Item.ItemID);
         if(!Lines.IsEmpty())Lines+=TEXT("\n");
-        Lines+=FText::Format(NSLOCTEXT("ICCombat","ItemReceived","+ {0} {1}개"),Name,FText::AsNumber(Item.Count)).ToString();
+        Lines+=FText::Format(NSLOCTEXT("ICCombat","ItemReceived","+ {0} {1}개 획득"),Name,FText::AsNumber(Item.Count)).ToString();
     }
     if(auto* Text=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Essence"))))
     {
@@ -79,6 +82,14 @@ UICCombatFeedbackWidget::UICCombatFeedbackWidget(const FObjectInitializer& Initi
 void UICCombatFeedbackWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+    if(auto* Canvas=Cast<UCanvasPanel>(GetWidgetFromName(TEXT("FeedbackCanvas")));Canvas&&!LockMarker)
+    {
+        LockMarker=WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),TEXT("TXT_LockOn"));
+        LockMarker->SetText(NSLOCTEXT("ICCombat","LockOnMarker","◎"));LockMarker->SetFont(ICFrontendLayout::Font(34,true));
+        LockMarker->SetColorAndOpacity(FLinearColor(1,.76f,.18f));LockMarker->SetJustification(ETextJustify::Center);
+        auto* MarkerSlot=Canvas->AddChildToCanvas(LockMarker);MarkerSlot->SetSize({64,64});MarkerSlot->SetAlignment({.5f,.5f});
+        LockMarker->SetVisibility(ESlateVisibility::Collapsed);
+    }
     BoundState=GetGameInstance()?GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr;
     if(BoundState)
     {
@@ -110,7 +121,7 @@ void UICCombatFeedbackWidget::ShowDamage(AActor* Victim,float Amount)
     auto* Canvas=Cast<UCanvasPanel>(GetWidgetFromName(TEXT("FeedbackCanvas")));
     if(!Canvas||!IsValid(Victim)||Amount<=0||!GetOwningPlayer())return;
     const bool Player=Victim==GetOwningPlayerPawn();
-    if(!Player&&!Victim->IsA<AICEnemyBase>())return;
+    if(!Player&&!Victim->ActorHasTag(TEXT("IC.Enemy")))return;
     auto* Class=(Player?PlayerDamageClass:MonsterDamageClass).LoadSynchronous();
     auto* Number=Class?CreateWidget<UICDamageNumberWidget>(GetOwningPlayer(),Class):nullptr;
     if(!Number)return;
@@ -144,6 +155,13 @@ void UICCombatFeedbackWidget::ShowItems(const TArray<FICItemAmount>& Items)
 void UICCombatFeedbackWidget::NativeTick(const FGeometry& Geometry,float DeltaSeconds)
 {
     Super::NativeTick(Geometry,DeltaSeconds);int32 RewardIndex=0;
+    if(LockMarker)
+    {
+        const auto* PC=Cast<AICPlayerController>(GetOwningPlayer());auto* Target=PC?PC->GetLockedCombatTarget():nullptr;FVector2D Screen;
+        const bool Visible=Target&&PC->Menu.IsEmpty()&&UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(GetOwningPlayer(),Target->GetActorLocation(),Screen,false);
+        LockMarker->SetVisibility(Visible?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
+        if(Visible)CastChecked<UCanvasPanelSlot>(LockMarker->Slot)->SetPosition(Geometry.AbsoluteToLocal(UWidgetLayoutLibrary::GetViewportWidgetGeometry(this).LocalToAbsolute(Screen)));
+    }
     for(int32 Index=FloatingEntries.Num()-1;Index>=0;--Index)
     {
         auto& Entry=FloatingEntries[Index];Entry.Age+=DeltaSeconds;

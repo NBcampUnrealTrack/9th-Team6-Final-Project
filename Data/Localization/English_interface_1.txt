@@ -1,0 +1,261 @@
+431|Welcome! Is there anything you need?
+432|I'm R01_01.
+433|I'm R01_02.
+434|I'm R01_03.
+435|I'm R01_04.
+436|I'm R01_05.
+437|I'm R01_06.
+438|I'm R01_07.
+439|I'm R01_08.
+440|I'm R01_09.
+441|I'm R01_10.
+442|I'm R01_11.
+443|Find the Ring
+444|I've lost a ring. Could you bring it to me if you find it?
+445|Searching for the Ring
+446|Have you found the ring? Please bring it to me when you do.
+447|Deliver the Ring
+448|You found my ring! Could you give it to me?
+449|Ring Returned
+450|Thank you for finding my ring.
+451|NPC 2: Where to Find Them
+452|Looking for NPC 3? They live here with us.
+453|There are so many beds that there's a little spot by the window. Talk to NPC 3 over there.
+454|Deliver a Ring to the Merchant
+455|Give the quest ring to the merchant.
+456|Deliver the Quest Ring to the Merchant
+457|[Test] Talk to the Merchant
+458|Finish a regular conversation with the merchant.
+459|[Test] Deliver a Gift
+460|Give the merchant one Pink Flower from your bag.
+461|[Test] Gather a Crop
+462|Obtain one ITM_R01_CROP_01 item from farming.
+463|[Test] Merchant Affinity
+464|Raise your affinity with the merchant to at least 1.
+465|[Test] Strength Growth
+466|Raise your base Strength to at least 2.
+467|Reach the Destination
+468|Follow the guide NPC to the destination. Accept to reveal a guiding sphere.
+469|Track a Quest and Move Toward Its Minimap Marker
+470|[Test] Keep a Crop
+471|Have one ITM_R01_CROP_01 item in your inventory.
+472|Quest 1
+473|A request from NPC 1. Talk to NPC 2.
+474|Talk to NPC 2
+475|Quest 2
+476|A request from NPC 2. Talk to NPC 3.
+477|Talk to NPC 3
+478|Quest 3
+479|A request from NPC 3. Talk to NPC 4.
+480|Talk to NPC 4
+481|Quest 4
+482|A request from NPC 4. Talk to NPC 5.
+483|Talk to NPC 5
+484|Quest 5
+485|A request from NPC 5. Talk to NPC 6.
+486|Talk to NPC 6
+487|Quest 6
+488|A request from NPC 6. Talk to NPC 7.
+489|Talk to NPC 7
+490|Quest 7
+491|A request from NPC 7. Talk to NPC 8.
+492|Talk to NPC 8
+493|Quest 8
+494|A request from NPC 8. Talk to NPC 9.
+495|Talk to NPC 9
+496|Quest 9
+497|A request from NPC 9. Talk to NPC 10.
+498|Talk to NPC 10
+499|Quest 10
+500|A request from NPC 10. Talk to NPC 11.
+501|Talk to NPC 11
+502|Isekai Class
+503|Another world. Your story.
+504|Start Game
+505|Continue
+506|Saved Games
+508|Quit
+509|What is your name?
+510|Choose your gender.
+511|Which story interests you?
+512|Tomorrow is your last day. What music would you listen to?
+513|What was the happiest moment of your life?
+514|Enter a name between 1 and 12 characters.
+515|Male
+516|Female
+517|Choose a Name
+523|Game Settings
+525|{0}\n{1}\nPlay Time {2}\nSaved {3}
+526|Next
+527|Return
+528|Back
+529|Start Game
+531|A New Story
+532|Loading a new world...
+533|Preparing your character and first save...
+534|Retry
+535|Main Menu
+536|Continue
+537|Save
+538|Load
+539|Paused
+540|Quit Without Saving
+541|WASD Move / Mouse Look / Space Jump / Shift Sprint / Left Click Attack / Right Click Switch Weapon / Q Skill / F Interact / Esc Menu
+542|1. The Overpowered Hero's Quiet Country Life
+543|Receive information about R01_08 and the Grilled Chicken recipe. Ingredients: Chicken Meat x2.
+544|2. The Villainess Returns
+545|Receive the Seasoned Rapeseed recipe. Ingredients: Rapeseed x2.
+546|3. Penniless Pioneer: From Nothing to Riches
+547|4. The Young Heir Who Claimed Every Opportunity
+548|1. A song that defined my youth
+549|Gain 300 affinity with R01_02, their unique skill and a matching beginner weapon.
+550|2. A song I shared with someone I loved
+551|Gain 300 affinity with R01_04, their unique skill and a matching beginner weapon.
+552|3. An upbeat song to stay true to myself
+553|Gain 300 affinity with R01_01, their unique skill and a matching beginner weapon.
+554|4. A song that got me through hard times
+555|Gain 300 affinity with R01_03, their unique skill and a matching beginner weapon.
+556|1. When I achieved something
+557|Does not affect starting rewards
+558|2. When I was with someone I loved
+559|3. An ordinary, peaceful day
+560|4. When someone recognized my efforts
+561|Deleted manual slot {0} and its recovery file.
+562|Duplicate player state participant.
+563|Answer the questions before starting a new game.
+564|An effect request is being processed.
+565|Saving manual slot {0}...
+566|Manual slot {0}: 
+567|Placed {0} overflow items on the ground.
+568|This companion cannot be selected as a target.
+569|You cannot interact with this target right now. Check its actor settings.
+570|No active companions.
+571|No unlocked skill is assigned to the current weapon.
+572|Fishing is not available in this area.
+573|No item to use.
+574|This item cannot be consumed.
+575|Select a companion with E/R/T or the left stick.
+576|There is no companion in that slot.
+577|This skill cannot affect that target.
+578|Use Skill
+579|No valid targets.
+580|Unable to apply the current state. Nothing changed.
+581|State validation failed. Items and effects were not changed.
+582|Item used.
+583|You have died. Load a manual or automatic save.
+584|You do not have access to this storage.
+585|You cannot sleep right now.
+586|Unable to retrieve the recipe.
+587|Use the appropriate workstation to craft this recipe.
+588|You cannot craft right now.
+589|E/R/T or left stick: select party member / Number or Enter: use / {0}: cancel
+590|E/R/T or left stick: select party member / Q or Enter: use / {0}: cancel
+591|Target: {0} / Q, item key or Enter: confirm / {1}: cancel
+592|Rested for {0} game minutes. HP, MP and SP fully restored.
+593|Started crafting {0}
+594|This character has already been created.
+595|New game data or starting rewards are invalid.
+596|The questionnaire answers or rewards are invalid.
+597|Starting skill definition not found.
+598|Unable to grant or equip a starting weapon. Check its item definition.
+599|Starting inventory validation failed.
+600|Check the link between the starting NPC and their unique skill.
+601|Starting recipe definition not found.
+602|Starting character information not found.
+603|Initial character state validation failed. 
+604|Unable to apply the initial character state.
+605|Unable to set the starting time.
+606|Creating character and first save...
+607|Select manual save slot 1-4.
+608|Unable to grant starting item {0}.
+609|Wait for saving to finish before loading.
+610|Set the Start Map on the main menu.
+611|Select a slot with a save to load.
+612|Create a character before saving manually.
+613|Wait for item effects to finish before saving.
+614|Select a slot with a button or keys 1-4, then press Enter or Save
+615|Wait for saving to finish before returning.
+616|You are dead. Load a save or quit the game.
+617|Choose Save and Quit, Quit Without Saving, or Cancel.
+618|Wait for saving to finish before deleting.
+619|No original Version 1/8 save exists.
+620|The selected slot is empty.
+621|Wait for saving to finish before continuing.
+622|Cancelled.
+623|The game will close after saving. This screen will remain open if saving fails.
+624|The game did not close because saving failed. Check the save status.
+625|Load {0} / {1}? Your current unsaved progress will be replaced.
+626|Manual Slot {0}
+627|Overwrite the existing save in manual slot {0} / {1}?
+628|Creating a character replaces the automatic save / {0}. Continue?
+629|Use the forge's upgrade menu to upgrade equipment.
+630|Select a destination slot.
+631|Starting reward data is missing. Check DT_IC_CreationOptions.
+632|The play map could not be found.
+633|The save system is not ready.
+634|Unable to initialize a new game.
+635|Map travel failed: 
+636|Not enough bag space.
+637|Pickup validation failed. Nothing changed.
+638|Item picked up.
+639|Inventory validation failed. Nothing changed.
+640|WorldState is not connected. Nothing changed.
+641|Invalid item or quantity.
+642|The quantity exceeds the limit for a single operation.
+643|Not enough bag space. Nothing changed.
+644|The item is missing or locked.
+645|The slot is empty or the item is locked.
+646|This quantity cannot be split.
+647|There is no empty slot for the split stack.
+648|This item cannot be discarded.
+649|WorldState is not connected.
+650|Cannot equip this item.
+651|Equipment definition is missing.
+652|Your current class cannot use this equipment.
+653|No weapon to switch to.
+654|There is no bag space to unequip this item.
+655|Only consumables and expansion tickets can be assigned.
+656|The bag is already at its 100-slot limit. The ticket was not consumed.
+657|No expansion ticket.
+658|Not enough space to transfer. Nothing changed.
+659|Not enough ingredients.
+660|No space for the crafted item.
+661|Unable to store overflow items. Nothing changed.
+662|Unable to apply player state.
+663|Upgrade data is missing or this item cannot be upgraded.
+664|This item is already at its maximum upgrade level.
+665|The next upgrade level is configured incorrectly.
+666|Not enough gold for the upgrade.
+667|Upgrade transaction validation failed. Items and gold were not changed.
+668|Upgrade succeeded: +{0}, spent {1} gold
+669|Upgrade failed: remains +{0}, spent {1} gold
+670|The production system is not ready.
+671|Recipe, production or workstation definition is missing.
+672|This task requires its dedicated construction or gathering system.
+673|The production condition evaluator is not connected. Nothing changed.
+674|This workstation cannot perform that task.
+675|Recipe and production time or costs do not match.
+676|Crafting time or SP cost is invalid.
+677|Unable to apply the current state.
+678|No player character has been created.
+679|This recipe has not been unlocked yet.
+680|Finish or cancel your current task first.
+681|You cannot craft right now or do not have enough SP.
+682|A required tool or its definition is missing.
+683|A required production tool is missing.
+684|The ingredient or result definition is empty.
+685|An ingredient definition or quantity is invalid.
+686|Ingredient quantity exceeds the limit.
+687|Not enough available ingredients.
+688|The result definition is missing or there is no space for the item.
+689|Reserved ingredient recheck failed.
+690|Production start validation failed. Nothing changed.
+691|This task has already ended or does not exist.
+692|Crafting is still in progress.
+693|A required completion definition is missing or has changed.
+694|This task must be handled by NPC production.
+695|Unable to finalize the reserved cost.
+696|Unable to verify reserved ingredients.
+697|The result definition is missing or the bag is full. Nothing changed.
+698|Production completion transaction validation failed.
+699|Not enough gift items.

@@ -31,7 +31,7 @@ bool FICNPCGiftPickerCheck::RunTest(const FString&)
     PRAGMA_ENABLE_DEPRECATION_WARNINGS
     auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(D,0);
-    for(const auto ID:{TEXT("ITEM_P0_01"),TEXT("ITM_R01_PLANT_01"),TEXT("ITM_R01_ORE_01"),TEXT("ITM_MAT_001"),TEXT("ITM_QST_001")})
+    for(const auto ID:{TEXT("ITM_R01_FOOD_15"),TEXT("ITM_R01_PLANT_01"),TEXT("ITM_R01_ORE_01"),TEXT("ITM_R01_FISH_ROD"),TEXT("ITM_QST_001")})
         TestTrue(TEXT("Seed actual inventory definitions"),Staging->AddItem(ID,2,false));
     FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("선물선택 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");Initial.Inventory=Staging->GetSnapshot();
     for(auto& Item:Initial.Inventory.Bag.Slots)if(Item.ItemID==TEXT("ITM_R01_ORE_01"))Item.bLocked=true;
@@ -50,13 +50,13 @@ bool FICNPCGiftPickerCheck::RunTest(const FString&)
     auto Send=[&](UICNPCGiftWidget* Widget){Key(Widget,EKeys::Enter);Key(Widget,EKeys::W);Key(Widget,EKeys::Enter);};
     auto* Picker=Open();auto* List=CastChecked<UGridPanel>(Picker->GetWidgetFromName(TEXT("GiftGrid")));
     TestEqual(TEXT("Gift inventory has a five-column, twenty-slot grid"),List->GetChildrenCount(),20);
-    TestEqual(TEXT("First item selected automatically"),Picker->GetSelectedItemID(),FName(TEXT("ITEM_P0_01")));
+    TestEqual(TEXT("First item selected automatically"),Picker->GetSelectedItemID(),FName(TEXT("ITM_R01_FOOD_15")));
     auto* First=CastChecked<UICInventorySlotWidget>(List->GetChildAt(0));
     TestEqual(TEXT("Inventory cells show the actual owned quantity"),CastChecked<UTextBlock>(First->GetWidgetFromName(TEXT("TXT_Count")))->GetText().ToString(),FString(TEXT("2")));
     Key(Picker,EKeys::S);TestTrue(TEXT("S moves down one grid row"),Picker->GetSelectedItemID().IsNone());
-    Key(Picker,EKeys::W);TestEqual(TEXT("W moves up one grid row"),Picker->GetSelectedItemID(),FName(TEXT("ITEM_P0_01")));
+    Key(Picker,EKeys::W);TestEqual(TEXT("W moves up one grid row"),Picker->GetSelectedItemID(),FName(TEXT("ITM_R01_FOOD_15")));
     Key(Picker,EKeys::D);TestEqual(TEXT("D selects the item to the right"),Picker->GetSelectedItemID(),FName(TEXT("ITM_R01_PLANT_01")));
-    Key(Picker,EKeys::A);TestEqual(TEXT("A selects the item to the left"),Picker->GetSelectedItemID(),FName(TEXT("ITEM_P0_01")));
+    Key(Picker,EKeys::A);TestEqual(TEXT("A selects the item to the left"),Picker->GetSelectedItemID(),FName(TEXT("ITM_R01_FOOD_15")));
     Key(Picker,EKeys::D);Key(Picker,EKeys::Enter,true);
     TestEqual(TEXT("Holding Enter does not send a gift"),Pawn->Inventory->CountItem(TEXT("ITM_R01_PLANT_01")),2);
     Key(Picker,EKeys::Enter);
@@ -70,16 +70,16 @@ bool FICNPCGiftPickerCheck::RunTest(const FString&)
     Key(Picker,EKeys::Enter);Key(Picker,EKeys::Escape);TestFalse(TEXT("ESC dismisses only confirmation"),Picker->bConfirming);
     Send(Picker);
     TestEqual(TEXT("Enter gives exactly one selected item"),Pawn->Inventory->CountItem(TEXT("ITM_R01_PLANT_01")),1);
-    TestEqual(TEXT("Choosing another item never sends the preferred item"),Pawn->Inventory->CountItem(TEXT("ITEM_P0_01")),2);
+    TestEqual(TEXT("Choosing another item never sends the preferred item"),Pawn->Inventory->CountItem(TEXT("ITM_R01_FOOD_15")),2);
     TestEqual(TEXT("Neutral item follows the NPC DT affinity value"),State->GetSnapshot(TEXT("NPC_R01_002")).Affinity,0);
     Key(Picker,EKeys::Enter);TestEqual(TEXT("Closed picker cannot send twice"),Pawn->Inventory->CountItem(TEXT("ITM_R01_PLANT_01")),1);
     Picker=Open();Key(Picker,EKeys::Escape);
-    TestEqual(TEXT("ESC consumes nothing"),Pawn->Inventory->CountItem(TEXT("ITEM_P0_01")),2);
+    TestEqual(TEXT("ESC consumes nothing"),Pawn->Inventory->CountItem(TEXT("ITM_R01_FOOD_15")),2);
     Picker=Open();Send(Picker);
-    TestEqual(TEXT("Preferred gift consumes one selected item"),Pawn->Inventory->CountItem(TEXT("ITEM_P0_01")),1);
+    TestEqual(TEXT("Preferred gift consumes one selected item"),Pawn->Inventory->CountItem(TEXT("ITM_R01_FOOD_15")),1);
     TestEqual(TEXT("Preferred gift applies actual DT affinity"),State->GetSnapshot(TEXT("NPC_R01_002")).Affinity,20);
     Picker=Open();Key(Picker,EKeys::Enter);TestTrue(TEXT("Pending gift opens confirmation"),Picker->bConfirming);
-    const int32 PreferredIndex=Pawn->Inventory->GetSnapshot().Bag.Slots.IndexOfByPredicate([](const auto& Item){return Item.ItemID==TEXT("ITEM_P0_01");});
+    const int32 PreferredIndex=Pawn->Inventory->GetSnapshot().Bag.Slots.IndexOfByPredicate([](const auto& Item){return Item.ItemID==TEXT("ITM_R01_FOOD_15");});
     TestTrue(TEXT("The selected item can become locked externally"),Pawn->Inventory->ToggleLock(PreferredIndex));
     TestFalse(TEXT("Locking the pending item invalidates its confirmation"),Picker->bConfirming);
     TestEqual(TEXT("Inventory changes remove a locked selection"),Picker->GetSelectedItemID(),FName(TEXT("ITM_R01_PLANT_01")));
@@ -88,16 +88,16 @@ bool FICNPCGiftPickerCheck::RunTest(const FString&)
     TestEqual(TEXT("Empty inventory retains its slot layout"),List->GetChildrenCount(),20);
     TestTrue(TEXT("Empty gift list explains the state"),CastChecked<UTextBlock>(Picker->GetWidgetFromName(TEXT("GiftStatus")))->GetText().ToString().Contains(TEXT("없습니다")));
     Key(Picker,EKeys::Enter);
-    TestFalse(TEXT("Locked gifts are rechecked at transaction time"),NPC->TryGiveGift(PC,TEXT("ITEM_P0_01")));
+    TestFalse(TEXT("Locked gifts are rechecked at transaction time"),NPC->TryGiveGift(PC,TEXT("ITM_R01_FOOD_15")));
     TestFalse(TEXT("No implicit gift is chosen without an item ID"),NPC->TryGiveGift(PC,NAME_None));
     TestEqual(TEXT("Failed gifts preserve affinity"),State->GetSnapshot(TEXT("NPC_R01_002")).Affinity,20);
     Pawn->Inventory->ToggleLock(PreferredIndex);State->SetAffinity(TEXT("NPC_R01_002"),300);
     TestTrue(TEXT("NPC joins party for companion gifting"),State->SetPartySlot(TEXT("NPC_R01_002"),0));
     Picker=Open();Send(Picker);
-    TestEqual(TEXT("Companion can receive the selected gift"),Pawn->Inventory->CountItem(TEXT("ITEM_P0_01")),0);
+    TestEqual(TEXT("Companion can receive the selected gift"),Pawn->Inventory->CountItem(TEXT("ITM_R01_FOOD_15")),0);
     TestEqual(TEXT("Companion gifting applies DT affinity"),State->GetSnapshot(TEXT("NPC_R01_002")).Affinity,320);
     Picker=Open();State->RestoreState(Initial);Key(Picker,EKeys::Enter);
-    TestEqual(TEXT("Loading closes the picker before another gift can be sent"),Pawn->Inventory->CountItem(TEXT("ITEM_P0_01")),2);
+    TestEqual(TEXT("Loading closes the picker before another gift can be sent"),Pawn->Inventory->CountItem(TEXT("ITM_R01_FOOD_15")),2);
     Pawn->ReleaseForLoad();NPC->ReleaseForLoad();GI->Shutdown();GEngine->DestroyWorldContext(World);World->DestroyWorld(false);
     return !HasAnyErrors();
 }

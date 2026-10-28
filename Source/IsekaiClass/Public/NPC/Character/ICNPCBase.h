@@ -1,11 +1,13 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "Engine/EngineTypes.h"
 #include "Character/Base/ICCharacterBase.h"
 #include "Data/Rows/NPC/ICNPCRow.h"
 #include "ICNPCBase.generated.h"
 
 class AICNPCBase;
 class AICPlayerController;
+class UICLifeObjectUserComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FICNPCInteractionStarted, AICNPCBase*, NPC, AICPlayerController*, Requester, FName, ServiceID);
 
@@ -29,6 +31,7 @@ struct ISEKAICLASS_API FICNPCInteractionOption
     UPROPERTY(BlueprintReadOnly, Category="IC|NPC") FName ServiceID;
     UPROPERTY(BlueprintReadOnly, Category="IC|NPC") bool bEnabled = true;
 };
+
 UCLASS(Blueprintable)
 class ISEKAICLASS_API AICNPCBase : public AICCharacterBase
 {
@@ -36,11 +39,15 @@ class ISEKAICLASS_API AICNPCBase : public AICCharacterBase
 public:
     AICNPCBase();
     virtual void BeginPlay() override;
+    virtual void Tick(float DeltaSeconds) override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void HandleZeroHP() override;
     virtual void RestoreFromWorldState_Implementation(const FICWorldState& Candidate) override;
     bool InitializeNPC(FName ID);
     void RefreshExecution();
     void HoldDownedActor();
+    bool IsFollowingPlayerSprint() const;
+    void UpdateMovementSpeed();
     const FICNPCRow& GetNPCDefinition() const { return Definition; }
 
     UFUNCTION(BlueprintPure,Category="IC|NPC")
@@ -59,6 +66,7 @@ public:
 
     UFUNCTION(BlueprintPure,Category="IC|NPC")
     FText GetInteractionText() const;
+    UFUNCTION(BlueprintPure,Category="IC|NPC") bool IsSleepingForInteraction() const;
 
     UFUNCTION(BlueprintPure,Category="IC|NPC")
     TArray<FICNPCInteractionOption> GetInteractionOptions() const;
@@ -74,12 +82,17 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="IC|Quest") TObjectPtr<class UWidgetComponent> QuestMarker;
 
+    /** 생활 오브젝트(침대·의자·카운터 등) 예약/점유 상태. 연출 전용이며 저장하지 않는다. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="IC|Life") TObjectPtr<UICLifeObjectUserComponent> LifeObjectUser;
+    UFUNCTION(BlueprintPure, Category="IC|Life") UICLifeObjectUserComponent* GetLifeObjectUser() const { return LifeObjectUser; }
+
 protected:
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|NPC|Movement",meta=(ClampMin="0"))
     float ScheduleMoveSpeed=300.f;
     virtual void StoredCharacterChanged(FName ID) override;
 
 private:
+    UFUNCTION() void HandleTimeJumped(double FromGameMinute, double ToGameMinute);
     FICNPCRow Definition;
     bool bInitialized=false,bInteracting=false;
     FTimerHandle DefeatTimer;

@@ -45,6 +45,10 @@ bool FICInventoryMenuCheck::RunTest(const FString&)
         auto Label=[&](const TCHAR* Key){return CastChecked<UTextBlock>(UI->GetWidgetFromName(Key))->GetText().ToString();};
         auto BagIndex=[&](FName ID){return Inv->GetSnapshot().Bag.Slots.IndexOfByPredicate([&](const auto& Item){return Item.ItemID==ID&&!Item.IsEmpty();});};
         auto SelectBag=[&](FName ID){UI->SelectItemTab(EPlayerItemTab::Normal);return UI->SelectItem(BagIndex(ID));};
+        Inv->AddItem(TEXT("ITM_TKT_001"),1,false);SelectBag(TEXT("ITM_TKT_001"));TestTrue(TEXT("Bag ticket opens its detail"),UI->OpenItem(UI->SelectedItem));
+        const int32 BeforeCapacity=Inv->GetSnapshot().Bag.Slots.Num();TestTrue(TEXT("Inventory detail uses expansion ticket directly"),UI->BeginUseSelected());
+        TestFalse(TEXT("Expansion ticket does not ask for a party target"),UI->bPickingUseTarget);TestEqual(TEXT("Ticket adds ten bag slots"),Inv->GetSnapshot().Bag.Slots.Num(),BeforeCapacity+10);TestEqual(TEXT("Ticket consumes once"),Inv->CountItem(TEXT("ITM_TKT_001")),0);
+        UI->Activate(); // The following roster checks start from the menu's member area.
         TestEqual(TEXT("Only the actual player appears initially"),UI->Members.Num(),1);
         for(int32 I=0;I<4;++I)TestTrue(TEXT("All four player weapon panels visible"),UI->GetWidgetFromName(FName(*FString::Printf(TEXT("WeaponFrame%d"),I)))->IsVisible());
         const FName Weapons[]={TEXT("EQP_WPN_SWORD_001"),TEXT("EQP_WPN_BOW_001"),TEXT("EQP_WPN_STAFF_001"),TEXT("EQP_WPN_WAND_001")};
@@ -120,7 +124,7 @@ bool FICInventoryMenuCheck::RunTest(const FString&)
         TestFalse(TEXT("Quest tab cannot bind quest cells"),UI->BeginQuickSlot());TestFalse(TEXT("Quest tab cannot trash quest cells"),UI->BeginTrash());
         TestTrue(TEXT("Quest item detail opens"),UI->OpenItem(0));auto* Detail=CastChecked<UICInventoryItemPopupWidget>(UI->GetWidgetFromName(TEXT("ItemPopup")));
         TestFalse(TEXT("Quest item popup protects trash action"),Detail->GetWidgetFromName(TEXT("BTN_Trash"))->GetIsEnabled());Menu->HandleMenuKey(EKeys::Escape);TestFalse(TEXT("ESC returns to item list"),UI->bDetailOpen);
-        UI->SelectItemTab(EPlayerItemTab::Normal);Inv->AddItem(TEXT("ITM_MAT_002"),2,false);UI->SelectItem(BagIndex(TEXT("ITM_MAT_002")));UI->OpenItem(UI->SelectedItem);
+        UI->SelectItemTab(EPlayerItemTab::Normal);Inv->AddItem(TEXT("ITM_R01_CROP_01"),2,false);UI->SelectItem(BagIndex(TEXT("ITM_R01_CROP_01")));UI->OpenItem(UI->SelectedItem);
         TestFalse(TEXT("Material popup has no equip action"),Detail->GetWidgetFromName(TEXT("BTN_Equip"))->IsVisible());TestFalse(TEXT("Material popup has no quick-slot action"),Detail->GetWidgetFromName(TEXT("BTN_Quick"))->IsVisible());
         TestTrue(TEXT("Material popup retains trash and back"),Detail->GetWidgetFromName(TEXT("BTN_Trash"))->IsVisible()&&Detail->GetWidgetFromName(TEXT("BTN_Back"))->IsVisible());UI->CloseItem();
         Inv->AddItem(Weapons[0],1,false);SelectBag(Weapons[0]);UI->OpenItem(UI->SelectedItem);TestTrue(TEXT("Weapon popup offers equip"),Detail->GetWidgetFromName(TEXT("BTN_Equip"))->IsVisible());TestFalse(TEXT("Weapon popup hides quick slots"),Detail->GetWidgetFromName(TEXT("BTN_Quick"))->IsVisible());

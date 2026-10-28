@@ -9,6 +9,7 @@
 #include "Engine/GameInstance.h"
 #include "Debug/ICLog.h"
 #include "Codex/ICCodexSubsystem.h"
+#include "Combat/Party/ICPartyStatus.h"
 
 namespace
 {
@@ -78,12 +79,9 @@ void UICAbilitySystemComponent::RebuildDerivedStats()
         {const int32 Pet=Codex->GetEquippedPet(Runtime.CharacterId);if(Codex->IsPetUnlocked(Pet))if(const auto* Row=Codex->FindPet(Pet))Mods.Append(Row->PetBuffs);}
     if(Definitions()&&Runtime.HasStats()&&!Runtime.IsDowned()&& (Runtime.Kind==EICCharacterKind::Player||Runtime.PartySlot>=0))
     {
-        Definitions()->GetDefinitionIDs(EICDefinitionType::Synergy,Synergies);
-        for(FName ID:Synergies)if(const auto* R=Definitions()->Find<FICSynergyRow>(ID,Result))
+        for(const auto* R:ICPartyStatus::ActiveSynergies(World,Definitions(),this))
         {
-            bool Match=Conditions(R->ActivationConditions);
-            for(FName Member:R->MemberNPCIDs){const auto* S=World.Characters.Find(Member);Match&=S&&S->PartySlot>=0;}
-            if(Match)for(const auto& M:R->StatModifiers)SynergyMods.FindOrAdd(M.Stat).Add(M);
+            for(const auto& M:R->StatModifiers)if(R->bAdditiveWithOtherGroups)Mods.Add(M);else SynergyMods.FindOrAdd(M.Stat).Add(M);
         }
 
     }

@@ -130,6 +130,22 @@ bool FICProductionLifecycleCheck::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICRecipeDurationCheck,"IC.Runtime.RecipeDurationAuthority",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICRecipeDurationCheck::RunTest(const FString&)
+{
+    FRuntimeFixture F;FGuid ID;FString Reason;
+    auto* Binding=F.Catalog->Tables.FindByPredicate([](const auto& B){return B.Type==EICDefinitionType::Recipe;});
+    auto* Recipe=Binding->Table.LoadSynchronous()->FindRow<FICRecipeRow>(TEXT("RCP_COOK_998"),TEXT("duration test"));
+    Recipe->WorkDurationPlaySeconds=2.5;Recipe->SPCost=3;
+    TestTrue(TEXT("Editing only recipe DT duration and SP starts a job"),F.Production->StartRecipe(Recipe->RecipeID,TEXT("ANC_KITCHEN_998"),F.Inventory,ID,Reason));
+    TestEqual(TEXT("Recipe SP wins over legacy production defaults"),F.State->GetSnapshot(UICWorldStateSubsystem::PlayerId()).SP,67.f);
+    TestFalse(TEXT("Output cannot be collected early"),F.Production->CompleteJob(ID,F.Inventory,Reason));
+    F.Time->AdvanceClock(2.4,false);TestEqual(TEXT("Before edited duration no output exists"),F.Inventory->CountItem(TEXT("ITM_FOOD_998")),0);
+    F.Time->AdvanceClock(.11,false);TestEqual(TEXT("Edited duration grants output automatically"),F.Inventory->CountItem(TEXT("ITM_FOOD_998")),1);
+    TestFalse(TEXT("Repeated collection cannot duplicate output"),F.Production->CompleteJob(ID,F.Inventory,Reason));
+    return !HasAnyErrors();
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICRealDefinitionAssetsCheck,"IC.Runtime.RealAssetBindings",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FICRealDefinitionAssetsCheck::RunTest(const FString& Parameters)
 {
@@ -137,7 +153,7 @@ bool FICRealDefinitionAssetsCheck::RunTest(const FString& Parameters)
     auto* Catalog=GetDefault<UICDefinitionSettings>()->Catalog.LoadSynchronous();TestNotNull(TEXT("Production catalog is configured"),Catalog);if(!Catalog)return false;
     TestEqual(TEXT("Catalog resolves from DataAsset folder"),Catalog->GetPathName(),
         FString(TEXT("/Game/IsekaiClass/Data/DataAsset/DA_IC_DefinitionCatalog.DA_IC_DefinitionCatalog")));
-    TestEqual(TEXT("All native schemas registered"),Catalog->Tables.Num(),51);
+    TestEqual(TEXT("All native schemas registered"),Catalog->Tables.Num(),UICDefinitionLibrary::GetDefinitionSchemas().Num());
     for(const auto& Schema:UICDefinitionLibrary::GetDefinitionSchemas())
     {
         const auto* Binding=Catalog->Tables.FindByPredicate([&](const auto& B){ IC_TRACE_FUNCTION();return B.Type==Schema.Type&&B.RowStruct==Schema.RowStruct;});

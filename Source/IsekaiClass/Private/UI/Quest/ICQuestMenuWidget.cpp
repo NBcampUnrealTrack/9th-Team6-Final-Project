@@ -1,12 +1,18 @@
 #include "UI/Quest/ICQuestMenuWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Quest/ICQuestDisplay.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "Quest/ICQuestSubsystem.h"
+#include "Quest/ICQuestGuideComponent.h"
+#include "GameFramework/Pawn.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Data/Text/ICTextLibrary.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
+#include "Components/Image.h"
+#include "Components/SizeBoxSlot.h"
+#include "Engine/Texture2D.h"
 #include "Components/Button.h"
 #include "Components/ButtonSlot.h"
 #include "Components/HorizontalBox.h"
@@ -52,7 +58,7 @@ FText QuestText(const FString& Key,FText Fallback=FText::GetEmpty())
 FText DefinitionName(const FString& Key,FName ID)
 {
     auto* Strings=LoadObject<UStringTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_Definitions.ST_IC_Definitions"));
-    const auto Text=UICTextLibrary::ResolveText(Strings,Key);return Text.bSuccess?Text.Text:FText::FromName(ID);
+    const auto Text=UICTextLibrary::ResolveText(Strings,Key);return Text.bSuccess?Text.Text:ID.IsNone()?FText::GetEmpty():FText::FromName(ID);
 }
 void QuestMenuSetText(UUserWidget* W,const TCHAR* Name,FText Text)
 {if(auto* T=Cast<UTextBlock>(W->GetWidgetFromName(Name)))T->SetText(Text);}
@@ -63,31 +69,75 @@ UClass* QuestMenuWidgetClass(const TCHAR* Asset,UClass* Fallback)
     const auto Path=FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Asset,Asset);
     auto* C=LoadClass<UUserWidget>(nullptr,*Path);return C?C:Fallback;
 }
-FText RewardText(const FICQuestRow& Quest,UICDefinitionSubsystem* D)
+void PresentRewards(UICQuestDetailWidget* Widget,const FICQuestRow& Quest,UICDefinitionSubsystem* Definitions)
 {
-    FICRewardRow R;TArray<FText> Lines;
-    if(D&&!Quest.RewardID.IsNone()&&D->GetReward(Quest.RewardID,R).bSuccess)
+    auto* Entries=Cast<UVerticalBox>(Widget->GetWidgetFromName(TEXT("RewardEntries")));
+    if(Entries)Entries->ClearChildren();
+    TArray<FText> Summary;
+    auto AddReward=[&](FText Label,FText Tooltip,TSoftObjectPtr<UTexture2D> Icon,FText Badge,FLinearColor Color)
     {
-        if(R.Gold>0)Lines.Add(FText::Format(NSLOCTEXT("ICQuestMenu","GoldReward","{0} 골드"),FText::AsNumber(R.Gold)));
-        for(const auto& Item:R.Items)
+        Summary.Add(Label);
+        if(!Entries)return;
+        auto* Tree=Widget->WidgetTree.Get();
+        auto* Card=Tree->ConstructWidget<UBorder>();Card->SetPadding(FMargin(12,8));
+        Card->SetBrushColor(FLinearColor(.065f,.09f,.14f));
+        // The row receives hover events; decorative children do not intercept them.
+        Card->SetVisibility(ESlateVisibility::Visible);
+        Card->SetToolTipText(Tooltip.IsEmpty()?Label:Tooltip);
+        auto* Row=Tree->ConstructWidget<UHorizontalBox>();Card->SetContent(Row);
+        auto* IconBox=Tree->ConstructWidget<USizeBox>();IconBox->SetWidthOverride(36);IconBox->SetHeightOverride(36);
+        auto* IconSlot=Row->AddChildToHorizontalBox(IconBox);IconSlot->SetPadding(FMargin(0,0,12,0));IconSlot->SetVerticalAlignment(VAlign_Center);
+        if(auto* Texture=Icon.LoadSynchronous())
         {
-            FICItemRow Definition;const bool Found=D->GetItem(Item.ItemID,Definition).bSuccess;
+            auto* Image=Tree->ConstructWidget<UImage>();Image->SetBrushFromTexture(Texture);
+            Image->SetVisibility(ESlateVisibility::HitTestInvisible);IconBox->AddChild(Image);
+        }
+        else
+        {
+            auto* Text=QuestMenuLabel(Tree,NAME_None,Badge,16);Text->SetColorAndOpacity(Color);Text->SetJustification(ETextJustify::Center);
+            auto* Slot=CastChecked<USizeBoxSlot>(IconBox->AddChild(Text));Slot->SetVerticalAlignment(VAlign_Center);
+        }
+        auto* Text=QuestMenuLabel(Tree,NAME_None,Label,17,true);Text->SetColorAndOpacity(Color);
+        auto* Slot=Row->AddChildToHorizontalBox(Text);Slot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));Slot->SetVerticalAlignment(VAlign_Center);
+        QuestMenuRow(Entries,Card,6);
+    };
+    const FLinearColor Normal(.92f,.94f,.98f);
+    FICRewardRow Reward;
+    if(!Quest.RewardID.IsNone()&&(!Definitions||!Definitions->GetReward(Quest.RewardID,Reward).bSuccess))
+        AddReward(NSLOCTEXT("ICQuestMenu","RewardsUnavailable","보상 정보를 불러올 수 없습니다."),FText::GetEmpty(),{},FText::FromString(TEXT("?")),Normal);
+    else
+    {
+        if(Reward.Gold>0)
+            AddReward(FText::Format(NSLOCTEXT("ICQuestMenu","GoldReward","{0} 골드"),FText::AsNumber(Reward.Gold)),FText::GetEmpty(),
+                TSoftObjectPtr<UTexture2D>(FSoftObjectPath(TEXT("/Game/IsekaiClass/UI/SampleUI/FantasyIconPack/Textures/Coin.Coin"))),FText::FromString(TEXT("G")),QuestGlowColor);
+        for(const auto& Item:Reward.Items)
+        {
+            FICItemRow Definition;const bool Found=Definitions&&Definitions->GetItem(Item.ItemID,Definition).bSuccess;
             const auto Name=Found&&!Definition.DisplayName.IsEmpty()?Definition.DisplayName:DefinitionName(Found?Definition.NameKey:FString(),Item.ItemID);
-            Lines.Add(FText::Format(NSLOCTEXT("ICQuestMenu","ItemReward","{0} × {1}"),Name,FText::AsNumber(Item.Count)));
+            const auto Label=FText::Format(NSLOCTEXT("ICQuestMenu","ItemReward","{0} × {1}"),Name,FText::AsNumber(Item.Count));
+            const auto Description=Found?DefinitionName(Definition.DescriptionKey,NAME_None):FText::GetEmpty();
+            AddReward(Label,Description.IsEmpty()?Label:FText::Format(NSLOCTEXT("ICQuestMenu","RewardItemTooltip","{0}\n{1}"),Label,Description),
+                Definition.Icon,NSLOCTEXT("ICQuestMenu","ItemBadge","물품"),Normal);
         }
         FICDefinitionResult Result;
-        for(const auto& Affinity:R.Affinity)
+        for(const auto& Affinity:Reward.Affinity)
         {
-            const auto* NPC=D->Find<FICNPCRow>(Affinity.NPCID,Result);
-            Lines.Add(FText::Format(NSLOCTEXT("ICQuestMenu","AffinityReward","{0} 호감도 +{1}"),DefinitionName(NPC?NPC->NameKey:FString(),Affinity.NPCID),FText::AsNumber(Affinity.Amount)));
+            const auto* NPC=Definitions?Definitions->Find<FICNPCRow>(Affinity.NPCID,Result):nullptr;
+            const auto Amount=Affinity.Amount>0?FText::Format(NSLOCTEXT("ICQuestMenu","PositiveAffinity","+{0}"),FText::AsNumber(Affinity.Amount)):FText::AsNumber(Affinity.Amount);
+            AddReward(FText::Format(NSLOCTEXT("ICQuestMenu","AffinityRewardPreview","{0} 호감도 {1}"),DefinitionName(NPC?NPC->NameKey:FString(),Affinity.NPCID),Amount),
+                FText::GetEmpty(),{},NSLOCTEXT("ICQuestMenu","AffinityBadge","호감"),FLinearColor(1,.65f,.72f));
         }
-        for(FName ID:R.UnlockRecipeIDs)
+        for(FName ID:Reward.UnlockRecipeIDs)
         {
-            FICRecipeRow Recipe;D->GetRecipe(ID,Recipe);
-            Lines.Add(FText::Format(NSLOCTEXT("ICQuestMenu","RecipeReward","제작법 해금: {0}"),DefinitionName(Recipe.NameKey,ID)));
+            FICRecipeRow Recipe;if(Definitions)Definitions->GetRecipe(ID,Recipe);
+            AddReward(FText::Format(NSLOCTEXT("ICQuestMenu","RecipeRewardPreview","{0} 제작법 해금"),DefinitionName(Recipe.NameKey,ID)),
+                FText::GetEmpty(),{},NSLOCTEXT("ICQuestMenu","RecipeBadge","제작"),FLinearColor(.58f,.85f,1));
         }
     }
-    return Lines.IsEmpty()?NSLOCTEXT("ICQuestMenu","NoRewards","없음"):FText::Join(FText::FromString(TEXT("\n")),Lines);
+    if(Summary.IsEmpty())AddReward(NSLOCTEXT("ICQuestMenu","NoRewards","없음"),FText::GetEmpty(),{},FText::GetEmpty(),Normal);
+    // Preserve the text summary for older layouts and accessibility/integration consumers.
+    QuestMenuSetText(Widget,TEXT("TXT_Rewards"),FText::Join(FText::FromString(TEXT("\n")),Summary));
+    if(auto* Text=Widget->GetWidgetFromName(TEXT("TXT_Rewards")))Text->SetVisibility(Entries?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);
 }
 }
 
@@ -130,7 +180,8 @@ bool UICQuestDetailWidget::BuildLayout(UWidgetTree* T)
     QuestMenuRow(Content,QuestMenuLabel(T,TEXT("ObjectivesHeading"),NSLOCTEXT("ICQuestMenu","Objectives","목표"),20),8);
     QuestMenuRow(Content,QuestMenuLabel(T,TEXT("TXT_Objectives"),FText::GetEmpty(),17,true),12);
     QuestMenuRow(Content,QuestMenuLabel(T,TEXT("RewardsHeading"),NSLOCTEXT("ICQuestMenu","Rewards","보상"),20),8);
-    QuestMenuRow(Content,QuestMenuLabel(T,TEXT("TXT_Rewards"),FText::GetEmpty(),17,true),12);
+    QuestMenuRow(Content,T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("RewardEntries")),12);
+    auto* Summary=QuestMenuLabel(T,TEXT("TXT_Rewards"),FText::GetEmpty(),17,true);Summary->SetVisibility(ESlateVisibility::Collapsed);QuestMenuRow(Content,Summary,0);
     QuestMenuRow(Column,QuestMenuLabel(T,TEXT("TXT_Message"),FText::GetEmpty(),15,true),8);
     T->FindWidget(TEXT("TXT_Message"))->SetVisibility(ESlateVisibility::Collapsed);
     auto* Warning=QuestMenuLabel(T,TEXT("SwitchNotice"),NSLOCTEXT("ICQuestMenu","SwitchNotice","다른 퀘스트를 시작하면 이전 퀘스트의 진행도가 초기화됩니다."),14,true);
@@ -138,11 +189,36 @@ bool UICQuestDetailWidget::BuildLayout(UWidgetTree* T)
     auto* Actions=T->ConstructWidget<UHorizontalBox>();QuestMenuRow(Column,Actions,10);
     auto* Abandon=Actions->AddChildToHorizontalBox(QuestMenuButton(T,TEXT("BTN_Abandon"),NSLOCTEXT("ICQuestMenu","Abandon","포기")));Abandon->SetSize(FSlateChildSize(ESlateSizeRule::Fill));Abandon->SetPadding(FMargin(0,0,8,0));
     Actions->AddChildToHorizontalBox(QuestMenuButton(T,TEXT("BTN_Start"),NSLOCTEXT("ICQuestMenu","Start","시작하기")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    QuestMenuRow(Column,QuestMenuButton(T,TEXT("BTN_ToggleGuide"),NSLOCTEXT("ICQuestMenu","StopGuide","경로 안내 중지")),10);
     QuestMenuRow(Column,QuestMenuButton(T,TEXT("BTN_Back"),NSLOCTEXT("ICQuestMenu","Back","뒤로가기")),0);return true;
 }
 void UICQuestDetailWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    // Upgrade existing detail Blueprints in place, keeping their authored layout.
+    if(!GetWidgetFromName(TEXT("RewardEntries")))
+        if(auto* Summary=GetWidgetFromName(TEXT("TXT_Rewards")))
+            if(auto* Column=Cast<UVerticalBox>(Summary->GetParent()))
+            {
+                auto* Entries=WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("RewardEntries"));
+                auto* RewardSlot=Cast<UVerticalBoxSlot>(Column->InsertChildAt(Column->GetChildIndex(Summary),Entries));
+                if(RewardSlot)RewardSlot->SetPadding(FMargin(0,0,0,12));
+                Summary->SetVisibility(ESlateVisibility::Collapsed);
+            }
+    // Existing Widget Blueprints also gain the new action without rebuilding their layout.
+    if (!GetWidgetFromName(TEXT("BTN_ToggleGuide")))
+    {
+        auto* BackButton = GetWidgetFromName(TEXT("BTN_Back"));
+        auto* Column = BackButton ? Cast<UVerticalBox>(BackButton->GetParent()) : nullptr;
+        if (Column)
+        {
+            auto* Button = QuestMenuButton(WidgetTree,TEXT("BTN_ToggleGuide"),FText::GetEmpty());
+            auto* ButtonSlot = Cast<UVerticalBoxSlot>(Column->InsertChildAt(Column->GetChildIndex(BackButton),Button));
+            if (ButtonSlot) ButtonSlot->SetPadding(FMargin(0,0,0,10));
+        }
+    }
+    if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_ToggleGuide"))))
+        Button->OnClicked.AddUniqueDynamic(this,&ThisClass::ToggleGuide);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Start")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Start);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Abandon")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Abandon);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Back")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Back);
@@ -165,17 +241,36 @@ void UICQuestDetailWidget::Present(FName ID)
         {const auto Text=QuestText(Objective.DescriptionKey,FText::FromName(Objective.ObjectiveID));Lines.Add(FICQuestDisplay::FormatObjective(Text,Objective,Quest,World,Q));}
     }
     QuestMenuSetText(this,TEXT("ObjectivesHeading"),Definition.ObjectiveGroupPolicy==EICConditionPolicy::Any?NSLOCTEXT("ICQuestMenu","AnyGroup","목표 (그룹 중 하나 달성)"):NSLOCTEXT("ICQuestMenu","Objectives","목표"));
-    QuestMenuSetText(this,TEXT("TXT_Objectives"),FText::Join(FText::FromString(TEXT("\n")),Lines));QuestMenuSetText(this,TEXT("TXT_Rewards"),RewardText(Definition,D));
+    QuestMenuSetText(this,TEXT("TXT_Objectives"),FText::Join(FText::FromString(TEXT("\n")),Lines));PresentRewards(this,Definition,D);
+    if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_ToggleGuide"))))
+    {
+        const auto* Pawn = GetOwningPlayerPawn();
+        const auto* Guide = Pawn ? Pawn->FindComponentByClass<UICQuestGuideComponent>() : nullptr;
+        const bool bEnabled = Guide && Guide->IsQuestGuideEnabled(ID);
+        Button->SetIsEnabled(Guide && Quest.bAccepted && Quest.bStarted && !Quest.bCompleted && !Quest.bAbandoned);
+        if (auto* Caption = Cast<UTextBlock>(Button->GetContent()))
+            Caption->SetText(bEnabled ? NSLOCTEXT("ICQuestMenu","StopGuide","경로 안내 중지")
+                                     : NSLOCTEXT("ICQuestMenu","StartGuide","경로 안내 시작"));
+    }
     GetWidgetFromName(TEXT("BTN_Start"))->SetIsEnabled(Quest.bAccepted&&!Quest.bStarted&&!Quest.bCompleted);
     GetWidgetFromName(TEXT("BTN_Abandon"))->SetIsEnabled(Quest.bAccepted&&!Quest.bCompleted&&Definition.bAllowAbandon);
 }
 void UICQuestDetailWidget::HighlightAction(int32 Index)
 {
-    const TCHAR* Names[]={TEXT("BTN_Abandon"),TEXT("BTN_Start"),TEXT("BTN_Back")};
-    for(int32 I=0;I<3;++I)CastChecked<UButton>(GetWidgetFromName(Names[I]))->SetBackgroundColor(I==Index?QuestGlowColor:QuestButtonColor);
+    const TCHAR* Names[]={TEXT("BTN_Abandon"),TEXT("BTN_Start"),TEXT("BTN_ToggleGuide"),TEXT("BTN_Back")};
+    for(int32 I=0;I<4;++I)if(auto* Button=Cast<UButton>(GetWidgetFromName(Names[I])))Button->SetBackgroundColor(I==Index?QuestGlowColor:QuestButtonColor);
 }
 void UICQuestDetailWidget::Scroll(float Delta)
 {auto* W=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("DetailScroll")));W->SetScrollOffset(FMath::Clamp(W->GetScrollOffset()+Delta,0.f,W->GetScrollOffsetOfEnd()));}
+void UICQuestDetailWidget::ToggleGuide()
+{
+    auto* Pawn = GetOwningPlayerPawn();
+    auto* Guide = Pawn ? Pawn->FindComponentByClass<UICQuestGuideComponent>() : nullptr;
+    const auto* Button = GetWidgetFromName(TEXT("BTN_ToggleGuide"));
+    if (!Guide || !Button || !Button->GetIsEnabled()) return;
+    Guide->SetQuestGuideEnabled(QuestID,!Guide->IsQuestGuideEnabled(QuestID));
+    Present(QuestID);
+}
 void UICQuestDetailWidget::Start(){OnStart.Broadcast();}
 void UICQuestDetailWidget::Abandon(){OnAbandon.Broadcast();}
 void UICQuestDetailWidget::Back(){OnBack.Broadcast();}
@@ -278,14 +373,14 @@ FText UICQuestMenuWidget::NavigationHint() const
 {
     if(!bShowingDetails)return NSLOCTEXT("ICQuestMenu","ListHint","W / S  퀘스트 선택     Enter / D  상세 보기     A  상단 탭     ESC  닫기");
     if(bReadingDetails)return NSLOCTEXT("ICQuestMenu","ReadHint","W / S  설명 스크롤     D / Enter  버튼 이동     A / ESC  목록으로");
-    return NSLOCTEXT("ICQuestMenu","DetailHint","A / D  포기 / 시작하기     S  뒤로가기     W  설명 읽기     Enter  선택     ESC  목록으로");
+    return NSLOCTEXT("ICQuestMenu","DetailHint","A / D  포기 / 시작하기     W / S  경로 안내 / 뒤로가기     Enter  실행     ESC  목록으로");
 }
 bool UICQuestMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
 {
     const bool Up=Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up,Down=Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down;
     const bool Left=Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left,Right=Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right;
-    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||Key==EKeys::Gamepad_FaceButton_Bottom;
-    const bool Back=Key==EKeys::Escape||Key==EKeys::Equals||Key==EKeys::Gamepad_FaceButton_Right;
+    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key);
+    const bool Back=Key==EKeys::Escape||Key==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(Key);
     if(!bShowingDetails)
     {
         if(Left||(Up&&SelectedIndex==0))return false;
@@ -297,12 +392,12 @@ bool UICQuestMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
     if(Back){if(!Repeat)BackToList();return true;}
     if(bReadingDetails)
     {if(Up||Down)Detail->Scroll(Down?72:-72);else if(Right||Accept)bReadingDetails=false;else if(Left)BackToList();else return false;}
-    else if(Up){if(ActionIndex==2)ActionIndex=1;else bReadingDetails=true;}
-    else if(Down)ActionIndex=2;
-    else if(Left||Right)ActionIndex=Right?1:0;
+    else if(Up){if(ActionIndex>=2)--ActionIndex;else bReadingDetails=true;}
+    else if(Down)ActionIndex=FMath::Min(3,FMath::Max(2,ActionIndex+1));
+    else if(Left||Right){if(ActionIndex<2)ActionIndex=Right?1:0;}
     else if(Accept&&!Repeat)
     {
-        const TCHAR* Names[]={TEXT("BTN_Abandon"),TEXT("BTN_Start"),TEXT("BTN_Back")};auto* B=CastChecked<UButton>(Detail->GetWidgetFromName(Names[ActionIndex]));if(B->GetIsEnabled())B->OnClicked.Broadcast();
+        const TCHAR* Names[]={TEXT("BTN_Abandon"),TEXT("BTN_Start"),TEXT("BTN_ToggleGuide"),TEXT("BTN_Back")};auto* B=CastChecked<UButton>(Detail->GetWidgetFromName(Names[ActionIndex]));if(B->GetIsEnabled())B->OnClicked.Broadcast();
     }
     else if(!Accept)return false;
     RefreshSelection();return true;

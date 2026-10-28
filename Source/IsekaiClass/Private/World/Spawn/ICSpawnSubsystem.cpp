@@ -91,10 +91,13 @@ void UICSpawnSubsystem::RefreshSpawns()
         }
         auto* Existing=Cast<AICNPCBase>(FindCharacter(ID));if(Existing){NPCs.Add(ID,Existing);if(!Wanted&&!Existing->IsActorBeingDestroyed())Existing->Destroy();continue;}if(!Wanted)continue;
         UClass* Type=Row->ActorClass.IsNull()?AICNPCBase::StaticClass():Row->ActorClass.LoadSynchronous();if(!Type||!Type->IsChildOf(AICNPCBase::StaticClass())){UE_LOG(LogICData,Warning,TEXT("[Spawn.NPCClassInvalid] %s"),*ID.ToString());continue;}
-        auto* Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Position);
+        // 앵커가 바닥·벽에 살짝 겹쳐 있어도 근처 빈 자리로 옮겨 생성한다(완전히 막혀 있으면 생성하지 않는다).
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
+        auto* Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Position,SpawnParams);
         if(!Actor)
         {
-            UE_LOG(LogICWorldState,Warning,TEXT("[Spawn.NPCCreateFailed] NPC=%s Class=%s"),*ID.ToString(),*GetNameSafe(Type));
+            UE_LOG(LogICWorldState,Warning,TEXT("[Spawn.NPCCreateFailed] NPC=%s Class=%s Location=%s 앵커 위치가 바닥/벽/다른 오브젝트에 막혀 있습니다. 앵커를 바닥에서 약 100cm 위, 빈 공간으로 옮겨 주세요."),*ID.ToString(),*GetNameSafe(Type),*Position.GetLocation().ToCompactString());
         }
         else if(!Actor->InitializeNPC(ID))
         {
@@ -112,11 +115,26 @@ void UICSpawnSubsystem::RefreshSpawns()
     {
         FTransform Origin;if(!ResolveLoadedAnchor(Slot.OriginAnchorID,Origin))continue;const auto* Monster=D->Find<FICMonsterRow>(Slot.MonsterID,R);if(!Monster)continue;
         if(auto* Player=Cast<AICCharacterBase>(UGameplayStatics::GetPlayerPawn(GetWorld(),0)))if(Player->GetICAbilitySystem()&&!Player->GetICAbilitySystem()->Conditions(Slot.Availability))continue;
-        const FName Key=FName(*(ID.ToString()+TEXT(":")+FString::FromInt(Slot.SpawnSlotIndex)));WantedKeys.Add(Key);if(auto* A=Enemies.Find(Key);A&&A->IsValid())continue;
-        const auto World=S->ExportState();const auto* Saved=World.SpawnSlots.Find(Key);if(Saved&&Saved->bDefeated&&(Saved->bRewardPending||T->GetClock().PlaySecond<Saved->RespawnReadyAtPlaySecond))continue;
+        const FName Key=FName(*(ID.ToString()+TEXT(":")+FString::FromInt(Slot.SpawnSlotIndex)));WantedKeys.Add(Key);
+        auto World=S->ExportState();auto* Saved=World.SpawnSlots.Find(Key);
+        if(Saved&&Saved->bDefeated)
+        {
+            if(Saved->RespawnReadyAtGameMinute<0)
+            {
+                Saved->RespawnReadyAtGameMinute=T->GetClock().GameMinute+FMath::Max(0.,Monster->RespawnGameMinutes);
+                S->ApplyWorldProgress(World);
+            }
+            if(Saved->bRewardPending||T->GetClock().GameMinute<Saved->RespawnReadyAtGameMinute)continue;
+        }
+        if(auto* Existing=Enemies.Find(Key);Existing&&Existing->IsValid())
+        {
+            if(!Saved||!Saved->bDefeated)continue;
+            // Calendar jumps can expire the cooldown before the death animation ends.
+            Existing->Get()->Destroy();Enemies.Remove(Key);
+        }
         UClass* Type=Monster->PawnClass.IsNull()?AICEnemyBase::StaticClass():Monster->PawnClass.LoadSynchronous();if(!Type||!Type->IsChildOf(AICEnemyBase::StaticClass())){UE_LOG(LogICData,Warning,TEXT("[Spawn.EnemyClassInvalid] %s"),*Slot.MonsterID.ToString());continue;}
 
-        auto* Actor=GetWorld()->SpawnActor<AICEnemyBase>(Type,Origin);if(Actor){if(!Actor->InitializeEnemy(ID,Slot,Origin))Actor->Destroy();else {Enemies.Add(Key,Actor);auto Next=S->ExportState();auto& New=Next.SpawnSlots.FindChecked(Key);New.bDefeated=false;New.RespawnReadyAtPlaySecond=0;S->ApplyWorldProgress(Next);}}
+        auto* Actor=GetWorld()->SpawnActor<AICEnemyBase>(Type,Origin);if(Actor){if(!Actor->InitializeEnemy(ID,Slot,Origin))Actor->Destroy();else {Enemies.Add(Key,Actor);auto Next=S->ExportState();auto& New=Next.SpawnSlots.FindChecked(Key);New.bDefeated=false;New.RespawnReadyAtPlaySecond=0;New.RespawnReadyAtGameMinute=0;S->ApplyWorldProgress(Next);}}
     }
     for(auto It=Enemies.CreateIterator();It;++It)if(!WantedKeys.Contains(It.Key())){if(It.Value().IsValid())It.Value()->Destroy();It.RemoveCurrent();}
 }

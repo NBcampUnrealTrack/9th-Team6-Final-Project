@@ -1,12 +1,11 @@
 #include "UI/Gameplay/ICGameplayWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Gameplay/ICGameMenuWidget.h"
 #include "UI/Gameplay/ICCompanionGroupWidget.h"
 #include "UI/Gameplay/ICCharacterStatusWidget.h"
 #include "UI/Gameplay/ICQuickSlotsWidget.h"
-#include "UI/Gameplay/ICMovementCooldownWidget.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Engine/GameInstance.h"
-#include "Engine/Texture2D.h"
 #include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Core/Controller/ICPlayerController.h"
@@ -16,18 +15,14 @@
 #include "Components/TextBlock.h"
 #include "Components/ProgressBar.h"
 #include "Components/Border.h"
-#include "Components/CanvasPanel.h"
-#include "Components/CanvasPanelSlot.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
-#include "Components/Image.h"
-#include "Components/Overlay.h"
-#include "Components/OverlaySlot.h"
 #include "Components/ScrollBox.h"
-#include "Components/SizeBox.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Rendering/DrawElementTypes.h"
+#include "UI/Gameplay/ICGameplayLayout.h"
+#include "Time/ICTimeSubsystem.h"
 
 AICPlayerController* UICGameplayWidget::GetICPlayerController() const
 {
@@ -40,7 +35,7 @@ void UICGameplayWidget::NativeOnInitialized()
     Super::NativeOnInitialized();
     if (!WidgetTree->RootWidget)
         ICFrontendLayout::Build(WidgetTree, TEXT("HUD"));
-    EnsureSkillCooldown();
+    ICGameplayLayout::EnsureGameClock(WidgetTree);
     RefreshSkillCooldown();
     SetIsFocusable(true);
     if (auto* Menu = Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu"))))
@@ -86,71 +81,23 @@ void UICGameplayWidget::NativeOnInitialized()
     }
 }
 
-void UICGameplayWidget::EnsureSkillCooldown()
-{
-    if (!WidgetTree || GetWidgetFromName(TEXT("HUD_SkillCooldown"))) return;
-    auto* Canvas = Cast<UCanvasPanel>(GetWidgetFromName(TEXT("HUDCanvas")));
-    if (!Canvas) return;
-
-    auto* Root = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("HUD_SkillCooldown"));
-    Root->SetWidthOverride(96.f);
-    Root->SetHeightOverride(96.f);
-    Root->SetVisibility(ESlateVisibility::Collapsed);
-
-    auto* Frame = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("SkillCooldownFrame"));
-    Frame->SetPadding(FMargin(5.f));
-    Frame->SetBrushColor(FLinearColor(.018f, .027f, .044f, .94f));
-    Root->SetContent(Frame);
-
-    auto* Overlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("SkillCooldownOverlay"));
-    Frame->SetContent(Overlay);
-    auto Fill = [](UOverlaySlot* OverlaySlot)
-    {
-        OverlaySlot->SetHorizontalAlignment(HAlign_Fill);
-        OverlaySlot->SetVerticalAlignment(VAlign_Fill);
-    };
-
-    auto* Icon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("IMG_SkillIcon"));
-    Fill(Overlay->AddChildToOverlay(Icon));
-
-    auto* Ring = WidgetTree->ConstructWidget<UICRadialCooldownBar>(UICRadialCooldownBar::StaticClass(), TEXT("RING_SkillCooldown"));
-    Ring->Thickness = 8.f;
-    Ring->FillColor = FLinearColor(1.f, .77f, .3f);
-    Ring->SetVisibility(ESlateVisibility::Hidden);
-    Fill(Overlay->AddChildToOverlay(Ring));
-
-    auto* Remaining = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TXT_SkillCooldown"));
-    Remaining->SetFont(ICFrontendLayout::Font(28, true));
-    Remaining->SetJustification(ETextJustify::Center);
-    Remaining->SetColorAndOpacity(FLinearColor::White);
-    Remaining->SetShadowColorAndOpacity(FLinearColor::Black);
-    Remaining->SetShadowOffset(FVector2D(2.f, 2.f));
-    auto* RemainingSlot = Overlay->AddChildToOverlay(Remaining);
-    RemainingSlot->SetHorizontalAlignment(HAlign_Fill);
-    RemainingSlot->SetVerticalAlignment(VAlign_Center);
-
-    auto* Key = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TXT_SkillKey"));
-    Key->SetText(FText::FromString(TEXT("Q")));
-    Key->SetFont(ICFrontendLayout::Font(18, true));
-    Key->SetColorAndOpacity(FLinearColor(1.f, .77f, .3f));
-    Key->SetShadowColorAndOpacity(FLinearColor::Black);
-    Key->SetShadowOffset(FVector2D(1.f, 1.f));
-    auto* KeySlot = Overlay->AddChildToOverlay(Key);
-    KeySlot->SetHorizontalAlignment(HAlign_Left);
-    KeySlot->SetVerticalAlignment(VAlign_Bottom);
-    KeySlot->SetPadding(FMargin(4.f));
-
-    auto* Placement = Canvas->AddChildToCanvas(Root);
-    Placement->SetAnchors(FAnchors(.5f, 1.f));
-    Placement->SetAlignment(FVector2D(.5f, 1.f));
-    Placement->SetPosition(FVector2D(0.f, -32.f));
-    Placement->SetSize(FVector2D(96.f));
-}
-
 void UICGameplayWidget::NativeTick(const FGeometry& Geometry, float DeltaSeconds)
 {
     Super::NativeTick(Geometry, DeltaSeconds);
+    if(auto* Clock=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_GameClock"))))
+    {
+        const auto* PC=GetICPlayerController();
+        Clock->SetVisibility(PC&&PC->bCreated?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
+        if(PC&&PC->GetTime())Clock->SetText(FormatGameClock(PC->GetTime()->GetClock().GameMinute));
+    }
     RefreshSkillCooldown();
+    RefreshTargetInfo();
+}
+FText UICGameplayWidget::FormatGameClock(double GameMinute)
+{
+    const int64 Total=FMath::FloorToInt64(FMath::Max(0.,FMath::IsFinite(GameMinute)?GameMinute:0.));
+    return FText::Format(NSLOCTEXT("ICTime","HUDDayClock","{0}일차  {1}:{2}"),FText::AsNumber(Total/1440+1),
+        FText::FromString(FString::Printf(TEXT("%02lld"),(Total%1440)/60)),FText::FromString(FString::Printf(TEXT("%02lld"),Total%60)));
 }
 
 int32 UICGameplayWidget::NativePaint(const FPaintArgs& Args,const FGeometry& Geometry,const FSlateRect& Culling,
@@ -173,41 +120,17 @@ int32 UICGameplayWidget::NativePaint(const FPaintArgs& Args,const FGeometry& Geo
 
 void UICGameplayWidget::RefreshSkillCooldown()
 {
-    auto* Root = GetWidgetFromName(TEXT("HUD_SkillCooldown"));
+    auto* Status = Cast<UICCharacterStatusWidget>(GetWidgetFromName(TEXT("HUD_PlayerStatus")));
+    if (!Status) return;
     auto* PC = GetICPlayerController();
     const FName SkillID = PC ? PC->GetCurrentWeaponSkill() : NAME_None;
-    if (!Root || SkillID.IsNone())
-    {
-        if (Root) Root->SetVisibility(ESlateVisibility::Collapsed);
-        return;
-    }
-
-    Root->SetVisibility(ESlateVisibility::HitTestInvisible);
     const auto* Definitions = GetGameInstance() ? GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>() : nullptr;
     FICDefinitionResult Result;
     const auto* Skill = Definitions ? Definitions->Find<FICSkillRow>(SkillID, Result) : nullptr;
     const double RemainingSeconds = FMath::Max(0., PC->GetCurrentWeaponSkillCooldown());
     const double Duration = Skill ? Skill->CooldownPlaySeconds : 0.;
-    const bool bCoolingDown = RemainingSeconds > KINDA_SMALL_NUMBER;
-
-    if (auto* Icon = Cast<UImage>(GetWidgetFromName(TEXT("IMG_SkillIcon"))))
-    {
-        auto* Texture = Skill ? Skill->Presentation.Icon.LoadSynchronous() : nullptr;
-        Icon->SetBrushFromTexture(Texture);
-        Icon->SetVisibility(Texture ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
-        Icon->SetColorAndOpacity(bCoolingDown ? FLinearColor(.32f, .32f, .32f, 1.f) : FLinearColor::White);
-    }
-    if (auto* Ring = Cast<UICRadialCooldownBar>(GetWidgetFromName(TEXT("RING_SkillCooldown"))))
-    {
-        const float Progress = Duration > 0. ? FMath::Clamp(float(1. - RemainingSeconds / Duration), 0.f, 1.f) : 0.f;
-        Ring->SetProgress(Progress);
-        Ring->SetVisibility(bCoolingDown ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
-    }
-    if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_SkillCooldown"))))
-    {
-        Text->SetText(FText::AsNumber(FMath::CeilToInt(RemainingSeconds)));
-        Text->SetVisibility(bCoolingDown ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
-    }
+    const float Progress = Duration > 0. ? FMath::Clamp(float(1. - RemainingSeconds / Duration), 0.f, 1.f) : 1.f;
+    Status->UpdateSkillCooldown(!SkillID.IsNone(), Progress, RemainingSeconds);
 }
 
 void UICGameplayWidget::RefreshCurrentScreen()
@@ -245,11 +168,11 @@ void UICGameplayWidget::RefreshCurrentScreen()
     if (auto* Menu = Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu"))))
     {
         if (auto* Hint = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Hint"))))
-            Hint->SetText(FText::FromString(PC->InteractionHint.IsEmpty() ? TEXT("") : TEXT("[F] ") + PC->InteractionHint));
+            Hint->SetText(FText::FromString(PC->InteractionHint));
         if (auto* Notice = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Notice"))))
             Notice->SetText(PC->NoticeDisplayText);
         const bool Open = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Death") && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
-            PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue");
+            PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue") && PC->Menu != TEXT("Station") && PC->Menu != TEXT("Map");
         Menu->SetVisibility(Open ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
         Menu->SetSessionPresentation(PC->Menu, PC->Menu == TEXT("Confirm") ? PC->ModalDisplayText : PC->NoticeDisplayText);
         OnRefreshGameplayUI();
@@ -273,11 +196,11 @@ void UICGameplayWidget::RefreshCurrentScreen()
             Bar->SetPercent(Maximums[I] > 0 ? FMath::Clamp(Values[I] / Maximums[I], 0.f, 1.f) : 0);
     }
     const FString CombatHint=PC->bInCombat ? TEXT("전투 중") : TEXT("");
-    SetText(TEXT("TXT_Hint"), CombatHint+(PC->InteractionHint.IsEmpty()?TEXT(""):(CombatHint.IsEmpty()?TEXT("[F] "):TEXT("\n[F] "))+PC->InteractionHint));
+    SetText(TEXT("TXT_Hint"), CombatHint+(PC->InteractionHint.IsEmpty()?TEXT(""):(CombatHint.IsEmpty()?TEXT(""):TEXT("\n"))+PC->InteractionHint));
     if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Notice"))))
         Text->SetText(PC->NoticeDisplayText);
     const bool HasPanel = !PC->Menu.IsEmpty() && PC->Menu != TEXT("Death") && PC->Menu != TEXT("Loading") && PC->Menu != TEXT("Create") &&
-                          PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue");
+                          PC->Menu != TEXT("Settings") && PC->Menu != TEXT("Dialogue") && PC->Menu != TEXT("Station") && PC->Menu != TEXT("Map");
     if (auto* Panel = GetWidgetFromName(TEXT("MenuPanel")))
         Panel->SetVisibility(HasPanel ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     if (HasPanel)
@@ -361,12 +284,23 @@ FReply UICGameplayWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyE
     if(auto* Menu=Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu")));Menu&&Menu->IsVisible())
         if(Menu->HandleMenuKey(Event.GetKey(),Event.IsRepeat()))return FReply::Handled();
     if (PC &&
-        (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::Equals || Event.GetKey() == EKeys::Gamepad_FaceButton_Right))
+        (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::Equals || UICGameUserSettings::IsGamepadBackKey(Event.GetKey())))
     {
         if (!Event.IsRepeat()) PC->HandleInputCommand(EICInputCommand::Menu);
         return FReply::Handled();
     }
     return Super::NativeOnKeyDown(Geometry, Event);
+}
+FReply UICGameplayWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event)
+{
+    // Xbox A is also Slate's default Accept key; gameplay/party targeting must see it before UI navigation.
+    if(!Event.IsRepeat())if(auto* PC=GetICPlayerController();PC&&PC->RouteGameplayGamepadKey(Event.GetKey(),true))return FReply::Handled();
+    return Super::NativeOnPreviewKeyDown(Geometry,Event);
+}
+FReply UICGameplayWidget::NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& Event)
+{
+    if(auto* PC=GetICPlayerController();PC&&PC->RouteGameplayGamepadKey(Event.GetKey(),false))return FReply::Handled();
+    return Super::NativeOnKeyUp(Geometry,Event);
 }
 void UICGameplayWidget::Resume()
 {

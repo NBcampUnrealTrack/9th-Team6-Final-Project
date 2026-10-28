@@ -48,13 +48,9 @@ bool AICPlayerCharacter::RequestCycleWeapon()
     PendingWeaponID = Next.bWeaponSheathed ? FGuid() : Next.Equipment[Slot].InstanceID;
     TransitionWeaponID = Inventory->GetSnapshot().Equipment[Slot].InstanceID;
     ++WeaponTransitionSerial;
-    if (Inventory->GetEquippedWeaponFamily() != EICWeaponFamily::None) StartWeaponTransition(false);
-    else
-    {
-        TransitionWeaponID = PendingWeaponID;
-        if (!Inventory->SelectWeaponForTransition(PendingWeaponID)) { CancelWeaponTransition(); return false; }
-        StartWeaponTransition(true);
-    }
+    // Moving to another occupied slot plays only that weapon's draw montage.
+    // Putting away is a separate step only after the last equipped family.
+    StartWeaponTransition(PendingWeaponID.IsValid());
     return true;
 }
 
@@ -63,7 +59,14 @@ void AICPlayerCharacter::StartWeaponTransition(bool bDraw)
     WeaponTransition = bDraw ? EWeaponTransition::Drawing : EWeaponTransition::Sheathing;
     WeaponMontageInstanceID = INDEX_NONE;
     auto* Profile = GetAnimationProfile();
-    const auto* Set = Profile ? Profile->WeaponSets.Find(Inventory->GetSelectedWeaponFamily()) : nullptr;
+    auto Family = Inventory->GetSelectedWeaponFamily();
+    if (bDraw)
+    {
+        const auto Loadout = Inventory->GetWeaponLoadout();
+        const int32 Index = Loadout.IndexOfByPredicate([&](const auto& Item) { return Item.InstanceID == PendingWeaponID; });
+        Family = Index == INDEX_NONE ? EICWeaponFamily::None : static_cast<EICWeaponFamily>(Index + 1);
+    }
+    const auto* Set = Profile ? Profile->WeaponSets.Find(Family) : nullptr;
     WeaponTransitionMontage = Set ? (bDraw ? Set->Draw : Set->Sheathe) : nullptr;
     auto* Anim = GetMesh()->GetAnimInstance();
     if (Anim && WeaponTransitionMontage && Anim->Montage_Play(WeaponTransitionMontage) > 0)
@@ -92,7 +95,16 @@ bool AICPlayerCharacter::ApplyWeaponVisibility(bool bDraw)
     const int32 Slot = static_cast<int32>(EPlayerEquipSlot::Weapon);
     if (!Inventory || !ASC || !ASC->IsAlive()
         || Inventory->GetSnapshot().Equipment[Slot].InstanceID != TransitionWeaponID) return false;
-    if (!Inventory->SetWeaponSheathed(!bDraw)) return false;
+    if (bDraw)
+    {
+        const FGuid PreviousWeaponID = TransitionWeaponID;
+        // OnChanged fires during the commit, so accept the incoming instance
+        // before publishing it to the inventory's live listeners.
+        TransitionWeaponID = PendingWeaponID;
+        if (!Inventory->DrawWeaponForTransition(PendingWeaponID))
+        { TransitionWeaponID = PreviousWeaponID; return false; }
+    }
+    else if (!Inventory->SetWeaponSheathed(true)) return false;
     RefreshWeaponAppearance();
     return true;
 }
@@ -111,13 +123,7 @@ void AICPlayerCharacter::FinishWeaponTransitionPhase(bool bInterrupted)
     if (bInterrupted || !ApplyWeaponVisibility(bDrawing)) { CancelWeaponTransition(); return; }
     WeaponTransitionMontage = nullptr;
     WeaponMontageInstanceID = INDEX_NONE;
-    if (!bDrawing && PendingWeaponID.IsValid())
-    {
-        TransitionWeaponID = PendingWeaponID;
-        if (!Inventory->SelectWeaponForTransition(PendingWeaponID)) { CancelWeaponTransition(); return; }
-        StartWeaponTransition(true);
-    }
-    else CancelWeaponTransition();
+    CancelWeaponTransition();
 }
 
 void AICPlayerCharacter::CancelWeaponTransition()

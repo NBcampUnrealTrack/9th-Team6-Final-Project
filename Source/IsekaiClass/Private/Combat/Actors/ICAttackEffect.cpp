@@ -7,6 +7,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
+#include "Combat/VFX/ICCombatVFX.h"
 
 AICAttackEffect::AICAttackEffect()
 {
@@ -43,11 +44,19 @@ void AICAttackEffect::Line(int32 Index,FVector Start,FVector End,float Width)
     Piece->SetRelativeRotation(FRotationMatrix::MakeFromZ(End-Start).Rotator());
     Piece->SetRelativeScale3D(FVector(Width/50,Width/50,FVector::Distance(Start,End)/100));
 }
-void AICAttackEffect::SpawnSlash(AICCharacterBase* Character,double Radius,double Angle,int32 Stage)
+void AICAttackEffect::SpawnSlash(AICCharacterBase* Character,double Radius,double Angle,int32 Stage,const FICCombatPresentation& Presentation)
 {
     if(!Character||!Character->GetWorld()||Character->GetWorld()->GetNetMode()==NM_DedicatedServer)return;
     auto* Effect=Character->GetWorld()->SpawnActor<AICAttackEffect>(Character->GetActorLocation(),Character->GetActorRotation());
     if(!Effect)return;
+    if(const auto* Style=ICCombatVFX::Resolve(Presentation))
+    {
+        const float Floor=-Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()+5;
+        const bool Slash=ICCombatVFX::Attach(Effect,Effect->RootComponent,Style->Slash,.24f,Radius,Angle,Floor,Style->SlashSlope)!=nullptr;
+        const bool Range=ICCombatVFX::Attach(Effect,Effect->RootComponent,Style->Range,.24f,Radius,Angle,Floor,0)!=nullptr;
+        if(Slash||Range||!Style->bLegacyMeshFallback||(!Style->Slash.bEnabled&&!Style->Range.bEnabled))
+        {Effect->UseNiagaraLifetime(FMath::Max(Style->Slash.Duration>0?Style->Slash.Duration:.24f,Style->Range.Duration>0?Style->Range.Duration:.24f));return;}
+    }
     Effect->SetColor(Stage==2?FLinearColor(1,.65f,.18f):FamilyColor(EICWeaponFamily::Sword));
     const float Half=FMath::DegreesToRadians(FMath::Clamp(Angle,1.,180.)*.5);
     const float Floor=-Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()+5;
@@ -78,9 +87,11 @@ void AICAttackEffect::SpawnImpact(UWorld* World,const FVector& Location,EICWeapo
 }
 void AICAttackEffect::Tick(float Seconds)
 {
-    Super::Tick(Seconds);Age+=Seconds;const float Alpha=FMath::Clamp(Age/Duration,0.f,1.f);
+    Super::Tick(Seconds);if(bNiagara)return;Age+=Seconds;const float Alpha=FMath::Clamp(Age/Duration,0.f,1.f);
     if(Glow)Glow->SetVectorParameterValue(TEXT("Color"),Color*(3.f*(1-Alpha)));
     if(bImpact)SetActorScale3D(FVector(1+Alpha*1.6f));
     else for(int32 I=12;I<24;++I)Pieces[I]->SetVisibility(float(I-12)/12<=Alpha*1.8f);
     if(Alpha>=1)Destroy();
 }
+void AICAttackEffect::UseNiagaraLifetime(float Seconds)
+{bNiagara=true;SetActorTickEnabled(false);SetLifeSpan(FMath::Max(.01f,Seconds)+.05f);}

@@ -51,6 +51,19 @@ void UICQuestGuideComponent::EndPlay(const EEndPlayReason::Type Reason)
     Super::EndPlay(Reason);
 }
 
+void UICQuestGuideComponent::SetQuestGuideEnabled(FName QuestID, bool bEnabled)
+{
+    if (QuestID.IsNone()) return;
+    if (bEnabled)
+    {
+        bGuideEnabled = true;
+        PausedQuestIDs.Remove(QuestID);
+    }
+    else PausedQuestIDs.Add(QuestID);
+    if (GuidedQuestID == QuestID) ResetPulse();
+    RefreshGuide();
+}
+
 void UICQuestGuideComponent::ResetPulse(bool bImmediate)
 {
     if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(PulseTimer);
@@ -170,7 +183,7 @@ bool UICQuestGuideComponent::SelectTarget(const FICWorldState& Snapshot, UICDefi
     TArray<FName> Candidates;
     for (const auto& Entry : Snapshot.Quests)
     {
-        if (Entry.Value.bAccepted && Entry.Value.bStarted && !Entry.Value.bCompleted && !Entry.Value.bAbandoned)
+        if (IsQuestGuideEnabled(Entry.Key) && Entry.Value.bAccepted && Entry.Value.bStarted && !Entry.Value.bCompleted && !Entry.Value.bAbandoned)
             Candidates.Add(Entry.Key);
     }
     Candidates.Sort([&Snapshot](FName A, FName B)

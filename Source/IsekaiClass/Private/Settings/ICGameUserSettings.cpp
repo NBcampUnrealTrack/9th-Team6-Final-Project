@@ -1,4 +1,5 @@
 #include "Settings/ICGameUserSettings.h"
+#include "Data/Text/ICLocalization.h"
 #include "Settings/ICDisplaySettings.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Player/Character/ICPlayerCharacter.h"
@@ -29,6 +30,7 @@ UICGameUserSettings* UICGameUserSettings::Get()
 void UICGameUserSettings::LoadSettings(bool bForceReload)
 {
     Super::LoadSettings(bForceReload);
+    ICLocalization::ApplyLanguage(LanguageIndex);
     float Value;
     if(!GConfig->GetFloat(TEXT("/Script/IsekaiClass.ICGameUserSettings"),TEXT("CameraSensitivity"),Value,GGameUserSettingsIni))
         if(GConfig->GetFloat(TEXT("/Script/IsekaiClass.Input"),TEXT("CameraSensitivity"),Value,GGameUserSettingsIni))CameraSensitivity=Value;
@@ -42,14 +44,33 @@ void UICGameUserSettings::SetToDefaults()
     bShowFPS=false;UIScale=1;DisplayGamma=2.2f;AntiAliasingMethod=4;
     bMotionBlur=bBloom=bDepthOfField=bAmbientOcclusion=true;
     MonitorDevice.Empty();MonitorRefreshRate=0;KeyOverrides.Reset();
+    LanguageIndex=InputDeviceMode=0;GamepadLayout=1;
 }
 void UICGameUserSettings::ValidateSettings()
 {
     Super::ValidateSettings();
+    LanguageIndex=FMath::Clamp(LanguageIndex,0,1);InputDeviceMode=FMath::Clamp(InputDeviceMode,0,2);GamepadLayout=FMath::Clamp(GamepadLayout,0,1);
     auto Clamp=[](float Value,float Min,float Max,float Default){return FMath::IsFinite(Value)?FMath::Clamp(Value,Min,Max):Default;};
     CameraSensitivity=Clamp(CameraSensitivity,.1f,3,1);CameraFOV=Clamp(CameraFOV,60,110,90);CameraZoomStep=Clamp(CameraZoomStep,10,100,50);
     for(float* Value:{&MasterVolume,&MusicVolume,&EffectsVolume,&AmbientVolume,&VoiceVolume,&UIVolume})*Value=Clamp(*Value,0,1,1);
     UIScale=Clamp(UIScale,.75f,1.3f,1);DisplayGamma=Clamp(DisplayGamma,1.8f,2.6f,2.2f);AntiAliasingMethod=FMath::Clamp(AntiAliasingMethod,0,4);
+}
+FKey UICGameUserSettings::GamepadFaceKey(int32 Semantic)
+{
+    const bool Nintendo=Get()->GamepadLayout==0;
+    const FKey Keys[]={Nintendo?EKeys::Gamepad_FaceButton_Top:EKeys::Gamepad_FaceButton_Left,
+        Nintendo?EKeys::Gamepad_FaceButton_Left:EKeys::Gamepad_FaceButton_Top,
+        Nintendo?EKeys::Gamepad_FaceButton_Bottom:EKeys::Gamepad_FaceButton_Right,
+        Nintendo?EKeys::Gamepad_FaceButton_Right:EKeys::Gamepad_FaceButton_Bottom};
+    return Keys[FMath::Clamp(Semantic,0,3)];
+}
+bool UICGameUserSettings::IsGamepadAcceptKey(FKey Key){return Key==GamepadFaceKey(3);}
+bool UICGameUserSettings::IsGamepadBackKey(FKey Key){return Key==GamepadFaceKey(2);}
+FKey UICGameUserSettings::MenuKey(FKey Key)
+{
+    if(IsGamepadAcceptKey(Key))return EKeys::Enter;if(IsGamepadBackKey(Key))return EKeys::Escape;
+    if(Key==EKeys::Gamepad_DPad_Up)return EKeys::Up;if(Key==EKeys::Gamepad_DPad_Down)return EKeys::Down;
+    if(Key==EKeys::Gamepad_DPad_Left)return EKeys::Left;if(Key==EKeys::Gamepad_DPad_Right)return EKeys::Right;return Key;
 }
 double UICGameUserSettings::ReadOption(FName ID) const
 {
@@ -94,6 +115,7 @@ void UICGameUserSettings::WriteOption(FName ID,double Value)
 void UICGameUserSettings::ApplyNonResolutionSettings()
 {
     ValidateSettings();Super::ApplyNonResolutionSettings();
+    ICLocalization::ApplyLanguage(LanguageIndex);
     auto Set=[](const TCHAR* Name,int32 Value){if(auto* Variable=IConsoleManager::Get().FindConsoleVariable(Name))Variable->Set(Value,ECVF_SetByGameOverride);};
     Set(TEXT("r.AntiAliasingMethod"),AntiAliasingMethod);Set(TEXT("r.MotionBlurQuality"),bMotionBlur?4:0);
     Set(TEXT("r.DefaultFeature.MotionBlur"),bMotionBlur?1:0);Set(TEXT("r.DefaultFeature.Bloom"),bBloom?1:0);

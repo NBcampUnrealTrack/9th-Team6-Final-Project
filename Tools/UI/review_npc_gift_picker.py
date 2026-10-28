@@ -62,11 +62,11 @@ def tick(delta):
             player.set_actor_location_and_rotation(npc.get_actor_location()+u.Vector(-190,0,0),u.Rotator(),False,True)
             player.get_component_by_class(u.CharacterMovementComponent).stop_movement_immediately();pc.set_control_rotation(u.Rotator())
             inventory=pc.get_inventory()
-            for id in ('ITEM_P0_01','ITM_R01_PLANT_01','ITM_R01_ORE_01'):assert inventory.add_item(id,2,False)
+            for id in ('ITM_R01_FOOD_15','ITM_R01_PLANT_01','ITM_R01_ORE_01'):assert inventory.add_item(id,2,False)
             for index,item in enumerate(inventory.get_snapshot().bag.slots):
                 if str(item.item_id)=='ITM_R01_ORE_01':assert inventory.toggle_lock(index)
             pc.get_world_state().set_affinity('NPC_R01_002',280)
-            STATE.update(npc=npc,inventory=inventory,plant_before=inventory.count_item('ITM_R01_PLANT_01'),preferred_before=inventory.count_item('ITEM_P0_01'))
+            STATE.update(npc=npc,inventory=inventory,plant_before=inventory.count_item('ITM_R01_PLANT_01'),preferred_before=inventory.count_item('ITM_R01_FOOD_15'))
             pc.set_menu('');phase('settle');return
         if STATE['phase']=='settle' and elapsed>1:
             pc.handle_input_command(u.ICInputCommand.INTERACT,0);phase('greeting');return
@@ -103,13 +103,13 @@ def tick(delta):
         if STATE['phase']=='neutral_given' and elapsed>.3:
             assert picker() is None
             assert STATE['inventory'].count_item('ITM_R01_PLANT_01')==STATE['plant_before']-1
-            assert STATE['inventory'].count_item('ITEM_P0_01')==STATE['preferred_before']
+            assert STATE['inventory'].count_item('ITM_R01_FOOD_15')==STATE['preferred_before']
             assert pc.get_world_state().get_snapshot('NPC_R01_002').affinity==280
             assert selected()=='선물하기'
             STATE['checks']['enter_gives_exact_selected_item_once']=True
             capture('GiftPicker_NeutralResult');press('Enter');STATE['grid_index']=0;phase('choose_preferred');return
         if STATE['phase']=='choose_preferred' and elapsed>.3:
-            if not seek_item('ITEM_P0_01'):return
+            if not seek_item('ITM_R01_FOOD_15'):return
             capture('GiftPicker_SelectedPreferred');press('Enter');phase('confirm_preferred');return
         if STATE['phase']=='confirm_preferred' and elapsed>.3:
             assert picker().get_editor_property('confirming')
@@ -118,7 +118,7 @@ def tick(delta):
             phase('preferred_given');return
         if STATE['phase']=='preferred_given' and elapsed>.3:
             assert picker() is None
-            assert STATE['inventory'].count_item('ITEM_P0_01')==STATE['preferred_before']-1
+            assert STATE['inventory'].count_item('ITM_R01_FOOD_15')==STATE['preferred_before']-1
             assert pc.get_world_state().get_snapshot('NPC_R01_002').affinity==300
             assert any(str(e.get_entry_text())=='동료 영입하기' for e in dialogue_entries())
             STATE['checks']['preferred_affinity_and_recruit_threshold_update']=True
@@ -126,7 +126,7 @@ def tick(delta):
             press('Enter');phase('cancel');return
         if STATE['phase']=='cancel' and elapsed>.3:
             assert picker();press('Escape');assert picker() is None
-            assert STATE['inventory'].count_item('ITEM_P0_01')==STATE['preferred_before']-1
+            assert STATE['inventory'].count_item('ITM_R01_FOOD_15')==STATE['preferred_before']-1
             assert str(pc.get_editor_property('menu'))=='Dialogue' and selected()=='선물하기'
             STATE['checks']['escape_returns_to_npc_without_consuming_item']=True
             phase('after_cancel');return

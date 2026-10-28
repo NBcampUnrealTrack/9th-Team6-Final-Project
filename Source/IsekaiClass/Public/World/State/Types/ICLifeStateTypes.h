@@ -45,4 +45,17 @@ struct FICCropState
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) FName OwnerCharacterID;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) double PlantedAtGameMinute = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) double HarvestableAtGameMinute = 0;
+    /** A harvested natural crop is hidden until this calendar time. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) double RegrowthAtGameMinute = 0;
+};
+
+USTRUCT(BlueprintType)
+struct FICRanchAnimalState
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,SaveGame) FName DefinitionID;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,SaveGame) FGuid IncarnationID;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,SaveGame) float HP=1;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,SaveGame) bool bDefeated=false;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,SaveGame) double RespawnAtGameMinute=0;
 };

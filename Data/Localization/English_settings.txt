@@ -1,0 +1,136 @@
+1133|Controls
+1134|Graphics
+1135|Audio
+1136|Other
+1137|Auto-Select Attack Target
+1138|Select an enemy in front of the camera when no target is selected. Disable to attack freely in the direction you face.
+1139|Maintain Combat Aim
+1140|While moving in combat, melee weapons face the selected enemy and ranged weapons aim at the centre of the screen. Disable to face your movement direction.
+1141|Crosshair Distance Correction
+1142|Use the distance to an enemy or obstacle at the crosshair to correct the offset between the hand and camera. Disable to aim at maximum range.
+1143|Show Damage Numbers
+1144|Display damage dealt to players and enemies.
+1145|Show Enemy Health Bars
+1146|Display health bars above monsters.
+1147|Mouse Sensitivity
+1148|Adjust horizontal and vertical camera rotation speed.
+1149|Invert Horizontal Camera
+1150|Reverse horizontal camera rotation.
+1151|Invert Vertical Camera
+1152|Reverse vertical camera rotation.
+1153|Field of View
+1154|Adjust the player camera's field of view. Higher values show more of your surroundings.
+1155|Mouse Wheel Zoom Speed
+1156|Adjust how far the camera moves with each mouse wheel step.
+1157|Display / Monitor
+1158|Choose which connected display shows the game.
+1159|Display Mode
+1160|Choose fullscreen, borderless or windowed mode. Borderless uses the desktop resolution.
+1161|Borderless
+1162|Windowed
+1163|Resolution
+1164|Resolutions supported by the selected monitor. Unavailable in borderless mode.
+1165|Refresh Rate
+1166|Vertical Sync
+1167|Reduce screen tearing. The monitor refresh rate may limit the frame rate.
+1168|Frame Rate Limit
+1169|Limit rendered frames per second. This does not change the monitor refresh rate.
+1170|Unlimited
+1171|Medium
+1172|Custom
+1173|Graphics Preset
+1174|Change the quality options below together. Individual changes select Custom.
+1175|Internal 3D rendering resolution. Lower values improve performance but reduce clarity. UI resolution is unchanged.
+1176|Dynamic Resolution
+1177|Adjust internal rendering resolution to match the workload when supported by the engine and GPU.
+1178|View Distance
+1179|Control how far away objects are displayed.
+1180|Texture Quality
+1181|Control surface texture detail and graphics memory use.
+1182|Shadow Quality
+1183|Control shadow resolution and display distance.
+1184|Global Illumination Quality
+1185|Quality of bounced light. Higher settings can affect performance.
+1186|Reflection Quality
+1187|Quality of reflective surfaces such as water and metal.
+1188|Anti-Aliasing Quality
+1189|Reduce jagged edges on objects.
+1190|Anti-Aliasing Method
+1191|TSR reconstructs a lower internal resolution. TAA uses temporal smoothing; FXAA is a lightweight screen filter.
+1192|Off
+1193|Effects Quality
+1194|Detail level of particles and combat effects.
+1195|Post-Processing Quality
+1196|Quality of screen effects, including depth of field.
+1197|Foliage Quality
+1198|Display density and distance of grass and vegetation.
+1199|Shading Quality
+1200|Detail level of surface materials and lighting.
+1201|Landscape Quality
+1202|Terrain detail and quality.
+1203|Motion Blur
+1204|Blur caused by fast movement.
+1205|Bloom
+1206|Glow around bright lights and attack effects.
+1207|Depth of Field
+1208|Allow areas outside the focus range to blur.
+1209|Ambient Occlusion
+1210|Add depth to corners where objects meet.
+1211|Adjust the midtone brightness of the game.
+1212|Master Volume
+1213|Overall volume of all sounds.
+1214|Music
+1215|Volume of background music.
+1216|Sound Effects
+1217|Volume of combat, hit, gathering and other game effects.
+1218|Ambience
+1219|Volume of wind, water and other environmental sounds.
+1220|Voice
+1221|Volume of character voices.
+1222|UI Sounds
+1223|Volume of menu and button sounds.
+1224|Mute in Background
+1225|Mute the game when another window is focused.
+1226|HUD and Menu Text Size
+1227|Scale HUD and menu text from 75% to 130%.
+1228|Show FPS
+1229|Display the current rendered frame rate.
+1230|Language
+1231|Switch between Korean and English.
+1232|Korean
+1233|Input Prompts
+1234|Use automatic detection, keyboard or controller prompts.
+1235|Automatic
+1236|Keyboard / Mouse
+1237|Controller
+1238|Controller Button Layout
+1239|Choose Nintendo or Xbox button positions.
+1240|Adjust your play experience. Apply changes to save them.
+1241|Change Key Bindings
+1242|Select a key button, then press the new key. ESC remains reserved for cancel and menu. Duplicate keys are checked before applying.
+1243|Defaults
+1244|Apply and Save
+1245|Keep Changes
+1246|Revert
+1247|Tab: Navigate / Arrows: Change / Space or Enter: Select / ESC: Close
+1248|Press Apply and Save after making changes. Closing discards unapplied changes.
+1249|You have unapplied changes. Press Apply and Save.
+1250|Move Forward
+1251|Move Backward
+1252|Move Left
+1253|Move Right
+1254|Companion Skill {0}
+1255|Quick Slot {0}
+1256|Game Controls
+1257|Press a new key...
+1258|This key cannot be used. ESC is reserved for menu and back.
+1259|Key changed. Duplicate bindings are swapped. Press Apply and Save.
+1260|Settings applied and saved.
+1261|Display changes cancelled. Previous settings restored.
+1262|Options and key bindings reset to defaults. Display mode and resolution were retained. Press Apply and Save.
+1263|Keep these display settings? Reverting in {0} seconds.
+1264|Warp data '%s' not found. (%s)
+1265|Warp data '%s' has no Arrival Anchor ID.
+1266|Inspect Warp Stone
+1267|Warp stone activated.
+

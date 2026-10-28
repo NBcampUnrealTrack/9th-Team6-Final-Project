@@ -1,0 +1,60 @@
+BGM DT 관리 안내
+2026-10-28
+
+곡을 바꾸는 위치
+/Game/IsekaiClass/Data/DataTable/Audio/DT_IC_BGM
+
+기본 행
+- BGM_Village: 마을. 예시곡 Merchant.
+- BGM_Outside: 마을 밖. 예시곡 Flying_Through_Mountains.
+- BGM_Area_01: 다른 구역 1. 예시곡 Ocean_Waves.
+- BGM_Area_02: 다른 구역 2. 예시곡 Inner_Dreams.
+- BGM_Combat: 전투 중. 예시곡 Enemy_Scrolls.
+
+위 곡들은 프로젝트 안에 있는 OrchestralLoops 에셋으로 우선 연결했습니다.
+새 음악을 Content Browser에 임포트한 다음 DT의 Music 칸에 지정하면 됩니다.
+기본 행 이름 5개는 유지하고 곡을 교체하는 편이 관리하기 쉽습니다.
+
+각 열
+- DisplayName: 편집용 이름(FText, 현지화 가능).
+- Music: 재생할 SoundWave 또는 SoundCue.
+- Volume: 이 곡의 상대 볼륨. 기본 0.6.
+- FadeInSeconds: 전환하며 새 곡이 커지는 시간. 기본 1.5초.
+- FadeOutSeconds: 이 곡을 떠날 때 작아지는 시간. 기본 1.5초.
+- bLoop: 반복 재생 여부. SoundWave는 BGM 전용 반복 노드로 재생합니다.
+  SoundCue도 지정할 수 있으며, Cue 내부에서 반복을 구성할 수도 있습니다.
+
+지역을 나누는 방법
+1. 맵에 /Game/IsekaiClass/Audio/Blueprints/BP_IC_BGMZone 을 배치합니다.
+2. MusicRowID에서 원하는 DT 행을 선택합니다.
+3. Bounds의 Box Extent 또는 액터 Scale로 적용 범위를 조절합니다.
+4. 범위가 겹치면 Priority가 큰 구역이 우선합니다.
+   Priority도 같으면 더 작은 구역이 우선합니다.
+5. 어느 구역에도 속하지 않으면 BGM_Outside를 재생합니다.
+
+전투와 복귀
+- 플레이어의 실제 전투 상태가 지역 음악보다 우선합니다.
+- 전투 중에는 BGM_Combat를 재생합니다.
+- 전투 상태가 끝나면 현재 서 있는 구역의 음악으로 돌아갑니다.
+- 원래 구역을 나간 상태라면 새 구역 음악으로 돌아갑니다.
+- 같은 구역에 있는 동안 매번 처음부터 재생하지 않습니다.
+- 전환 시 기존 곡의 FadeOut과 새 곡의 FadeIn이 동시에 진행됩니다.
+- 옵션의 오디오 > 음악 볼륨(SC_Music)과 전체 볼륨을 적용받습니다.
+
+테스트 맵 배치
+- L_TestMap / 아웃라이너 IC_BGM_Zones.
+- IC_BGM_Village: NPC·집·농사 중심 구역.
+- IC_BGM_Area_01: 채집물 근처의 예시 구역.
+- IC_BGM_Area_02: 광석 근처의 예시 구역.
+- 나머지는 마을 밖 음악. 전투 음악은 위치와 관계없이 우선합니다.
+
+구역을 더 늘리기
+- DT에 새 행을 추가하고 새 BP_IC_BGMZone의 MusicRowID로 선택하면 됩니다.
+- 예: BGM_Dungeon, BGM_BossRoom. 지역 추가에 C++ 수정은 필요 없습니다.
+- 퀘스트/연출에서는 월드의 IC BGM Subsystem을 얻어 SetMusicOverride(행 이름),
+  ClearMusicOverride()로 임시 지역 음악을 지정하고 해제할 수 있습니다. 전투가 더 우선합니다.
+
+구현 / 원본 내보내기
+- UICBGMSubsystem / AICBGMZone / FICBGMRow.
+- Data/Audio/DT_IC_BGM.csv 는 에셋 내용을 내보낸 참고 파일입니다.
+- 실제 게임 편집은 UE의 DT 에셋에서 저장하면 됩니다.

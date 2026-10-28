@@ -13,6 +13,8 @@ public:
     UFUNCTION(BlueprintPure, Category = "IC|UI") AICPlayerController* GetICPlayerController() const;
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshCurrentScreen();
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshSkillCooldown();
+    UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshTargetInfo();
+    UFUNCTION(BlueprintPure,Category="IC|Time") static FText FormatGameClock(double GameMinute);
     UFUNCTION(BlueprintImplementableEvent, Category = "IC|UI") void OnRefreshGameplayUI();
 
 protected:
@@ -21,9 +23,10 @@ protected:
     virtual int32 NativePaint(const FPaintArgs& Args,const FGeometry& Geometry,const FSlateRect& Culling,
         FSlateWindowElementList& Elements,int32 Layer,const FWidgetStyle& Style,bool ParentEnabled) const override;
     virtual FReply NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event) override;
+    virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event) override;
+    virtual FReply NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& Event) override;
 
 private:
-    void EnsureSkillCooldown();
     UFUNCTION() void Back();
     UFUNCTION() void Resume();
     UFUNCTION() void Save();

@@ -5,6 +5,7 @@
 #include "UI/Gameplay/ICGameMenuWidget.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
 #include "Quest/ICQuestSubsystem.h"
+#include "Quest/ICQuestGuideComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Save/ICSaveGame.h"
@@ -12,6 +13,10 @@
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Components/Button.h"
+#include "Components/Border.h"
+#include "Components/HorizontalBox.h"
+#include "Components/SizeBox.h"
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Kismet/GameplayStatics.h"
@@ -58,12 +63,45 @@ bool FICQuestMenuCheck::RunTest(const FString&)
             TestTrue(TEXT("Journal opens the accepted sample quest"),UI->OpenQuest(ID));
             TestTrue(TEXT("A newly accepted quest starts when the HUD is empty"),State->ExportState().Quests.FindRef(ID).bStarted);
             Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,Definition.OfferNPCID,1,FGuid::NewGuid());TestFalse(TEXT("Talking to the offer NPC does not complete the objective"),State->ExportState().Quests.FindRef(ID).bCompleted);
-            Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,Definition.ObjectiveGroups[0].Objectives[0].Target.ID,1,FGuid::NewGuid());TestTrue(TEXT("Talking to the target completes the quest"),State->ExportState().Quests.FindRef(ID).bCompleted);
+            Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,Definition.ObjectiveGroups[0].Objectives[0].Target.ID,
+                1,FGuid::NewGuid(),EICLifeActivity::Gathering,NAME_None,Definition.ObjectiveGroups[0].Objectives[0].DialogueID);TestTrue(TEXT("Talking to the target completes the quest"),State->ExportState().Quests.FindRef(ID).bCompleted);
             TestEqual(TEXT("Actual gold reward is applied once"),State->ExportState().Gold,StartingGold+I*100);
-            Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,Definition.ObjectiveGroups[0].Objectives[0].Target.ID,1,FGuid::NewGuid());TestEqual(TEXT("Repeated talk does not pay twice"),State->ExportState().Gold,StartingGold+I*100);
+            Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,Definition.ObjectiveGroups[0].Objectives[0].Target.ID,
+                1,FGuid::NewGuid(),EICLifeActivity::Gathering,NAME_None,Definition.ObjectiveGroups[0].Objectives[0].DialogueID);TestEqual(TEXT("Repeated talk does not pay twice"),State->ExportState().Gold,StartingGold+I*100);
         }
         TestTrue(TEXT("Reset to the isolated journal fixture"),State->RestoreState(Data));UI->RefreshQuests();
         auto* Detail=CastChecked<UICQuestDetailWidget>(UI->GetWidgetFromName(TEXT("QuestDetail")));
+        auto* RewardEntries=Cast<UVerticalBox>(Detail->GetWidgetFromName(TEXT("RewardEntries")));
+        if(TestNotNull(TEXT("Existing detail Blueprint gains reward cards"),RewardEntries))
+        {
+            auto* Reward=const_cast<FICRewardRow*>(D->Find<FICRewardRow>(TEXT("RWD_RING_001"),R));
+            if(TestNotNull(TEXT("Actual item reward fixture resolves"),Reward))
+            {
+                TGuardValue<FName> QuestReward(TalkRow->RewardID,TEXT("RWD_RING_001"));
+                TGuardValue<FICRewardRow> RestoreReward(*Reward,*Reward);
+                Reward->Gold=125;Reward->Affinity.Reset();
+                FICAffinityReward Affinity;Affinity.NPCID=TEXT("NPC_R01_001");Affinity.Amount=30;Reward->Affinity.Add(Affinity);
+                Reward->UnlockRecipeIDs={TEXT("RCP_COOK_001")};
+                const int32 GoldBeforePreview=State->ExportState().Gold;
+                Detail->Present(Talk);
+                TestEqual(TEXT("Gold, item, affinity and recipe have separate cards"),RewardEntries->GetChildrenCount(),4);
+                const auto Summary=CastChecked<UTextBlock>(Detail->GetWidgetFromName(TEXT("TXT_Rewards")))->GetText().ToString();
+                TestTrue(TEXT("Actual amounts are previewed"),Summary.Contains(TEXT("125"))&&Summary.Contains(TEXT("× 10"))&&Summary.Contains(TEXT("+30")));
+                TestTrue(TEXT("Recipe unlock is identified"),Summary.Contains(TEXT("제작법 해금")));
+                auto* GoldRow=CastChecked<UHorizontalBox>(CastChecked<UBorder>(RewardEntries->GetChildAt(0))->GetContent());
+                auto* GoldIcon=Cast<UImage>(CastChecked<USizeBox>(GoldRow->GetChildAt(0))->GetContent());
+                TestTrue(TEXT("Gold uses an actual coin icon"),GoldIcon&&GoldIcon->GetBrush().GetResourceObject());
+                TestTrue(TEXT("Item card exposes a hover tooltip"),!RewardEntries->GetChildAt(1)->GetToolTipText().IsEmpty());
+                Detail->Present(Talk);
+                TestEqual(TEXT("Refresh replaces cards without duplicates"),RewardEntries->GetChildrenCount(),4);
+                TestEqual(TEXT("Preview does not grant gold"),State->ExportState().Gold,GoldBeforePreview);
+            }
+            {
+                TGuardValue<FName> NoReward(TalkRow->RewardID,NAME_None);Detail->Present(Talk);
+                TestEqual(TEXT("No reward clears previous cards"),RewardEntries->GetChildrenCount(),1);
+                TestEqual(TEXT("No reward is explicitly labeled"),CastChecked<UTextBlock>(Detail->GetWidgetFromName(TEXT("TXT_Rewards")))->GetText().ToString(),FString(TEXT("없음")));
+            }
+        }
         auto* Tracker=CastChecked<UICQuestTrackerWidget>(HUD->GetWidgetFromName(TEXT("HUD_QuestTracker")));
         auto TrackerText=[&](){return CastChecked<UTextBlock>(Tracker->GetWidgetFromName(TEXT("QuestText")))->GetText().ToString();};
         auto Label=[&](const TCHAR* Name){return CastChecked<UTextBlock>(Detail->GetWidgetFromName(Name))->GetText().ToString();};
@@ -88,14 +126,30 @@ bool FICQuestMenuCheck::RunTest(const FString&)
         TestFalse(TEXT("Detail description is present"),Label(TEXT("TXT_Description")).IsEmpty());TestFalse(TEXT("Objectives are present"),Label(TEXT("TXT_Objectives")).IsEmpty());TestFalse(TEXT("Rewards section exists even when empty"),Label(TEXT("TXT_Rewards")).IsEmpty());
         Menu->HandleMenuKey(EKeys::Enter);TestTrue(TEXT("Keyboard Start activates selected quest"),State->ExportState().Quests[Talk].bStarted);
         TestTrue(TEXT("HUD displays the started quest"),TrackerText().Contains(TEXT("상인과 대화")));TestFalse(TEXT("HUD excludes waiting quests"),TrackerText().Contains(TEXT("재료 수집")));
+        auto* Guide=Player->FindComponentByClass<UICQuestGuideComponent>();
+        auto* GuideButton=Cast<UButton>(Detail->GetWidgetFromName(TEXT("BTN_ToggleGuide")));
+        if(TestNotNull(TEXT("Player has quest guidance"),Guide)&&TestNotNull(TEXT("Existing detail Blueprint gains guide toggle"),GuideButton))
+        {
+            TestTrue(TEXT("Running quest enables guide toggle"),GuideButton->GetIsEnabled());
+            const auto Before=State->ExportState().Quests.FindRef(Talk);
+            Menu->HandleMenuKey(EKeys::S);Menu->HandleMenuKey(EKeys::Enter);
+            TestFalse(TEXT("Keyboard stops guidance"),Guide->IsQuestGuideEnabled(Talk));
+            TestEqual(TEXT("Stopped guidance offers restart"),CastChecked<UTextBlock>(GuideButton->GetContent())->GetText().ToString(),FString(TEXT("경로 안내 시작")));
+            TestTrue(TEXT("Stopping guidance preserves running quest"),State->ExportState().Quests.FindRef(Talk).bStarted);
+            TestTrue(TEXT("Stopping guidance preserves objective progress"),State->ExportState().Quests.FindRef(Talk).Objectives.OrderIndependentCompareEqual(Before.Objectives));
+            GuideButton->OnClicked.Broadcast();
+            TestTrue(TEXT("Same button resumes guidance"),Guide->IsQuestGuideEnabled(Talk));
+            TestEqual(TEXT("Resumed guidance offers stop"),CastChecked<UTextBlock>(GuideButton->GetContent())->GetText().ToString(),FString(TEXT("경로 안내 중지")));
+            Menu->HandleMenuKey(EKeys::W);
+        }
         Q->ReportObjectiveEvent(EICQuestObjectiveType::Talk,TEXT("NPC_R01_101"),1,FGuid::NewGuid());
-        Menu->HandleMenuKey(EKeys::S);Menu->HandleMenuKey(EKeys::Enter);TestFalse(TEXT("Bottom Back returns to list"),UI->bShowingDetails);TestEqual(TEXT("Back preserves the selected quest"),UI->SelectedQuest,Talk);
+        Menu->HandleMenuKey(EKeys::S);Menu->HandleMenuKey(EKeys::S);Menu->HandleMenuKey(EKeys::Enter);TestFalse(TEXT("Bottom Back returns to list"),UI->bShowingDetails);TestEqual(TEXT("Back preserves the selected quest"),UI->SelectedQuest,Talk);
         Menu->HandleMenuKey(EKeys::W);Menu->HandleMenuKey(EKeys::Enter);Menu->HandleMenuKey(EKeys::Enter);
         auto Current=State->ExportState();TestTrue(TEXT("Switch leaves old quest accepted but stopped"),Current.Quests[Talk].bAccepted&&!Current.Quests[Talk].bStarted);
         TestEqual(TEXT("Switch resets old progress"),Current.Quests[Talk].Objectives.Num(),0);TestTrue(TEXT("New quest starts"),Current.Quests[Collect].bStarted);
         TestTrue(TEXT("HUD replaces old quest"),TrackerText().Contains(TEXT("재료 수집"))&&!TrackerText().Contains(TEXT("상인과 대화")));
         TestTrue(TEXT("Explicit switching moves the running marker"),RowTitle(0).Contains(TEXT("(진행중)"))&&!RowTitle(1).Contains(TEXT("(진행중)")));
-        Q->ReportObjectiveEvent(EICQuestObjectiveType::Collect,TEXT("ITM_MAT_002"),1,FGuid::NewGuid());
+        Q->ReportObjectiveEvent(EICQuestObjectiveType::Collect,TEXT("ITM_R01_CROP_01"),1,FGuid::NewGuid());
         auto* Save=NewObject<UICSaveGame>();Save->WorldState=State->ExportState();TArray<uint8> Bytes;
         TestTrue(TEXT("Quest selection serializes with the real save type"),UGameplayStatics::SaveGameToMemory(Save,Bytes));
         auto* Loaded=Cast<UICSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes));TestNotNull(TEXT("Serialized save reloads"),Loaded);
@@ -105,7 +159,7 @@ bool FICQuestMenuCheck::RunTest(const FString&)
         if(Loaded){TestTrue(TEXT("Load restores active quest"),State->RestoreState(Loaded->WorldState));UI->RefreshQuests();TestEqual(TEXT("Journal refreshes after load"),UI->QuestIDs.Num(),2);TestTrue(TEXT("HUD restores started quest"),TrackerText().Contains(TEXT("재료 수집")));}
         UI->OpenQuest(Talk);Menu->HandleMenuKey(EKeys::Escape);TestFalse(TEXT("ESC in details returns to list"),UI->bShowingDetails);TestEqual(TEXT("Detail Back does not close game menu"),PC->Menu,FString(TEXT("Pause")));
         UI->OpenQuest(Collect);Menu->SelectTab(TEXT("Party"));Menu->SelectTab(TEXT("Quest"));TestFalse(TEXT("Reentering tab always starts at quest list"),UI->bShowingDetails);
-        Q->ReportObjectiveEvent(EICQuestObjectiveType::Collect,TEXT("ITM_MAT_002"),2,FGuid::NewGuid());UI->RefreshQuests();
+        Q->ReportObjectiveEvent(EICQuestObjectiveType::Collect,TEXT("ITM_R01_CROP_01"),2,FGuid::NewGuid());UI->RefreshQuests();
         TestTrue(TEXT("Started quest completes through actual objective runner"),State->ExportState().Quests[Collect].bCompleted);
         TestFalse(TEXT("Completed quest cannot be restarted for duplicate rewards"),Q->StartQuest(Collect));TestEqual(TEXT("Completed quest leaves HUD"),Tracker->GetVisibility(),ESlateVisibility::Collapsed);
         // Exercise entry and back buttons through their real delegates too.

@@ -121,20 +121,9 @@ def main():
     save("StringTables/ST_IC_Dialogue.csv",dlg_fields,dlg_texts)
 
     f,r=load("NPC/DT_IC_GiftPreference.csv")
-    upsert(r,definition(f,"GIFT_R01_COMMON",PreferredAffinityDelta=20,NeutralAffinityDelta=0,DislikedAffinityDelta=0,Items='((ItemID="ITEM_P0_01",Preference=Preferred))'))
+    upsert(r,definition(f,"GIFT_R01_COMMON",PreferredAffinityDelta=20,NeutralAffinityDelta=0,DislikedAffinityDelta=0,Items='((ItemID="ITM_R01_FOOD_15",Preference=Preferred))'))
     save("NPC/DT_IC_GiftPreference.csv",f,r);register("GIFT_R01_COMMON","GiftPreference","NPC/DT_IC_GiftPreference")
-    f,r=load("Items/DT_IC_Item.csv")
-    for extra in ["WorldMesh","WorldMeshScale"]:
-        if extra not in f:
-            f.append(extra)
-            for row in r:row[extra]="None" if extra=="WorldMesh" else "(X=0.25,Y=0.25,Z=0.25)"
-    row=definition(f,"ITEM_P0_01",ItemID="ITEM_P0_01",DisplayName='LOCTABLE("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_Definitions.ST_IC_Definitions", "ITEM_P0_01.NAME")',Tab="Normal",Category="Material",Kind="Material",EquipSlot="None",StackLimit=99,bCanDiscard="True",bCanSell="True",bCanGift="True",RequiredClass=-1,GrowthStat="None",DefaultGrade="Common",UseTarget="None",UseEffect="None",bRejectWhenNoEffect="True",WorldMesh="/Engine/BasicShapes/Cube.Cube",WorldMeshScale="(X=0.25,Y=0.25,Z=0.25)")
-    # Numeric CSV properties must contain valid import values, rather than empty strings.
-    for key in ["BuyPrice","SellPrice","GrowthAmount","RestoreHP","RestoreSP","MaxEnhanceLevel","MaxRandomOptions","BaseAttack","BaseDefense","EnhanceAttackPerLevel","EnhanceDefensePerLevel","EnhanceBaseCost","RestoreMP","RestoreHPRatio","RestoreMPRatio","RestoreSPRatio","RevivalHPRatio","RevivalMinimumMPRatio"]:
-        if key in row:row[key]="0"
-    row["EnhanceBaseSuccessRate"]="1"
-    upsert(r,row);save("Items/DT_IC_Item.csv",f,r);register("ITEM_P0_01","Item","Items/DT_IC_Item")
-    f,t=load("StringTables/ST_IC_Definitions.csv");upsert_text(t,"ITEM_P0_01.NAME","Item_P0_01");save("StringTables/ST_IC_Definitions.csv",f,t)
+    # Life item rows are maintained by the life DT workflow; preserve their tuning.
 
     f,r=load("Character/DT_IC_PlayerPreset.csv")
     for extra in ["AnimationProfile","MeshTransform"]:
@@ -163,7 +152,7 @@ def main():
             row["AttachSocket"]="weapon_l" if row["WeaponFamily"]=="Bow" else "weapon_r"
     save("Equipment/DT_IC_Equipment.csv",f,r)
     f,r=load("Settings/DT_IC_PartySettings.csv")
-    for row in r:row.update(MaximumCompanions="3",RequiredRecruitAffinity="300",FormationOffsetsCm="((X=-180,Y=-120,Z=0),(X=-220,Y=0,Z=0),(X=-180,Y=120,Z=0))")
+    for row in r:row.update(MaximumCompanions="3",RequiredRecruitAffinity="300",SearchDistanceCm="800",ChaseDistanceCm="1200",RecoveryDistanceCm="2000",PathFailurePlaySeconds="2",FormationOffsetsCm="((X=-140,Y=-110,Z=0),(X=-180,Y=0,Z=0),(X=-140,Y=110,Z=0))")
     save("Settings/DT_IC_PartySettings.csv",f,r)
     f,r=load("World/DT_IC_Region.csv")
     for row in r:
