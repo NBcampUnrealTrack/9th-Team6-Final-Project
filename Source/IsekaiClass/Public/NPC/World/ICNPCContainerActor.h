@@ -2,9 +2,19 @@
 
 #include "CoreMinimal.h"
 #include "Interaction/ICInteractionActor.h"
+#include "Engine/DataTable.h"
 #include "ICNPCContainerActor.generated.h"
 
 class AICPlayerController;
+USTRUCT(BlueprintType)
+struct ISEKAICLASS_API FICFurnitureLootRow : public FTableRowBase
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere,BlueprintReadWrite) FText DisplayName;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite) FName DropTableID;
+    /** 0 means once per save. Positive values refill after this many game minutes. */
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(ClampMin="0")) double RefillGameMinutes=0;
+};
 
 /**
  * A world object owned by one NPC, such as that NPC's chest, wardrobe, or bookshelf.
@@ -20,6 +30,12 @@ class ISEKAICLASS_API AICNPCContainerActor : public AICInteractionActor
 
 public:
     AICNPCContainerActor();
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UICChestPresentationComponent> ChestPresentation;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="IC|NPC Container") bool bPickupOnly=false;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="IC|NPC Container") TSoftObjectPtr<UDataTable> FurnitureLootTable;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="IC|NPC Container") FName FurnitureLootRow=TEXT("Bookshelf");
+    UFUNCTION(BlueprintPure,Category="IC|NPC Container") bool IsFurnitureLootAvailable() const;
+    virtual FText GetInteractionText() const override;
 
     /** Stable NPC definition ID that owns this personal container. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="IC|NPC Container")

@@ -1,0 +1,2 @@
+﻿---,bUseCloseUpCamera,bAllowPlayerMovement,CloseDistanceCm,HeadBone,CameraDistanceCm,CameraHeightCm,CameraSideOffsetCm,FocusOffset,FieldOfView,FollowSpeed,CameraCollisionRadiusCm,bHidePlayerInCamera
+Default,"True","True","500.000000","J_Bip_C_Head","220.000000","10.000000","0.000000","(X=0.000000,Y=0.000000,Z=-12.000000)","40.000000","12.000000","8.000000","True"

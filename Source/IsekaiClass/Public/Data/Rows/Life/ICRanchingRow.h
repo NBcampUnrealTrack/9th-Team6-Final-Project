@@ -12,6 +12,8 @@ struct ISEKAICLASS_API FICRanchingRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSoftObjectPtr<class USkeletalMesh> Mesh;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSoftClassPtr<class UAnimInstance> AnimationClass;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSoftObjectPtr<class UAnimationAsset> IdleAnimation;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite) TSoftObjectPtr<class UAnimSequence> DeathAnimation;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(ClampMin="0.1")) float SlaughterSeconds=1.5f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FTransform MeshTransform;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1")) float MaxHP=30;
     /** Hunting rewards use the same drop-table format as monsters. */

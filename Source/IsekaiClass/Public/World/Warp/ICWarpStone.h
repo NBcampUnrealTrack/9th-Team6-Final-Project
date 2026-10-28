@@ -20,7 +20,7 @@ public:
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="IC|Warp", meta=(ExposeOnSpawn="true")) FName WarpID;
 
     /** Global warp fee. Keep the same value on every stone while prices are region-independent. */
-    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="IC|Warp", meta=(ClampMin="0")) int32 CostGold = 10;
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="IC|Warp", meta=(ClampMin="0")) int32 CostGold = 500;
 
     virtual bool TryInteract_Implementation(AICPlayerController* Controller) override;
 

@@ -6,6 +6,8 @@
 class UBlueprint;
 class UStringTable;
 class UFont;
+class AICLifeObjectActor;
+class USmartObjectDefinition;
 
 UCLASS()
 class ISEKAICLASS_API UICBlueprintMaintenanceLibrary : public UBlueprintFunctionLibrary
@@ -17,6 +19,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool AddDialogueAffinityHearts(UBlueprint* Blueprint);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool AddCombatFeedbackHUD(UBlueprint* Blueprint);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool AddMovementCooldownHUD(UBlueprint* Blueprint);
+    UFUNCTION(BlueprintCallable,Category="IC|Editor") static bool AddGameClockHUD(UBlueprint* Blueprint);
+    UFUNCTION(BlueprintCallable,Category="IC|Editor") static bool SetLifeObjectDefinition(AICLifeObjectActor* Object,USmartObjectDefinition* Definition);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool ImportUIStrings(UStringTable* Table,const FString& File);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static UFont* CreateFrontendFont(const FString& RegularFile,const FString& BoldFile);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool EnsureFrontendFontFallback();

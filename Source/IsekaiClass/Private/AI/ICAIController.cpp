@@ -27,7 +27,39 @@ bool AICAIController::StartExecution(UStateTree* Tree,UBehaviorTree* Behavior)
     else if(Tree){ScheduleRunner->SetStateTree(Tree);ScheduleRunner->StartLogic();bUsesAuthoredTree=ScheduleRunner->IsRunning();if(!bUsesAuthoredTree)UE_LOG(LogICCore,Warning,TEXT("[AI.StateTreeFailed] %s"),*GetPathNameSafe(Tree));}
     NextDecisionAt=0;return true;
 }
-void AICAIController::StopExecution() { IC_TRACE_FUNCTION();bExecutionReady=false;StopMovement();Target.Reset();ScheduleRunner->StopLogic(TEXT("상태 전환"));if(BrainComponent&&BrainComponent!=ScheduleRunner)BrainComponent->StopLogic(TEXT("상태 전환")); }
+void AICAIController::StopExecution() { IC_TRACE_FUNCTION();bExecutionReady=false;StopMovement();Target.Reset();OrderedTarget.Reset();ScheduleRunner->StopLogic(TEXT("상태 전환"));if(BrainComponent&&BrainComponent!=ScheduleRunner)BrainComponent->StopLogic(TEXT("상태 전환")); }
+void AICAIController::OrderAttack(AICCharacterBase* Enemy)
+{
+    auto* NPC=Cast<AICNPCBase>(GetPawn());auto* State=GetGameInstance()?GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr;
+    if(!NPC||!State||State->GetSnapshot(NPC->GetCharacterID()).Mode!=EICCharacterMode::Companion||!IsValid(Enemy)||!NPC->IsHostileTo(Enemy)||!Enemy->GetICAbilitySystem()||!Enemy->GetICAbilitySystem()->IsAlive())return;
+    OrderedTarget=Enemy;NextDecisionAt=0;
+}
+bool AICAIController::DecideCompanionCombat(AICNPCBase* NPC)
+{
+    auto* ASC=NPC?NPC->GetICAbilitySystem():nullptr;auto* State=GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>();
+    if(!NPC||!ASC||!ASC->IsAlive()||State->GetSnapshot(NPC->GetCharacterID()).Mode!=EICCharacterMode::Companion)return false;
+    auto Valid=[NPC](AICCharacterBase* Enemy){return IsValid(Enemy)&&NPC->IsHostileTo(Enemy)&&Enemy->GetICAbilitySystem()&&Enemy->GetICAbilitySystem()->IsAlive();};
+    if(!Valid(Target.Get()))Target.Reset();if(!Valid(OrderedTarget.Get()))OrderedTarget.Reset();
+    if(!Target.IsValid()&&OrderedTarget.IsValid()){Target=OrderedTarget;OrderedTarget.Reset();}
+    if(!Target.IsValid())
+    {
+        double Nearest=FMath::Square(1200.);
+        for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)if(Valid(*It)&&LineOfSightTo(*It)&&(ASC->HasRecentCombat()||It->GetICAbilitySystem()->HasRecentCombat()))
+        {const double Distance=FVector::DistSquared(NPC->GetActorLocation(),It->GetActorLocation());if(Distance<Nearest){Nearest=Distance;Target=*It;}}
+    }
+    if(!Target.IsValid()){ClearFocus(EAIFocusPriority::Gameplay);return false;}
+    if(auto* Player=UGameplayStatics::GetPlayerPawn(GetWorld(),0);!Player||FVector::DistSquared(Player->GetActorLocation(),Target->GetActorLocation())>FMath::Square(4500.f))
+    {Target.Reset();return false;}
+    SetFocus(Target.Get());const float Distance=FVector::Distance(NPC->GetActorLocation(),Target->GetActorLocation());
+    const float Range=FMath::Max(120.f,ASC->GetNormalAttackRangeCm());
+    if(Distance>Range*.9f||!LineOfSightTo(Target.Get())){NPC->GetCharacterMovement()->bOrientRotationToMovement=true;MoveToActor(Target.Get(),FMath::Max(50.f,Range*.7f),false);return true;}
+    StopMovement();NPC->GetCharacterMovement()->StopMovementImmediately();NPC->GetCharacterMovement()->bOrientRotationToMovement=false;
+    const FRotator Facing=(Target->GetActorLocation()-NPC->GetActorLocation()).GetSafeNormal2D().Rotation();SetControlRotation(Facing);NPC->SetActorRotation(Facing);
+    const auto Snapshot=State->GetSnapshot(NPC->GetCharacterID());FICDefinitionResult R;
+    const auto* Base=ASC->Definitions()->Find<FICRecruitCombatRow>(NPC->GetNPCDefinition().RecruitCombatID,R);
+    if(Base&&Snapshot.bAutoSkillsEnabled){const auto Result=ASC->RequestAction(TEXT("Skill"),Base->UniqueSkillID,Target.Get());if(Result.bSuccess)return true;}
+    ASC->RequestAction(TEXT("Attack"),NAME_None,Target.Get());return true;
+}
 void AICAIController::SetInteractionHold(bool bHold,AActor* FaceTarget)
 {
     IC_TRACE_FUNCTION();bInteractionHold=bHold;
@@ -104,6 +136,7 @@ void AICAIController::Decide()
     {
         if(bInteractionHold){StopMovement();return;}
         const auto State=S->GetSnapshot(C->GetCharacterID());if(State.IsDowned()){StopExecution();return;}
+        if(State.Mode==EICCharacterMode::Companion&&DecideCompanionCombat(NPC))return;
         constexpr float ArrivalDistanceCm=150.f;
         FVector Goal;FRotator GoalRotation=FRotator::ZeroRotator;bool HasGoal=false;
         if(State.Mode==EICCharacterMode::Companion)
@@ -137,13 +170,6 @@ void AICAIController::Decide()
                 C->SetActorRotation(GoalRotation);
             }
         }
-        if(!ASC||State.Mode!=EICCharacterMode::Companion||!ASC->IsAlive())return;
-        const auto* Base=D->Find<FICRecruitCombatRow>(NPC->GetNPCDefinition().RecruitCombatID,R);if(!Base)return;
-        AICCharacterBase* Closest=nullptr;double Dist=DBL_MAX;
-        for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)if(C->IsHostileTo(*It)&&It->GetICAbilitySystem()&&It->GetICAbilitySystem()->IsAlive()&&LineOfSightTo(*It))
-        {const double N=FVector::DistSquared(C->GetActorLocation(),It->GetActorLocation());if(N<Dist){Dist=N;Closest=*It;}}
-        if(Closest&&Dist<FMath::Square(1200.)&&(ASC->HasRecentCombat()||Closest->GetICAbilitySystem()->HasRecentCombat()))
-        {if(State.bAutoSkillsEnabled)ASC->RequestAction(TEXT("Skill"),Base->UniqueSkillID,Closest);if(Dist<FMath::Square(180.))ASC->RequestAction(TEXT("Attack"),NAME_None,Closest);}
         return;
     }
     auto* Enemy=Cast<AICEnemyBase>(C);if(!Enemy||!ASC||!ASC->IsAlive())return;const auto& M=Enemy->GetMonsterDefinition();

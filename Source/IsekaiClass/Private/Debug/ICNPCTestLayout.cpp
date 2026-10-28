@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Debug/ICLog.h"
+#include "NPC/LifeObject/ICLifeObjectActor.h"
 
 AICNPCTestLayout::AICNPCTestLayout()
 {
@@ -15,6 +16,7 @@ AICNPCTestLayout::AICNPCTestLayout()
     PrimaryActorTick.bCanEverTick = false;
     for(int32 Index=1;Index<=11;++Index)NPCIDs.Add(FName(*FString::Printf(TEXT("NPC_R01_%03d"),Index)));
     BedClass = FSoftClassPath(TEXT("/Game/IsekaiClass/World/SampleLevel/DreamscapeSeries/DreamscapeFarm/Meshes/Props/Interior/Cloth/BP_Farm_Bed.BP_Farm_Bed_C"));
+    InteractionBedClass=FSoftClassPath(TEXT("/Game/IsekaiClass/NPC/Blueprints/Interaction/BP_IC_NPCBed.BP_IC_NPCBed_C"));
 }
 FTransform AICNPCTestLayout::StandingTransform(int32 Index) const
 {
@@ -34,6 +36,7 @@ void AICNPCTestLayout::BeginPlay()
     auto* Spawns=GetWorld()->GetSubsystem<UICSpawnSubsystem>();
     if(!D||!Spawns)return;
     UClass* BedType=BedClass.LoadSynchronous();
+    UClass* InteractionType=InteractionBedClass.LoadSynchronous();
     for(int32 Index=0;Index<NPCIDs.Num();++Index)
     {
         FICDefinitionResult Result;
@@ -55,6 +58,18 @@ void AICNPCTestLayout::BeginPlay()
             Anchor->AnchorID=ID;UGameplayStatics::FinishSpawningActor(Anchor,Transform);
             Anchor->AttachToActor(this,FAttachmentTransformRules::KeepWorldTransform);GeneratedAnchors.Add(Anchor);
         }
+        if(InteractionType)
+        {
+            const FVector Position=BedTransform(Index).GetLocation()+FVector(0,0,AnchorHeightCm);
+            const FTransform Transform(GetActorQuat(),Position);
+            auto* Bed=GetWorld()->SpawnActorDeferred<AICLifeObjectActor>(InteractionType,Transform,this,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+            if(Bed)
+            {
+                Bed->ObjectID=FName(*FString::Printf(TEXT("BED_%s"),*NPCIDs[Index].ToString()));Bed->OwnerNPCID=NPCIDs[Index];Bed->RegionID=TEXT("R01");
+                if(const auto* Home=D->Find<FICHomeRow>(NPC->HomeID,Result);Home&&!Home->BedAnchorIDs.IsEmpty())Bed->LinkedAnchorID=Home->BedAnchorIDs[0];
+                UGameplayStatics::FinishSpawningActor(Bed,Transform);Bed->AttachToActor(this,FAttachmentTransformRules::KeepWorldTransform);GeneratedBedInteractions.Add(Bed);
+            }
+        }
         if(BedType)
         {
             FActorSpawnParameters Params;Params.Owner=this;Params.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -72,6 +87,7 @@ void AICNPCTestLayout::BeginPlay()
 }
 void AICNPCTestLayout::EndPlay(const EEndPlayReason::Type Reason)
 {
+    for(AICLifeObjectActor* Bed:GeneratedBedInteractions)if(IsValid(Bed))Bed->Destroy();GeneratedBedInteractions.Reset();
     for(AActor* Bed:GeneratedBeds)if(IsValid(Bed))Bed->Destroy();
     for(AICWorldAnchor* Anchor:GeneratedAnchors)if(IsValid(Anchor))Anchor->Destroy();
     GeneratedBeds.Reset();GeneratedAnchors.Reset();Super::EndPlay(Reason);

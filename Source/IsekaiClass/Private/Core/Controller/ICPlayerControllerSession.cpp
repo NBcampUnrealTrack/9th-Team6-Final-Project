@@ -19,6 +19,7 @@
 FString AICPlayerController::MenuCancelLabel() const
 {
     IC_TRACE_FUNCTION();
+    if(IsUsingGamepad())return TEXT("B");
     if(DefaultMappingContext)
         for(const FICInputCommandBinding& Binding:CommandActions)
             if(Binding.Command==EICInputCommand::Menu&&Binding.Action)

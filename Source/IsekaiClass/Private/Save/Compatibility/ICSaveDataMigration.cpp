@@ -63,6 +63,21 @@ void ICSaveDataMigration::NormalizeInventoryIDs(FICWorldState& State)
         else if(Job.ProductionID==TEXT("PRD_GREEN_JUICE"))Job.ProductionID=TEXT("PRD_R01_COOK_15");
     }
     NormalizeWeaponOnly(State);
+    // Retired expanded containers become fixed chests without deleting overflow.
+    FICDropState Recovery;Recovery.ID=FGuid::NewGuid();Recovery.Position=State.PlayerPosition+FVector(100,0,0);Recovery.bStorageRecovery=true;
+    for(auto& Pair:State.Inventory.Storage)
+    {
+        auto& Slots=Pair.Value.Slots;
+        if(Slots.Num()<=40||Slots.Num()>160)continue;
+        for(int32 Index=40;Index<Slots.Num();++Index)if(!Slots[Index].IsEmpty())
+        {
+            const int32 Empty=Slots.IndexOfByPredicate([](const auto& Item){return Item.IsEmpty();});
+            if(Empty>=0&&Empty<40){Slots[Empty]=Slots[Index];Slots[Index]=FPlayerItemInstance();}
+            else Recovery.Contents.Add(Slots[Index]);
+        }
+        Slots.SetNum(40);
+    }
+    if(!Recovery.Contents.IsEmpty())State.Drops.Add(MoveTemp(Recovery));
 }
 
 void ICSaveDataMigration::NormalizeWeaponOnly(FICWorldState& State)

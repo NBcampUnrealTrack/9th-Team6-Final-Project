@@ -1,4 +1,8 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "Audio/ICBGMSubsystem.h"
+#include "Inventory/Actors/ICChestPresentationComponent.h"
+#include "Life/Production/ICPlayerLifeComponent.h"
+#include "UI/Life/ICStorageWidget.h"
 #include "UI/Framework/ICText.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
@@ -28,6 +32,7 @@ void AICPlayerController::BeginItem(FName ID,int32 Quick)
     if(!Menu.IsEmpty())SetMenu(TEXT(""));
     CancelTarget();
     PendingItem=ID;PendingQuick=Quick;
+    SelectTarget(UICWorldStateSubsystem::PlayerId());
     ShowLocalized(ICText::FormatText(TEXT("Native_784669b9489d"),*MenuCancelLabel()));
 }
 
@@ -103,20 +108,27 @@ void AICPlayerController::ConfirmTarget(FName Target)
         else Show(Result.Reason);
         return;
     }
-    auto* Inventory=GetInventory();auto* State=GetWorldState();
-    if(PendingItem.IsNone()||bItemTransactionInProgress||!Inventory||!State)return;
+    if(PendingItem.IsNone())return;FText Reason;
+    if(UseInventoryItem(PendingItem,Target,Reason))ShowLocalized(ICText::Get(TEXT("Native_2a766b32b014")));else ShowLocalized(Reason);
+}
+
+bool AICPlayerController::UseInventoryItem(FName ItemID,FName Target,FText& Reason)
+{
+    Reason=FText::GetEmpty();auto* Inventory=GetInventory();auto* State=GetWorldState();
+    auto Fail=[&](FText Text){Reason=Text;return false;};
+    if(ItemID.IsNone()||bItemTransactionInProgress||bDead||!Inventory||!State)return Fail(NSLOCTEXT("ICInventory","UseUnavailable","지금은 아이템을 사용할 수 없습니다."));
     if(!UICWorldStateSubsystem::IsCharacterIdValid(Target)||!State->GetStoredCharacter(Target))
-    {ShowLocalized(ICText::Get(TEXT("Native_f1e41db0ad98")));return;}
-    if(!State->FlushParticipants()){ShowLocalized(ICText::Get(TEXT("Native_1878d244a70a")));return;}
-    AICNPCBase* ReviveActor=nullptr;const auto* Item=Inventory->Find(PendingItem);
+        return Fail(ICText::Get(TEXT("Native_f1e41db0ad98")));
+    if(!State->FlushParticipants())return Fail(ICText::Get(TEXT("Native_1878d244a70a")));
+    AICNPCBase* ReviveActor=nullptr;const auto* Item=Inventory->Find(ItemID);
     if(Item&&Item->UseEffect==EICItemEffect::Revival)
     {
-        FString Reason;auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());auto* Spawn=GetWorld()->GetSubsystem<UICSpawnSubsystem>();
-        ReviveActor=Spawn?Spawn->ReserveReviveTarget(Target,PlayerCharacter?PlayerCharacter->GetICAbilitySystem():nullptr,Reason):nullptr;
-        if(!ReviveActor){if(Reason.IsEmpty())ShowLocalized(ICText::Get(TEXT("Target_RevivePlacementFailed")));else Show(Reason);return;}
+        FString ReviveReason;auto* PlayerCharacter=Cast<AICPlayerCharacter>(GetPawn());auto* Spawn=GetWorld()->GetSubsystem<UICSpawnSubsystem>();
+        ReviveActor=Spawn?Spawn->ReserveReviveTarget(Target,PlayerCharacter?PlayerCharacter->GetICAbilitySystem():nullptr,ReviveReason):nullptr;
+        if(!ReviveActor)return Fail(ReviveReason.IsEmpty()?ICText::Get(TEXT("Target_RevivePlacementFailed")):FText::FromString(ReviveReason));
     }
-    FICItemUseResult Prepared=UICItemUseService::Prepare(Inventory,Inventory->GetDefinitions(),PendingItem,State->GetSnapshot(Target));
-    if(!Prepared.bSuccess){Show(Prepared.Reason);return;}
+    FICItemUseResult Prepared=UICItemUseService::Prepare(Inventory,Inventory->GetDefinitions(),ItemID,State->GetSnapshot(Target));
+    if(!Prepared.bSuccess)return Fail(FText::FromString(Prepared.Reason));
     if(ReviveActor){Prepared.Character.Position=ReviveActor->GetActorLocation();Prepared.Character.Rotation=ReviveActor->GetActorRotation();}
     FICWorldState Next=State->ExportState();Next.Inventory=Prepared.Inventory;Next.Characters.Add(Target,Prepared.Character);
     bool Applied=false;
@@ -124,10 +136,10 @@ void AICPlayerController::ConfirmTarget(FName Target)
         TGuardValue<bool> Guard(bItemTransactionInProgress,true);
         Applied=State->CommitGameplayTransaction(Next,FGuid::NewGuid());
     }
-    if(!Applied){ShowLocalized(ICText::Get(TEXT("Native_13ad4c07f5b9")));return;}
+    if(!Applied)return Fail(ICText::Get(TEXT("Native_13ad4c07f5b9")));
     if(Prepared.GrowthAmount>0)OnStatBookApplied.Broadcast(Target,Prepared.GrowthStat,Prepared.GrowthAmount);
     UE_LOG(LogICInventory, Log, TEXT("[Item.Used] Item=%s Target=%s HP=%.2f MP=%.2f SP=%.2f Growth=%d"),*Prepared.ItemID.ToString(),*Target.ToString(),Prepared.Character.HP,Prepared.Character.MP,Prepared.Character.SP,Prepared.GrowthAmount);
-    CancelTarget();SyncSaveSafety();ShowLocalized(ICText::Get(TEXT("Native_2a766b32b014")));
+    CancelTarget();SyncSaveSafety();return true;
 }
 void AICPlayerController::PlayerDied()
 {
@@ -135,6 +147,7 @@ void AICPlayerController::PlayerDied()
     if(bDead)return;
     UE_LOG(LogICCore, Log, TEXT("[Player.Died] Controller=%s"),*GetNameSafe(this));
     bDead=true;bExitAfterSave=false;bQuitAfterWrite=false;
+    if(auto* Audio=GetWorld()->GetSubsystem<UICBGMSubsystem>())Audio->SilenceForDeath();
     LoadReturnMenu=SaveReturnMenu=TEXT("Death");
     SetMenu(TEXT("Death"));ShowLocalized(ICText::Get(TEXT("Native_2a469f1dc6da")));
 }
@@ -143,10 +156,16 @@ void AICPlayerController::OpenContainer(FName ID,bool Home,bool Access)
     IC_TRACE_FUNCTION();
     if(!Access){ShowLocalized(ICText::Get(TEXT("Native_26f38145a6c6")));return;}
     auto* State=GetWorld()?GetWorld()->GetGameState<AICGameState>():nullptr;
+    if(StorageScreen)StorageScreen->CloseStorage();
     OpenStorage=Home&&State?State->SharedHomeStorageID:ID;
     if(OpenStorage.IsNone())return;
-    GetInventory()->EnsureStorage(OpenStorage);SetMenu(TEXT("Storage"));SelectedStorage=INDEX_NONE;
+    const FName Container=OpenStorage;GetInventory()->EnsureStorage(Container);SetMenu(TEXT(""));SelectedStorage=INDEX_NONE;
+    auto* Type=LoadClass<UICStorageWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Storage.WBP_IC_Storage_C"));
+    StorageScreen=CreateWidget<UICStorageWidget>(this,Type?Type:UICStorageWidget::StaticClass());
+    if(!StorageScreen||!StorageScreen->OpenStorage(Container)){StorageScreen=nullptr;OpenStorage=NAME_None;}
 }
+void AICPlayerController::CloseChestPresentation()
+{if(ActiveChestPresentation.IsValid())ActiveChestPresentation->CloseChest();ActiveChestPresentation.Reset();}
 
 float AICPlayerController::ConsumeProductionSP(float Amount)
 {
@@ -159,7 +178,9 @@ float AICPlayerController::ConsumeProductionSP(float Amount)
 bool AICPlayerController::Sleep()
 {
     IC_TRACE_FUNCTION();
-    if(!bCreated||bDead||bInCombat||bInDialogue||bInEvent||bItemTransactionInProgress){ShowLocalized(ICText::Get(TEXT("Native_6a365287176f")));return false;}
+    const auto* SleepingPlayer=Cast<AICPlayerCharacter>(GetPawn());
+    const bool OwnSleep=SleepingPlayer&&SleepingPlayer->LifeActions&&SleepingPlayer->LifeActions->IsSleeping();
+    if(!bCreated||bDead||bInCombat||bInDialogue||(bInEvent&&!OwnSleep)||bItemTransactionInProgress){ShowLocalized(ICText::Get(TEXT("Native_6a365287176f")));return false;}
     CombatCacheChanged();
     auto* State=GetWorldState();auto* Definitions=GetInventory()?GetInventory()->GetDefinitions():nullptr;
     if(!State||!Definitions||!State->FlushParticipants())return false;
@@ -186,7 +207,7 @@ bool AICPlayerController::Sleep()
     UE_LOG(LogICCore, Log, TEXT("[Player.Sleep] GameMinutes=%d HP=%.2f MP=%.2f SP=%.2f"),Minutes,Survival.HP,Survival.MP,Survival.SP);
     OnSleepRequested.Broadcast(Minutes);FlushWorldState();bDirty=true;
     ShowLocalized(ICText::FormatText(TEXT("Native_d1dcacd6f1a5"),Minutes));
-    AutoSavePlayer();return true;
+    if(!OwnSleep)AutoSavePlayer();return true;
 }
 
 bool AICPlayerController::CraftRecipe(FName RecipeID)

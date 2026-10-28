@@ -1,3 +1,4 @@
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Dialogue/ICNPCGiftWidget.h"
 #include "UI/Gameplay/ICInventoryMenuWidget.h"
 #include "UI/Gameplay/ICGameplayLayout.h"
@@ -175,9 +176,9 @@ FReply UICNPCGiftWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const 
     if(Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down){MoveSelection(0,1);return FReply::Handled();}
     if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left){MoveSelection(-1,0);return FReply::Handled();}
     if(Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right){MoveSelection(1,0);return FReply::Handled();}
-    if(Key==EKeys::Enter||Key==EKeys::Gamepad_FaceButton_Bottom)
+    if(Key==EKeys::Enter||UICGameUserSettings::IsGamepadAcceptKey(Key))
     {if(!Event.IsRepeat()){if(bBackSelected)ClosePicker();else ItemPicked(SelectedIndex);}return FReply::Handled();}
-    if(Key==EKeys::Escape||Key==EKeys::Equals||Key==EKeys::Gamepad_FaceButton_Right)
+    if(Key==EKeys::Escape||Key==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(Key))
     {if(!Event.IsRepeat())ClosePicker();return FReply::Handled();}
     return Super::NativeOnPreviewKeyDown(Geometry,Event);
 }

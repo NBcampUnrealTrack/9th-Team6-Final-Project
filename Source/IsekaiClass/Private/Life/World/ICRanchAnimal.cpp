@@ -10,6 +10,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/GameInstance.h"
 #include "TimerManager.h"
+#include "Core/Controller/ICPlayerController.h"
+#include "Animation/AnimSequence.h"
 
 AICRanchAnimal::AICRanchAnimal()
 {
@@ -22,14 +24,14 @@ void AICRanchAnimal::BeginPlay()
 {
     Super::BeginPlay();EnableCombat(false,false);
     AbilitySystem->OnStateChanged.AddUniqueDynamic(this,&ThisClass::PersistVitals);
-    if(auto* State=WorldState())State->OnWorldRestored.AddUniqueDynamic(this,&ThisClass::RefreshAnimal);
+    if(auto* State=WorldState())State->OnWorldRestored.AddUniqueDynamic(this,&ThisClass::RestoreAnimal);
     if(GetGameInstance())GetGameInstance()->GetSubsystem<UICTimeSubsystem>()->OnTimeJumped.AddUniqueDynamic(this,&ThisClass::GameTimeJumped);
     RefreshAnimal();GetWorldTimerManager().SetTimer(RefreshTimer,this,&ThisClass::RefreshAnimal,.5f,true);
 }
 void AICRanchAnimal::GameTimeJumped(double From,double To){RefreshAnimal();}
 void AICRanchAnimal::RefreshAnimal()
 {
-    if(bRefreshing||!WorldState()||!GetGameInstance()||!AbilitySystem)return;
+    if(bRefreshing||bSlaughtering||!WorldState()||!GetGameInstance()||!AbilitySystem)return;
     TGuardValue<bool> Guard(bRefreshing,true);auto* D=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;
     const auto* Row=D->Find<FICRanchingRow>(DefinitionID,R);if(!Row)return;
     if(GetMesh()->GetSkeletalMeshAsset()!=Row->Mesh.LoadSynchronous())GetMesh()->SetSkeletalMesh(Row->Mesh.LoadSynchronous());
@@ -63,7 +65,27 @@ void AICRanchAnimal::PersistVitals()
     Saved->HP=HP;WorldState()->CommitGameplayTransaction(Next,FGuid::NewGuid());
 }
 void AICRanchAnimal::HandleZeroHP()
+{BeginSlaughter();}
+bool AICRanchAnimal::TrySlaughter(AICPlayerController* Player)
 {
+    if(!Player||!Player->bCreated||Player->IsDead()||!Player->Menu.IsEmpty()||!Player->GetPawn()||IsHidden()
+        ||FVector::DistSquared(Player->GetPawn()->GetActorLocation(),GetActorLocation())>FMath::Square(300.f))return false;
+    return BeginSlaughter();
+}
+bool AICRanchAnimal::BeginSlaughter()
+{
+    if(bSlaughtering||bZeroHPHandled||!WorldState()||!GetGameInstance())return false;
+    FICDefinitionResult R;const auto* Row=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>()->Find<FICRanchingRow>(DefinitionID,R);if(!Row)return false;
+    bSlaughtering=true;SetActorEnableCollision(false);GetCharacterMovement()->StopMovementImmediately();
+    float Duration=FMath::Max(.1f,Row->SlaughterSeconds);
+    if(auto* Death=Row->DeathAnimation.LoadSynchronous()){GetMesh()->PlayAnimation(Death,false);Duration=FMath::Max(Duration,Death->GetPlayLength());}
+    GetWorldTimerManager().SetTimer(SlaughterTimer,this,&ThisClass::FinishSlaughter,Duration,false);return true;
+}
+void AICRanchAnimal::RestoreAnimal()
+{GetWorldTimerManager().ClearTimer(SlaughterTimer);bSlaughtering=false;RefreshAnimal();}
+void AICRanchAnimal::FinishSlaughter()
+{
+    bSlaughtering=false;
     if(bZeroHPHandled||!WorldState()||!GetGameInstance())return;
     auto* State=WorldState();if(!State->FlushParticipants())return;
     auto Next=State->ExportState();auto* Saved=Next.RanchAnimals.Find(PointKey());if(!Saved||Saved->bDefeated)return;
@@ -75,12 +97,14 @@ void AICRanchAnimal::HandleZeroHP()
     Next.CompletedTransactionIDs.Add(Receipt);
     if(State->CommitGameplayTransaction(Next,FGuid::NewGuid()))
     {bZeroHPHandled=true;SetActorHiddenInGame(true);SetActorEnableCollision(false);if(!Received.IsEmpty())State->OnItemsReceived.Broadcast(Received);OnDefeated();}
+    else RefreshAnimal();
 }
 void AICRanchAnimal::EndPlay(const EEndPlayReason::Type Reason)
 {
     GetWorldTimerManager().ClearTimer(RefreshTimer);
+    GetWorldTimerManager().ClearTimer(SlaughterTimer);
     if(AbilitySystem)AbilitySystem->OnStateChanged.RemoveDynamic(this,&ThisClass::PersistVitals);
-    if(auto* State=WorldState())State->OnWorldRestored.RemoveDynamic(this,&ThisClass::RefreshAnimal);
+    if(auto* State=WorldState())State->OnWorldRestored.RemoveDynamic(this,&ThisClass::RestoreAnimal);
     if(GetGameInstance())GetGameInstance()->GetSubsystem<UICTimeSubsystem>()->OnTimeJumped.RemoveDynamic(this,&ThisClass::GameTimeJumped);
     Super::EndPlay(Reason);
 }

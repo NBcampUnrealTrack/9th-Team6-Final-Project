@@ -1,0 +1,35 @@
+6|Test Companion's Home
+54|Starting Test Effect
+55|Temporary data for reviewing gameplay flow. Replace with final NPC skills and balance.
+76|Likes Seasoned Rapeseed and Grilled Chicken.
+77|R01_08 - Hero
+78|The hero of Region 1. Favorite gifts are Seasoned Rapeseed and Grilled Chicken.
+92|Dialogue Quest Reward
+300|An egg from a chicken. Also used in cooking.
+301|Fresh milk. Drink it to restore energy.
+302|Pork obtained from a farm.
+303|Soft wool used to make various items.
+304|Meat obtained by slaughtering a chicken. Used in chicken dishes.
+306|Bake wheat to make one loaf of bread.
+307|Chicken Hunting Reward
+308|Gacha Machine
+309|Pay gold to receive a random item.
+310|Gathered Materials
+311|Growth Books
+312|Any Kind of Fish
+414|Player Plot 1
+415|Player Plot 2
+416|Player Plot 3
+417|Player Plot 4
+418|Player Plot 5
+419|Player Plot 6
+420|Player Plot 7
+421|Player Plot 8
+423|Additional Storage 1
+424|Additional Storage 2
+425|Player Life Area
+426|Build Additional Storage
+427|Build Personal Storage 1/2
+428|Requires Vitality 10. Use Ore 1 x1 and Ore 2 x1 to build one personal storage chest (40 slots).
+429|Build Personal Storage 2/2
+430|Requires Vitality 20. Use Ore 1 x1 and Ore 2 x1 to build one personal storage chest (40 slots).

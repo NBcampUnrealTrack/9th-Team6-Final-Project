@@ -85,27 +85,27 @@ SKL_START_WAND_001.NAME,완드 시작 기술 (테스트)
 SKL_START_WAND_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
 CLS_HEALER_001.NAME,완드 무기 프로필
 CLS_HEALER_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
-SKL_NPC_R01_001.NAME,R01_01 기술
+SKL_NPC_R01_001.NAME,선형 폭발
 NPC_R01_002.NAME,R01_02
-SKL_NPC_R01_002.NAME,R01_02 기술
+SKL_NPC_R01_002.NAME,섬광 베기
 NPC_R01_003.NAME,R01_03
-SKL_NPC_R01_003.NAME,R01_03 기술
+SKL_NPC_R01_003.NAME,치유의 빛
 NPC_R01_004.NAME,R01_04
-SKL_NPC_R01_004.NAME,R01_04 기술
+SKL_NPC_R01_004.NAME,마력 화살
 NPC_R01_005.NAME,R01_05
-SKL_NPC_R01_005.NAME,R01_05 기술
+SKL_NPC_R01_005.NAME,원형 충격파
 NPC_R01_006.NAME,R01_06
-SKL_NPC_R01_006.NAME,R01_06 기술
+SKL_NPC_R01_006.NAME,마력 참격
 NPC_R01_007.NAME,R01_07
-SKL_NPC_R01_007.NAME,R01_07 기술
+SKL_NPC_R01_007.NAME,관통 화살
 NPC_R01_008.NAME,R01_08
-SKL_NPC_R01_008.NAME,R01_08 기술
+SKL_NPC_R01_008.NAME,별빛 대폭발
 NPC_R01_009.NAME,R01_09
-SKL_NPC_R01_009.NAME,R01_09 기술
+SKL_NPC_R01_009.NAME,회복의 선율
 NPC_R01_010.NAME,R01_10
-SKL_NPC_R01_010.NAME,R01_10 기술
+SKL_NPC_R01_010.NAME,수호의 방패
 NPC_R01_011.NAME,R01_11
-SKL_NPC_R01_011.NAME,R01_11 기술
+SKL_NPC_R01_011.NAME,연속 화살
 DLG_RECRUIT_001.NAME,DLG_RECRUIT_001
 ANC_R01_002_HOME.NAME,ANC_R01_002_HOME
 ANC_R01_002_BED.NAME,ANC_R01_002_BED
@@ -619,3 +619,163 @@ GAC_R01_BASIC_001.NAME,뽑기 기계
 GAC_R01_BASIC_001.DESCRIPTION,골드를 지불하고 무작위 아이템을 받습니다.
 GAC_R01_BASIC_001.GATHERING,채집물
 GAC_R01_BASIC_001.GROWTH_BOOK,성장서
+Recipe.AnyFish,물고기 아무 종류
+EQP_WPN_SWORD_002.NAME,시골 마을 검
+EQP_WPN_SWORD_002.DESCRIPTION,시골 마을 검. 기본 공격력 20. 요구 STR 10.
+RCP_WPN_SWORD_002.NAME,시골 마을 검 제작
+RCP_WPN_SWORD_002.DESCRIPTION,시골 마을 검 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_SWORD_003.NAME,단단한 검
+EQP_WPN_SWORD_003.DESCRIPTION,단단한 검. 기본 공격력 30. 요구 STR 20.
+RCP_WPN_SWORD_003.NAME,단단한 검 제작
+RCP_WPN_SWORD_003.DESCRIPTION,단단한 검 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_SWORD_004.NAME,물고기 비늘 검
+EQP_WPN_SWORD_004.DESCRIPTION,물고기 비늘 검. 기본 공격력 40. 요구 STR 30.
+RCP_WPN_SWORD_004.NAME,물고기 비늘 검 제작
+RCP_WPN_SWORD_004.DESCRIPTION,물고기 비늘 검 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_SWORD_005.NAME,무지개 검
+EQP_WPN_SWORD_005.DESCRIPTION,무지개 검. 기본 공격력 50. 요구 STR 40.
+RCP_WPN_SWORD_005.NAME,무지개 검 제작
+RCP_WPN_SWORD_005.DESCRIPTION,무지개 검 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_BOW_002.NAME,시골 마을 활
+EQP_WPN_BOW_002.DESCRIPTION,시골 마을 활. 기본 공격력 20. 요구 DEX 10.
+RCP_WPN_BOW_002.NAME,시골 마을 활 제작
+RCP_WPN_BOW_002.DESCRIPTION,시골 마을 활 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_BOW_003.NAME,단단한 활
+EQP_WPN_BOW_003.DESCRIPTION,단단한 활. 기본 공격력 30. 요구 DEX 20.
+RCP_WPN_BOW_003.NAME,단단한 활 제작
+RCP_WPN_BOW_003.DESCRIPTION,단단한 활 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_BOW_004.NAME,물고기 비늘 활
+EQP_WPN_BOW_004.DESCRIPTION,물고기 비늘 활. 기본 공격력 40. 요구 DEX 30.
+RCP_WPN_BOW_004.NAME,물고기 비늘 활 제작
+RCP_WPN_BOW_004.DESCRIPTION,물고기 비늘 활 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_BOW_005.NAME,무지개 활
+EQP_WPN_BOW_005.DESCRIPTION,무지개 활. 기본 공격력 50. 요구 DEX 40.
+RCP_WPN_BOW_005.NAME,무지개 활 제작
+RCP_WPN_BOW_005.DESCRIPTION,무지개 활 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_STAFF_002.NAME,시골 마을 마법스태프
+EQP_WPN_STAFF_002.DESCRIPTION,시골 마을 마법스태프. 기본 공격력 20. 요구 INT 10.
+RCP_WPN_STAFF_002.NAME,시골 마을 마법스태프 제작
+RCP_WPN_STAFF_002.DESCRIPTION,시골 마을 마법스태프 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_STAFF_003.NAME,단단한 마법스태프
+EQP_WPN_STAFF_003.DESCRIPTION,단단한 마법스태프. 기본 공격력 30. 요구 INT 20.
+RCP_WPN_STAFF_003.NAME,단단한 마법스태프 제작
+RCP_WPN_STAFF_003.DESCRIPTION,단단한 마법스태프 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_STAFF_004.NAME,물고기 비늘 마법스태프
+EQP_WPN_STAFF_004.DESCRIPTION,물고기 비늘 마법스태프. 기본 공격력 40. 요구 INT 30.
+RCP_WPN_STAFF_004.NAME,물고기 비늘 마법스태프 제작
+RCP_WPN_STAFF_004.DESCRIPTION,물고기 비늘 마법스태프 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_STAFF_005.NAME,무지개 마법스태프
+EQP_WPN_STAFF_005.DESCRIPTION,무지개 마법스태프. 기본 공격력 50. 요구 INT 40.
+RCP_WPN_STAFF_005.NAME,무지개 마법스태프 제작
+RCP_WPN_STAFF_005.DESCRIPTION,무지개 마법스태프 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_WAND_002.NAME,시골 마을 치유완드
+EQP_WPN_WAND_002.DESCRIPTION,시골 마을 치유완드. 기본 공격력 20. 요구 CON 10.
+RCP_WPN_WAND_002.NAME,시골 마을 치유완드 제작
+RCP_WPN_WAND_002.DESCRIPTION,시골 마을 치유완드 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_WAND_003.NAME,단단한 치유완드
+EQP_WPN_WAND_003.DESCRIPTION,단단한 치유완드. 기본 공격력 30. 요구 CON 20.
+RCP_WPN_WAND_003.NAME,단단한 치유완드 제작
+RCP_WPN_WAND_003.DESCRIPTION,단단한 치유완드 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_WAND_004.NAME,물고기 비늘 치유완드
+EQP_WPN_WAND_004.DESCRIPTION,물고기 비늘 치유완드. 기본 공격력 40. 요구 CON 30.
+RCP_WPN_WAND_004.NAME,물고기 비늘 치유완드 제작
+RCP_WPN_WAND_004.DESCRIPTION,물고기 비늘 치유완드 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+EQP_WPN_WAND_005.NAME,무지개 치유완드
+EQP_WPN_WAND_005.DESCRIPTION,무지개 치유완드. 기본 공격력 50. 요구 CON 40.
+RCP_WPN_WAND_005.NAME,무지개 치유완드 제작
+RCP_WPN_WAND_005.DESCRIPTION,무지개 치유완드 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
+SFE_NPC_R01_001.NAME,선형 폭발 효과
+SFE_NPC_R01_001.DESCRIPTION,선형 폭발의 피해·회복·상태 효과 수치입니다.
+SKL_NPC_R01_001.DESCRIPTION,R01_01 고유 스킬. 시전 0.45초 · 재사용 9초 · MP 12. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SFE_NPC_R01_002.NAME,섬광 베기 효과
+SFE_NPC_R01_002.DESCRIPTION,섬광 베기의 피해·회복·상태 효과 수치입니다.
+SKL_NPC_R01_002.DESCRIPTION,R01_02 고유 스킬. 시전 0.12초 · 재사용 6초 · MP 8. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SFE_NPC_R01_003.NAME,치유의 빛 효과
+SFE_NPC_R01_003.DESCRIPTION,치유의 빛의 피해·회복·상태 효과 수치입니다.
+SKL_NPC_R01_003.DESCRIPTION,R01_03 고유 스킬. 시전 0.6초 · 재사용 8초 · MP 14. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SFE_NPC_R01_004.NAME,마력 화살 효과
+SFE_NPC_R01_004.DESCRIPTION,마력 화살의 피해·회복·상태 효과 수치입니다.
+SKL_NPC_R01_004.DESCRIPTION,R01_04 고유 스킬. 시전 0.25초 · 재사용 5초 · MP 7. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SFE_NPC_R01_005.NAME,원형 충격파 효과
+SFE_NPC_R01_005.DESCRIPTION,원형 충격파의 피해·회복·상태 효과 수치입니다.
+SKL_NPC_R01_005.DESCRIPTION,R01_05 고유 스킬. 시전 0.4초 · 재사용 11초 · MP 14. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SFE_NPC_R01_006.NAME,마력 참격 효과
+SFE_NPC_R01_006.DESCRIPTION,마력 참격의 피해·회복·상태 효과 수치입니다.
+SKL_NPC_R01_006.DESCRIPTION,R01_06 고유 스킬. 시전 0.25초 · 재사용 7초 · MP 9. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SFE_NPC_R01_007.NAME,관통 화살 효과
+SFE_NPC_R01_007.DESCRIPTION,관통 화살의 피해·회복·상태 효과 수치입니다.
+SKL_NPC_R01_007.DESCRIPTION,R01_07 고유 스킬. 시전 0.3초 · 재사용 7초 · MP 9. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SFE_NPC_R01_008.NAME,별빛 대폭발 효과
+SFE_NPC_R01_008.DESCRIPTION,별빛 대폭발의 피해·회복·상태 효과 수치입니다.
+SKL_NPC_R01_008.DESCRIPTION,R01_08 고유 스킬. 시전 0.9초 · 재사용 25초 · MP 30. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SFE_NPC_R01_009.NAME,회복의 선율 효과
+SFE_NPC_R01_009.DESCRIPTION,회복의 선율의 피해·회복·상태 효과 수치입니다.
+STE_NPC_R01_009.NAME,회복의 선율
+STE_NPC_R01_009.DESCRIPTION,회복의 선율 지속 효과
+SKL_NPC_R01_009.DESCRIPTION,R01_09 고유 스킬. 시전 0.5초 · 재사용 15초 · MP 18. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SFE_NPC_R01_010.NAME,수호의 방패 효과
+SFE_NPC_R01_010.DESCRIPTION,수호의 방패의 피해·회복·상태 효과 수치입니다.
+STE_NPC_R01_010.NAME,수호의 방패
+STE_NPC_R01_010.DESCRIPTION,수호의 방패 지속 효과
+SKL_NPC_R01_010.DESCRIPTION,R01_10 고유 스킬. 시전 0.35초 · 재사용 18초 · MP 15. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SFE_NPC_R01_011.NAME,연속 화살 효과
+SFE_NPC_R01_011.DESCRIPTION,연속 화살의 피해·회복·상태 효과 수치입니다.
+SKL_NPC_R01_011.DESCRIPTION,R01_11 고유 스킬. 시전 0.25초 · 재사용 9초 · MP 12. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SRV_R01_006_SHOP.NAME,R01_06 씨앗 상점
+SRV_R01_006_SHOP.DESCRIPTION,R01_06 씨앗 상점
+SHOP_R01_006_SEEDS.NAME,씨앗 상점
+SHOP_R01_006_SEEDS.DESCRIPTION,씨앗 상점
+ANC_PLAYER_PLOT_01.NAME,플레이어 밭 1
+ANC_PLAYER_PLOT_01.DESCRIPTION,플레이어 밭 1
+ANC_PLAYER_PLOT_02.NAME,플레이어 밭 2
+ANC_PLAYER_PLOT_02.DESCRIPTION,플레이어 밭 2
+ANC_PLAYER_PLOT_03.NAME,플레이어 밭 3
+ANC_PLAYER_PLOT_03.DESCRIPTION,플레이어 밭 3
+ANC_PLAYER_PLOT_04.NAME,플레이어 밭 4
+ANC_PLAYER_PLOT_04.DESCRIPTION,플레이어 밭 4
+ANC_PLAYER_PLOT_05.NAME,플레이어 밭 5
+ANC_PLAYER_PLOT_05.DESCRIPTION,플레이어 밭 5
+ANC_PLAYER_PLOT_06.NAME,플레이어 밭 6
+ANC_PLAYER_PLOT_06.DESCRIPTION,플레이어 밭 6
+ANC_PLAYER_PLOT_07.NAME,플레이어 밭 7
+ANC_PLAYER_PLOT_07.DESCRIPTION,플레이어 밭 7
+ANC_PLAYER_PLOT_08.NAME,플레이어 밭 8
+ANC_PLAYER_PLOT_08.DESCRIPTION,플레이어 밭 8
+ANC_PLAYER_BED.NAME,플레이어 침대
+ANC_PLAYER_BED.DESCRIPTION,플레이어 침대
+ANC_PLAYER_CHEST_02.NAME,추가 창고 1
+ANC_PLAYER_CHEST_02.DESCRIPTION,추가 창고 1
+ANC_PLAYER_CHEST_03.NAME,추가 창고 2
+ANC_PLAYER_CHEST_03.DESCRIPTION,추가 창고 2
+HOME_PLAYER_001.NAME,플레이어 생활 구역
+HOME_PLAYER_001.DESCRIPTION,플레이어 생활 구역
+PRD_PLAYER_STORAGE.NAME,창고 추가 설치
+PRD_PLAYER_STORAGE.DESCRIPTION,창고 추가 설치
+RCP_PLAYER_STORAGE_01.NAME,개인 창고 추가 설치 1/2
+RCP_PLAYER_STORAGE_01.DESCRIPTION,체력 10 이상. 광석1 1개와 광석2 1개로 개인 창고 1개(40칸)를 설치합니다.
+RCP_PLAYER_STORAGE_02.NAME,개인 창고 추가 설치 2/2
+RCP_PLAYER_STORAGE_02.DESCRIPTION,체력 20 이상. 광석1 1개와 광석2 1개로 개인 창고 1개(40칸)를 설치합니다.
+DRP_FURNITURE_BOOKSHELF.NAME,책장 보상
+DRP_FURNITURE_WARDROBE.NAME,옷장 보상
+MAP_TEST_001.NAME,테스트맵
+WRP_TEST_01.NAME,왼쪽 포탈
+WRP_TEST_02.NAME,중앙 포탈
+WRP_TEST_03.NAME,오른쪽 포탈
+ITM_CONS_REVIVE_SCROLL.NAME,부활서
+ITM_CONS_REVIVE_SCROLL.DESCRIPTION,"전투불능인 동료 한 명을 최대 HP의 50%, MP 최소 30%로 소생시킵니다. 살아 있는 대상에게는 사용할 수 없습니다."
+SYN_CLASS_SWORD.NAME,검사 3인
+SYN_CLASS_SWORD.DESCRIPTION,살아 있는 같은 직업 파티원 3명 이상: 파티 전체 물리·마법 공격력 +20%. 플레이어의 현재 무기 직업을 포함합니다.
+SYN_CLASS_BOW.NAME,궁수 3인
+SYN_CLASS_BOW.DESCRIPTION,살아 있는 같은 직업 파티원 3명 이상: 파티 전체 물리·마법 공격력 +20%. 플레이어의 현재 무기 직업을 포함합니다.
+SYN_CLASS_STAFF.NAME,마법사 3인
+SYN_CLASS_STAFF.DESCRIPTION,살아 있는 같은 직업 파티원 3명 이상: 파티 전체 물리·마법 공격력 +20%. 플레이어의 현재 무기 직업을 포함합니다.
+SYN_CLASS_WAND.NAME,힐러 3인
+SYN_CLASS_WAND.DESCRIPTION,살아 있는 같은 직업 파티원 3명 이상: 파티 전체 물리·마법 공격력 +20%. 플레이어의 현재 무기 직업을 포함합니다.
+SYN_HERO_DOUBLE.NAME,용사파티 더블
+SYN_HERO_DOUBLE.DESCRIPTION,용사파티 구성원 2명: 파티 전체 물리·마법 공격력 +10%. 트리플과 중복되지 않습니다.
+SYN_HERO_TRIPLE.NAME,용사파티 트리플
+SYN_HERO_TRIPLE.DESCRIPTION,용사파티 구성원 3명 이상: 파티 전체 물리·마법 공격력 +30%. 더블을 대체합니다.
+SYN_CLASSMATES.NAME,반친구들
+SYN_CLASSMATES.DESCRIPTION,"R01_09, R01_10, R01_11이 함께 생존 중: 파티 전체 물리·마법 공격력 +30%."
+SYN_VILLAGERS.NAME,마을 주민
+SYN_VILLAGERS.DESCRIPTION,"R01_05, R01_06, R01_07이 함께 생존 중: 파티 전체 물리·마법 공격력 +20%."

@@ -5,6 +5,7 @@
 #include "Life/Production/ICProductionSubsystem.h"
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
+#include "World/State/ICWorldStateSubsystem.h"
 
 UICCraftingComponent::UICCraftingComponent() { IC_TRACE_FUNCTION(); PrimaryComponentTick.bCanEverTick=false; }
 const FICRecipeRow* UICCraftingComponent::Find(FName RecipeID) const
@@ -20,7 +21,8 @@ TArray<FName> UICCraftingComponent::GetRecipes(EPlayerRecipeType Type) const
     TArray<FName> IDs;auto* GI=GetWorld()?GetWorld()->GetGameInstance():nullptr;
     auto* Service=GI?GI->GetSubsystem<UICDefinitionSubsystem>():nullptr;
     if(!Service || !Service->GetDefinitionIDs(EICDefinitionType::Recipe,IDs).bSuccess)return {};
-    IDs.RemoveAll([&](FName ID){ IC_TRACE_FUNCTION();const auto* Row=Find(ID);return !Row||Row->Type!=Type;});return IDs;
+    const auto State=GI->GetSubsystem<UICWorldStateSubsystem>()->ExportState();
+    IDs.RemoveAll([&](FName ID){ IC_TRACE_FUNCTION();const auto* Row=Find(ID);return !Row||Row->Type!=Type||(Row->ResultKind==EICProductionResultKind::InstallStorage&&(Row->RequiredExtraStorage<0||Row->RequiredExtraStorage>=2||State.ProgressionStages.FindRef(TEXT("PLAYER_STORAGE"))!=Row->RequiredExtraStorage));});return IDs;
 }
 bool UICCraftingComponent::StartCraft(FName RecipeID,FName WorkAnchorID,UICInventoryComponent* Inventory,FGuid& JobID,FString& Reason)
 {
@@ -41,6 +43,6 @@ bool UICCraftingComponent::ValidateDefinitions() const
     auto* GI=GetWorld()?GetWorld()->GetGameInstance():nullptr;
     auto* Service=GI?GI->GetSubsystem<UICDefinitionSubsystem>():nullptr;TArray<FName> IDs;
     if(!Service || !Service->GetDefinitionIDs(EICDefinitionType::Recipe,IDs).bSuccess)return false;
-    for(FName ID:IDs){const auto* Row=Find(ID);if(!Row||Row->RecipeID!=ID||Row->Ingredients.IsEmpty()||Row->Results.IsEmpty()||Row->ProductionID.IsNone())return false;}
+    for(FName ID:IDs){const auto* Row=Find(ID);if(!Row||Row->RecipeID!=ID||(Row->Ingredients.IsEmpty()&&Row->IngredientGroups.IsEmpty())||(Row->ResultKind==EICProductionResultKind::BagItems&&Row->Results.IsEmpty())||Row->ProductionID.IsNone())return false;}
     return true;
 }

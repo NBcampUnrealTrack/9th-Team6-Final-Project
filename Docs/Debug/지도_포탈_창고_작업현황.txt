@@ -1,0 +1,38 @@
+2026-10-28 지도/포탈/창고 뚜껑 작업 완료
+커밋·푸시·PR은 수행하지 않음. 기존 작업 변경분 보존.
+
+- 기존 BP_ICWarpStone 재사용. 테스트맵 좌/중/우에 WRP_TEST_01~03 설치.
+- 실제 맵을 위에서 2048×1024 정사영 촬영. AI 이미지 생성 사용 없음.
+  조명 대신 실제 재질 색상 패스로 촬영하여 지도에서 어두워지지 않도록 함.
+- T_TestMap_Overview, WBP_IC_Map, HUD WBP_IC_Minimap 연결.
+- M / Xbox View로 지도. 포탈에서 F / Xbox X도 지도 열기.
+- 지도 마커 클릭 또는 방향키+Enter / Xbox A로 선택 및 이동.
+- DT_IC_MapPresentation에서 비용 500G, 로딩 1.2초 및 자동 해금 설정.
+- DT_IC_Map의 이미지/좌표축/범위와 실제 배치된 Warp/Anchor 연동.
+- 파티 워프는 기존 ICPartyWarpComponent 사용. 성공 시에만 과금.
+- 이동 중 닫기 및 중복 요청 차단. 골드 부족 시 위치/골드 유지.
+- 개인/NPC 창고 CDO 및 배치 인스턴스 OpenRotation.Roll=-105로 통일.
+- Xbox View는 기존 임시 인벤토리 바로가기 대신 지도 열기로 변경.
+- 지도 영어 문구도 번역 목록에 추가. 총 1281개, 번역/형식 인자 검증 성공.
+
+검증
+- Saved/BuildMapTravel5.log : C++ 빌드 성공.
+- Saved/MapTravel/Live/Review.json : complete=true.
+- MapLive7에서 실제 마우스로 왼쪽 포탈 클릭 → 로딩 화면 확인.
+- 왼쪽/중앙/오른쪽 연속 이동, 골드 1600→1100→600→100 확인.
+- 각 Warp.Completed 로그의 Companions=3 확인.
+- 개인 창고 뚜껑 중심 Z 57.25→89.05, NPC 창고 103.26→160.61 확인.
+- 양쪽 창고 닫힘 복귀, 499G 이동 불가, 중복/취소 입력 차단 확인.
+- Saved/MapTravel/Automation/index.json : 9개 성공, 실패 0.
+  4개는 테스트용 월드의 입력 IA 미설정 경고를 포함한 성공.
+- 캡처 보조 액터는 transient이며 검증 세션 종료 시 정리. 맵 파일에는 저장하지 않음.
+- 검증은 IC_Visual 격리 세이브 사용. 사용자 세이브 골드는 변경하지 않음.
+
+주의/위치
+- 상세 DT 경로·재촬영: Docs/Life/지도_포탈_캡처_사용안내.txt
+- 초기 저작: Tools/Life/setup_map_travel.py
+- 재촬영/검증: Tools/Life/capture_map_and_review.py
+  -ICMapPointerReview 인자는 첫 마커의 실제 마우스 클릭을 기다리는 검증 모드.
+- 변경 전 자산 백업: Saved/MapTravel/Before.
+- 지도 이미지는 Content/IsekaiClass/UI/Map/T_TestMap_Overview.uasset에 저장되어 Saved를 정리해도 유지됨.
+- HUD는 전체맵을 축소한 개요 지도이며 플레이어 위치와 방향을 실시간 갱신.

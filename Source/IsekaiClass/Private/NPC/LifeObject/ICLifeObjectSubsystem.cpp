@@ -241,6 +241,8 @@ bool UICLifeObjectSubsystem::IsClaimAlive(const FSmartObjectClaimHandle& Claim) 
 
 bool UICLifeObjectSubsystem::TryLockForPlayer(AICLifeObjectActor& Object, AActor* Player, FText& OutFailure)
 {
+    if(Object.IsPlayerLocked()||Object.IsOccupiedByAnyNPC())
+    {OutFailure=NSLOCTEXT("ICLifeObject","BedAlreadyUsed","다른 사람이 사용 중인 침대입니다.");return false;}
     TArray<const FICLifeSlotOccupant*> Current;
     GetOccupantsOf(Object, Current);
     for (const FICLifeSlotOccupant* Occupant : Current)

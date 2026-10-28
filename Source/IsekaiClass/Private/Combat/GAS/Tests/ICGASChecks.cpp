@@ -97,6 +97,29 @@ bool FICGASCommitCheck::RunTest(const FString& Parameters)
     F.ASC->CancelAction();TestFalse(TEXT("Old action notify rejected"),F.ASC->NotifyCombatEvent(A.ActionID,TEXT("AN_HitStart"),2));TestFalse(TEXT("Full cooldown persists after committed cancellation"),F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player).bSuccess);TestTrue(TEXT("Cooldown is captured by definition ID"),F.ASC->Capture().Combat.SkillReadyAtPlaySecond.FindRef(F.SkillID)>F.Time->GetClock().PlaySecond);
     return !HasAnyErrors();
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASDataTimingCheck,"IC.GAS.DataTableCastTimingAndFinalRepeat",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICGASDataTimingCheck::RunTest(const FString&)
+{
+    FGASFixture F;
+    auto* Skill=F.Skills->FindRow<FICSkillRow>(F.SkillID,TEXT("DT timing test"));
+    Skill->bUseDataTableTiming=true;Skill->CastPlaySeconds=.9;Skill->FirstEffectOffsetPlaySeconds=.9;
+    Skill->FirstEffectEvent=EICFirstEffectEvent::EffectCommit;Skill->RecoveryPlaySeconds=.05;
+    Skill->Hits[0].StartOffsetPlaySeconds=.9;Skill->Hits[0].RepeatCount=3;Skill->Hits[0].RepeatIntervalPlaySeconds=.2;
+    auto Vitals=F.ASC->Capture();Vitals.HP=40;F.ASC->Restore(Vitals);
+    const auto Action=F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player);
+    if(!TestTrue(TEXT("Timed skill starts"),Action.bSuccess))return false;
+    TestFalse(TEXT("Early montage hit cannot bypass DT cast time"),F.ASC->NotifyCombatEvent(Action.ActionID,TEXT("AN_HitStart"),0));
+    TestFalse(TEXT("Early commit cannot charge MP"),F.ASC->NotifyCombatEvent(Action.ActionID,TEXT("AN_EffectCommit"),0));
+    F.Step(.89);TestEqual(TEXT("No recovery before cast time"),F.ASC->Capture().HP,40.f);TestEqual(TEXT("No early MP charge"),F.ASC->Capture().MP,100.f);
+    F.Step(.02);TestEqual(TEXT("First hit releases at the DT time"),F.ASC->Capture().HP,50.f);TestEqual(TEXT("One MP charge"),F.ASC->Capture().MP,90.f);
+    F.Step(.2);TestEqual(TEXT("Second timed repeat applies"),F.ASC->Capture().HP,60.f);
+    TestTrue(TEXT("Action survives beyond cast plus short recovery until final repeat"),F.ASC->GetActionID().IsValid());
+    F.Step(.2);TestEqual(TEXT("Third timed repeat is not cut off"),F.ASC->Capture().HP,70.f);
+    TestEqual(TEXT("Repeats never pay MP again"),F.ASC->Capture().MP,90.f);
+    F.Step(.1);TestFalse(TEXT("Action ends after last repeat and recovery"),F.ASC->GetActionID().IsValid());
+    return !HasAnyErrors();
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASSkillEventCheck,"IC.GAS.SkillGameplayEventAndCooldownEffect",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FICGASSkillEventCheck::RunTest(const FString& Parameters)
 {
@@ -211,7 +234,7 @@ bool FICGASBindingsCheck::RunTest(const FString& Parameters)
         if(Type->IsChildOf(AICEnemyBase::StaticClass()))TestTrue(TEXT("Enemy has authored AI BP"),Type->GetDefaultObject<AICEnemyBase>()->AIControllerClass->GetPathName().Contains(TEXT("BP_ICAIController_C")));
     }
     auto* NPC=LoadClass<AICNPCBase>(nullptr,TEXT("/Game/IsekaiClass/NPC/Blueprints/BP_ICNPCBase.BP_ICNPCBase_C"));if(TestNotNull(TEXT("NPC BP loads"),NPC))
-    {TestNull(TEXT("Default non-recruit NPC has no ASC"),NPC->GetDefaultObject<AICNPCBase>()->GetICAbilitySystem());TestTrue(TEXT("NPC has authored AI BP"),NPC->GetDefaultObject<AICNPCBase>()->AIControllerClass->GetPathName().Contains(TEXT("BP_ICAIController_C")));}
+    {TestNull(TEXT("Default non-recruit NPC has no ASC"),NPC->GetDefaultObject<AICNPCBase>()->GetICAbilitySystem());TestTrue(TEXT("NPC has authored NPC-specific AI BP"),NPC->GetDefaultObject<AICNPCBase>()->AIControllerClass->GetPathName().Contains(TEXT("BP_ICNPCAIController_C")));}
     return !HasAnyErrors();
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASSpawnCheck,"IC.GAS.SpawnDeathRewardLifecycle",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
@@ -230,7 +253,19 @@ bool FICGASSpawnCheck::RunTest(const FString& Parameters)
     ASC=Enemy->GetICAbilitySystem();ASC->ChangeResource(TEXT("HP"),-1000);ASC->TickComponent(.1f,LEVELTICK_All,nullptr);auto Dead=F.State->ExportState().SpawnSlots.FindChecked(Key);
     TestTrue(TEXT("Defeat is persistent"),Dead.bDefeated);TestFalse(TEXT("Empty reward still finishes receipt"),Dead.bRewardPending);TestTrue(TEXT("Reward receipt prevents duplicate kill reward"),F.State->ExportState().CompletedTransactionIDs.Contains(Dead.IncarnationID));TestEqual(TEXT("Respawn deadline is PlayClock 90 seconds"),Dead.RespawnReadyAtPlaySecond,90.);
     Enemy->HandleZeroHP();TestEqual(TEXT("Duplicate death preserves receipt"),F.State->ExportState().SpawnSlots.FindChecked(Key).IncarnationID,Dead.IncarnationID);
-    F.Time->JumpGameMinutes(480);TestEqual(TEXT("Sleep cannot advance monster respawn deadline"),F.Time->GetClock().PlaySecond,0.);Spawn->UnregisterAnchor(A);A->Destroy();
+    TestEqual(TEXT("Respawn also records the calendar one-hour deadline"),Dead.RespawnReadyAtGameMinute,F.Time->GetClock().GameMinute+60.);
+    F.Time->JumpGameMinutes(59);Spawn->RefreshSpawns();TestTrue(TEXT("Before one game hour the slot remains defeated"),F.State->ExportState().SpawnSlots.FindChecked(Key).bDefeated);
+    F.Time->JumpGameMinutes(1);Spawn->RefreshSpawns();auto* Respawned=Cast<AICEnemyBase>(Spawn->FindCharacter(Key));
+    TestNotNull(TEXT("A game-hour jump respawns even while the corpse exists"),Respawned);TestTrue(TEXT("Respawn is a new actor"),Respawned!=Enemy);
+    TestFalse(TEXT("Calendar respawn clears defeat"),F.State->ExportState().SpawnSlots.FindChecked(Key).bDefeated);
+    TestEqual(TEXT("Sleeping needs no play-clock advance"),F.Time->GetClock().PlaySecond,0.);
+    if(Respawned)
+    {
+        Respawned->GetICAbilitySystem()->ChangeResource(TEXT("HP"),-1000);Respawned->GetICAbilitySystem()->TickComponent(.1f,LEVELTICK_All,nullptr);
+        auto Legacy=F.State->ExportState();Legacy.SpawnSlots[Key].RespawnReadyAtGameMinute=-1;TestTrue(TEXT("Old saves without a calendar deadline remain valid"),F.State->ApplyWorldProgress(Legacy));Spawn->RefreshSpawns();
+        TestEqual(TEXT("Legacy cooldown migrates to one hour from current calendar"),F.State->ExportState().SpawnSlots.FindChecked(Key).RespawnReadyAtGameMinute,F.Time->GetClock().GameMinute+60.);
+    }
+    Spawn->UnregisterAnchor(A);A->Destroy();
     return !HasAnyErrors();
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASNPCCheck,"IC.GAS.NPCStateAndSafeRevive",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)

@@ -1,4 +1,6 @@
 #include "NPC/Character/ICNPCBase.h"
+#include "Character/Animation/ICCharacterAnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "UI/Framework/ICText.h"
 #include "AI/ICAIController.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
@@ -177,7 +179,7 @@ bool AICNPCBase::TryInteract(AICPlayerController* Requester)
     if(State.IsDowned()||(State.Mode!=EICCharacterMode::Scheduled&&!CanDismiss()))
     {UE_LOG(LogICInteraction,Verbose,TEXT("[NPC.InteractRejected] NPC=%s Mode=%d Downed=%d"),*CharacterID.ToString(),static_cast<int32>(State.Mode),State.IsDowned()?1:0);return false;}
     // 취침 중 NPC는 일반 대화 후보에서 제외한다(NPC 최신 구현 규칙 3장).
-    if(LifeObjectUser&&LifeObjectUser->IsSleeping())
+    if(IsSleepingForInteraction())
     {UE_LOG(LogICInteraction,Verbose,TEXT("[NPC.InteractRejected] NPC=%s Reason=Sleeping"),*CharacterID.ToString());return false;}
     const TArray<FName> Services=GetAvailableServices();
     const FName ServiceID=Services.Num()>0?Services[0]:NAME_None;
@@ -294,7 +296,14 @@ bool AICNPCBase::TryDismiss(AICPlayerController* Requester)
 FText AICNPCBase::GetInteractionText() const
 {
     IC_TRACE_FUNCTION();
+    if(IsSleepingForInteraction())return NSLOCTEXT("ICNPC","SleepingInteraction","(자는 중)");
     return ICText::Get(TEXT("NPC_TalkHint"));
+}
+bool AICNPCBase::IsSleepingForInteraction() const
+{
+    if(LifeObjectUser&&LifeObjectUser->IsSleeping())return true;
+    const auto* Anim=GetMesh()?Cast<UICCharacterAnimInstance>(GetMesh()->GetAnimInstance()):nullptr;
+    return Anim&&Anim->bSleeping;
 }
 TArray<FICNPCInteractionOption> AICNPCBase::GetInteractionOptions() const
 {

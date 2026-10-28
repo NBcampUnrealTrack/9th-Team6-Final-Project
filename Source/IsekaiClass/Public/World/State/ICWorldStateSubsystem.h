@@ -48,6 +48,7 @@ public:
     bool FlushParticipants();
     bool CanRestoreState(const FICWorldState& Candidate) const;
     bool RestoreState(const FICWorldState& Candidate);
+    bool IsRestoringState() const{return bRestoringState;}
     UFUNCTION(BlueprintPure, Category="IC|State") static bool ValidateStateWithReason(const FICWorldState& Candidate, FString& FailureReason);
     static bool ValidateState(const FICWorldState& Candidate);
     static bool ValidateAdditionalState(const FICWorldState& Candidate, FString& FailureReason);
@@ -56,6 +57,7 @@ public:
     static bool ValidateInventoryShape(const FICInventoryState& Inventory, TSet<FGuid>* ExistingIDs = nullptr);
     bool ApplyWorldProgress(const FICWorldState& Candidate);
 private:
+    bool bRestoringState=false;
     static void RecordAcquiredItems(FICWorldState& World);
     bool AdvanceOfflineCharacter(FName ID);
     UPROPERTY() FICWorldState State;

@@ -1,0 +1,36 @@
+2026-10-28 작업 완료
+
+현재 요청
+- NPC F 대화에서 얼굴을 자세히 보여주기.
+- H로 낚시. 낚싯대 줄 끝이 물고기 구역에 닿으면 기존 20초 낚시, 쿨타임 없음.
+- NPC마다 침대 뒤 개인 상자 배치. 옷장/책장도 기존 보관함 기능으로 각각 추가.
+
+반영
+- ICPlayerControllerDialogueCamera.cpp: 머리 본을 기준으로 근접 카메라 생성, 대화 종료/메뉴 전환/종료에서 원래 view target 복원.
+  대화 UI의 월드 일시정지 이후에도 카메라 캐시를 즉시 갱신하도록 처리.
+- ICPlayerLifeComponent: 카메라 중앙에서 물 구역 윗면 교차점 계산, 최대 1200cm. 실제 낚싯대에 줄 연결.
+- AICFishingLine: 20구간 줄 + 찌, 낚싯대 끝 추적. 구역/장애물 검증.
+- ICGatheringSubsystem: StartFishing 전용 시작 경로, 일반 F/StartGather로 낚시 불가. 착수 지점 유지 확인, H 취소 처리.
+- 줄/찌 BP와 재질 생성. 낚시 구역 H 안내. 기존 20초 생산 DT와 랜덤 물고기 지급 유지.
+- NPC 컨테이너는 기존 AICNPCContainerActor 사용. 3종 BP 생성, L_TestMap에 11명 × 3종 = 33개 저장.
+- 각 NPC의 소유자 ID와 종류별 고유 ContainerID, 기존 호감도 200 조건, 독립 40칸 UI 연결.
+- 기존 팀원 코드는 C++ 보관함과 DT 유형이 있었고, 전용 BP는 없었음.
+
+검증
+- Saved/BuildNPCFishing8.log: 최종 빌드 성공.
+- Saved/NPCFishing/Automation/index.json: 7개 자동 테스트 성공, 오류 0. 네이티브 테스트 액터의 입력/빈 메시 경고 있음.
+- 실제 H 입력, 줄/찌 표시, 20초 보상, 즉시 재시도, H 취소, 구역 밖 조준 보상 없음 확인.
+- 실제 NPC F 대화, 원래 카메라 복귀, 33개 고유 ID, 호감도 199 잠김/200 열림, 세 보관함 UI 확인.
+- 카메라 220cm/FOV40, 머리 본 위로 조준, 모션 블러 제거, 대화 뷰에서만 플레이어/장비 숨김 처리.
+- 최종 화면 검증: Saved/NPCFishing/LiveNPCReview.json. 전체 낚시 검증 로그는 Saved/NPCFishingLive4.log.
+- 최종 카메라 자동 검증: Saved/NPCFishing/VerifiedCameraAutomation/index.json, 오류 0.
+- 실제 화면 확인 완료: NPC_FaceDialogue_Complete.png / Fishing_HalfProgress_Final.png.
+
+안내 문서
+- Docs/Life/NPC_대화_낚시_보관함_안내.txt
+- 실행 도구: Tools/Life/setup_npc_fishing.py, setup_npc_containers.py, review_npc_fishing.py.
+
+주의
+- 사용자 커밋/푸시/PR은 실행하지 않음.
+- 이전 전투/스킬/VFX/생활/창고 작업 변경분은 그대로 보존.
+- 실제 플레이 검증은 별도 IC_Visual 세이브 네임스페이스를 사용함.

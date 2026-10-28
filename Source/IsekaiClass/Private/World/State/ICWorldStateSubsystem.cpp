@@ -1,4 +1,6 @@
 #include "World/State/ICWorldStateSubsystem.h"
+#include "Audio/ICBGMSubsystem.h"
+#include "Engine/World.h"
 #include "Combat/GAS/Simulation/ICCombatSimulation.h"
 #include "Time/ICTimeSubsystem.h"
 #include "World/Spawn/ICSpawnSubsystem.h"
@@ -420,6 +422,8 @@ bool UICWorldStateSubsystem::RestoreState(const FICWorldState& Candidate)
     IC_TRACE_FUNCTION();
     FICWorldState Normalized=Candidate;ICSaveDataMigration::NormalizeInventoryIDs(Normalized);
     if (!CanRestoreState(Normalized)){UE_LOG(LogICWorldState, Verbose, TEXT("[State.Restore.Rejected] Characters=%d Jobs=%d Gold=%d: 규격/활성 참여자 검사 실패"),Candidate.Characters.Num(),Candidate.ProductionJobs.Num(),Candidate.Gold);return false;}
+    TGuardValue<bool> RestoringGuard(bRestoringState,true);
+    if(GetWorld())if(auto* Audio=GetWorld()->GetSubsystem<UICBGMSubsystem>())Audio->ResetForRestore();
     State = MoveTemp(Normalized);
     RecordAcquiredItems(State);
     UE_LOG(LogICWorldState, Log, TEXT("[State.Restored] PlayerCreated=%d Characters=%d Jobs=%d Quests=%d Gold=%d"),State.bPlayerCreated,State.Characters.Num(),State.ProductionJobs.Num(),State.Quests.Num(),State.Gold);

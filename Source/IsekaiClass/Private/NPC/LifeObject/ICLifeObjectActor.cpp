@@ -10,6 +10,10 @@
 #include "SmartObjectDefinition.h"
 #include "SmartObjectSubsystem.h"
 #include "Debug/ICLog.h"
+#include "Player/Character/ICPlayerCharacter.h"
+#include "Life/Production/ICPlayerLifeComponent.h"
+#include "NPC/Character/ICNPCBase.h"
+#include "EngineUtils.h"
 
 AICLifeObjectActor::AICLifeObjectActor()
 {
@@ -72,7 +76,7 @@ bool AICLifeObjectActor::TryInteract_Implementation(AICPlayerController* Control
     {
         const UICWorldStateSubsystem* State = Controller->GetWorldState();
         const int32 Affinity = State ? State->GetSnapshot(OwnerNPCID).Affinity : 0;
-        if (Affinity < PlayerRequiredAffinity)
+        if (Affinity <= PlayerRequiredAffinity)
         {
             Controller->ShowLocalized(NSLOCTEXT("ICLifeObject", "BedAffinity", "아직 이 침대를 사용할 수 없습니다."));
             UE_LOG(LogICLifeObject, Log, TEXT("[LifeObject.PlayerBedRejected] Object=%s Owner=%s Affinity=%d Required=%d"),
@@ -88,7 +92,8 @@ bool AICLifeObjectActor::TryInteract_Implementation(AICPlayerController* Control
         if (!Failure.IsEmpty()) Controller->ShowLocalized(Failure);
         return false;
     }
-    const bool bSlept = Controller->Sleep();
+    auto* Character=Cast<AICPlayerCharacter>(Controller->GetPawn());
+    const bool bSlept = Character&&Character->LifeActions&&Character->LifeActions->BeginSleep(this);
     if (!bSlept) Life->UnlockForPlayer(*this);
     UE_LOG(LogICLifeObject, Log, TEXT("[LifeObject.PlayerSleep] Object=%s Success=%d"), *GetDebugID().ToString(), bSlept ? 1 : 0);
     return bSlept;
@@ -169,7 +174,18 @@ bool AICLifeObjectActor::CanBeUsedBy(FName NPCID, const FGameplayTag& Occupation
 
 bool AICLifeObjectActor::IsOccupiedByAnyNPC() const
 {
-    return GetUserIDs().Num() > 0;
+    if(GetUserIDs().Num()>0)return true;
+    if(ObjectType==EICLifeObjectType::Bed&&GetWorld())for(TActorIterator<AICNPCBase> It(GetWorld());It;++It)
+        if((OwnerNPCID.IsNone()||It->GetNPCDefinition().ID==OwnerNPCID)&&It->IsSleepingForInteraction()
+            &&FVector::DistSquared2D(It->GetActorLocation(),GetActorLocation())<FMath::Square(150.f))return true;
+    return false;
+}
+FText AICLifeObjectActor::GetInteractionText() const
+{
+    if(ObjectType!=EICLifeObjectType::Bed)return Super::GetInteractionText();
+    if(IsOccupiedByAnyNPC()||IsPlayerLocked())return NSLOCTEXT("ICLifeObject","BedBusyHint","침대 · 사용 중");
+    return OwnerNPCID.IsNone()?NSLOCTEXT("ICLifeObject","BedFreeHint","빈 침대 · 잠자기")
+        :FText::Format(NSLOCTEXT("ICLifeObject","OwnedBedHint","NPC 침대 · 잠자기 (호감도 {0} 초과)"),FText::AsNumber(PlayerRequiredAffinity));
 }
 
 bool AICLifeObjectActor::IsUsedByNPC(FName NPCID) const

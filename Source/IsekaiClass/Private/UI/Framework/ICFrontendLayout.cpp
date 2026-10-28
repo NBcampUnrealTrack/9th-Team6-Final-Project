@@ -3,6 +3,10 @@
 #include "UI/Framework/ICDisplayPolicy.h"
 #include "UI/Settings/ICSettingsLayout.h"
 #include "UI/Life/ICCraftingStationWidget.h"
+#include "UI/Life/ICEnhancementWidget.h"
+#include "UI/Life/ICLifeWidgets.h"
+#include "UI/Life/ICStorageWidget.h"
+#include "UI/Map/ICMapWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
@@ -196,6 +200,13 @@ static void BuildSave(UWidgetTree* Tree,FName Kind)
 void Build(UWidgetTree* Tree, FName Kind)
 {
     if(Kind==TEXT("CraftingStation")){UICCraftingStationWidget::BuildLayout(Tree);return;}
+    if(Kind==TEXT("Enhancement")){UICEnhancementWidget::BuildLayout(Tree);return;}
+    if(Kind==TEXT("Shop")){UICShopWidget::BuildLayout(Tree);return;}
+    if(Kind==TEXT("Storage")){UICStorageWidget::BuildLayout(Tree);return;}
+    if(Kind==TEXT("Map")||Kind==TEXT("Minimap")){UICMapWidget::BuildLayout(Tree,Kind==TEXT("Minimap"));return;}
+    if(Kind==TEXT("StorageTransferPopup")){UICStorageTransferPopup::BuildLayout(Tree);return;}
+    if(Kind==TEXT("SeedPicker")){UICSeedPickerWidget::BuildLayout(Tree);return;}
+    if(Kind==TEXT("SleepFade")){UICSleepFadeWidget::BuildLayout(Tree);return;}
     if (!Tree || Tree->RootWidget)
         return;
     if (ICGameplayLayout::Build(Tree, Kind))

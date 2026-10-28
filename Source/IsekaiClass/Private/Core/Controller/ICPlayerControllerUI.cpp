@@ -1,4 +1,5 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Life/ICStorageWidget.h"
 #include "UI/Framework/ICText.h"
 #include "Debug/ICLog.h"
 #include "Player/Character/ICPlayerCharacter.h"
@@ -11,6 +12,7 @@ void AICPlayerController::ExecuteUI(const FString& Command,int32 Index)
 {
     IC_TRACE_FUNCTION();
     UE_LOG(LogICUI, Verbose, TEXT("[UI.Command] Command=%s Index=%d Menu=%s"),*Command,Index,*Menu);
+    if(StorageScreen&&StorageScreen->IsOpen()){if(Command==TEXT("Close"))StorageScreen->CloseStorage();return;}
     auto* Inventory=GetInventory();auto* Saves=GetSaves();if(!Saves)return;
     if(Command==TEXT("ConfirmYes")){ConfirmModal(true);return;}
     if(Command==TEXT("ConfirmNo")){ConfirmModal(false);return;}

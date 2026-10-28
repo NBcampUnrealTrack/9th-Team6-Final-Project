@@ -57,6 +57,10 @@ bool FICRanchHuntingCheck::RunTest(const FString&)
     const auto Injured=State->ExportState();const float HurtHP=ASC->Capture().HP;State->RestoreState(Injured);
     TestEqual(TEXT("Loading preserves nonlethal damage"),ASC->Capture().HP,HurtHP);
     Hit.Magnitude=1000;TestTrue(TEXT("Combat killing blow applies"),ASC->ApplyDamage(Hit,nullptr,false,false,false,false));ASC->TickComponent(.01f,LEVELTICK_All,nullptr);
+    TestTrue(TEXT("Killing blow starts the visible slaughter phase"),Chicken->IsSlaughtering());
+    // Timers created before the first world tick enter the active heap on the following frame.
+    {TGuardValue<uint64> Frame(GFrameCounter,GFrameCounter+1);World->GetTimerManager().Tick(.01f);}
+    {TGuardValue<uint64> Frame(GFrameCounter,GFrameCounter+2);World->GetTimerManager().Tick(30.f);}
     auto* Bag=NewObject<UICInventoryComponent>();Bag->BeginStaging(D,0);Bag->ApplySnapshot(State->GetInventorySnapshot());
     TestEqual(TEXT("Kill grants exactly one chicken meat"),Bag->CountItem(TEXT("ITM_R01_CHICKEN_MEAT")),1);
     const auto Killed=State->ExportState();Chicken->HandleZeroHP();State->RestoreState(Killed);Chicken->RefreshAnimal();

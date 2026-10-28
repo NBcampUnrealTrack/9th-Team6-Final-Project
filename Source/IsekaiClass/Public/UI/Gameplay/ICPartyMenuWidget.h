@@ -45,9 +45,11 @@ protected:
     virtual void NativeOnInitialized() override;
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
+    virtual void NativeTick(const FGeometry& Geometry,float DeltaSeconds) override;
 private:
     UPROPERTY(Transient) TObjectPtr<UICWorldStateSubsystem> BoundState;
     bool bRefreshing = false;
+    float StatusRefreshAt = 0;
     UFUNCTION() void CharacterChanged(FName ID);
     UFUNCTION() void PortraitPicked(int32 Index);
     void RefreshDetails();
