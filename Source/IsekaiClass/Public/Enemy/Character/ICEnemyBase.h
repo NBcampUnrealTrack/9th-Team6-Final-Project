@@ -18,6 +18,7 @@ public:
     const FICMonsterRow& GetMonsterDefinition() const { return Definition; }
     FName GetSpawnKey() const { return SpawnKey; }
     bool OutsideLeash() const;
+    bool IsOutsideLeash(const FVector& WorldLocation) const;
     void BeginReturn();
     void FinishReturn();
     bool IsReturning() const { return bReturning; }

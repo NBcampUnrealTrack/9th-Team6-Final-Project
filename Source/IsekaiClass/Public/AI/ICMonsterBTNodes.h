@@ -21,6 +21,7 @@ class ISEKAICLASS_API UBTTask_ICMonsterPickWanderLocation : public UBTTaskNode
     GENERATED_BODY()
 public:
     UBTTask_ICMonsterPickWanderLocation();
+    virtual void InitializeFromAsset(UBehaviorTree& Asset) override;
     virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 
     UPROPERTY(EditAnywhere, Category = "Blackboard")
@@ -48,6 +49,15 @@ class ISEKAICLASS_API UBTTask_ICMonsterFinishReturn : public UBTTaskNode
     GENERATED_BODY()
 public:
     UBTTask_ICMonsterFinishReturn();
+    virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+};
+
+UCLASS()
+class ISEKAICLASS_API UBTTask_ICMonsterFinishInvestigation : public UBTTaskNode
+{
+    GENERATED_BODY()
+public:
+    UBTTask_ICMonsterFinishInvestigation();
     virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 };
 
