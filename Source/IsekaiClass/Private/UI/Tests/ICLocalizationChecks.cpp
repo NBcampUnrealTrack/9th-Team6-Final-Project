@@ -4,6 +4,25 @@
 #include "Internationalization/StringTable.h"
 #include "Internationalization/StringTableCore.h"
 #include "UI/Framework/ICText.h"
+#include "Data/Text/ICLocalization.h"
+#include "Internationalization/Internationalization.h"
+#include "Internationalization/Culture.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICLanguageRoundTrip,"IC.Polish.LanguageRoundTrip",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICLanguageRoundTrip::RunTest(const FString&)
+{
+    const FString Previous=FInternationalization::Get().GetCurrentCulture()->GetName();
+    ICLocalization::ApplyLanguage(0);
+    FText Label=ICLocalization::Localize(FText::FromString(TEXT("체력 포션")));
+    TestEqual(TEXT("Korean remains the source language"),Label.ToString(),FString(TEXT("체력 포션")));
+    ICLocalization::ApplyLanguage(1);
+    TestEqual(TEXT("An existing label updates to English"),Label.ToString(),FString(TEXT("Health Potion")));
+    TestEqual(TEXT("String table resolves in English"),ICText::Get(TEXT("Save_Complete")).ToString(),FString(TEXT("Save complete")));
+    const FText Format=NSLOCTEXT("ICInventoryMenu","GoldBalance","보유 골드  {0} G");
+    TestFalse(TEXT("Formatted native text translates before its arguments are applied"),FText::Format(ICLocalization::Localize(Format),42).ToString().Contains(TEXT("골드")));
+    ICLocalization::ApplyLanguage(0);TestEqual(TEXT("Switching back restores the Korean text"),Label.ToString(),FString(TEXT("체력 포션")));
+    FInternationalization::Get().SetCurrentCulture(Previous);return !HasAnyErrors();
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICLocalizationAssetsCheck,"IC.UI.LocalizationAssets",
     EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)

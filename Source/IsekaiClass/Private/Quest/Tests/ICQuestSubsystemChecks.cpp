@@ -376,12 +376,13 @@ bool FICQuestReacceptGrantCheck::RunTest(const FString& Parameters)
     Grant.Count = 1;
     Definition.AcceptanceQuestItems = {Grant, Grant};
     F.Catalog->Tables.Last().Table.LoadSynchronous()->AddRow(Definition.ID, Definition);
+    auto OwnedQuestItems=[&](){int32 Count=0;for(const auto& Item:F.Inventory->GetSnapshot().QuestItems)if(Item.ItemID==Grant.ItemID)Count+=Item.Count;return Count;};
     TestTrue(TEXT("First acceptance grants the configured quest items"), F.Quests->AcceptQuest(Definition.ID));
-    TestEqual(TEXT("Duplicate grant rows aggregate to two items"), F.Inventory->CountItem(Grant.ItemID), 2);
+    TestEqual(TEXT("Duplicate grant rows aggregate to two items"), OwnedQuestItems(), 2);
     TestTrue(TEXT("Granted quest can be abandoned"), F.Quests->AbandonQuest(Definition.ID));
-    TestEqual(TEXT("Abandon preserves the quest items"), F.Inventory->CountItem(Grant.ItemID), 2);
+    TestEqual(TEXT("Abandon preserves the quest items"), OwnedQuestItems(), 2);
     TestTrue(TEXT("Abandoned quest can be accepted again"), F.Quests->AcceptQuest(Definition.ID));
-    TestEqual(TEXT("Reacceptance does not duplicate retained quest items"), F.Inventory->CountItem(Grant.ItemID), 2);
+    TestEqual(TEXT("Reacceptance does not duplicate retained quest items"), OwnedQuestItems(), 2);
     return !HasAnyErrors();
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestObjectiveDialogueCheck, "IC.Runtime.QuestObjectiveDialogue",

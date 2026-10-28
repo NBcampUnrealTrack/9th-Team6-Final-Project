@@ -9,6 +9,7 @@
 #include "Player/Character/ICPlayerAppearance.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Life/Crafting/ICCraftingComponent.h"
+#include "Life/Production/ICPlayerLifeComponent.h"
 #include "Quest/ICQuestGuideComponent.h"
 #include "World/Warp/ICPartyWarpComponent.h"
 #include "Camera/CameraComponent.h"
@@ -50,6 +51,7 @@ AICPlayerCharacter::AICPlayerCharacter()
     CharacterID=UICWorldStateSubsystem::PlayerId();bUsePrimaryStats=true;bUsePlayerSP=true;
     Inventory=CreateDefaultSubobject<UICInventoryComponent>(TEXT("Inventory"));
     Crafting=CreateDefaultSubobject<UICCraftingComponent>(TEXT("Crafting"));
+    LifeActions=CreateDefaultSubobject<UICPlayerLifeComponent>(TEXT("LifeActions"));
     QuestGuide=CreateDefaultSubobject<UICQuestGuideComponent>(TEXT("QuestGuide"));
     PartyWarp=CreateDefaultSubobject<UICPartyWarpComponent>(TEXT("PartyWarp"));
     CameraArm=CreateDefaultSubobject<UICCameraSpringArm>(TEXT("CameraArm"));

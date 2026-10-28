@@ -19,6 +19,7 @@ bool AICWarpStone::TryInteract_Implementation(AICPlayerController* Controller)
     else if (Player->PartyWarp->UnlockWarp(WarpID, GetActorLocation(), Reason))
     {
         Controller->ShowLocalized(NSLOCTEXT("ICWarp", "StoneRegistered", "워프 돌이 활성화되었습니다."));
+        Controller->SetMenu(TEXT("Map"));
         return true;
     }
     // The controller otherwise replaces a false return value with its generic

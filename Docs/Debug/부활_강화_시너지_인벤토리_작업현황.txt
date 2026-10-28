@@ -1,0 +1,67 @@
+2026-10-28 / Leader 브랜치 / 부활·강화·시너지·인벤토리 작업 완료
+
+완료 범위
+1. 부활서 ITM_CONS_REVIVE_SCROLL 추가. 두 상점에서 5,000G 판매.
+2. 전투불능 동료의 초상화 회색 머티리얼, 이름/HP/MP 회색 표시.
+   기존 CanDismiss / TryDismiss의 전투불능 퇴출 금지 경로 검증.
+3. 제작대 제작/강화 탭, 무기 목록, 보유 광석 선택, 확률/비용 표시와 강화/취소.
+   가방/플레이어 무기 슬롯/현재 파티 동료 무기 지원. GUID로 동일 무기 추적.
+   성공 +1, 실패 단계 유지, 비용 1회 처리, 잠금/자원 부족 거절.
+4. 직업 3인 +20%, 용사 2인 +10%/3인 +30%, 반친구들 +30%, 마을 주민 +20%.
+   살아 있는 파티원과 플레이어 현재 무기 직업 포함. 서로 다른 보너스 합산.
+   용사 더블/트리플은 높은 단계만. 물리/마법 공격력 모두 적용.
+5. HUD 초록 + 아이콘. 파티 메뉴 현재 상태에 버프/디버프/펫/시너지 수치와 남은 시간.
+6. 인벤토리 이름/ID 검색, 분류, 정렬, 잠금/해제, 개수 지정 묶음 분할.
+7. 신규 문구 한국어/영어 카탈로그 연결.
+
+데이터와 UI
+- Combat/DT_IC_Synergy: 8개 시너지 행.
+- Equipment/DT_IC_EnhancementOre: 광석1~6의 개수/추가 확률.
+- 기존 Equipment/DT_IC_Enhancement: 단계별 비용/확률/증가율 유지.
+- Items/DT_IC_Item, NPC/DT_IC_Shop, Registry/DT_IC_IDRegistry, ST_IC_Definitions.
+- WBP_IC_Enhancement 신규 및 제작대/요리대/인벤토리/파티/상태 WBP 갱신.
+- UI/Materials/M_UI_DownedPortrait: 밝기 가중합을 이용한 실제 회색 초상화.
+- Config/DefaultGame.ini: UI/Materials 패키징 포함.
+- Data/Localization/English_PartyForge.tsv 및 번역 카탈로그.
+- 상세 안내: Docs/Combat/부활_강화_시너지_인벤토리_사용안내.txt
+
+주요 C++ 파일
+- Combat/Party/ICPartyStatus: 조건 계산, 배타 그룹, 현재 상태 설명.
+- Combat/GAS/ICAbilitySystemStats: 시너지 수치를 실제 능력치에 합산.
+- Character/Base/ICCharacterBase: 구성/생존/무기 변경 시 다른 파티원의 능력치 갱신.
+- Inventory/Enhancement/ICInventoryEnhancement: 원자적 강화 거래.
+- UI/Life/ICEnhancementWidget, ICCraftingStationWidget.
+- UI/Gameplay/ICInventoryOrganization, ICInventoryMenuWidget.
+- UI/Gameplay/ICCharacterStatusWidget, ICPartyMenuWidget, ICGameMenuWidget.
+- Data/Rows/Combat/ICSynergyRow 및 Data/Validation/ICCombatValidation.
+
+검증
+- C++ 최신 빌드 성공: Saved/BuildPartyForge6.log.
+- IC.PartyForge 자동 테스트 3개 모두 통과:
+  SynergyRulesAndCombatRefresh: 실제 플레이어 공격력 +50%, 전투불능 시 단계 감소.
+  EnhancementTransactions: 장착 무기, 성공/실패, 정확한 비용, 부족/무효 거절.
+  RevivalAndInventoryUI: 5,000G 데이터, 퇴출 금지, 실제 소생, 묶음/정렬 보존.
+- 기존 관련 테스트 7개 통과:
+  IC.Expansion 2개, IC.Storage 3개, IC.UI.InventoryMenu, IC.Polish.LanguageRoundTrip.
+- 번역 검증: 1,350개 원문, 오류 0.
+- 실제 테스트맵 PIE 전체 흐름 완료: Saved/PartyForge/Live/Review.json.
+  부활서 5,000G 구매 → 인벤토리로 전투불능 동료 소생 → 파티 버프 +30% 표시
+  → 검색/잠금/분할/정렬 → 플레이어가 장착한 검 +1 강화
+  → 광석 1개, 100G 정확히 차감 → 제작 탭 복귀.
+- 실제 화면 이미지: Saved/PartyForge/Live 폴더.
+- 머티리얼 컴파일 오류 없이 실제 회색 초상화 확인.
+
+에셋 생성 도구
+- Tools/Combat/setup_party_forge.py: 지정 신규 행과 WBP 기본값 생성.
+- Tools/Combat/repair_party_portrait.py: 회색 UI 머티리얼 생성.
+- Tools/Combat/refresh_enhancement_widget.py: 강화 WBP 레이아웃 재생성.
+- Tools/Combat/review_party_forge.py: 임시 저장 네임스페이스에서 실제 PIE 검증.
+- 기존 에셋 백업: Saved/PartyForge/Before.
+
+커밋/PR은 사용자가 직접 진행하는 기존 방침을 유지. 이 작업에서 실행하지 않음.
+
+후속 커밋 후 빌드 수정 (2026-10-28)
+- 번역 Cache/Loaded와 강화 UI Add의 Unity 묶음 내 이름 충돌 수정.
+- UI 첫 헤더 순서 정리. BuildProject.ps1 -FullUnity 검증 옵션 추가.
+- 전체 Unity 빌드 및 관련 테스트 10개 통과.
+- 자세한 원인/검증: Docs/Debug/커밋후_Unity_빌드_오류_수정.txt.

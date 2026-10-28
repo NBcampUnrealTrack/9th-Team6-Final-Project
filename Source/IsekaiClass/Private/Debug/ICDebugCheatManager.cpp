@@ -46,6 +46,119 @@ void UICDebugCheatManager::ICGiveItem(FName ItemId, int32 Count)
 #endif
 }
 
+void UICDebugCheatManager::ICAddGameHours(double Hours)
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    auto* PC = Cast<AICPlayerController>(GetOuterAPlayerController());
+    if (!PC) return;
+    const double Minutes = Hours * 60.;
+    auto* Time = PC->GetTime();
+    if (!FMath::IsFinite(Hours) || Hours < 0 || !FMath::IsFinite(Minutes)
+        || !Time || !Time->JumpGameMinutes(Minutes))
+    {
+        PC->ShowLocalized(NSLOCTEXT("ICCheat", "InvalidGameHours", "0 이상의 유효한 시간을 입력하세요. 예: ICAddGameHours 2"));
+        return;
+    }
+    UE_LOG(LogICTime, Log, TEXT("[Cheat.TimeHours] Hours=%.2f Minutes=%.2f GameMinute=%.2f"), Hours, Minutes, Time->GetClock().GameMinute);
+    PC->ShowLocalized(FText::Format(NSLOCTEXT("ICCheat", "GameHoursAdded", "게임시간 {0}시간 경과"), FText::AsNumber(Hours)));
+#endif
+}
+
+void UICDebugCheatManager::ICGiveStarterWeapons()
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    auto* PC = Cast<AICPlayerController>(GetOuterAPlayerController());
+    if (!PC) return;
+    auto* Inventory = PC->GetInventory();
+    auto* State = PC->GetWorldState();
+    if (!Inventory || !Inventory->GetDefinitions() || !State || !State->ExportState().bPlayerCreated)
+    {
+        PC->ShowLocalized(NSLOCTEXT("ICCheat", "PlayerNotReady", "플레이어를 생성한 뒤 사용하세요."));
+        return;
+    }
+    auto* Staging = NewObject<UICInventoryComponent>(this);
+    Staging->BeginStaging(Inventory->GetDefinitions(), Inventory->CurrentClass);
+    if (!Staging->ApplySnapshot(Inventory->GetSnapshot())) return;
+    TArray<FICItemAmount> Weapons;
+    for (const auto* ID : {TEXT("EQP_WPN_SWORD_001"), TEXT("EQP_WPN_BOW_001"), TEXT("EQP_WPN_STAFF_001"), TEXT("EQP_WPN_WAND_001")})
+    {
+        if (!Staging->AddItem(ID, 1, false))
+        {
+            PC->ShowLocalized(NSLOCTEXT("ICCheat", "StarterWeaponsNoRoom", "초보 무기 4종을 넣을 가방 공간이 부족하거나 아이템 정의를 확인할 수 없습니다."));
+            return;
+        }
+        auto& Weapon = Weapons.AddDefaulted_GetRef(); Weapon.ItemID = ID; Weapon.Count = 1;
+    }
+    if (!Inventory->ApplySnapshot(Staging->GetSnapshot())) return;
+    State->OnItemsReceived.Broadcast(Weapons);
+    UE_LOG(LogICInventory, Log, TEXT("[Cheat.GiveStarterWeapons] Sword=1 Bow=1 Staff=1 Wand=1"));
+    PC->ShowLocalized(NSLOCTEXT("ICCheat", "StarterWeaponsGranted", "초보 무기 4종 지급 완료 · 검, 활, 마법스태프, 치유완드 각 1개"));
+#endif
+}
+
+void UICDebugCheatManager::ICGiveGold()
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    auto* PC=Cast<AICPlayerController>(GetOuterAPlayerController());if(!PC)return;
+    auto* State=PC->GetWorldState();
+    if(!State||!State->ExportState().bPlayerCreated)
+    {PC->ShowLocalized(NSLOCTEXT("ICCheat","PlayerNotReady","플레이어를 생성한 뒤 사용하세요."));return;}
+    const int64 Total=static_cast<int64>(State->ExportState().Gold)+10000;
+    if(Total>MAX_int32||!PC->SetGold(static_cast<int32>(Total)))
+    {PC->ShowLocalized(NSLOCTEXT("ICCheat","GoldLimit","보유 골드 한도를 초과하여 지급할 수 없습니다."));return;}
+    PC->ShowLocalized(NSLOCTEXT("ICCheat","GoldGranted","10,000G 지급 완료"));
+    UE_LOG(LogICInventory,Log,TEXT("[Cheat.GiveGold] Added=10000 Total=%d"),PC->Gold);
+#endif
+}
+
+void UICDebugCheatManager::ICEquipStarterWeapons()
+{
+#if !UE_BUILD_SHIPPING
+    auto* PC=Cast<AICPlayerController>(GetOuterAPlayerController());auto* Inventory=PC?PC->GetInventory():nullptr;
+    auto* State=PC?PC->GetWorldState():nullptr;
+    if(!Inventory||!State||!State->ExportState().bPlayerCreated)return;
+    auto* Staging=NewObject<UICInventoryComponent>(this);Staging->BeginStaging(Inventory->GetDefinitions(),Inventory->CurrentClass);
+    if(!Staging->ApplySnapshot(Inventory->GetSnapshot()))return;TArray<FICItemAmount> Received;
+    for(const TCHAR* ID:{TEXT("EQP_WPN_SWORD_001"),TEXT("EQP_WPN_BOW_001"),TEXT("EQP_WPN_STAFF_001"),TEXT("EQP_WPN_WAND_001")})
+    {
+        if(!Staging->AddItem(ID,1,false)){PC->Show(TEXT("초보 무기 4종을 지급할 가방 공간이 부족합니다."));return;}
+        FICItemAmount Amount;Amount.ItemID=ID;Amount.Count=1;Received.Add(Amount);
+    }
+    for(const auto& Amount:Received)
+    {
+        const auto Snapshot=Staging->GetSnapshot();const int32 Slot=Snapshot.Bag.Slots.IndexOfByPredicate([&](const auto& Item){return Item.ItemID==Amount.ItemID&&!Item.bLocked;});
+        if(Slot==INDEX_NONE||!Staging->Equip(Slot)){PC->Show(TEXT("초보 무기 장착에 실패했습니다. 기존 인벤토리는 유지합니다."));return;}
+    }
+    if(!Inventory->ApplySnapshot(Staging->GetSnapshot()))return;
+    State->OnItemsReceived.Broadcast(Received);PC->Show(TEXT("초보 무기 4종 지급 및 장착 완료. 우클릭으로 꺼낼 수 있습니다."));
+#endif
+}
+
+void UICDebugCheatManager::ICRecruitTestParty()
+{
+#if !UE_BUILD_SHIPPING
+    auto* PC=Cast<AICPlayerController>(GetOuterAPlayerController());auto* State=PC?PC->GetWorldState():nullptr;
+    if(!State||!State->ExportState().bPlayerCreated||!State->FlushParticipants())return;
+    const TArray<FName> IDs={TEXT("NPC_R01_001"),TEXT("NPC_R01_002"),TEXT("NPC_R01_003")};
+    for(FName ID:IDs)if(!State->EnsureCharacter(ID,EICCharacterKind::Recruitable)){PC->Show(TEXT("NPC 정의를 확인할 수 없습니다."));return;}
+    auto Next=State->ExportState();
+    for(auto& Pair:Next.Characters)if(Pair.Value.PartySlot>=0&&!IDs.Contains(Pair.Key))
+    {
+        if(Pair.Value.IsDowned()){PC->Show(TEXT("기존 쓰러진 동료를 먼저 소생시킨 뒤 테스트 파티를 편성하세요."));return;}
+        Pair.Value.PartySlot=INDEX_NONE;Pair.Value.Mode=EICCharacterMode::Scheduled;
+    }
+    for(int32 Index=0;Index<IDs.Num();++Index)
+    {
+        auto& NPC=Next.Characters.FindChecked(IDs[Index]);NPC.Affinity=300;NPC.PartySlot=Index;NPC.Mode=EICCharacterMode::Companion;
+        NPC.LifeState=EICCharacterLifeState::Alive;NPC.HP=NPC.MaxHP;NPC.MP=NPC.MaxMP;
+    }
+    PC->Show(State->CommitGameplayTransaction(Next,FGuid::NewGuid())?TEXT("R01_01 · 02 · 03 호감도 300, 테스트 파티 3명 편성 완료"):TEXT("테스트 파티 편성에 실패했습니다."));
+#endif
+}
+
 void UICDebugCheatManager::ICSetAffinity(FName NpcId, int32 Value)
 {
     IC_TRACE_FUNCTION();
@@ -54,8 +167,8 @@ void UICDebugCheatManager::ICSetAffinity(FName NpcId, int32 Value)
     if (auto* PC = Cast<AICPlayerController>(GetOuterAPlayerController()))
     {
         auto* State = PC->GetWorldState();
-        if (!State || !UICWorldStateSubsystem::IsCharacterIdValid(NpcId) || NpcId == UICWorldStateSubsystem::PlayerId() || Value < 0 || Value > 100)
-        { PC->Show(TEXT("유효한 NPC ID와 0~100 호감도를 입력하세요.")); return; }
+        if (!State || !UICWorldStateSubsystem::IsCharacterIdValid(NpcId) || NpcId == UICWorldStateSubsystem::PlayerId() || Value < 0 || Value > 500)
+        { PC->Show(TEXT("유효한 NPC ID와 0~500 호감도를 입력하세요.")); return; }
         const int32 Serial = FCString::Atoi(*NpcId.ToString().Right(3));
         const EICCharacterKind Kind = Serial < 100 ? EICCharacterKind::Recruitable : Serial < 200 ? EICCharacterKind::Resident : EICCharacterKind::Background;
         if (Kind == EICCharacterKind::Background || !State->EnsureCharacter(NpcId, Kind) || !State->SetAffinity(NpcId, Value))

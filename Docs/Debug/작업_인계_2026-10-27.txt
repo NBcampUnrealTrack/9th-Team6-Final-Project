@@ -1,0 +1,180 @@
+IsekaiClass 작업 인계 — 팀원 dev 병합 후 재개용
+작성일: 2026-10-27
+프로젝트: C:\Users\20ori\Desktop\IsekaiClass
+엔진: Unreal Engine 5.8 (설치 경로 C:\Program Files\Epic Games\UE_5.8)
+
+
+1. 사용자가 원하는 다음 작업 순서
+
+현재 Leader의 작업을 먼저 커밋한다.
+다른 팀원들이 PR을 통해 dev에 작업을 합친 뒤, 최신 dev를 Leader에 반영한다.
+이때 충돌과 통합 후 문제를 수정하고 검증하여 Leader를 Push하고 dev 대상 PR로 보낸다.
+이 문서는 그 시점에 현재 구현을 놓치지 않고 바로 이어서 작업하기 위한 기록이다.
+이번 인계 기록 작업에서는 커밋·Fetch·병합·Push·PR 생성을 실행하지 않았다.
+
+기록 시점 Git 상태:
+- 현재 브랜치: Leader
+- HEAD: e0b927f7 (Merge pull request #20 from NBcampUnrealTrack/Leader)
+- 이전 기능 커밋: bdf3e4e9 ([Feat] 직업별 콤보·중앙 조준 전투 구현 및 게임 설정 확장)
+- 이 인계 파일 작성 직전 158개 변경 파일이 스테이지에 올라가 있었다.
+- 치트 설명 텍스트와 새 시나리오 텍스트도 스테이지에 포함된 상태였다.
+- 다음 작업 시에는 실제 커밋 여부와 HEAD, 원격 브랜치 상태부터 다시 확인한다.
+
+
+2. 이번에 추가·수정한 주요 기능
+
+전투 이펙트
+- 일반 공격과 스킬 Niagara 에셋을 /Game/IsekaiClass/VFX/CombatEffect 아래에 분리했다.
+- DT_IC_CombatVFX로 검 궤적·범위 표시·명중 효과·투사체 모양·색·크기·지속시간 등을 설정한다.
+- 기존 공격의 시각적 느낌을 유지하는 것이 사용자 요구다.
+- 검사 3타 판정을 짧은 시간 동안 연속 검사하여 늦게 범위에 들어온 대상도 맞도록 보완했다.
+
+무기 순환 — 가장 최근 변경
+- 우클릭 한 번마다 무기 없음 → 검 → 활 → 마법스태프 → 치유완드 → 무기 없음 순으로 반복한다.
+- 비어 있는 장착 슬롯은 건너뛰며, 가방에만 있는 무기는 순환 대상에 넣지 않는다.
+- 장착 무기 사이에서는 다음 무기 Draw Montage만 재생한다.
+- 기존 무기는 다음 무기의 Draw Notify에서 바로 교체한다. 사이에 빈손 상태를 만들지 않는다.
+- 마지막 무기 다음 입력에서만 Sheathe Montage로 빈손이 된다.
+- 전환 중 연타·공격·스킬을 막고, 중단 시 마지막 확정 상태를 유지한다.
+- 핵심: Private/Player/Character/ICPlayerWeaponTransition.cpp
+- 핵심: UICInventoryComponent::DrawWeaponForTransition (선택과 꺼냄을 한 번에 반영)
+- 이전 SelectWeaponForTransition의 숨김 상태를 거치는 방식으로 되돌리지 않는다.
+
+제작대·주방
+- C++ 기능과 BP/WBP를 Life/Crafting, Life/Cooking에 추가했다.
+- F 상호작용 → 레시피 이름 목록(W/S·스크롤) → 상세/재료 → 제작·취소 → 진행 게이지.
+- 제작 시간·재료·결과·SP 비용은 DT_IC_Recipe로 관리한다.
+- 완료 시 기존 아이템 획득 알림을 사용한다.
+- L_TestMap 제작대 (2000,-3100,40), 주방 (2000,-3550,40).
+
+채집·농사·축산
+- 채집물과 광석: 게임시간 120분 후 재생성. DT_IC_Resource.RegenerationGameMinutes.
+- 작물: 원본 메시 순서대로 게임시간 하루(1440분)마다 다음 단계, 마지막 단계만 수확.
+- 수확 후 120분 동안 숨겼다가 첫 단계로 재생성. DT_IC_Crop의 성장/재성장 값 사용.
+- 현재 R01 작물은 bGrowsNaturally=True로 자연 성장한다.
+- 닭은 전투로 처치할 수 있고 닭고기 1개 보장, 달걀은 기본 50% 확률로 1~4개 지급.
+- 닭 BP 부모는 AICRanchAnimal이며, DRP_R01_CHICKEN 전리품 DT를 사용한다.
+- 게임시간 점프와 저장/로드 후에도 성장·재생성 시각을 유지한다.
+
+아이템·레시피·현지화
+- 현재 활성 아이템 97종. 삭제 요청한 기존/테스트 재료·선물·임시 아이템과 사용 불가 책을 정리했다.
+- 기존 저장 데이터와 아이템 참조의 호환 처리를 추가했다.
+- 초보 무기 4종 제작 재료를 현재 작물·물고기·광석·채집물 조합으로 바꿨다.
+- 구매가·판매가·회복량은 DT_IC_Item, 이름/설명은 ST_IC_Definitions의 FText 키로 관리한다.
+- R01 요리 30종은 결과 1개, 기본 HP 25 / SP 15 회복.
+- DT_IC_Quest 등의 변경에는 삭제 아이템 참조 정리가 포함되며, 새 시나리오 적용을 뜻하지 않는다.
+
+가방 초과 드롭
+- 현재 모든 아이템의 WorldMesh는 엔진 기본 큐브, WorldMeshScale은 (0.25,0.25,0.25).
+- 나중에 DT_IC_Item의 해당 필드로 아이템별 바닥 외형을 바꾼다.
+- 메시가 비었거나 로드에 실패해도 기본 큐브로 표시한다.
+- 기존 F 줍기와 플레이시간 600초 소멸 규칙을 사용한다.
+
+뽑기 기계
+- /Game/IsekaiClass/Life/Gacha/BP_IC_GachaMachine.
+- L_TestMap (1400,-3550,75), 주방 왼쪽의 기본 큐브 외형.
+- F 상호작용으로 기본 1000G 지불 후 아이템 1개 추첨.
+- DT_IC_GachaMachine / GAC_R01_BASIC_001.
+- 기본 그룹: 채집물 10종 50%, 성장서 15종 50%.
+- 그룹 확률과 그룹 내부 아이템 확률을 따로 계산하며, 비용·목록·가중치·수량은 DT로 설정한다.
+- 가방이 가득 차면 기계 앞 바닥 드롭으로 지급한다.
+- EICDefinitionType::GachaMachine은 기존 값 보존을 위해 enum 마지막에 추가했다.
+- 정의 카탈로그와 레지스트리 연결도 함께 유지한다.
+
+치트
+- ICGiveStarterWeapons: 초보 검·활·스태프·완드 각 1개를 가방에 지급. 빈칸 4개 필요, 자동 장착 아님.
+- ICGiveGold: 보유 골드에 10000G 추가.
+- ICAddGameHours <시간>: 게임 달력 이동. 2=2시간, 24=하루, 0.5=30분.
+- 기존 ICAddGameMinutes, ICGiveItem 등도 유지했다.
+- 전체 14종 설명: Docs/Debug/치트_명령어_정리.txt.
+
+
+3. 새 시나리오의 적용 제한
+
+사용자는 시나리오 때문에 게임 시스템이나 DT를 바꾸지 말고 텍스트만 작성하라고 요청했다.
+Docs/Scenario/R01_새_시나리오.txt는 의뢰 55개의 새 시나리오 원고이며 게임에 적용하지 않았다.
+첨부 원고와 실제 시스템·아이템 ID를 참고하여 작성했고, 미등록 장소·소품은 제안으로만 남겼다.
+다음 통합 작업에서 이 원고를 근거로 퀘스트나 시스템을 자동 구현하지 않는다.
+
+
+4. 완료한 검증과 알려진 문제
+
+가장 최근 무기 순환:
+- Saved/BuildDirectWeaponCycle.log: Editor 빌드 Succeeded.
+- Saved/DirectWeaponCycleTests/index.json: 관련 자동 검사 7개 모두 통과.
+  IC.Input.WeaponCycleEmptyHandsAndFullBag
+  IC.Input.WeaponCycleFourFamilies
+  IC.Input.WeaponCycleMontageAndInterruption
+  IC.Input.WeaponCycleOrderAndSave
+  IC.Input.WeaponSwitchAndIndependentCooldowns
+  IC.Combat.NormalAttack.ComboAnimations
+  IC.Combat.NormalAttack.SwordComboDamage
+- Saved/WeaponSwitchLiveReview.json: complete=true, 샘플 64개.
+- 남녀 캐릭터 각각 무기 4종 두 바퀴, 남성 무기 1종 두 바퀴를 실제 PIE에서 확인했다.
+- 빈손을 거치지 않는 중간 전환과 입력당 다음 무기 도달을 검사했다.
+
+치트·뽑기·드롭:
+- Saved/GachaDropsTests/index.json: 관련 자동 검사 5개 통과.
+- Saved/GachaLiveReview/Review.json: 실제 콘솔 지급, F 뽑기, 골드 차감, 가방 초과 큐브 확인.
+
+생활·제작:
+- IC.Life 6개 통과, 달력 성장/재생성·닭 보상·제작 UI 등의 실제 PIE 검증 완료.
+- 상세: Docs/Life/Life_Data_Verification.ko.md.
+
+남아 있는 알려진 기존 검사 실패:
+- IC.UI.SaveSessionInteraction의 Gameplay projection shares the common UI content rect 검사.
+- 렌더링을 켠 재검증에서도 사각형 일치 검사가 실패했다.
+- 이전 넓은 회귀 검사 결과는 최종 81/82 통과이며, 전체 통과라고 보고하면 안 된다.
+- 최신 무기 순환 7개와 뽑기 5개의 통과 결과와 구분해서 다룬다.
+
+Saved 아래 로그·스크린샷·자동화 보고서는 로컬 산출물이다.
+다른 체크아웃에서 파일이 없더라도 위 기록과 추적 중인 검증 도구를 참고한다.
+
+
+5. dev 병합 후 바로 확인할 부분
+
+먼저 작업 브랜치, 커밋 여부, 로컬 변경, 원격 dev의 최신 상태를 확인한다.
+사용자가 팀 변경 반영을 요청하면 Fetch 후 현재 Leader에 최신 origin/dev를 병합한다.
+팀이 공유하는 브랜치의 기존 커밋 기록을 임의로 다시 쓰지 않는다.
+
+변경이 겹치기 쉬운 부분:
+- L_TestMap.umap의 제작대·주방·뽑기 기계 배치와 다른 팀원의 맵 변경.
+- DA_IC_DefinitionCatalog, ID 레지스트리, 새 DT 연결.
+- DT_IC_Item, DT_IC_Recipe, 생활 DT, ST_IC_Definitions/ST_IC_UI와 CSV 원본의 일치.
+- PlayerController의 입력·UI·저장 흐름과 PlayerCharacter의 무기 전환.
+- 닭 BP 부모 클래스, 가방 초과 드롭과 보상 경로.
+- 아이템 삭제에 따른 퀘스트·선물·상점 참조 및 저장 호환 코드.
+
+에셋 충돌은 소스와 실제 연결을 확인하여 해결한다. 한쪽 에셋을 일괄 채택하면
+다른 팀원의 배치나 이 작업의 DT/BP 연결이 빠질 수 있으므로 최종 내용을 확인한다.
+CSV만 바꾼 뒤 실제 DT 에셋이 갱신되지 않은 상태로 완료 처리하지 않는다.
+Tools/Life/setup_gacha_and_drops.py, configure_life_data.py 등은 초기 데이터 설정 도구다.
+기존 DT 편집 내용을 확인하지 않고 통째로 재실행하여 팀원의 밸런스 수정을 덮어쓰지 않는다.
+
+통합 후에는 Editor 빌드와 영향받은 자동 검사, 테스트맵 PIE를 확인한다.
+검증 도구:
+- Tools/Characters/review_weapon_switch.py
+- Tools/Combat/review_sword_combo_damage.py
+- Tools/Life/review_crafting_stations.py
+- Tools/Life/review_life_calendar.py
+- Tools/Life/review_gacha.py
+
+빌드: Tools/BuildProject.ps1
+실제 에디터가 프로젝트 DLL을 사용 중인지 확인하고 빌드한다.
+PIE 검토 도구는 분리된 테스트 저장 공간을 사용하므로 기존 사용자 세이브를 검증용으로 덮어쓰지 않는다.
+수정과 검증을 끝내면 최종 변경 내용 기준으로 커밋 메시지를 정리하여 Push/PR을 진행한다.
+이전 커밋이 이미 dev에 들어갔는지도 확인하여 중복 변경을 만들지 않는다.
+
+
+6. 관련 안내 문서
+
+Docs/Characters/R01_Groundwork.ko.md
+Docs/Characters/Player_NormalCombo.ko.md
+Docs/Combat/Combat_VFX_DT.ko.md
+Docs/Life/Crafting_Stations.ko.md
+Docs/Life/Life_DT_Editing.ko.md
+Docs/Life/Gacha_and_Drops.ko.md
+Docs/Life/Life_Data_Verification.ko.md
+Docs/Debug/Cheat_Commands.ko.md
+Docs/Debug/치트_명령어_정리.txt
+Docs/Scenario/R01_새_시나리오.txt

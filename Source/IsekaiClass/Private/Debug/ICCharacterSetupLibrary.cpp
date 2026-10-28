@@ -63,6 +63,26 @@ bool UICCharacterSetupLibrary::PressUIReviewKey(UWorld* World,FKey Key)
     return false;
 #endif
 }
+bool UICCharacterSetupLibrary::SetUIReviewAnalog(UWorld* World,FKey Key,float Value)
+{
+#if WITH_EDITOR
+    if(!World||World->WorldType!=EWorldType::PIE||!FSlateApplication::IsInitialized())return false;
+    return FSlateApplication::Get().ProcessAnalogInputEvent(FAnalogInputEvent(Key,FModifierKeysState(),0,false,0,0,Value));
+#else
+    return false;
+#endif
+}
+bool UICCharacterSetupLibrary::SetUIReviewKey(UWorld* World,FKey Key,bool Pressed)
+{
+#if WITH_EDITOR
+    auto* Viewport=World&&World->WorldType==EWorldType::PIE?World->GetGameViewport():nullptr;
+    auto Window=Viewport?Viewport->GetWindow():nullptr;if(!Window.IsValid()||!FSlateApplication::IsInitialized())return false;
+    auto& App=FSlateApplication::Get();App.ProcessWindowActivatedEvent(FWindowActivateEvent(FWindowActivateEvent::EA_Activate,Window.ToSharedRef()));
+    return Pressed?App.ProcessKeyDownEvent(FKeyEvent(Key,FModifierKeysState(),0,false,0,0)):App.ProcessKeyUpEvent(FKeyEvent(Key,FModifierKeysState(),0,false,0,0));
+#else
+    return false;
+#endif
+}
 
 bool UICCharacterSetupLibrary::BeginMonsterTestReview()
 {

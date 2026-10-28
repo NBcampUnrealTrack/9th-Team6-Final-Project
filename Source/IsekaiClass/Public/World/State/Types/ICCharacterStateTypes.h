@@ -30,6 +30,8 @@ struct FICMainStats
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) int32 LUK = 1;
     bool IsValid() const;
     bool Set(EICMainStat Stat, int32 Value);
+    int32 Get(EICMainStat Stat) const
+    {switch(Stat){case EICMainStat::STR:return STR;case EICMainStat::DEX:return DEX;case EICMainStat::INT:return INT;case EICMainStat::CON:return CON;case EICMainStat::CHA:return CHA;case EICMainStat::LUK:return LUK;default:return 0;}}
 };
 
 USTRUCT(BlueprintType)

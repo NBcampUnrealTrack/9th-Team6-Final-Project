@@ -54,12 +54,15 @@ def tick(delta):
                 return
             assert u.ICCharacterSetupLibrary.prepare_live_character_review(worlds[0])
             STATE.update(world=worlds[0], pc=pc, phase='creating')
+            u.SystemLibrary.execute_console_command(worlds[0], 'r.MotionBlurQuality 0')
             return
         if STATE['phase'] == 'creating':
             if not STATE['pc'].get_editor_property('created'):
                 return
             player = u.GameplayStatics.get_player_pawn(STATE['world'], 0)
             inventory = STATE['pc'].get_inventory()
+            for name in ('SwordSlash', 'ConeRange', 'Hit', 'Arrow', 'MagicOrb', 'ProjectileTrail'):
+                assert u.load_asset('/Game/IsekaiClass/VFX/CombatEffect/NormalAttack/NS_IC_Normal_' + name)
             for index, item in enumerate(('EQP_WPN_SWORD_001', 'EQP_WPN_BOW_001', 'EQP_WPN_STAFF_001', 'EQP_WPN_WAND_001')):
                 if inventory.get_weapon_loadout()[index].count > 0:
                     continue
@@ -125,10 +128,19 @@ def tick(delta):
             visual_type = u.ICAttackEffect if STATE['case'] % 4 == 0 else u.ICProjectile
             visuals = u.GameplayStatics.get_all_actors_of_class(STATE['world'], visual_type)
             hit_time = TIMINGS[('Male' if STATE['case'] < 4 else 'Female', NAMES[STATE['case'] % 4], stage)]
-            if stage not in STATE['captured'] and visuals and anim.montage_get_position(montage) >= hit_time + .03:
+            if stage not in STATE['captured'] and visuals and anim.montage_get_position(montage) >= hit_time + .06:
                 label = f'{"M" if STATE["case"] < 4 else "F"}_{NAMES[STATE["case"] % 4]}_{stage}'
                 assert u.ICCharacterSetupLibrary.capture_monster_test_hud(STATE['world'], str(OUT / (label + '.png')))
                 sample = {'case': label, 'montage': montage.get_path_name(), 'visible_effects': len(visuals)}
+                niagara = [component for actor in visuals for component in actor.get_components_by_class(u.NiagaraComponent)
+                           if component.is_active() and component.get_asset()
+                           and component.get_asset().get_path_name().startswith('/Game/IsekaiClass/VFX/CombatEffect/')]
+                sample['niagara_systems'] = [n.get_asset().get_path_name() for n in niagara]
+                sample['niagara_particles'] = [u.ICCombatVFXSetupLibrary.get_combat_particle_count(n) for n in niagara]
+                sample['niagara_attributes'] = [u.ICCombatVFXSetupLibrary.describe_combat_particles(n) for n in niagara]
+                expected = 26 if STATE['case'] % 4 == 0 else 3 if STATE['case'] % 4 == 1 else 2
+                assert sum(sample['niagara_particles']) >= expected, sample
+                assert len(niagara) >= 2, sample
                 if STATE['case'] % 4:
                     shot = max(visuals, key=lambda value: int(value.get_name().rsplit('_', 1)[1]))
                     velocity = shot.get_component_by_class(u.ProjectileMovementComponent).get_editor_property('velocity')

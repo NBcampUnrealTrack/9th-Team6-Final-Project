@@ -1,0 +1,76 @@
+2026-10-27 NPC 스킬·무기·UI 작업 인계
+브랜치 Leader, 시작 HEAD 3dfe1fb1. 사용자가 커밋·Push·PR을 직접 진행한다.
+이 파일은 긴 작업 중 재개용 기록이다. 완료되지 않은 항목을 완료로 보고하지 않는다.
+
+사용자 요구
+1. NPC_R01_001~011 고유 스킬을 플레이어가 동일 SkillID로 사용한다.
+   지정된 프로젝트 Niagara를 복제하여 CombatEffect/Skill/NPC에 저장한다.
+   발사·범위·추적 명중 효과, NPC 머리색, 피해·범위·쿨타임·시전·사운드를 DT로 관리한다.
+   R01_08은 강한 피해와 화려한 다중 파티클. 원본 샘플 에셋은 보존한다.
+   회색 효과는 누락된 머티리얼/텍스처/참조를 검사하고 복구 또는 재다운로드 목록을 작성한다.
+2. 무기: 초보자/시골 마을/단단한/물고기 비늘/무지개 5단계, 검·활·스태프·완드 4종.
+   추가 16개 무기는 사용자 지정 메시를 사용한다. 공격력과 요구 주능력치는 단계마다 +10.
+   검 STR, 활 DEX, 스태프 INT, 완드 CON. 모두 DT에서 변경 가능해야 한다.
+   시골: 광석1x2+들꽃줄기x2. 단단한: 광석1x1+광석2x2+광석3x2.
+   비늘: 물고기 종류를 섞어 총10개+광석4x4.
+   무지개: 물고기10x1+광석6x2+달걀x1+해바라기x1+분홍꽃x1.
+3. 치트: NPC01/02/03 호감도 300 및 파티 3칸 한 번에 배치.
+   초보 무기 4종 지급+각 가족 슬롯에 장착하는 별도 명령.
+4. Tab 몬스터 락온: 대상 지정/전환/해제, 사망·거리·시야 이탈 처리와 전투 조준 연결.
+5. 인벤토리 골드 표시, 퀵슬롯 기능 정리, 소비품/음식/성장서 팝업 [사용]→파티 대상 선택→실제 사용.
+6. 메뉴 도감 NPC 카테고리와 호감도 표시.
+
+조사 내용
+- 시작 시 Git 작업 트리 깨끗함, 에디터 실행 중 아님.
+- 지정된 Niagara 11개와 무기 메시 파일들이 프로젝트에 존재한다.
+- DT_IC_Skill의 SKL_NPC_R01_001~011과 고유 Ability/Cooldown BP가 이미 존재한다.
+- FICCombatVFXRow의 Cast/Slash/Range/Projectile/Trail/Impact를 재사용한다.
+- UICCombatVFXSetupLibrary::DuplicateCombatNiagara는 원본을 복제하고 User.IC_Color 틴트를 추가한다.
+- FICEquipmentRow에는 주능력치 요구 조건이 아직 없으므로 구조 및 장착 경로를 확장해야 한다.
+- FICRecipeRow.Ingredients는 고정 ItemID만 지원하므로 '아무 물고기 합계' 재료 그룹을 구현해야 한다.
+- 호감도 저장 한도는 이미 0~500, 동료 편입 조건은 300이다. 기존 ICSetAffinity 치트 입력 검사는 100이라 불일치.
+- 인벤토리 팝업은 장착/퀵슬롯/휴지통/뒤로만 존재. 대상 선택은 새 UI 필요.
+- 기존 BeginItem은 메뉴를 닫고 월드에서 대상 선택하므로 인벤토리 내 사용은 기존 원자적 사용 서비스로 연결한다.
+- 플레이어 컨트롤러에 SelectCombatTarget/CombatTarget/TargetOccludedAt가 이미 있다. Tab 연결·해제·조준 경로 점검 필요.
+
+진행 상태 (2026-10-27 갱신)
+[구현/에셋 저장] 지정 원본 기반 NPC Niagara 24개, 스킬 11개, 효과·상태·사운드 DT 연결.
+[구현/에셋 저장] 무기 16개와 레시피 16개 추가. 공격력 10/20/30/40/50, 요구 주능력치 0/10/20/30/40.
+  초보자 요구치 0은 최초 능력치 1에서도 장착하기 위한 예외. 물고기는 종류를 섞어 10개 사용.
+[구현] ICRecruitTestParty, ICEquipStarterWeapons. ICSetAffinity 상한 500으로 실제 저장 규칙과 일치.
+[구현] Tab 대상 순환/해제, 락온 표식 및 손→대상 조준. IA_TargetNext Pressed 트리거 소유권 수정 중.
+[구현/에셋 저장] 인벤토리 골드, [사용]→파티 선택, 퀵슬롯 클릭/1~4 등록/삭제. NPC 도감과 호감도.
+[참조 검사 통과] Free_Magic/Free_Spells 옛 경로 23개를 PackageRedirects로 복구. 새 검사 누락 0, 손상 텍스처 0.
+[빌드 통과] 전체 Unity 빌드 Saved/BuildNPCSkillFinalUnity.log. 후속 크기·첫 GPU 명중 보정 및 진단 GPU 읽기 보호도 빌드 통과.
+[자동 검사 통과] Saved/NPCSkillReview/FinalTests/index.json: 35개 성공, 0개 실패(경고 포함).
+[실제 PIE 통과] 파티 치트, 무기 치트, 골드 표시, 키보드 성장서 대상 선택, 무효 음식 미소비, 숫자 퀵슬롯, NPC 호감도 도감, 락온 순환/해제.
+  성공 로그: Saved/NPCSkillExpansionLive6.log의 NPC_EXPANSION_LIVE_REVIEW_OK.
+[실제 PIE 통과] 신규 무기 16개 메시·실측 길이 및 NPC 스킬 11개 발동. 모든 공격 스킬 피해와 대상 부착 Hit 확인.
+  R01_08과 R01_11은 각각 3회 타격 확인. Saved/NPCSkillReview/Combat/Review.json, NPCSkillCombatLive4.log 참고.
+[보정 완료] 새 수입 Niagara는 bUseComponentScale=True로 DT Scale 적용. GPU 첫 로딩 시 활성화 누락 수정.
+[실제 PIE 통과] 지원 스킬 직접 회복·지속 회복 상태·보호막 확인. 최종 Combat/Review.json은 무기 16개와 스킬 11개 전체 성공.
+[실제 PIE 통과] 최종 UI·락온·이펙트 전체 성공. Saved/NPCExpansionUIFinal.log, Live/Review.json.
+[시각 점검 통과] 원본/복제/명중 효과 근접 비교 완료. VFX/Review.json과 PNG 참고.
+  무료 효과의 ScaleColor가 읽는 Initial.Color가 속성 최적화로 제거되는 것이 투명화 원인이었음.
+  신규 NPC 복제본 24개만 편집·쿠킹의 속성 제거를 해제하고 재컴파일. 원본 샘플은 변경하지 않음.
+  GPU 데이터 진단은 CPU readback을 생략하도록 보호함.
+[외형 보정 완료] 검/스태프/완드 수입 메시의 음의 길이 축에 맞춰 손잡이를 보정. 새 16종 모두 실제 장착 확인.
+[문서 완료] Docs/Combat/NPC_스킬_무기_설정_안내.txt, VFX_에셋_점검.txt, Docs/Debug/치트_명령어_정리.txt.
+[최종 완료] Saved/NPCExpansionFinalVerification.log 및 FinalTests/index.json: 35개 통과, 실패 0개.
+  최종 원본 의존성 감사도 11개 모두 로드, 누락 의존성 0개. 커밋·Push·PR은 수행하지 않음.
+
+재개 시 참고
+- 저작: Tools/Combat/setup_npc_skill_expansion.py, 참조 감사: Tools/Combat/audit_npc_skill_assets.py.
+- 성공 표식 NPC_SKILL_WEAPON_UI_SETUP_OK 확인. Cmd는 Python 오류여도 종료 코드 0일 수 있다.
+- Saved/NPCSkillReview/Setup.json / Audit/Assets.json / Tests/index.json 참고.
+- C++ 확장 검사: Source/IsekaiClass/Private/Debug/Tests/ICExpansionChecks.cpp.
+- 전체 저작 스크립트는 초기 저작용이다. 향후 사용자가 수정한 DT를 재적용으로 덮어쓰지 않는다.
+- 에디터 PIE는 기존 BeginMonsterTestReview/PrepareLiveCharacterReview로 테스트 세이브 격리.
+- 실제 컨트롤러 BP는 /Game/IsekaiClass/Core/GameFramework/BP_ICPlayerController.
+
+기존 유지 사항
+- 무기 순환은 빈손→검→활→스태프→완드→빈손. 중간 넣기 없음.
+- 시나리오 초안은 문서만이며 게임에 반영하지 않는다.
+- SmartObjects 플러그인이 활성화된 상태와 제작 UI의 Unity Add 참조 수정 유지.
+- 에셋 생성 스크립트 전체 재실행으로 기존 밸런스·다른 팀원 변경을 덮어쓰지 않는다.
+- 이전 알려진 IC.UI.SaveSessionInteraction의 UI 사각형 검사 실패는 새 검사 결과와 구분한다.

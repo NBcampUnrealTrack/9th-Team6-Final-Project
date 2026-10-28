@@ -12,6 +12,56 @@
 #include "Engine/GameInstance.h"
 #include "Debug/ICLog.h"
 
+namespace ICShopCart
+{
+TMap<FGuid,int32> Reservations(const FICWorldState& State)
+{
+    TMap<FGuid,int32> Counts;
+    for(const auto& Pair:State.ProductionJobs)if(Pair.Value.Status==EICProductionJobStatus::Running||Pair.Value.Status==EICProductionJobStatus::Ready)
+        for(const auto& Cost:Pair.Value.Materials)if(Cost.Timing!=EICProductionMaterialTiming::ConsumeAtStart||!Pair.Value.bCostsCommitted)Counts.FindOrAdd(Cost.ItemInstanceID)+=Cost.Count;
+    return Counts;
+}
+}
+
+int32 UICShopSubsystem::GetSellableCount(AICPlayerController* Player,FName ItemID) const
+{
+    if(!Player||!Player->GetWorldState())return 0;const auto State=Player->GetWorldState()->ExportState();const auto Reserved=ICShopCart::Reservations(State);int32 Count=0;
+    for(const auto& Slot:State.Inventory.Bag.Slots)if(Slot.ItemID==ItemID&&!Slot.bLocked)Count+=FMath::Max(0,Slot.Count-Reserved.FindRef(Slot.InstanceID));return Count;
+}
+bool UICShopSubsystem::Checkout(AICPlayerController* Player,FName ServiceID,const TArray<FICItemAmount>& Cart,bool bSell,FText& Reason)
+{
+    Reason=FText::GetEmpty();auto Fail=[&](const TCHAR* Text){Reason=FText::FromString(Text);return false;};
+    auto* State=Player?Player->GetWorldState():nullptr;auto* Inventory=Player?Player->GetInventory():nullptr;
+    if(!State||!Inventory||Cart.IsEmpty()||Player->IsDead())return Fail(TEXT("장바구니를 확인하세요."));
+    TArray<FICShopOffer> Offers;FString Failure;if(!GetOffers(ServiceID,Offers,Failure)){Reason=FText::FromString(Failure);return false;}
+    if(!State->FlushParticipants())return Fail(TEXT("현재 상태를 확인할 수 없습니다."));
+    auto Next=State->ExportState();const auto Reserved=ICShopCart::Reservations(Next);TMap<FName,int64> Counts;int64 Total=0;
+    for(const auto& Line:Cart){if(Line.ItemID.IsNone()||Line.Count<=0||Line.Count>999)return Fail(TEXT("수량을 확인하세요."));Counts.FindOrAdd(Line.ItemID)+=Line.Count;}
+    auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(Inventory->GetDefinitions(),Next.Job);if(!Staging->ApplySnapshot(Next.Inventory))return false;
+    for(const auto& Line:Counts)
+    {
+        const auto* Item=Inventory->Find(Line.Key);if(!Item||Line.Value>999)return Fail(TEXT("아이템 또는 수량을 확인하세요."));
+        if(bSell)
+        {
+            if(!Item->bCanSell||Item->SellPrice<=0||Item->Kind==EPlayerItemKind::Quest||GetSellableCount(Player,Line.Key)<Line.Value)return Fail(TEXT("판매할 수 없는 아이템이거나 수량이 부족합니다."));
+            int32 Remaining=Line.Value;
+            for(auto& Slot:Next.Inventory.Bag.Slots)if(Slot.ItemID==Line.Key&&!Slot.bLocked&&Remaining>0)
+            {const int32 Take=FMath::Min(Remaining,FMath::Max(0,Slot.Count-Reserved.FindRef(Slot.InstanceID)));Slot.Count-=Take;Remaining-=Take;if(Slot.Count==0)Slot=FPlayerItemInstance();}
+            if(Remaining>0)return Fail(TEXT("제작 예약 재료는 판매할 수 없습니다."));Total+=int64(Item->SellPrice)*Line.Value;
+        }
+        else
+        {
+            const auto* Offer=Offers.FindByPredicate([&](const FICShopOffer& O){return O.ItemID==Line.Key;});if(!Offer)return Fail(TEXT("판매중인 상품이 아닙니다."));
+            Total+=int64(Offer->FinalPrice)*Line.Value;if(!Staging->AddItem(Line.Key,Line.Value,false))return Fail(TEXT("가방에 공간이 부족합니다."));
+        }
+    }
+    const int64 Gold=int64(Next.Gold)+(bSell?Total:-Total);if(Gold<0)return Fail(TEXT("골드가 부족합니다."));if(Gold>MAX_int32)return Fail(TEXT("보유 골드 한도를 초과합니다."));
+    if(!bSell)Next.Inventory=Staging->GetSnapshot();
+    else for(auto& Quick:Next.Inventory.QuickSlots)if(!Quick.IsNone()&&!Next.Inventory.Bag.Slots.ContainsByPredicate([&](const auto& Slot){return Slot.ItemID==Quick&&Slot.Count>0;}))Quick=NAME_None;
+    Next.Gold=Gold;if(!Inventory->ValidateSnapshot(Next.Inventory)||!State->CommitGameplayTransaction(Next,FGuid::NewGuid()))return Fail(TEXT("아이템 상태가 변경됐습니다. 다시 시도하세요."));
+    return true;
+}
+
 bool UICShopSubsystem::ResolveService(FName ServiceID,const FICServiceRow*& Service,FString& Reason) const
 {
     IC_TRACE_FUNCTION();Service=nullptr;
@@ -39,6 +89,7 @@ bool UICShopSubsystem::ResolveService(FName ServiceID,const FICServiceRow*& Serv
     bool bOpen=Row->OpeningHours.IsEmpty();
     for(const auto& Hours:Row->OpeningHours)if(Minute>=Hours.OpenGameMinute&&Minute<Hours.CloseGameMinute)bOpen=true;
     if(!bOpen){Reason=ICText::Get(TEXT("Native_d91cd776aeb6")).ToString();return false;}
+    if(!Row->bRequireWorkSchedule){Service=Row;return true;}
     if(!Row->WorkAnchorID.IsNone()&&NPC.CurrentAnchorID!=Row->WorkAnchorID){Reason=ICText::Get(TEXT("Native_ae293ed2d69e")).ToString();return false;}
     const auto* NPCRow=D->Find<FICNPCRow>(Row->NPCID,R);
     const auto* Schedule=NPCRow?D->Find<FICScheduleRow>(NPCRow->ScheduleID,R):nullptr;

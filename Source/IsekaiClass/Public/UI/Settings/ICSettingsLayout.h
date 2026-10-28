@@ -10,6 +10,7 @@ struct FICSettingSpec
 };
 namespace ICSettingsLayout
 {
+    FText ControllerHelp(int32 Layout);
     const TArray<FICSettingSpec>& Specs();
     const TArray<FText>& Tabs();
     void Build(UWidgetTree* Tree);

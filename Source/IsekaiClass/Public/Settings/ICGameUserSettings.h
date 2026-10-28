@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/GameUserSettings.h"
+#include "InputCoreTypes.h"
 #include "ICGameUserSettings.generated.h"
 
 class AICPlayerController;
@@ -17,6 +18,10 @@ class ISEKAICLASS_API UICGameUserSettings : public UGameUserSettings
 public:
     UICGameUserSettings();
     static UICGameUserSettings* Get();
+    static bool IsGamepadAcceptKey(FKey Key);
+    static bool IsGamepadBackKey(FKey Key);
+    static FKey GamepadFaceKey(int32 SemanticXYBA);
+    static FKey MenuKey(FKey Key);
     virtual void SetToDefaults() override;
     virtual void ValidateSettings() override;
     virtual void LoadSettings(bool bForceReload=false) override;
@@ -44,6 +49,11 @@ public:
     UPROPERTY(Config,EditAnywhere,BlueprintReadWrite,Category="User Settings") float UIVolume=1;
     UPROPERTY(Config,EditAnywhere,BlueprintReadWrite,Category="User Settings") bool bMuteUnfocused=true;
     UPROPERTY(Config,EditAnywhere,BlueprintReadWrite,Category="User Settings") bool bShowFPS=false;
+    UPROPERTY(Config,EditAnywhere,BlueprintReadWrite,Category="User Settings") int32 LanguageIndex=0;
+    /** 0 auto, 1 keyboard/mouse hints, 2 gamepad hints. Both devices remain usable. */
+    UPROPERTY(Config,EditAnywhere,BlueprintReadWrite,Category="User Settings") int32 InputDeviceMode=0;
+    /** 0 Nintendo, 1 Xbox (default). Semantic X/Y/B/A follow the selected physical face layout. */
+    UPROPERTY(Config,EditAnywhere,BlueprintReadWrite,Category="User Settings") int32 GamepadLayout=1;
     UPROPERTY(Config,EditAnywhere,BlueprintReadWrite,Category="User Settings") float UIScale=1;
     UPROPERTY(Config,EditAnywhere,BlueprintReadWrite,Category="User Settings") float DisplayGamma=2.2f;
     UPROPERTY(Config,EditAnywhere,BlueprintReadWrite,Category="User Settings") int32 AntiAliasingMethod=4;

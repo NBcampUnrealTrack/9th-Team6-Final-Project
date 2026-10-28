@@ -1,4 +1,6 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Life/ICStorageWidget.h"
+#include "UI/Map/ICMapWidget.h"
 #include "UI/Gameplay/ICDeathWidget.h"
 #include "Life/Production/ICGatheringSubsystem.h"
 #include "UI/Framework/ICDisplayPolicy.h"
@@ -46,6 +48,7 @@ AICPlayerController::AICPlayerController()
 {
     IC_TRACE_FUNCTION();
     PrimaryActorTick.bTickEvenWhenPaused = true;
+    DialoguePresentationTable=TSoftObjectPtr<UDataTable>(FSoftObjectPath(TEXT("/Game/IsekaiClass/Data/DataTable/NPC/DT_IC_DialoguePresentation.DT_IC_DialoguePresentation")));
     CheatClass = UICDebugCheatManager::StaticClass();
     DroppedItemClass = AICDroppedItem::StaticClass();
     QuestTrackerWidgetClass = TSoftClassPtr<UICQuestTrackerWidget>(FSoftObjectPath(
@@ -273,6 +276,16 @@ void AICPlayerController::UpdateScreens()
         }
     }
     else if(LoadingScreen){if(FrontendUI)FrontendUI->CloseScreen(LoadingScreen);LoadingScreen=nullptr;}
+    if(Menu==TEXT("Map"))
+    {
+        if(!MapScreen)
+        {
+            auto* Class=LoadClass<UICMapWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Map.WBP_IC_Map_C"));
+            MapScreen=CreateWidget<UICMapWidget>(this,Class?Class:UICMapWidget::StaticClass());
+            if(MapScreen&&FrontendUI)FrontendUI->OpenScreen(MapScreen,true,200);
+        }
+    }
+    else if(MapScreen){if(FrontendUI)FrontendUI->CloseScreen(MapScreen);MapScreen=nullptr;}
     if(Menu==TEXT("Settings"))
     {
         if(!SettingsScreen)
@@ -335,6 +348,7 @@ void AICPlayerController::UpdateScreens()
 void AICPlayerController::EndPlay(const EEndPlayReason::Type Reason)
 {
     IC_TRACE_FUNCTION();
+    EndNPCDialogueCamera();
     UE_LOG(LogICCore, Log, TEXT("[Player.EndPlay] Controller=%s Reason=%d Created=%d"),*GetNameSafe(this),static_cast<int32>(Reason),bCreated);
     ResetHeldInput();
     if(bGameplayInitialized && bCreated)FlushWorldState();
@@ -441,8 +455,11 @@ void AICPlayerController::SetMenu(const FString& RequestedMenu)
 {
     IC_TRACE_FUNCTION();
     const FString NewMenu=bDead&&!IsMainMenuLevel()&&RequestedMenu!=TEXT("Death")&&RequestedMenu!=TEXT("Load")&&RequestedMenu!=TEXT("Confirm")&&RequestedMenu!=TEXT("Loading")?TEXT("Death"):RequestedMenu;
+    if(MapScreen&&MapScreen->IsTraveling()&&NewMenu!=TEXT("Death")&&NewMenu!=TEXT("Loading"))return;
+    if(!NewMenu.IsEmpty()&&StorageScreen)StorageScreen->CloseStorage();
     if(bItemTransactionInProgress&&NewMenu!=TEXT("Quit")&&NewMenu!=TEXT("Confirm")&&NewMenu!=TEXT("Death")){ShowLocalized(ICText::Get(TEXT("Native_bfb9fda0713f")));return;}
     if(!NewMenu.IsEmpty()&&GetGameInstance())GetGameInstance()->GetSubsystem<UICGatheringSubsystem>()->CancelGather();
+    if(NewMenu!=TEXT("Dialogue"))EndNPCDialogueCamera();
     if (NewMenu != TEXT("Dialogue") && DialogueScreen)
     {
         UICNPCDialogueWidget* Closing = DialogueScreen;
@@ -464,8 +481,8 @@ void AICPlayerController::SetMenu(const FString& RequestedMenu)
     UpdateScreens();
     InteractionHint.Empty();bShowMouseCursor=!NewMenu.IsEmpty();
     if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);}
-    UUserWidget* Focus=LoadingScreen?static_cast<UUserWidget*>(LoadingScreen.Get()):SettingsScreen?static_cast<UUserWidget*>(SettingsScreen.Get()):SessionSaveLoadScreen?static_cast<UUserWidget*>(SessionSaveLoadScreen.Get()):DeathScreen?static_cast<UUserWidget*>(DeathScreen.Get()):CharacterCreateScreen&&CharacterCreateScreen->IsActivated()?static_cast<UUserWidget*>(CharacterCreateScreen.Get()):IsMainMenuLevel()?static_cast<UUserWidget*>(MainMenuWidget.Get()):static_cast<UUserWidget*>(Screen.Get());
-    if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->SetMenuContext(this,Focus,!NewMenu.IsEmpty());
+    UUserWidget* Focus=LoadingScreen?static_cast<UUserWidget*>(LoadingScreen.Get()):MapScreen?static_cast<UUserWidget*>(MapScreen.Get()):SettingsScreen?static_cast<UUserWidget*>(SettingsScreen.Get()):SessionSaveLoadScreen?static_cast<UUserWidget*>(SessionSaveLoadScreen.Get()):DeathScreen?static_cast<UUserWidget*>(DeathScreen.Get()):CharacterCreateScreen&&CharacterCreateScreen->IsActivated()?static_cast<UUserWidget*>(CharacterCreateScreen.Get()):IsMainMenuLevel()?static_cast<UUserWidget*>(MainMenuWidget.Get()):static_cast<UUserWidget*>(Screen.Get());
+    if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->SetMenuContext(this,Focus,!NewMenu.IsEmpty()&&NewMenu!=TEXT("Dialogue"));
     FlushPressedKeys();bDirty=true;UpdateGamePhase();SyncSaveSafety();OnMenuChanged.Broadcast(Menu);
 }
 void AICPlayerController::UpdateGamePhase()
@@ -473,7 +490,7 @@ void AICPlayerController::UpdateGamePhase()
     IC_TRACE_FUNCTION();
     if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);}
     auto* State=GetWorld()?GetWorld()->GetGameState<AICGameState>():nullptr;
-    if(State)State->SetPhase(IsMainMenuLevel()?EICGamePhase::Menu:bDead?EICGamePhase::Dead:!bCreated?EICGamePhase::CharacterCreation:!Menu.IsEmpty()?EICGamePhase::Menu:EICGamePhase::Playing);
+    if(State)State->SetPhase(IsMainMenuLevel()?EICGamePhase::Menu:bDead?EICGamePhase::Dead:!bCreated?EICGamePhase::CharacterCreation:!Menu.IsEmpty()&&Menu!=TEXT("Dialogue")?EICGamePhase::Menu:EICGamePhase::Playing);
 }
 void AICPlayerController::CancelTarget()
 {

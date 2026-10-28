@@ -4,6 +4,7 @@
 #include "ICNPCTestLayout.generated.h"
 
 class AICWorldAnchor;
+class AICLifeObjectActor;
 
 /** A single test-map origin; normal spawn and schedule systems still own NPCs. */
 UCLASS(Blueprintable)
@@ -19,8 +20,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="IC|NPC Test", meta=(ClampMin="200", Units="cm")) float BedDistanceCm = 700;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="IC|NPC Test", meta=(Units="cm")) float AnchorHeightCm = 88;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="IC|NPC Test") TSoftClassPtr<AActor> BedClass;
+    UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="IC|NPC Test") TSoftClassPtr<AICLifeObjectActor> InteractionBedClass;
     UFUNCTION(BlueprintPure, Category="IC|NPC Test") FTransform StandingTransform(int32 Index) const;
     UFUNCTION(BlueprintPure, Category="IC|NPC Test") FTransform BedTransform(int32 Index) const;
     UPROPERTY(Transient, BlueprintReadOnly, Category="IC|NPC Test") TArray<TObjectPtr<AICWorldAnchor>> GeneratedAnchors;
     UPROPERTY(Transient, BlueprintReadOnly, Category="IC|NPC Test") TArray<TObjectPtr<AActor>> GeneratedBeds;
+    UPROPERTY(Transient,BlueprintReadOnly,Category="IC|NPC Test") TArray<TObjectPtr<AICLifeObjectActor>> GeneratedBedInteractions;
 };

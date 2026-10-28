@@ -1,4 +1,5 @@
 #include "UI/Gameplay/ICGameMenuWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "UI/Gameplay/ICPartyMenuWidget.h"
 #include "UI/Gameplay/ICInventoryMenuWidget.h"
@@ -129,6 +130,7 @@ bool UICGameMenuWidget::HandleMenuKey(FKey Key,bool bRepeat)
         if(CodexContent->HandleMenuKey(Key,bRepeat)){RefreshNavigation();return true;}
     }
     auto* Inventory=SelectedTab==TEXT("Inventory")?Cast<UICInventoryMenuWidget>(GetWidgetFromName(TEXT("InventoryContent"))):nullptr;
+    if(Inventory&&Inventory->IsSearchFocused())return false;
     if(Inventory&&(NavigationArea!=0||Inventory->IsBusy()))
     {
         if(Inventory->HandleMenuKey(Key,bRepeat)){RefreshNavigation();return true;}
@@ -143,7 +145,7 @@ bool UICGameMenuWidget::HandleMenuKey(FKey Key,bool bRepeat)
     const bool Down=Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down;
     const bool Left=Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left;
     const bool Right=Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right;
-    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||Key==EKeys::Gamepad_FaceButton_Bottom;
+    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key);
     if(!Up&&!Down&&!Left&&!Right&&!Accept)return false;
     auto* TabsWidget=GetWidgetFromName(TEXT("MenuTabs"));const bool TabsVisible=!TabsWidget||TabsWidget->IsVisible();
     if(!TabsVisible)NavigationArea=1;
@@ -185,7 +187,7 @@ FReply UICGameMenuWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const
 FReply UICGameMenuWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)
 {
     if(HandleMenuKey(Event.GetKey(),Event.IsRepeat()))return FReply::Handled();
-    if (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::Equals || Event.GetKey() == EKeys::Gamepad_FaceButton_Right)
+    if (Event.GetKey() == EKeys::Escape || Event.GetKey() == EKeys::Equals || UICGameUserSettings::IsGamepadBackKey(Event.GetKey()))
     {
         if (!Event.IsRepeat())
         {

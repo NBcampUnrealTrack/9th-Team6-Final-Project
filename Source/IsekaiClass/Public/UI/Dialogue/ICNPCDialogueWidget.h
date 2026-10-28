@@ -26,6 +26,7 @@ protected:
     virtual void NativeDestruct() override;
     virtual void NativeTick(const FGeometry& Geometry, float DeltaSeconds) override;
     virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
+    virtual FReply NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& KeyEvent) override;
 
 private:
     UPROPERTY(meta=(BindWidget))

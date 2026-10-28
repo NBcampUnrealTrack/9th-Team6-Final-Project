@@ -4,6 +4,27 @@
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
 
+bool UICInventoryComponent::MeetsEquipmentRequirements(FName CharacterID,FName ItemID,FText& Reason) const
+{
+    Reason=FText::GetEmpty();FICDefinitionResult Result;
+    const auto* Item=Find(ItemID);const auto* Gear=Item&&GetDefinitions()?GetDefinitions()->Find<FICEquipmentRow>(Item->EquipmentID,Result):nullptr;
+    if(!Gear)return false;
+    if(Gear->RequiredMainStatValue==0)return true;
+    if(Gear->RequiredMainStatValue<0||!WorldState)return false;
+    const auto Stats=WorldState->GetSnapshot(CharacterID).MainStats;int32 Value=0;FText Name;
+    switch(Gear->RequiredMainStat)
+    {
+        case EICStat::STR:Value=Stats.STR;Name=NSLOCTEXT("ICEquipment","STR","근력");break;
+        case EICStat::DEX:Value=Stats.DEX;Name=NSLOCTEXT("ICEquipment","DEX","민첩");break;
+        case EICStat::INT:Value=Stats.INT;Name=NSLOCTEXT("ICEquipment","INT","지력");break;
+        case EICStat::CON:Value=Stats.CON;Name=NSLOCTEXT("ICEquipment","CON","체력");break;
+        case EICStat::LUK:Value=Stats.LUK;Name=NSLOCTEXT("ICEquipment","LUK","운");break;
+        default:return false;
+    }
+    if(Value>=Gear->RequiredMainStatValue)return true;
+    Reason=FText::Format(NSLOCTEXT("ICEquipment","Requirement","{0} {1} 이상 필요합니다. (현재 {2})"),Name,FText::AsNumber(Gear->RequiredMainStatValue),FText::AsNumber(Value));return false;
+}
+
 bool UICInventoryComponent::RollRandomOptions(FPlayerItemInstance& Item,const FICItemRow& Definition) const
 {
     IC_TRACE_FUNCTION();

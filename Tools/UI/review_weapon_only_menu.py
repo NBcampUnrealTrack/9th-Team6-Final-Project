@@ -44,7 +44,7 @@ def tick(delta):
         if STATE['phase']=='party' and elapsed>.4:
             capture('PartyStatGroups');STATE['checks']['three_stat_groups']=True
             assert menu.select_tab('Inventory')
-            for id,count in (('ITM_CONS_001',3),('ITM_MAT_002',4),('EQP_WPN_SWORD_001',1)):assert inv.add_item(id,count,False)
+            for id,count in (('ITM_CONS_001',3),('ITM_R01_CROP_01',4),('EQP_WPN_SWORD_001',1)):assert inv.add_item(id,count,False)
             inventory.refresh_inventory();phase('inventory');return
         if STATE['phase']=='inventory' and elapsed>.4:
             capture('WeaponAndQuickSlots');open_item('EQP_WPN_SWORD_001');phase('weapon_popup');return
@@ -58,10 +58,10 @@ def tick(delta):
             capture('QuickSlotConfirmation');press('Escape');assert inventory.get_editor_property('detail_open');assert not inventory.get_editor_property('confirming')
             STATE['checks']['cancel_returns_to_item_popup']=True
             keys('Enter','D','D','Enter','A','Enter');assert str(inv.get_snapshot().quick_slots[2])=='ITM_CONS_001';assert not inventory.get_editor_property('detail_open')
-            STATE['checks']['keyboard_assigns_quick_slot']=True;open_item('ITM_MAT_002');STATE['material_count']=inv.count_item('ITM_MAT_002');phase('material_popup');return
+            STATE['checks']['keyboard_assigns_quick_slot']=True;open_item('ITM_R01_CROP_01');STATE['material_count']=inv.count_item('ITM_R01_CROP_01');phase('material_popup');return
         if STATE['phase']=='material_popup' and elapsed>.3:
-            capture('MaterialItemPopup');press('Enter');assert inventory.get_editor_property('confirming');press('Escape');assert inv.count_item('ITM_MAT_002')==STATE['material_count']
-            keys('Enter','A','Enter');assert inv.count_item('ITM_MAT_002')==0;STATE['checks']['trash_requires_confirmation']=True
+            capture('MaterialItemPopup');press('Enter');assert inventory.get_editor_property('confirming');press('Escape');assert inv.count_item('ITM_R01_CROP_01')==STATE['material_count']
+            keys('Enter','A','Enter');assert inv.count_item('ITM_R01_CROP_01')==0;STATE['checks']['trash_requires_confirmation']=True
             assert menu.select_tab('Codex');codex=u.WidgetLibrary.get_all_widgets_of_class(STATE['world'],u.ICCodexMenuWidget,False)[0];codex.select_category(0);STATE['codex']=codex;phase('skills');return
         if STATE['phase']=='skills' and elapsed>.3:
             capture('UnknownSkills');codex=STATE['codex'];known={str(id) for id in pc.get_world_state().get_snapshot('CHR_PLAYER').get_editor_property('UnlockedSkillIDs')}

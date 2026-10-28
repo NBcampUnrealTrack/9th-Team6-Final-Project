@@ -32,12 +32,13 @@ bool FICLifePrototypeCheck::RunTest(const FString&)
     {
         const FName ID(*FString::Printf(TEXT("CRP_R01_%02d"),Index));const auto* Crop=D->Find<FICCropRow>(ID,R);
         if(!TestNotNull(TEXT("Real crop DT row"),Crop))continue;
-        TestEqual(TEXT("Seed plus one stage per game day"),Crop->GrowthStages.Num(),Days[Index-1]+1);
-        TestTrue(TEXT("Initial planted stage has no visible mesh"),Crop->GrowthStages[0].Mesh.IsNull());
+        TestEqual(TEXT("Original visible meshes are the complete stage list"),Crop->GrowthStages.Num(),Days[Index-1]);
+        TestFalse(TEXT("First growth stage has a real mesh"),Crop->GrowthStages[0].Mesh.IsNull());
         auto* Type=Crop->CropActorClass.LoadSynchronous();if(!TestNotNull(TEXT("Real crop BP"),Type))continue;
         auto* Plot=World->SpawnActor<AICLifeActor>(Type,FVector(Index*400,0,0),FRotator::ZeroRotator);Plots.Add(Plot);
-        TestTrue(TEXT("Plant consumes the actual seed and saves a plot"),Plot->Plant(PC));
-        TestEqual(TEXT("Just planted is stage zero"),Plot->GetGrowthStage(),0);TestNull(TEXT("Just planted is invisible"),Plot->VisualMesh->GetStaticMesh().Get());
+        Plot->RefreshLife();
+        TestEqual(TEXT("Natural crop starts at its first stage"),Plot->GetGrowthStage(),0);TestNotNull(TEXT("First stage is visible"),Plot->VisualMesh->GetStaticMesh().Get());
+        TestFalse(TEXT("Growing crop cannot be harvested early"),Plot->TryInteract(PC));
         TestFalse(TEXT("An occupied plot rejects duplicate planting"),Plot->Plant(PC));
     }
     for(int32 Day=1;Day<=5;++Day)
@@ -45,9 +46,9 @@ bool FICLifePrototypeCheck::RunTest(const FString&)
         TestTrue(TEXT("An actual game day advances"),Time->JumpGameMinutes(1440));
         for(int32 Index=0;Index<Plots.Num();++Index)
         {
-            auto* Plot=Plots[Index];Plot->RefreshLife();const int32 Expected=FMath::Min(Day,Days[Index]);
+            auto* Plot=Plots[Index];Plot->RefreshLife();const int32 Expected=FMath::Min(Day,Days[Index]-1);
             TestEqual(TEXT("Crop advances exactly one stage per day"),Plot->GetGrowthStage(),Expected);
-            TestEqual(TEXT("Only the last stage can be harvested"),Plot->IsHarvestable(),Day>=Days[Index]);
+            TestEqual(TEXT("Only the last stage can be harvested"),Plot->IsHarvestable(),Day>=Days[Index]-1);
             TestNotNull(TEXT("Grown crop displays its DT mesh"),Plot->VisualMesh->GetStaticMesh().Get());
         }
         if(Day==1)
@@ -60,7 +61,13 @@ bool FICLifePrototypeCheck::RunTest(const FString&)
         }
     }
     for(auto* Plot:Plots)
-    {TestTrue(TEXT("Ripe crop grants its actual yield"),Plot->TryInteract(PC));TestEqual(TEXT("Harvest clears the saved planted crop"),Plot->GetGrowthStage(),INDEX_NONE);TestFalse(TEXT("No seed means no duplicate harvest"),Plot->TryInteract(PC));Plot->Destroy();}
+    {FText Reason;TestTrue(TEXT("Ripe crop grants its actual yield at work completion"),Plot->CompletePlayerAction(PC,NAME_None,Reason));TestEqual(TEXT("Harvest hides the crop during regrowth"),Plot->GetGrowthStage(),INDEX_NONE);TestFalse(TEXT("Cooldown cannot grant duplicate harvest"),Plot->CompletePlayerAction(PC,NAME_None,Reason));TestNull(TEXT("Harvested crop has no visible mesh"),Plot->VisualMesh->GetStaticMesh().Get());}
+    const auto Dormant=State->ExportState();
+    TestTrue(TEXT("A harvested crop state can be saved"),UICWorldStateSubsystem::ValidateStateClock(Dormant,Time->GetClock()));
+    TestTrue(TEXT("119 calendar minutes elapse"),Time->JumpGameMinutes(119));
+    for(auto* Plot:Plots)TestEqual(TEXT("Regrowth never happens before two game hours"),Plot->GetGrowthStage(),INDEX_NONE);
+    TestTrue(TEXT("One more calendar minute elapses"),Time->JumpGameMinutes(1));
+    for(auto* Plot:Plots){Plot->RefreshLife();TestEqual(TEXT("Two game hours restarts at stage one"),Plot->GetGrowthStage(),0);TestFalse(TEXT("A regenerated crop is not mature"),Plot->IsHarvestable());Plot->Destroy();}
     for(int32 Index=1;Index<=10;++Index)
     {
         const auto* Row=D->Find<FICResourceRow>(FName(*FString::Printf(TEXT("RES_R01_GATHER_%02d"),Index)),R);

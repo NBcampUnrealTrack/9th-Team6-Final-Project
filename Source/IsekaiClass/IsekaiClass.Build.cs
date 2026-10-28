@@ -11,6 +11,7 @@ public class IsekaiClass : ModuleRules
             "Core",
             "CoreUObject",
             "Engine",
+            "Json",
             "AnimGraphRuntime",
             "DeveloperSettings",
             "InputCore",
@@ -39,6 +40,7 @@ public class IsekaiClass : ModuleRules
             PrivateDependencyModuleNames.Add("UMGEditor");
             PrivateDependencyModuleNames.Add("AssetRegistry");
             PrivateDependencyModuleNames.Add("AnimationBlueprintLibrary");
+            PrivateDependencyModuleNames.Add("NiagaraEditor");
             PrivateDependencyModuleNames.Add("RenderCore");
             PrivateDependencyModuleNames.Add("RHI");
             PrivateDependencyModuleNames.Add("VRM4U");

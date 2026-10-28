@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Data/Rows/Combat/ICCombatTypes.h"
+#include "Data/Rows/Life/ICProductionTypes.h"
 #include "ICCharacterAnimationProfile.generated.h"
 
 class UAnimMontage;
@@ -44,6 +45,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TMap<EICWeaponFamily, FICCharacterAnimationSet> WeaponSets;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) FICCharacterAnimationSet Unarmed;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TObjectPtr<UAnimSequence> Sleep;
+    UPROPERTY(EditAnywhere,BlueprintReadOnly) TObjectPtr<UAnimSequence> SleepEnter;
+    UPROPERTY(EditAnywhere,BlueprintReadOnly) TObjectPtr<UAnimSequence> SleepExit;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TMap<EICLifeActivity,TObjectPtr<UAnimMontage>> LifeActions;
     /** Mesh pose relative to a bed anchor (anchor origin is the standing capsule centre). */
     UPROPERTY(EditAnywhere, BlueprintReadOnly) FTransform SleepMeshTransform = FTransform(FRotator(0,-90,0), FVector(-35,-36,22));
     UPROPERTY(EditAnywhere, BlueprintReadOnly) EICWeaponFamily DefaultFamily = EICWeaponFamily::Sword;

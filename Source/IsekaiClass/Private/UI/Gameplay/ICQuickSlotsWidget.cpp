@@ -49,6 +49,7 @@ void UICQuickSlotsWidget::RefreshQuickSlots()
     {
         auto* Card = Cast<UICQuickSlotWidget>(GetWidgetFromName(FName(*FString::Printf(TEXT("QuickSlot%d"), Index + 1))));
         if (!Card) continue;
+        Card->SetSlotNumber(Index+1);
         const FName ID = Inventory.QuickSlots.IsValidIndex(Index) ? Inventory.QuickSlots[Index] : NAME_None;
         int64 Count = 0;
         if (!ID.IsNone())
@@ -57,6 +58,6 @@ void UICQuickSlotsWidget::RefreshQuickSlots()
         FICDefinitionResult Result;
         const auto* Item = Definitions && Count > 0 ? Definitions->Find<FICItemRow>(ID, Result) : nullptr;
         const bool bUsable = Item && (Item->Kind == EPlayerItemKind::Consumable || Item->Kind == EPlayerItemKind::Expansion);
-        Card->SetItem(ID, static_cast<int32>(FMath::Min<int64>(Count, MAX_int32)), bUsable ? Item->Icon.LoadSynchronous() : nullptr);
+        Card->SetItem(bUsable?ID:NAME_None, bUsable?static_cast<int32>(FMath::Min<int64>(Count, MAX_int32)):0, bUsable ? Item->Icon.LoadSynchronous() : nullptr);
     }
 }

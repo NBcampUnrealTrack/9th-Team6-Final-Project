@@ -60,7 +60,7 @@ void UICAbilitySystemComponent::PlayCombatCue(bool bImpact, const FICCombatPrese
 {
     // Configured monster reactions already play once from the applied HP loss,
     // including periodic and projectile damage. Do not add the generic impact.
-    if(bImpact)if(const auto* Enemy=Cast<AICEnemyBase>(Recipient))
+    if(bImpact&&Presentation.Visuals.IsNull())if(const auto* Enemy=Cast<AICEnemyBase>(Recipient))
         if(!Enemy->GetMonsterDefinition().HitVFX.IsNull()||!Enemy->GetMonsterDefinition().HitSound.IsNull())return;
     if(bImpact&&Cast<AICEnemyBase>(GetAvatarActor())&&Presentation.ImpactVFX.IsNull()&&Presentation.ImpactSound.IsNull())return;
     auto* Payload = NewObject<UICCombatCuePayload>(this);

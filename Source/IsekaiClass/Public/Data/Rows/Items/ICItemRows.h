@@ -21,6 +21,7 @@ struct ISEKAICLASS_API FICItemRow : public FPlayerItemDefinition
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSoftObjectPtr<UTexture2D> Icon;
     /** Automatic reads resource/crop/fish/production DT yields. Explicit categories cover future items. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Codex") EICCodexProductCategory CodexProductCategory=EICCodexProductCategory::Automatic;
+    /** World-drop appearance. Empty or unavailable meshes fall back to the basic cube. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") TSoftObjectPtr<UStaticMesh> WorldMesh;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") FVector WorldMeshScale = FVector(.25f);
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EICItemTarget UseTarget = EICItemTarget::None;
@@ -50,11 +51,18 @@ struct ISEKAICLASS_API FICEquipmentRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EPlayerEquipSlot Slot = EPlayerEquipSlot::None;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EICWeaponFamily WeaponFamily = EICWeaponFamily::None;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EICCharacterClass RequiredClass = EICCharacterClass::None;
+    /** Uses the character's permanent main stat, without equipment bonuses. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Requirements") EICStat RequiredMainStat=EICStat::None;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Requirements", meta=(ClampMin="0")) int32 RequiredMainStatValue=0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FICStatModifier> BaseModifiers;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSoftObjectPtr<UStaticMesh> WeaponMesh;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon") TSoftClassPtr<AICWeaponActor> WeaponActorClass;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName AttachSocket;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FTransform AttachmentTransform;
+    /** Leave false for existing weapon BPs; new meshes can calibrate their grip entirely in this DT. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Geometry") bool bOverrideWeaponGeometry=false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Geometry") FTransform WeaponVisualTransform;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|Geometry") FVector WeaponLengthAxis=FVector::UpVector;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName EnhancementID;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FName OptionPoolID;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EPlayerItemGrade DefaultGrade = EPlayerItemGrade::Common;

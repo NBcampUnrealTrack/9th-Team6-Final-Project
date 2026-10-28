@@ -14,6 +14,7 @@
 #include "Materials/MaterialInterface.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Combat/VFX/ICCombatVFX.h"
 AICProjectile::AICProjectile()
 {
     IC_TRACE_FUNCTION();PrimaryActorTick.bCanEverTick=true;
@@ -46,6 +47,14 @@ void AICProjectile::InitializeShot(UICAbilitySystemComponent* InSource,const FIC
     MaximumTravel=Rule.ProjectileMaxDistanceCm>0?Rule.ProjectileMaxDistanceCm:ShotSpeed*Rule.ProjectileLifetimePlaySeconds;
     if (!Effect.Presentation.ImpactVFX.IsNull()) Presentation.ImpactVFX=Effect.Presentation.ImpactVFX;
     if (!Effect.Presentation.ImpactSound.IsNull()) Presentation.ImpactSound=Effect.Presentation.ImpactSound;
+    if(!Effect.Presentation.Visuals.IsNull())Presentation.Visuals=Effect.Presentation.Visuals;
+    if(const auto* Visuals=ICCombatVFX::Resolve(InPresentation))
+    {
+        const bool Main=ICCombatVFX::Attach(this,Collision,Visuals->Projectile,Rule.ProjectileLifetimePlaySeconds)!=nullptr;
+        const bool Tail=ICCombatVFX::Attach(this,Collision,Visuals->Trail,Rule.ProjectileLifetimePlaySeconds)!=nullptr;
+        if(Main||!Visuals->Projectile.bEnabled||!Visuals->bLegacyMeshFallback){Body->SetVisibility(false);ArrowTip->SetVisibility(false);}
+        if(Tail||!Visuals->Trail.bEnabled||!Visuals->bLegacyMeshFallback)Trail->SetVisibility(false);
+    }
     bPierce=Rule.bPierceTargets;bStopAtWorld=Rule.bStopAtWorldCollision;
     RemainingTargets=FMath::Max(1,Rule.MaximumTargets);bEnemySource=InSource&&InSource->GetAvatarActor()&&InSource->GetAvatarActor()->ActorHasTag(TEXT("IC.Enemy"));
     if(InSource&&InSource->GetAvatarActor())Collision->IgnoreActorWhenMoving(InSource->GetAvatarActor(),true);
@@ -72,11 +81,20 @@ void AICProjectile::Hit(UPrimitiveComponent* Component,AActor* Other,UPrimitiveC
     if(Character&&Character->ActorHasTag(TEXT("IC.Enemy"))!=bEnemySource&&Character->GetICAbilitySystem())
     {
         HitActors.Add(Other);auto* Target=Character->GetICAbilitySystem();
-        AICAttackEffect::SpawnImpact(GetWorld(),Result.ImpactPoint,Family);
+        if(!ICCombatVFX::Resolve(Presentation))AICAttackEffect::SpawnImpact(GetWorld(),Result.ImpactPoint,Family);
         if(Source.IsValid()) {if(Source->ExecuteEffect(Effect,Target,&Captured))Source->PlayCombatCue(true,Presentation,Character,Result.ImpactPoint);}
-        else if(Effect.Kind==EICSkillEffectKind::Damage)Target->ApplyDamage(Captured,nullptr,Effect.bCanCritical,Effect.bCanBeGuarded,Effect.bCanBeAutoDodged,Effect.bCancelsCastingOnEffectiveHit);
+        else if(Effect.Kind==EICSkillEffectKind::Damage)
+        {
+            Target->ApplyDamage(Captured,nullptr,Effect.bCanCritical,Effect.bCanBeGuarded,Effect.bCanBeAutoDodged,Effect.bCancelsCastingOnEffectiveHit);
+            if(const auto* Config=ICCombatVFX::Resolve(Presentation))ICCombatVFX::Spawn(GetWorld(),FTransform(Result.ImpactPoint),Config->Impact,.16f);
+        }
         if(!bPierce||--RemainingTargets<=0)Destroy();else {Collision->IgnoreActorWhenMoving(Other,true);Movement->Activate();}
     }
-    else if(!Character&&bStopAtWorld){AICAttackEffect::SpawnImpact(GetWorld(),Result.ImpactPoint,Family);Destroy();}
+    else if(!Character&&bStopAtWorld)
+    {
+        if(const auto* Config=ICCombatVFX::Resolve(Presentation))ICCombatVFX::Spawn(GetWorld(),FTransform(Result.ImpactPoint),Config->Impact,.16f);
+        else AICAttackEffect::SpawnImpact(GetWorld(),Result.ImpactPoint,Family);
+        Destroy();
+    }
     else Collision->IgnoreActorWhenMoving(Other,true);
 }

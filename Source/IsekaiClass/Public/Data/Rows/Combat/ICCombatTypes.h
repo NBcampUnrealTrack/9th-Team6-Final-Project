@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Data/Rows/Common/ICDefinitionTypes.h"
+#include "Data/Rows/Combat/ICCombatVFXRow.h"
 #include "ICCombatTypes.generated.h"
 
 class AActor;
@@ -75,6 +76,7 @@ struct ISEKAICLASS_API FICCombatPresentation
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UNiagaraSystem> ImpactVFX;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<USoundBase> CastSound;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<USoundBase> ImpactSound;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Presentation",meta=(RowType="/Script/IsekaiClass.ICCombatVFXRow")) FDataTableRowHandle Visuals;
 };
 
 
@@ -188,4 +190,5 @@ struct ISEKAICLASS_API FICNormalAttackStage
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Attack") FName MontageSection;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Attack", meta=(ClampMin="0")) double GuardDodgeCancelStartPlaySeconds = 0.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Attack", meta=(ClampMin="0")) double GuardDodgeCancelEndPlaySeconds = 0.0;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Attack",meta=(RowType="/Script/IsekaiClass.ICCombatVFXRow")) FDataTableRowHandle Visuals;
 };

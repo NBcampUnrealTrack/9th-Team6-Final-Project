@@ -1,4 +1,5 @@
 #include "UI/Quest/ICQuestMenuWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Quest/ICQuestDisplay.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "Quest/ICQuestSubsystem.h"
@@ -378,8 +379,8 @@ bool UICQuestMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
 {
     const bool Up=Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up,Down=Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down;
     const bool Left=Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left,Right=Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right;
-    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||Key==EKeys::Gamepad_FaceButton_Bottom;
-    const bool Back=Key==EKeys::Escape||Key==EKeys::Equals||Key==EKeys::Gamepad_FaceButton_Right;
+    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key);
+    const bool Back=Key==EKeys::Escape||Key==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(Key);
     if(!bShowingDetails)
     {
         if(Left||(Up&&SelectedIndex==0))return false;

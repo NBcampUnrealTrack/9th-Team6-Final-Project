@@ -1,0 +1,66 @@
+2026-10-28 생활·상점·도감 작업 인계
+기존 2026-10-27 NPC 스킬·무기·UI 변경은 아직 미커밋 상태이며 그대로 보존한다.
+커밋·Push·PR은 사용자가 직접 한다. 현재 브랜치 Leader.
+
+이번 요청
+- 채집/채광/낚시/파종/수확/수면 애니메이션. 채집 빈손, 채광 곡괭이, 낚시 낚싯대.
+- Fishing/Blueprints/FishingPole 및 Fish 폴더 정리. 랜덤 낚시 구역 F 상호작용, 20초, 쿨타임 없음.
+- NPC R01_06 씨앗 5종 상점: 구매/판매 탭, 누적 장바구니, 일괄 결제, 취소 리셋·닫기.
+- 밭 4칸 2묶음, 총 8칸. 칸 안에서 씨앗 선택·파종하고 식물이 중앙에 나온다.
+- 보스 외형만 기존의 3배, 능력치 유지.
+- 중앙 플레이어 침대+옆 창고 3개(1개 기본, 2개 제작 순차 해금).
+- 추가 창고 요구 CON 10/20, 재료 광석1 1개+광석2 1개. DT로 편집, 2개 완성 후 레시피 숨김.
+- 수면 포즈 및 WBP 페이드아웃→시간/회복 처리→페이드인.
+- 몬스터 처치 후 게임 시간 1시간 재생성.
+- 몬스터 DT 실제 수만큼 펫 도감, 처치 정수 누적·100개 해금·사용중 표시.
+- 도감 제작물의 비어 있는 물건 분류 삭제.
+- 인벤토리 가방 확장권 즉시 사용.
+- 스킬 도감 실제 DT 기준, 미획득 ? 표시, 상단 4가족 스킬 설정 유지.
+
+변경 전 조사
+- UICGatheringSubsystem은 자원 채집 5초만 지원하며 애니메이션이 없다.
+- AICLifeActor는 Resource/Crop만 상호작용, 낚시 구역은 미연결.
+- ProductionRow.WorkMontage는 이미 존재하나 플레이어 작업에 사용하지 않는다.
+- Crop은 자연생장 테스트 작물과 수동 파종이 공존. 실제 8칸 전용 밭 구현 필요.
+- ProductionSubsystem은 InstallStorage ResultKind를 거부하므로 확장해야 한다.
+- Sleep() 회복·시간 점프는 이미 있으나 즉시 실행이며 침대·포즈·페이드 필요.
+- 몬스터 재생성은 RespawnReadyAtPlaySecond 기준. 달력 기준 필드와 기존 저장 마이그레이션 필요.
+- 펫 55/스킬 60 고정. 실제 uasset DT와 Data CSV가 다를 수 있어 uasset 먼저 감사한다.
+- 읽기 감사: Tools/Life/audit_life_expansion.py → Saved/LifeExpansion/Audit.json.
+
+진행 (구현·에셋 저작·검증 완료)
+- C++ 생활 작업 컴포넌트/남녀별 몽타주/임시 손 도구/종료 시 무기 복구 구현.
+- 채집·채광·낚시·파종·수확을 GatheringSubsystem의 취소 가능한 진행바에 연결.
+- Fishing/Blueprints/FishingPole 낚싯대 BP 및 Fish 아래 물고기 10 BP 정리, 기존 경로 redirector 유지.
+- NPC06 씨앗 상점 구매/판매/장바구니 WBP 및 일괄 거래 구현. 예약 재료 판매 방지.
+- 8칸 밭/중앙 침대/3개 창고 BP와 L_TestMap 배치, 2단계 창고 제작 DT 작성.
+- 수면 WBP 페이드 및 기존 수면 회복·달력 처리 연결.
+- 몬스터 달력 60분 재생성, 사망 포즈 중 시간 점프해도 새 액터 생성하도록 보완.
+- 몬스터 DT 실제 12개 펫 번호 연결, 도감 동적 셀·사용중 표시, 100개 해금.
+- 스킬 도감 DT 실제 목록 및 NPC 스킬 장착, 제작물 2분류, 가방 확장권 즉시 사용.
+- Tools/Life/setup_life_expansion.py 실행 성공: Saved/LifeExpansionSetup3.log의 LIFE_EXPANSION_SETUP_OK.
+- Saved/LifeExpansion/Setup.json: 실제 저장한 애니메이션·도구·맵·DT·WBP 목록.
+- 최종 C++ 빌드 성공: Saved/BuildLifeExpansion9.log. git diff --check 통과.
+- 새 회귀 검증: ICLifeExpansionChecks.cpp (상점 원자성/예약 보호, 창고 단계·스탯·중복 방지, 8칸 파종·낚시·정수).
+- 기존 CodexMenu/GAS Spawn/R01 SavedGrowth 검증을 새 동작에 맞춰 수정.
+- 자동화 검증 16개 통과(10 Success + 6 SuccessWithWarnings): Saved/LifeExpansion/Automation2/index.json.
+- 전체 남성 PIE 검증 성공: Saved/LifeExpansion/Live/Review.json, LifeExpansionLive4.log.
+  5종 작업 애니메이션/도구, 실제 20초 낚시·즉시 반복, 씨앗 선택·일별 성장·수확, NPC06 상점·장바구니·취소,
+  가방 확장권, 실제 도감, 창고 2개 제작·레시피 숨김, 수면·페이드까지 확인.
+- 화면에서 누운 방향이 침대와 어긋나 SleepPoseOffset을 BP에 추가하고 매트리스 높이에 보정.
+  Tools/Life/calibrate_player_bed.py 실행 성공. 최종 보정은 yaw=-90, 위치(36,0,-48).
+  기상 위치는 침대 로컬(-160,0,0)으로, 뒤가 아닌 옆에서 일어나도록 변경.
+- 낚시 구역 배치 인스턴스의 회색 박스 override도 평면·청록 재질로 갱신: polish_life_expansion.py.
+- 여성 전체 PIE 성공: Saved/LifeExpansion/LiveFemale/Review.json.
+- 최종 남녀 침대 보정·페이드·복귀 별도 검증도 성공: LiveSleep/Review.json, LiveFemaleSleep/Review.json.
+  실제 뼈 좌표로 누운 방향이 침대 길이 방향인지 검사했고, 화면 캡처 확인.
+- 최종 확대 회귀 49개 전부 통과, 실패/미실행 0.
+  Saved/LifeExpansion/FinalAutomation2/index.json (생활·GAS·입력·NPC·WorldState 40개)
+  Saved/LifeExpansion/FinalUIAutomation/index.json (도감·인벤토리·대화·파티·제작·에셋 9개)
+- 확장권 테스트 후 탐색 영역을 초기화하고, 기존 대화 테스트에 근거리 플레이어 Pawn을 배치해 실제 상호작용 조건으로 검증.
+- 실제 남녀 전체 검증 후 최종 침대 보정/옆 기상도 별도 재확인했다.
+- 사용자용 안내: Docs/Life/생활_상점_침대_창고_DT_안내.txt.
+
+상태
+요청한 작업 완료. 기존 NPC 스킬·무기·UI 미커밋 변경과 이번 생활 변경을 함께 보존했다.
+커밋·Push·PR은 실행하지 않았다. 사용자가 직접 진행한다.
