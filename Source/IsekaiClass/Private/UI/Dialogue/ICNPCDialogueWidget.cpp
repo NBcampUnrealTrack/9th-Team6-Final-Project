@@ -1,5 +1,5 @@
-#include "Settings/ICGameUserSettings.h"
 #include "UI/Dialogue/ICNPCDialogueWidget.h"
+#include "Settings/ICGameUserSettings.h"
 
 #include "UI/Dialogue/ICDialogueEntryWidget.h"
 #include "UI/Dialogue/ICNPCGiftWidget.h"

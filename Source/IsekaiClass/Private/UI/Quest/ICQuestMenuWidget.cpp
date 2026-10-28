@@ -1,5 +1,5 @@
-#include "Settings/ICGameUserSettings.h"
 #include "UI/Quest/ICQuestMenuWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Quest/ICQuestDisplay.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "Quest/ICQuestSubsystem.h"

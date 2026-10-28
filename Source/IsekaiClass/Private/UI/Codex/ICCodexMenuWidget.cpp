@@ -1,5 +1,5 @@
-#include "Settings/ICGameUserSettings.h"
 #include "UI/Codex/ICCodexMenuWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "Codex/ICCodexSubsystem.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"

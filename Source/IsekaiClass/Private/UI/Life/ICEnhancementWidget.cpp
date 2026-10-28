@@ -23,15 +23,15 @@ void UICEnhancementChoiceButton::Choose(){if(Screen.IsValid()){if(WeaponID.IsVal
 void UICEnhancementWidget::BuildLayout(UWidgetTree* T)
 {
     using namespace ICEnhanceLayout;auto* Pages=T->ConstructWidget<UWidgetSwitcher>(UWidgetSwitcher::StaticClass(),TEXT("EnhancePages"));T->RootWidget=Pages;
-    auto* List=T->ConstructWidget<UVerticalBox>();Pages->AddChild(List);Add(List,Label(T,NAME_None,NSLOCTEXT("ICEnhance","PickWeapon","강화할 무기를 선택하세요. 장착 중인 무기도 강화할 수 있습니다.")));
-    Add(List,T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("EnhanceWeapons")),true);
+    auto* List=T->ConstructWidget<UVerticalBox>();Pages->AddChild(List);ICEnhanceLayout::Add(List,Label(T,NAME_None,NSLOCTEXT("ICEnhance","PickWeapon","강화할 무기를 선택하세요. 장착 중인 무기도 강화할 수 있습니다.")));
+    ICEnhanceLayout::Add(List,T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("EnhanceWeapons")),true);
     auto* Detail=T->ConstructWidget<UVerticalBox>();Pages->AddChild(Detail);
-    Add(Detail,Label(T,TEXT("EnhanceWeaponName"),FText::GetEmpty(),23));Add(Detail,Label(T,TEXT("EnhanceOffer"),FText::GetEmpty()));
-    Add(Detail,Label(T,NAME_None,NSLOCTEXT("ICEnhance","PickOre","보유한 광석을 선택하세요. 실패해도 표시된 비용은 소모됩니다."),16));
-    Add(Detail,T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("EnhanceOres")),true);
-    Add(Detail,Label(T,TEXT("EnhanceResult"),FText::GetEmpty(),17));
-    Add(Detail,Button(T,TEXT("BTN_AttemptEnhance"),NSLOCTEXT("ICEnhance","Attempt","강화")));
-    Add(Detail,Button(T,TEXT("BTN_CancelEnhance"),NSLOCTEXT("ICEnhance","Cancel","취소 · 무기 목록")));
+    ICEnhanceLayout::Add(Detail,Label(T,TEXT("EnhanceWeaponName"),FText::GetEmpty(),23));ICEnhanceLayout::Add(Detail,Label(T,TEXT("EnhanceOffer"),FText::GetEmpty()));
+    ICEnhanceLayout::Add(Detail,Label(T,NAME_None,NSLOCTEXT("ICEnhance","PickOre","보유한 광석을 선택하세요. 실패해도 표시된 비용은 소모됩니다."),16));
+    ICEnhanceLayout::Add(Detail,T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("EnhanceOres")),true);
+    ICEnhanceLayout::Add(Detail,Label(T,TEXT("EnhanceResult"),FText::GetEmpty(),17));
+    ICEnhanceLayout::Add(Detail,Button(T,TEXT("BTN_AttemptEnhance"),NSLOCTEXT("ICEnhance","Attempt","강화")));
+    ICEnhanceLayout::Add(Detail,Button(T,TEXT("BTN_CancelEnhance"),NSLOCTEXT("ICEnhance","Cancel","취소 · 무기 목록")));
 }
 void UICEnhancementWidget::NativeConstruct()
 {

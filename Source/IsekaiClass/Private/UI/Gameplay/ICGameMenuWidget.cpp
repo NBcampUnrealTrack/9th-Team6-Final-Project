@@ -1,5 +1,5 @@
-#include "Settings/ICGameUserSettings.h"
 #include "UI/Gameplay/ICGameMenuWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "UI/Gameplay/ICPartyMenuWidget.h"
 #include "UI/Gameplay/ICInventoryMenuWidget.h"

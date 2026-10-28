@@ -1,5 +1,5 @@
-#include "Settings/ICGameUserSettings.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Gameplay/ICGameMenuWidget.h"
 #include "UI/Gameplay/ICCompanionGroupWidget.h"
 #include "UI/Gameplay/ICCharacterStatusWidget.h"

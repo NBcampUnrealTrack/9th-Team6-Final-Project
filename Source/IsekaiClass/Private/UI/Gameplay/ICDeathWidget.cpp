@@ -1,5 +1,5 @@
-#include "Settings/ICGameUserSettings.h"
 #include "UI/Gameplay/ICDeathWidget.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"

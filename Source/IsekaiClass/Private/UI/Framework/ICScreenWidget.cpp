@@ -1,5 +1,5 @@
-#include "Settings/ICGameUserSettings.h"
 #include "UI/Framework/ICScreenWidget.h"
+#include "Settings/ICGameUserSettings.h"
 
 FReply UICScreenWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)
 {
