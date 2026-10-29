@@ -15,6 +15,8 @@ class ISEKAICLASS_API UICMapWidget : public UUserWidget
     GENERATED_BODY()
 public:
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map") bool bMinimap=false;
+    /** How much of the map the HUD minimap magnifies around the player. */
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map|Minimap",meta=(ClampMin="1.0",ClampMax="8.0")) float MinimapZoom=3.f;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map") TSoftObjectPtr<UDataTable> MapTable;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map") TSoftObjectPtr<UDataTable> PresentationTable;
     UFUNCTION(BlueprintCallable,Category="Map") bool RequestTravel(FName WarpID);
@@ -22,6 +24,7 @@ public:
     UFUNCTION(BlueprintPure,Category="Map") FVector2D WorldToMapUV(FVector Position) const;
     static void BuildLayout(UWidgetTree* Tree,bool Mini);
     static float MinimapOpacity(FVector2D UV);
+    static FVector2D MinimapDisplayUV(FVector2D MapUV,FVector2D CenterUV,float Zoom);
 protected:
     virtual void NativeOnInitialized() override;
     virtual void NativeConstruct() override;
@@ -35,6 +38,8 @@ private:
     UPROPERTY(Transient) TObjectPtr<UUserWidget> PlayerMarker;
     FICMapLayerDefinition Layer;
     FICMapPresentationRow Rules;
+    FVector2D MinimapCenterUV=FVector2D(.5,.5);
+    double MapMinimumZoom=1.,MapMaximumZoom=4.;
     TArray<TWeakObjectPtr<AICWarpStone>> Portals;
     bool bTraveling=false,bMoved=false,bRegistered=false;
     float TravelElapsed=0,RefreshElapsed=1;
@@ -43,6 +48,7 @@ private:
     FText Status;
     void RefreshMap();
     void RefreshVisuals(const FGeometry& Geometry);
+    FVector2D DisplayUV(FVector Position) const;
     FSlateRect ImageRect(const FGeometry&) const;
     FVector2D MarkerPosition(const FSlateRect&,FVector) const;
     void RefreshLabels();
