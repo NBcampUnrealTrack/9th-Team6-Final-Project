@@ -1,10 +1,13 @@
 #include "UI/Gameplay/ICFirefightHUDLayout.h"
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Gameplay/ICCharacterStatusWidget.h"
 #include "Blueprint/WidgetBlueprintGeneratedClass.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/Border.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/SizeBox.h"
@@ -81,13 +84,19 @@ bool Status(UWidgetTree* Tree, bool Player, bool Alternate)
     if (!Panel) return false;
     auto* Root = Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), Panel->GetFName());
     Tree->RootWidget = Root;
-    const float Width = Player ? 223.f : 104.f;
+    // The original sample companion card was only as wide as its portrait.
+    // Reserve a real information rail on the right for name, resources and
+    // status effects so those widgets never need to paint over the portrait.
+    const float Width = Player ? 280.f : 220.f;
     const float Height = Player ? 194.f : 126.f;
     const float Shift = Player ? 174.f : 125.66188f;
     const FName PortraitName = Player ? TEXT("Image_70") : Alternate ? TEXT("Image_77") : TEXT("Image_74");
     const FName HPName = Player ? TEXT("ProgressBar_15") : Alternate ? TEXT("ProgressBar") : TEXT("ProgressBar_17");
     const FName NameLabel = Player ? TEXT("TextBlock_51") : Alternate ? TEXT("TextBlock_55") : TEXT("TextBlock_54");
     const FName BuffName = Player ? TEXT("Image_69") : Alternate ? TEXT("Image_79") : TEXT("Image_75");
+    auto* Backdrop=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("StatusBackdrop"));
+    Backdrop->SetBrushColor(FLinearColor(.01f,.018f,.03f,.62f));Backdrop->SetPadding(FMargin(0));
+    At(Root,Backdrop,{0,0},{Width,Height})->SetZOrder(-10);
     int32 MPIndex = 0;
     for (auto* Original : Panel->GetAllChildren())
     {
@@ -115,10 +124,16 @@ bool Status(UWidgetTree* Tree, bool Player, bool Alternate)
             auto* Prototype = Copy(Tree, Original, TEXT("StatusEffectPrototype"));
             Prototype->SetVisibility(ESlateVisibility::Collapsed);
             At(Root, Prototype, Position, {24, 24});
+            auto* EffectsPanel=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("StatusEffectsPanel"));
+            EffectsPanel->SetBrushColor(FLinearColor(.01f,.015f,.025f,.82f));EffectsPanel->SetPadding(FMargin(3));
             auto* Effects = Tree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("StatusEffects"));
-            // The row's right edge remains at the original badge; new badges extend left.
-            auto* Slot = At(Root, Effects, {Position.X + 24, Position.Y}, {0, 24});
-            Slot->SetAutoSize(true); Slot->SetAlignment({1, 0});
+            EffectsPanel->SetContent(Effects);
+            auto* Slot=At(Root,EffectsPanel,Player?FVector2D(132,8):FVector2D(106,5),Player?FVector2D(140,32):FVector2D(108,32));
+            Slot->SetZOrder(20);
+            auto* Overflow=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("StatusOverflow"));
+            Overflow->SetBrushColor(FLinearColor(.18f,.22f,.28f,.95f));Overflow->SetPadding(FMargin(2));Overflow->SetVisibility(ESlateVisibility::Collapsed);
+            auto* OverflowText=Text(Tree,TEXT("TXT_StatusOverflow"),11);OverflowText->SetText(FText::FromString(TEXT("+0")));OverflowText->SetJustification(ETextJustify::Center);Overflow->SetContent(OverflowText);
+            Effects->AddChildToHorizontalBox(Overflow)->SetPadding(FMargin(2,0,0,0));
             continue;
         }
         if (KeyString.StartsWith(TEXT("ImageArmor")) && !KeyString.StartsWith(TEXT("ImageArmorBg")))
@@ -152,6 +167,7 @@ bool Status(UWidgetTree* Tree, bool Player, bool Alternate)
     Aggregate->SetVisibility(ESlateVisibility::Collapsed); At(Root, Aggregate, {0, 0}, {0, 0});
     auto* Size = Tree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("StatusSize"));
     Size->SetWidthOverride(Width); Size->SetHeightOverride(Height); Size->SetContent(Root); Tree->RootWidget = Size;
+    UICCharacterStatusWidget::BuildSkillCooldownOverlay(Tree);
     return true;
 }
 

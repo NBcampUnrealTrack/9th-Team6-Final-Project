@@ -162,7 +162,7 @@ void UICCharacterStatusWidget::UpdateStatusEffects(const FICCharacterState& Stat
     auto* Row=Cast<UHorizontalBox>(GetWidgetFromName(TEXT("StatusEffects")));
     auto* Prototype=Cast<UImage>(GetWidgetFromName(TEXT("StatusEffectPrototype")));
     if(!Row||!Prototype||!Definitions)return;
-    Row->SetFlowDirectionPreference(EFlowDirectionPreference::RightToLeft);
+    Row->SetFlowDirectionPreference(EFlowDirectionPreference::LeftToRight);
     struct FBadge { FName ID; FText Name; UTexture2D* Icon=nullptr; bool Harmful=false; int32 Stacks=1; double Remaining=-1; };
     TArray<FBadge> Badges;
     auto Name=[](const FICDefinitionRow& Rule){return Rule.NameKey.IsEmpty()?FText::FromName(Rule.ID):ICLocalization::Localize(FText::FromStringTable(TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_Definitions.ST_IC_Definitions"),Rule.NameKey));};
@@ -178,13 +178,22 @@ void UICCharacterStatusWidget::UpdateStatusEffects(const FICCharacterState& Stat
         if(const auto* Pet=World.Codex.CharacterPets.Find(State.CharacterId);Pet&&World.Codex.PetEssence.FindRef(*Pet)>=100)
             Badges.Add({FName(*FString::Printf(TEXT("PetBuff_%d"),*Pet)),NSLOCTEXT("ICStatus","PetBuff","펫 버프")});
     }
+    // A compact HUD card cannot grow forever. Show dangerous effects first,
+    // keep a fixed number of cells, and summarize the rest with a +N badge.
+    Badges.StableSort([](const FBadge& A,const FBadge& B){return A.Harmful&&!B.Harmful;});
+    const int32 Capacity=GetWidgetFromName(TEXT("BAR_SP"))?4:3;
+    const int32 VisibleCount=Badges.Num()>Capacity?Capacity-1:Badges.Num();
+    const int32 HiddenCount=Badges.Num()-VisibleCount;
+    auto* Overflow=Cast<UBorder>(GetWidgetFromName(TEXT("StatusOverflow")));
+    auto* OverflowText=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_StatusOverflow")));
+    if(Overflow)Overflow->RemoveFromParent();
     TSet<FName> Active;
-    for(const auto& Badge:Badges)Active.Add(Badge.ID);
+    for(int32 Index=0;Index<VisibleCount;++Index)Active.Add(Badges[Index].ID);
     for(auto It=EffectWidgets.CreateIterator();It;++It)
         if(!Active.Contains(It.Key())){It.Value()->RemoveFromParent();It.RemoveCurrent();}
-    // Right-to-left flow keeps the first badge on the right and adds new badges to its left.
-    for(const auto& Badge:Badges)
+    for(int32 Index=0;Index<VisibleCount;++Index)
     {
+        const auto& Badge=Badges[Index];
         auto* Cell=EffectWidgets.FindRef(Badge.ID).Get();
         if(!Cell)
         {
@@ -192,10 +201,24 @@ void UICCharacterStatusWidget::UpdateStatusEffects(const FICCharacterState& Stat
             auto* Icon=CastChecked<UImage>(Cell->GetWidgetFromName(TEXT("IMG_Icon")));
             Icon->SetBrush(Prototype->GetBrush());
             if(Badge.Icon)Icon->SetBrushFromTexture(Badge.Icon);
-            Row->AddChildToHorizontalBox(Cell)->SetPadding(FMargin(2,0,0,0));EffectWidgets.Add(Badge.ID,Cell);
+            EffectWidgets.Add(Badge.ID,Cell);
         }
+        Cell->RemoveFromParent();
+        Row->AddChildToHorizontalBox(Cell)->SetPadding(FMargin(2,0,0,0));
         CastChecked<UBorder>(Cell->GetWidgetFromName(TEXT("Frame")))->SetBrushColor(Badge.Harmful?FLinearColor(.75f,.08f,.08f,.9f):FLinearColor(.08f,.55f,.18f,.9f));
         CastChecked<UTextBlock>(Cell->GetWidgetFromName(TEXT("TXT_Count")))->SetText(Badge.Stacks>1?FText::AsNumber(Badge.Stacks):FText::GetEmpty());
         Cell->SetToolTipText(Badge.Remaining>=0?FText::Format(NSLOCTEXT("ICStatus","EffectTime","{0} · {1}초"),Badge.Name,FText::AsNumber(FMath::CeilToInt(Badge.Remaining))):Badge.Name);
+    }
+    if(Overflow&&OverflowText&&HiddenCount>0)
+    {
+        OverflowText->SetText(FText::Format(NSLOCTEXT("ICStatus","MoreEffects","+{0}"),FText::AsNumber(HiddenCount)));
+        Overflow->SetToolTipText(FText::Format(NSLOCTEXT("ICStatus","HiddenEffects","숨겨진 상태 효과 {0}개"),FText::AsNumber(HiddenCount)));
+        Overflow->SetVisibility(ESlateVisibility::HitTestInvisible);
+        Row->AddChildToHorizontalBox(Overflow)->SetPadding(FMargin(2,0,0,0));
+    }
+    else if(Overflow)
+    {
+        Overflow->SetVisibility(ESlateVisibility::Collapsed);
+        Row->AddChildToHorizontalBox(Overflow)->SetPadding(FMargin(2,0,0,0));
     }
 }

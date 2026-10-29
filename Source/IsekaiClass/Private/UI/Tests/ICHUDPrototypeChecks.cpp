@@ -15,6 +15,7 @@
 #include "Internationalization/StringTable.h"
 #include "UI/Quest/ICQuestTrackerWidget.h"
 #include "UI/Map/ICMapWidget.h"
+#include "UI/Map/ICMapPlayerMarkerShape.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -151,6 +152,8 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
         TestNotNull(TEXT("Player HP"), Status->GetWidgetFromName(TEXT("BAR_HP")));
         TestNotNull(TEXT("Player MP"), Status->GetWidgetFromName(TEXT("BAR_MP")));
         TestNotNull(TEXT("Player SP"), Status->GetWidgetFromName(TEXT("BAR_SP")));
+        TestNotNull(TEXT("Player status effects use a bounded panel"), Status->GetWidgetFromName(TEXT("StatusEffectsPanel")));
+        TestNotNull(TEXT("Player status effects include an overflow badge"), Status->GetWidgetFromName(TEXT("StatusOverflow")));
         TestNull(TEXT("Player has no fixed sample portrait"), Status->Portrait);
         for (const auto* Key : {TEXT("HP"), TEXT("MP"), TEXT("SP")})
         {
@@ -159,6 +162,7 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
         }
         auto* Slot = Cast<UCanvasPanelSlot>(Status->Slot);
         TestTrue(TEXT("Player card is anchored at bottom left"), Slot && Slot->GetAnchors().Minimum == FVector2D(0, 1));
+        TestEqual(TEXT("Player card reserves room beside the portrait"), Slot ? Slot->GetSize().X : 0.0, 280.0);
 
         auto* State = GI->GetSubsystem<UICWorldStateSubsystem>();
         auto* Definitions = GI->GetSubsystem<UICDefinitionSubsystem>();
@@ -213,6 +217,8 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
         {
             TestNotNull(TEXT("Companion HP"), Member->GetWidgetFromName(TEXT("BAR_HP")));
             TestNotNull(TEXT("Companion MP"), Member->GetWidgetFromName(TEXT("BAR_MP")));
+            TestNotNull(TEXT("Companion status effects use a bounded panel"), Member->GetWidgetFromName(TEXT("StatusEffectsPanel")));
+            TestNotNull(TEXT("Companion status effects include an overflow badge"), Member->GetWidgetFromName(TEXT("StatusOverflow")));
             TestNull(TEXT("Companion has no SP bar"), Member->GetWidgetFromName(TEXT("BAR_SP")));
             TestNull(TEXT("Companion has no HP text"), Member->GetWidgetFromName(TEXT("TXT_HP")));
             TestNull(TEXT("Companion has no MP text"), Member->GetWidgetFromName(TEXT("TXT_MP")));
@@ -360,9 +366,18 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
         QuickSlots->ReleaseSlateResources(true);
     }
     TestNotNull(TEXT("Existing quest tracker is embedded"), HUD ? Cast<UICQuestTrackerWidget>(HUD->GetWidgetFromName(TEXT("HUD_QuestTracker"))) : nullptr);
+    TestNotNull(TEXT("Clock and minimap share a readable navigation panel"),HUD?HUD->GetWidgetFromName(TEXT("HUDNavigationPanel")):nullptr);
+    TestNotNull(TEXT("Navigation panel contains the game clock"),HUD?HUD->GetWidgetFromName(TEXT("TXT_GameClock")):nullptr);
     auto* Minimap=HUD?Cast<UICMapWidget>(HUD->GetWidgetFromName(TEXT("HUD_Minimap"))):nullptr;
+    const auto MarkerPoints=UICMapPlayerMarkerShape::TrianglePoints(FVector2D(20,36));
+    const FVector2D MarkerCentroid=(MarkerPoints[0]+MarkerPoints[1]+MarkerPoints[2])/3.f;
+    TestTrue(TEXT("Player marker rotates around the triangle centroid"),MarkerCentroid.Equals(FVector2D(10,18),.01f));
+    TestTrue(TEXT("Player marker is a narrow forward triangle"),(MarkerPoints[1].Y-MarkerPoints[0].Y)>(MarkerPoints[2].X-MarkerPoints[1].X)*2.f);
     TestNotNull(TEXT("Minimap widget exists"),Minimap);
     TestTrue(TEXT("HUD map always initializes in minimap mode"),Minimap&&Minimap->bMinimap);
+    TestEqual(TEXT("Radar minimap uses the readable close-range zoom"),Minimap?Minimap->MinimapZoom:0.f,4.f);
+    TestNotNull(TEXT("Radar minimap has a north indicator"),Minimap?Minimap->GetWidgetFromName(TEXT("TXT_MiniNorth")):nullptr);
+    TestNotNull(TEXT("Radar minimap explains world marker colours"),Minimap?Minimap->GetWidgetFromName(TEXT("TXT_MiniLegend")):nullptr);
     TestNull(TEXT("Standalone Q skill panel is removed"), HUD ? HUD->GetWidgetFromName(TEXT("HUD_SkillCooldown")) : nullptr);
     TestNotNull(TEXT("Player portrait contains the Q cooldown overlay"), Status ? Status->GetWidgetFromName(TEXT("PortraitCooldownOverlay")) : nullptr);
     TestNotNull(TEXT("Player portrait contains remaining seconds"), Status ? Status->GetWidgetFromName(TEXT("TXT_SkillCooldown")) : nullptr);

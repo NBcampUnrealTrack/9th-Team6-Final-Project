@@ -1,5 +1,6 @@
 #include "UI/Map/ICMapWidget.h"
 #include "UI/Map/ICMapTextureImage.h"
+#include "UI/Map/ICMapPlayerMarkerShape.h"
 #include "UI/Framework/ICWidgetTemplates.h"
 #include "Components/Image.h"
 #include "Blueprint/WidgetTree.h"
@@ -12,6 +13,8 @@
 #include "Data/Text/ICLocalization.h"
 #include "Engine/DataTable.h"
 #include "Engine/Texture2D.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/Character/ICPlayerCharacter.h"
@@ -25,6 +28,8 @@
 #include "World/State/ICWorldStateSubsystem.h"
 #include "World/Warp/ICPartyWarpComponent.h"
 #include "World/Warp/ICWarpStone.h"
+#include "NPC/Character/ICNPCBase.h"
+#include "Enemy/Character/ICEnemyBase.h"
 
 namespace { FText Local(const FText& Text){return ICLocalization::Localize(Text);} }
 
@@ -33,14 +38,20 @@ void UICMapWidget::BuildLayout(UWidgetTree* Tree,bool Mini)
     auto* Root=Tree->ConstructWidget<UCanvasPanel>();Tree->RootWidget=Root;
     auto Fill=[&](UWidget* W,FAnchors A=FAnchors(0,0,1,1),FMargin M=FMargin(0))
     {auto* S=Root->AddChildToCanvas(W);S->SetAnchors(A);S->SetOffsets(M);return S;};
-    auto* Background=Tree->ConstructWidget<UBorder>();Background->SetBrushColor(FLinearColor(.018f,.026f,.045f,Mini?0.f:.98f));Fill(Background);
-    auto* Surface=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("MapSurface"));Surface->SetBrushColor(FLinearColor(.045f,.06f,.08f,Mini?0.f:1.f));
+    auto* Background=Tree->ConstructWidget<UBorder>();Background->SetBrushColor(FLinearColor(.018f,.026f,.045f,Mini?.82f:.98f));Fill(Background);
+    auto* Surface=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("MapSurface"));Surface->SetBrushColor(FLinearColor(.055f,.075f,.095f,Mini?.88f:1.f));
     Fill(Surface,Mini?FAnchors(0,0,1,1):FAnchors(.035f,.17f,.965f,.87f));
     auto* Content=Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("MapContent"));Content->SetVisibility(ESlateVisibility::HitTestInvisible);Fill(Content);
     auto* Image=Tree->ConstructWidget<UICMapTextureImage>(UICMapTextureImage::StaticClass(),TEXT("IMG_Map"));Image->bFadeEdges=Mini;Content->AddChildToCanvas(Image);
     if(Mini)
     {
-        auto* Help=Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),TEXT("TXT_MiniHelp"));Help->SetFont(ICFrontendLayout::Font(11));Help->SetText(NSLOCTEXT("ICMap","MiniHelp","M · 지도"));Fill(Help,FAnchors(0,0),FMargin(8,3,80,20));
+        const TCHAR* EdgeNames[]={TEXT("MinimapFrameTop"),TEXT("MinimapFrameBottom"),TEXT("MinimapFrameLeft"),TEXT("MinimapFrameRight")};
+        const FAnchors EdgeAnchors[]={FAnchors(0,0,1,0),FAnchors(0,1,1,1),FAnchors(0,0,0,1),FAnchors(1,0,1,1)};
+        const FMargin EdgeOffsets[]={FMargin(0,0,0,2),FMargin(0,-2,0,2),FMargin(0,0,2,0),FMargin(-2,0,2,0)};
+        for(int32 Index=0;Index<4;++Index){auto* Edge=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),EdgeNames[Index]);Edge->SetBrushColor(FLinearColor(.48f,.62f,.68f,.72f));Fill(Edge,EdgeAnchors[Index],EdgeOffsets[Index])->SetZOrder(5);}
+        auto* North=Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),TEXT("TXT_MiniNorth"));North->SetFont(ICFrontendLayout::Font(12,true));North->SetText(FText::FromString(TEXT("N")));North->SetJustification(ETextJustify::Center);North->SetColorAndOpacity(FLinearColor(.95f,.78f,.28f));Fill(North,FAnchors(.5f,0),FMargin(-10,4,20,18))->SetZOrder(6);
+        auto* Help=Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),TEXT("TXT_MiniHelp"));Help->SetFont(ICFrontendLayout::Font(11));Help->SetText(NSLOCTEXT("ICMap","MiniHelp","M · 전체 지도"));Help->SetColorAndOpacity(FLinearColor(.82f,.87f,.9f));Fill(Help,FAnchors(0,1),FMargin(8,-21,100,18))->SetZOrder(6);
+        auto* Legend=Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),TEXT("TXT_MiniLegend"));Legend->SetFont(ICFrontendLayout::Font(9,true));Legend->SetText(NSLOCTEXT("ICMap","MiniLegend","■ 건물  ● NPC  ◆ 적"));Legend->SetJustification(ETextJustify::Right);Legend->SetColorAndOpacity(FLinearColor(.8f,.86f,.9f));Fill(Legend,FAnchors(1,1),FMargin(-158,-20,150,18))->SetZOrder(6);
     }
     if(Mini)return;
     auto AddText=[&](const TCHAR* Name,FVector2D At,int32 Size)
@@ -86,12 +97,44 @@ void UICMapWidget::RefreshMap()
     {Layer=R->Layers[0];MapTexture=Layer.MapTexture.LoadSynchronous();MapMinimumZoom=R->MinimumZoom;MapMaximumZoom=R->MaximumZoom;}
     Portals.Reset();if(auto* World=GetWorld())for(TActorIterator<AICWarpStone> It(World);It;++It)if(!It->WarpID.IsNone())Portals.Add(*It);
     Portals.Sort([](const auto& A,const auto& B){return A->WarpID.LexicalLess(B->WarpID);});
+    Buildings.Reset();NPCs.Reset();Monsters.Reset();
+    if(bMinimap)if(auto* World=GetWorld())
+    {
+        for(TActorIterator<AActor> It(World);It;++It)if(It->ActorHasTag(TEXT("IC.Map.Building")))Buildings.Add(*It);
+        // L_OpenWorld's houses are modular kits rather than one tagged root actor.
+        // Detect only a kit's large/core mesh, not every wall, roof, door or window,
+        // so a house produces one useful marker instead of a cloud of markers.
+        for(TActorIterator<AStaticMeshActor> It(World);It;++It)
+        {
+            auto* Actor=*It;auto* Component=Actor?Actor->GetStaticMeshComponent():nullptr;UStaticMesh* Mesh=Component?Component->GetStaticMesh().Get():nullptr;
+            if(!Mesh||!IsAutomaticBuildingMeshPath(Mesh->GetPathName())||Buildings.Contains(Actor))continue;
+            // Modular houses contain several floor pieces. Keep one representative
+            // within a building-sized radius instead of drawing a marker per piece.
+            const bool bSameBuilding=Buildings.ContainsByPredicate([Actor](const TWeakObjectPtr<AActor>& Existing)
+            {return Existing.IsValid()&&FVector::DistSquaredXY(Existing->GetActorLocation(),Actor->GetActorLocation())<=FMath::Square(1500.f);});
+            if(!bSameBuilding)Buildings.Add(Actor);
+        }
+        for(TActorIterator<AICNPCBase> It(World);It;++It)NPCs.Add(*It);
+        for(TActorIterator<AICEnemyBase> It(World);It;++It)Monsters.Add(*It);
+    }
     if(!bRegistered&&Rules.bUnlockPlacedPortals)if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer());PC&&PC->bCreated&&PC->GetWorldState())
     {
         auto Next=PC->GetWorldState()->ExportState();bool Changed=false;
         for(const auto& P:Portals)if(P.IsValid()&&!Next.UnlockedWarps.Contains(P->WarpID)){Next.UnlockedWarps.Add(P->WarpID);Changed=true;}
         bRegistered=!Changed||PC->GetWorldState()->ApplyWorldProgress(Next);
     }
+}
+bool UICMapWidget::IsAutomaticBuildingMeshPath(const FString& AssetPath)
+{
+    FString Path=AssetPath.ToLower();
+    if(!Path.Contains(TEXT("/meshes/building/"))&&!Path.Contains(TEXT("/meshes/buildings/")))return false;
+    const bool bCore=Path.Contains(TEXT("building_block"))||Path.Contains(TEXT("building_box"))||Path.Contains(TEXT("/sm_floor"))||
+        Path.Contains(TEXT("farmhouse"))||Path.Contains(TEXT("farm_house"))||Path.Contains(TEXT("windmill"))||
+        Path.Contains(TEXT("/sm_house_"))||Path.Contains(TEXT("/sm_building_"));
+    if(!bCore)return false;
+    for(const TCHAR* Detail:{TEXT("fence"),TEXT("roof"),TEXT("wall"),TEXT("door"),TEXT("window"),TEXT("stairs"),TEXT("decoration")})
+        if(Path.Contains(Detail))return false;
+    return true;
 }
 void UICMapWidget::RefreshLabels()
 {
@@ -105,6 +148,14 @@ FVector2D UICMapWidget::WorldToMapUV(FVector P) const
     const FVector2D D=FVector2D(P.X,P.Y)-Layer.WorldOriginCm;
     return Layer.MapOriginUV+FVector2D(FVector2D::DotProduct(D,Layer.WorldAxisU)/FMath::Max(1.,Layer.WorldCmPerUV.X),FVector2D::DotProduct(D,Layer.WorldAxisV)/FMath::Max(1.,Layer.WorldCmPerUV.Y));
 }
+namespace
+{
+int32 CountValidActors(const TArray<TWeakObjectPtr<AActor>>& Actors)
+{int32 Count=0;for(const auto& Actor:Actors)if(Actor.IsValid())++Count;return Count;}
+}
+int32 UICMapWidget::GetTrackedBuildingCount() const{return CountValidActors(Buildings);}
+int32 UICMapWidget::GetTrackedNPCCount() const{return CountValidActors(NPCs);}
+int32 UICMapWidget::GetTrackedMonsterCount() const{return CountValidActors(Monsters);}
 FVector2D UICMapWidget::MinimapDisplayUV(FVector2D MapUV,FVector2D CenterUV,float Zoom)
 {return FVector2D(.5,.5)+(MapUV-CenterUV)*FMath::Max(1.f,Zoom);}
 FVector2D UICMapWidget::DisplayUV(FVector P) const
@@ -118,6 +169,7 @@ FSlateRect UICMapWidget::ImageRect(const FGeometry& G) const
     // Paint-space geometries share a window origin; cached tick geometry includes the desktop offset.
     const auto& SG=Surface->GetPaintSpaceGeometry();const auto& Root=GetPaintSpaceGeometry();
     const FVector2D A=Root.AbsoluteToLocal(SG.LocalToAbsolute(FVector2D::ZeroVector)),B=Root.AbsoluteToLocal(SG.LocalToAbsolute(SG.GetLocalSize()));
+    if(bMinimap)return FSlateRect(A.X,A.Y,B.X,B.Y);
     FVector2D Size=B-A;const double Aspect=MapTexture?double(MapTexture->GetSizeX())/FMath::Max(1,MapTexture->GetSizeY()):2.;
     const double W=FMath::Min(Size.X,Size.Y*Aspect),H=W/Aspect;const FVector2D Min=A+(Size-FVector2D(W,H))*.5;
     return FSlateRect(Min.X,Min.Y,Min.X+W,Min.Y+H);
@@ -137,11 +189,12 @@ void UICMapWidget::RefreshVisuals(const FGeometry& G)
     const double Zoom=bMinimap?FMath::Clamp(double(MinimapZoom),MapMinimumZoom,MapMaximumZoom):1.;
     if(bMinimap&&Player)
     {
-        const FVector2D Desired=WorldToMapUV(Player->GetActorLocation());const double Half=.5/Zoom;
-        MinimapCenterUV={FMath::Clamp(Desired.X,Half,1.-Half),FMath::Clamp(Desired.Y,Half,1.-Half)};
+        // Radar-style minimap: the player stays centred and nearby markers move.
+        MinimapCenterUV=WorldToMapUV(Player->GetActorLocation());
     }
     const auto Rect=ImageRect(G);const FVector2D Size(Rect.Right-Rect.Left,Rect.Bottom-Rect.Top);
     Image->SetTexture(MapTexture);
+    Image->SetVisibility(bMinimap?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);
     const FVector2D HalfUV(.5/Zoom,.5/Zoom);
     Image->SetUVRegion(bMinimap?MinimapCenterUV-HalfUV:FVector2D::ZeroVector,bMinimap?MinimapCenterUV+HalfUV:FVector2D(1,1));
     if(auto* S=Cast<UCanvasPanelSlot>(Image->Slot)){S->SetPosition({Rect.Left,Rect.Top});S->SetSize(Size);}
@@ -152,7 +205,7 @@ void UICMapWidget::RefreshVisuals(const FGeometry& G)
         if(!Marker)
         {
             Marker=ICWidgetTemplates::Create(this,TEXT("WBP_IC_MapPortalMarker"));if(!Marker)continue;
-            PortalMarkers.Add(Portal->WarpID,Marker);auto* S=Canvas->AddChildToCanvas(Marker);S->SetAutoSize(true);S->SetZOrder(1);
+            PortalMarkers.Add(Portal->WarpID,Marker);auto* S=Canvas->AddChildToCanvas(Marker);S->SetAutoSize(true);S->SetAlignment({.5f,.5f});S->SetZOrder(1);
             Marker->SetVisibility(ESlateVisibility::HitTestInvisible);
         }
         const auto UV=DisplayUV(Portal->GetActorLocation());
@@ -166,14 +219,44 @@ void UICMapWidget::RefreshVisuals(const FGeometry& G)
         }
         if(auto* Label=Cast<UTextBlock>(Marker->GetWidgetFromName(TEXT("TXT_Label"))))
         {Label->SetText(Local(Portal->InteractionText));Label->SetVisibility(bMinimap?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);}
-        Marker->SetRenderScale(bMinimap?FVector2D(.36f):FVector2D(1));Marker->SetRenderOpacity(bMinimap?MinimapOpacity(UV):1.f);
+        Marker->SetRenderScale(bMinimap?FVector2D(.65f):FVector2D(1));Marker->SetRenderOpacity(1.f);
         CastChecked<UCanvasPanelSlot>(Marker->Slot)->SetPosition(MarkerPosition(Rect,Portal->GetActorLocation()));
     }
     for(auto It=PortalMarkers.CreateIterator();It;++It)if(!Active.Contains(It.Key())){It.Value()->RemoveFromParent();It.RemoveCurrent();}
+    TSet<TObjectPtr<AActor>> ActiveWorldActors;
+    auto AddWorldMarkers=[&](const TArray<TWeakObjectPtr<AActor>>& Actors,const TCHAR* Glyph,FLinearColor Color,int32 ZOrder,const FText& Label)
+    {
+        for(const auto& WeakActor:Actors)if(auto* Actor=WeakActor.Get();IsValid(Actor))
+        {
+            ActiveWorldActors.Add(Actor);
+            auto* Marker=WorldActorMarkers.FindRef(Actor).Get();
+            if(!Marker)
+            {
+                Marker=WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+                Marker->SetFont(ICFrontendLayout::Font(15,true));Marker->SetText(FText::FromString(Glyph));Marker->SetJustification(ETextJustify::Center);
+                Marker->SetColorAndOpacity(Color);Marker->SetShadowColorAndOpacity(FLinearColor::Black);Marker->SetShadowOffset({1,1});Marker->SetToolTipText(Label);
+                auto* Slot=Canvas->AddChildToCanvas(Marker);Slot->SetAutoSize(true);Slot->SetAlignment({.5f,.5f});Slot->SetZOrder(ZOrder);WorldActorMarkers.Add(Actor,Marker);
+            }
+            const auto UV=DisplayUV(Actor->GetActorLocation());
+            Marker->SetVisibility(UV.X>=0&&UV.X<=1&&UV.Y>=0&&UV.Y<=1?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
+            CastChecked<UCanvasPanelSlot>(Marker->Slot)->SetPosition(MarkerPosition(Rect,Actor->GetActorLocation()));
+        }
+    };
+    if(bMinimap)
+    {
+        AddWorldMarkers(Buildings,TEXT("■"),FLinearColor(1.f,.7f,.18f),1,NSLOCTEXT("ICMap","BuildingMarker","건물"));
+        AddWorldMarkers(NPCs,TEXT("●"),FLinearColor(.2f,.85f,1.f),2,NSLOCTEXT("ICMap","NPCMarker","NPC"));
+        AddWorldMarkers(Monsters,TEXT("◆"),FLinearColor(1.f,.2f,.18f),3,NSLOCTEXT("ICMap","MonsterMarker","몬스터"));
+    }
+    for(auto It=WorldActorMarkers.CreateIterator();It;++It)if(!IsValid(It.Key())||!ActiveWorldActors.Contains(It.Key())){It.Value()->RemoveFromParent();It.RemoveCurrent();}
     if(!PlayerMarker)
     {
-        PlayerMarker=ICWidgetTemplates::Create(this,TEXT("WBP_IC_MapPlayerMarker"));
-        if(PlayerMarker){auto* S=Canvas->AddChildToCanvas(PlayerMarker);S->SetAutoSize(true);S->SetAlignment({.5f,.5f});S->SetZOrder(2);}
+        PlayerMarker=WidgetTree->ConstructWidget<UICMapPlayerMarkerShape>(UICMapPlayerMarkerShape::StaticClass(),TEXT("PlayerDirectionMarker"));
+        if(PlayerMarker)
+        {
+            auto* S=Canvas->AddChildToCanvas(PlayerMarker);S->SetAutoSize(true);S->SetAlignment({.5f,.5f});S->SetZOrder(5);
+            PlayerMarker->SetRenderTransformPivot(FVector2D(.5f,.5f));
+        }
     }
     if(PlayerMarker)
     {
@@ -183,7 +266,7 @@ void UICMapWidget::RefreshVisuals(const FGeometry& G)
         {
             const auto Forward=Player->GetActorForwardVector();const FVector2D Direction(Forward.X*Layer.WorldAxisU.X+Forward.Y*Layer.WorldAxisU.Y,Forward.X*Layer.WorldAxisV.X+Forward.Y*Layer.WorldAxisV.Y);
             PlayerMarker->SetRenderTransformAngle(FMath::RadiansToDegrees(FMath::Atan2(Direction.X,-Direction.Y)));
-            PlayerMarker->SetRenderScale(bMinimap?FVector2D(.5f):FVector2D(1));PlayerMarker->SetRenderOpacity(bMinimap?MinimapOpacity(UV):1.f);
+            PlayerMarker->SetRenderScale(bMinimap?FVector2D(.85f):FVector2D(1));PlayerMarker->SetRenderOpacity(1.f);
             CastChecked<UCanvasPanelSlot>(PlayerMarker->Slot)->SetPosition(MarkerPosition(Rect,Player->GetActorLocation()));
         }
     }
@@ -200,7 +283,7 @@ bool UICMapWidget::RequestTravel(FName ID)
 void UICMapWidget::NativeTick(const FGeometry& G,float Delta)
 {
     Super::NativeTick(G,Delta);RefreshElapsed+=Delta;
-    if(RefreshElapsed>.25f){RefreshElapsed=0;RefreshMap();RefreshLabels();}
+    if(RefreshElapsed>.5f){RefreshElapsed=0;RefreshMap();RefreshLabels();}
     RefreshVisuals(G);
     if(!bTraveling)return;
     auto* PC=Cast<AICPlayerController>(GetOwningPlayer());auto* Player=PC?Cast<AICPlayerCharacter>(PC->GetPawn()):nullptr;
