@@ -1,4 +1,5 @@
 #include "UI/Life/ICLifeWidgets.h"
+#include "UI/Framework/ICWidgetTemplates.h"
 #include "Settings/ICGameUserSettings.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
@@ -48,12 +49,11 @@ FText LifeItem(UUserWidget* Widget,FName ID){return Widget->GetGameInstance()->G
 }
 void UICLifeChoiceButton::Configure(int32 Index,FText Caption)
 {
-    Choice=Index;auto* Label=NewObject<UTextBlock>(this);Label->SetText(Caption);Label->SetFont(ICFrontendLayout::Font(20));Label->SetAutoWrapText(true);SetContent(Label);
-    SetBackgroundColor(FLinearColor(.13f,.22f,.31f));OnClicked.AddUniqueDynamic(this,&ThisClass::Choose);
+    Choice=Index;SetCaption(Caption);OnClicked.AddUniqueDynamic(this,&ThisClass::Choose);
 }
 bool UICSleepFadeWidget::BuildLayout(UWidgetTree* Tree)
 {auto* Black=Tree->ConstructWidget<UBorder>();Black->SetBrushColor(FLinearColor::Black);Tree->RootWidget=Black;return true;}
-void UICSleepFadeWidget::NativeOnInitialized(){Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);}
+void UICSleepFadeWidget::NativeOnInitialized(){Super::NativeOnInitialized();}
 
 bool UICSeedPickerWidget::BuildLayout(UWidgetTree* Tree)
 {
@@ -64,12 +64,12 @@ bool UICSeedPickerWidget::BuildLayout(UWidgetTree* Tree)
     LifeRow(Body,LifeButton(Tree,TEXT("BTN_SeedCancel"),NSLOCTEXT("ICFarm","SeedCancel","취소")),0);return true;
 }
 void UICSeedPickerWidget::NativeOnInitialized()
-{Super::NativeOnInitialized();SetIsFocusable(true);if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_SeedCancel")))->OnClicked.AddUniqueDynamic(this,&ThisClass::ClosePicker);}
+{Super::NativeOnInitialized();SetIsFocusable(true);CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_SeedCancel")))->OnClicked.AddUniqueDynamic(this,&ThisClass::ClosePicker);}
 bool UICSeedPickerWidget::Open(AICPlayerController* Player,AICLifeActor* Plot)
 {
     if(!Player||!Plot||!Player->GetLocalPlayer())return false;
     auto* Type=LoadClass<UICSeedPickerWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_SeedPicker.WBP_IC_SeedPicker_C"));
-    auto* Widget=CreateWidget<UICSeedPickerWidget>(Player,Type?Type:StaticClass());if(!Widget)return false;
+    auto* Widget=CreateWidget<UICSeedPickerWidget>(Player,Type);if(!Widget)return false;
     Widget->Target=Plot;auto* UI=ICExpandedLifeUI::LifeUI(Widget);if(!UI||!UI->OpenScreen(Widget,true,180))return false;Widget->Refresh();Widget->SetKeyboardFocus();return true;
 }
 void UICSeedPickerWidget::Refresh()
@@ -79,7 +79,7 @@ void UICSeedPickerWidget::Refresh()
     auto* List=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("SeedList")));List->ClearChildren();FICDefinitionResult R;
     for(int32 Index=0;Index<CropIDs.Num();++Index)if(const auto* Crop=Definitions->Find<FICCropRow>(CropIDs[Index],R))
     {
-        const int32 Count=PC->GetInventory()->CountItem(Crop->SeedItemID);auto* Button=WidgetTree->ConstructWidget<UICLifeChoiceButton>();
+        const int32 Count=PC->GetInventory()->CountItem(Crop->SeedItemID);auto* Button=ICWidgetTemplates::Create<UICLifeChoiceButton>(this,TEXT("WBP_IC_LifeChoice"));
         Button->Configure(Index,FText::Format(NSLOCTEXT("ICFarm","SeedCount","{0}   보유 {1}개"),LifeItem(this,Crop->SeedItemID),FText::AsNumber(Count)));
         Button->SetIsEnabled(Count>0);Button->OnChoice.AddUniqueDynamic(this,&ThisClass::PickSeed);List->AddChild(Button);
     }
@@ -98,7 +98,7 @@ FReply UICSeedPickerWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,con
     const FKey Key=UICGameUserSettings::MenuKey(Event.GetKey());if(Key==EKeys::Escape){ClosePicker();return FReply::Handled();}
     if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down)
     {Selected=FMath::Clamp(Selected+(Key==EKeys::S||Key==EKeys::Down?1:-1),0,FMath::Max(0,CropIDs.Num()-1));auto* List=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("SeedList")));if(List->GetChildAt(Selected)){List->ScrollWidgetIntoView(List->GetChildAt(Selected));List->GetChildAt(Selected)->SetKeyboardFocus();}return FReply::Handled();}
-    if(Key==EKeys::Enter&&!Event.IsRepeat()){PickSeed(Selected);return FReply::Handled();}return Super::NativeOnPreviewKeyDown(Geometry,Event);
+    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)&&!Event.IsRepeat()){PickSeed(Selected);return FReply::Handled();}return Super::NativeOnPreviewKeyDown(Geometry,Event);
 }
 
 bool UICShopWidget::BuildLayout(UWidgetTree* Tree)
@@ -116,11 +116,11 @@ bool UICShopWidget::BuildLayout(UWidgetTree* Tree)
     auto* Actions=Tree->ConstructWidget<UHorizontalBox>();LifeRow(Body,Actions);
     Actions->AddChildToHorizontalBox(LifeButton(Tree,TEXT("BTN_Checkout"),NSLOCTEXT("ICShop","CheckoutBuy","구매하기")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     Actions->AddChildToHorizontalBox(LifeButton(Tree,TEXT("BTN_ShopCancel"),NSLOCTEXT("ICShop","Cancel","취소하고 나가기")))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    LifeRow(Body,LifeLabel(Tree,NAME_None,NSLOCTEXT("ICShop","Keys","W/S 선택 · Enter 담기 · A/D 탭 · F 결제 · ESC 취소"),16),0);return true;
+    LifeRow(Body,LifeLabel(Tree,NAME_None,NSLOCTEXT("ICShop","Keys","W/S 선택 · G/F 담기 · A/D 탭 · R 결제 · ESC 취소"),16),0);return true;
 }
 void UICShopWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();SetIsFocusable(true);if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();SetIsFocusable(true);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_BuyTab")))->OnClicked.AddUniqueDynamic(this,&ThisClass::BuyTab);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_SellTab")))->OnClicked.AddUniqueDynamic(this,&ThisClass::SellTab);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Checkout")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Checkout);
@@ -130,7 +130,7 @@ bool UICShopWidget::Open(AICPlayerController* Player,FName ServiceID)
 {
     if(!Player||!Player->GetLocalPlayer())return false;FString Failure;
     if(!Player->GetGameInstance()->GetSubsystem<UICShopSubsystem>()->CanUseShop(ServiceID,Failure)){Player->Show(Failure);return false;}
-    auto* Type=LoadClass<UICShopWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Shop.WBP_IC_Shop_C"));auto* Widget=CreateWidget<UICShopWidget>(Player,Type?Type:StaticClass());if(!Widget)return false;
+    auto* Type=LoadClass<UICShopWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Shop.WBP_IC_Shop_C"));auto* Widget=CreateWidget<UICShopWidget>(Player,Type);if(!Widget)return false;
     Player->SetMenu(TEXT(""));Widget->Service=ServiceID;auto* UI=ICExpandedLifeUI::LifeUI(Widget);if(!UI||!UI->OpenScreen(Widget,true,180))return false;Widget->Refresh();Widget->SetKeyboardFocus();return true;
 }
 void UICShopWidget::SelectTab(bool Sell){if(bSubmitting)return;bSelling=Sell;Selected=0;Cart.Reset();ICExpandedLifeUI::LifeCaption(this,TEXT("TXT_ShopNotice"),FText::GetEmpty());Refresh();}
@@ -147,13 +147,13 @@ void UICShopWidget::Refresh()
     else for(const auto& Offer:Offers){Items.Add(Offer.ItemID);Prices.Add(Offer.ItemID,Offer.FinalPrice);}
     for(int32 Index=0;Index<Items.Num();++Index)
     {
-        auto* Button=WidgetTree->ConstructWidget<UICLifeChoiceButton>();Button->Configure(Index,FText::Format(NSLOCTEXT("ICShop","OfferLine","{0}   {1} G   보유 {2}개"),LifeItem(this,Items[Index]),FText::AsNumber(Prices.FindRef(Items[Index])),FText::AsNumber(PC->GetInventory()->CountItem(Items[Index]))));
+        auto* Button=ICWidgetTemplates::Create<UICLifeChoiceButton>(this,TEXT("WBP_IC_LifeChoice"));Button->Configure(Index,FText::Format(NSLOCTEXT("ICShop","OfferLine","{0}   {1} G   보유 {2}개"),LifeItem(this,Items[Index]),FText::AsNumber(Prices.FindRef(Items[Index])),FText::AsNumber(PC->GetInventory()->CountItem(Items[Index]))));
         Button->OnChoice.AddUniqueDynamic(this,&ThisClass::ItemPicked);List->AddChild(Button);
     }
     auto* CartList=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("ShopCart")));CartList->ClearChildren();int64 Total=0;
     for(int32 Index=0;Index<Cart.Num();++Index)
     {
-        const auto& Entry=Cart[Index];Total+=int64(Prices.FindRef(Entry.ItemID))*Entry.Count;auto* Button=WidgetTree->ConstructWidget<UICLifeChoiceButton>();
+        const auto& Entry=Cart[Index];Total+=int64(Prices.FindRef(Entry.ItemID))*Entry.Count;auto* Button=ICWidgetTemplates::Create<UICLifeChoiceButton>(this,TEXT("WBP_IC_LifeChoice"));
         Button->Configure(10000+Index,FText::Format(NSLOCTEXT("ICShop","CartLine","{0} × {1}   {2} G"),LifeItem(this,Entry.ItemID),FText::AsNumber(Entry.Count),FText::AsNumber(int64(Prices.FindRef(Entry.ItemID))*Entry.Count)));
         Button->OnChoice.AddUniqueDynamic(this,&ThisClass::ItemPicked);CartList->AddChild(Button);
     }
@@ -182,10 +182,33 @@ bool UICShopWidget::SubmitCart()
 void UICShopWidget::CloseShop(){if(bSubmitting)return;Cart.Reset();if(auto* UI=ICExpandedLifeUI::LifeUI(this))UI->CloseScreen(this);else RemoveFromParent();}
 FReply UICShopWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event)
 {
-    const FKey Key=UICGameUserSettings::MenuKey(Event.GetKey());if(Key==EKeys::Escape){CloseShop();return FReply::Handled();}
-    if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::D||Key==EKeys::Right){SelectTab(Key==EKeys::D||Key==EKeys::Right);return FReply::Handled();}
-    if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down){Selected=FMath::Clamp(Selected+(Key==EKeys::S||Key==EKeys::Down?1:-1),0,FMath::Max(0,Items.Num()-1));auto* List=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("ShopItems")));if(List->GetChildrenCount()>Selected){List->ScrollWidgetIntoView(List->GetChildAt(Selected));List->GetChildAt(Selected)->SetKeyboardFocus();}return FReply::Handled();}
-    if(Key==EKeys::Enter&&!Event.IsRepeat()){ItemPicked(Selected);return FReply::Handled();}if((Key==EKeys::F||Event.GetKey()==UICGameUserSettings::GamepadFaceKey(0))&&!Event.IsRepeat()){SubmitCart();return FReply::Handled();}
+    const FKey Key=UICGameUserSettings::MenuKey(Event.GetKey());
+    if(Key==EKeys::Escape){if(!Event.IsRepeat())CloseShop();return FReply::Handled();}
+    if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::D||Key==EKeys::Right)
+    {if(!Event.IsRepeat())SelectTab(Key==EKeys::D||Key==EKeys::Right);return FReply::Handled();}
+    if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down)
+    {
+        const bool Down=Key==EKeys::S||Key==EKeys::Down;
+        auto* Checkout=GetWidgetFromName(TEXT("BTN_Checkout"));
+        if(Down&&Selected>=Items.Num()-1&&Checkout&&Checkout->GetIsEnabled())
+        {Checkout->SetUserFocus(GetOwningPlayer());return FReply::Handled();}
+        if(!Down&&Checkout&&Checkout->HasKeyboardFocus())Selected=Items.Num();
+        Selected=FMath::Clamp(Selected+(Down?1:-1),0,FMath::Max(0,Items.Num()-1));
+        auto* List=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("ShopItems")));
+        if(List->GetChildrenCount()>Selected){List->ScrollWidgetIntoView(List->GetChildAt(Selected));List->GetChildAt(Selected)->SetUserFocus(GetOwningPlayer());}
+        return FReply::Handled();
+    }
+    if(Key==EKeys::Enter)
+    {
+        if(!Event.IsRepeat())
+        {
+            UButton* Focused=nullptr;
+            WidgetTree->ForEachWidget([&](UWidget* Widget){if(auto* Button=Cast<UButton>(Widget);Button&&Button->HasKeyboardFocus()&&Button->GetIsEnabled())Focused=Button;});
+            if(Focused)Focused->OnClicked.Broadcast();else ItemPicked(Selected);
+        }
+        return FReply::Handled();
+    }
+    if(Event.GetKey()==EKeys::R||Event.GetKey()==UICGameUserSettings::GamepadFaceKey(0))
+    {if(!Event.IsRepeat())SubmitCart();return FReply::Handled();}
     return Super::NativeOnPreviewKeyDown(Geometry,Event);
 }
-

@@ -64,7 +64,7 @@ bool UICPartyPortraitWidget::BuildLayout(UWidgetTree* Tree)
 }
 void UICPartyPortraitWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     if(auto* Button=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Select"))))Button->OnClicked.AddUniqueDynamic(this,&ThisClass::Pick);
 }
 void UICPartyPortraitWidget::Present(int32 Index,FName ID,UTexture2D* Portrait,bool Selected)
@@ -142,7 +142,7 @@ UICPartyMenuWidget::UICPartyMenuWidget(const FObjectInitializer& Initializer):Su
 }
 void UICPartyMenuWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     for(int32 Index=0;Index<4;++Index)if(auto* Card=Cast<UICPartyPortraitWidget>(GetWidgetFromName(FName(*FString::Printf(TEXT("Member%d"),Index)))))
         Card->OnPicked.AddUniqueDynamic(this,&ThisClass::PortraitPicked);
     RefreshParty();

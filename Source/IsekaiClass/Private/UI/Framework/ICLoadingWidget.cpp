@@ -6,11 +6,11 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
+#include "Components/Border.h"
 void UICLoadingWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-    if (!WidgetTree->RootWidget)
-        ICFrontendLayout::Build(WidgetTree, TEXT("Loading"));
+
     SetIsFocusable(true);
     GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->OnChanged.AddUniqueDynamic(this, &ThisClass::Refresh);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Retry"))))
@@ -33,6 +33,9 @@ void UICLoadingWidget::Refresh()
 {
     auto* Flow = GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
     const bool Failed = Flow->Phase == EICGameFlowPhase::Failed;
+    const bool Black=Flow->bPendingNewGame&&!Failed;
+    if(auto* Background=Cast<UBorder>(GetWidgetFromName(TEXT("Background"))))Background->SetBrushColor(Black?FLinearColor::Black:FLinearColor(.018f,.026f,.045f));
+    if(auto* Card=GetWidgetFromName(TEXT("Card")))Card->SetVisibility(Black?ESlateVisibility::Hidden:ESlateVisibility::Visible);
     if (auto* Text = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Status"))))
         Text->SetText(Failed ? FText::FromString(Flow->LastError) : ICFrontendLayout::Text(TEXT("Preparing")));
     if (auto* Spinner = GetWidgetFromName(TEXT("LoadingSpinner")))

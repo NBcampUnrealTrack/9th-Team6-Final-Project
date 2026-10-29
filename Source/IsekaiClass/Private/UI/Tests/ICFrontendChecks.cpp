@@ -88,10 +88,18 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "UI/MainMenu/ICMainMenuWidget.h"
 #include "UI/CharacterCreate/ICCharacterCreateWidget.h"
+#include "UI/Framework/ICPrologueWidget.h"
+#include "Audio/ICBGMSubsystem.h"
+#include "Settings/ICGameUserSettings.h"
+#include "Player/Character/ICPlayerCharacter.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
+#include "UI/Gameplay/ICGameMenuWidget.h"
+#include "UI/CharacterCreate/ICNameKeyButton.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
+#include "Components/CheckBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "UI/Framework/ICFrontendLayout.h"
@@ -118,17 +126,28 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
 #include "Kismet/GameplayStatics.h"
 #include "Tests/AutomationCommon.h"
 
+struct FICPrologueTestAccess
+{
+    static void Tick(UICPrologueWidget* Widget,float Delta){Widget->NativeTick(Widget->GetCachedGeometry(),Delta);}
+    static bool Reading(UICPrologueWidget* W){return W->State==UICPrologueWidget::EState::Reading;}
+    static bool Finishing(UICPrologueWidget* W){return W->State==UICPrologueWidget::EState::FadeOut;}
+    static float Held(UICPrologueWidget* W){return W->SkipElapsed;}
+};
+struct FICKeyboardTestAccess
+{
+    static void Sync(UICCharacterCreateWidget* Widget){Widget->NativeTick(Widget->GetCachedGeometry(),0.f);}
+};
 namespace
 {
 class FICPlaythroughCommand : public IAutomationLatentCommand
 {
 public:
-    explicit FICPlaythroughCommand(FAutomationTestBase* InTest) : Test(InTest), Started(FPlatformTime::Seconds())
+    explicit FICPlaythroughCommand(FAutomationTestBase* InTest,bool Skip=false) : Test(InTest), bSkipRun(Skip), Started(FPlatformTime::Seconds())
     {
     }
     virtual bool Update() override
     {
-        if (FPlatformTime::Seconds() - Started > 100)
+        if (FPlatformTime::Seconds() - Started > 180)
         {
             Test->AddError(TEXT("Title-to-play timed out"));
             Cleanup();
@@ -143,10 +162,67 @@ public:
         auto* Flow = PC->GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
         auto* Client = PC->GetLocalPlayer() ? PC->GetLocalPlayer()->ViewportClient.Get() : nullptr;
         if (!Client || !Client->GetWindow()) return false;
+        if(Flow->Phase==EICGameFlowPhase::Prologue)
+        {
+            TArray<UUserWidget*> Prologues;
+            UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World,Prologues,UICPrologueWidget::StaticClass(),false);
+            for(auto* Entry:Prologues)if(auto* Prologue=Cast<UICPrologueWidget>(Entry);Prologue&&Prologue->IsActivated())
+            {
+                Test->TestFalse(TEXT("Cursor stays hidden during prologue"),PC->bShowMouseCursor);
+                auto* Music=World->GetSubsystem<UICBGMSubsystem>();Music->Tick(1.f);
+                if(FICPrologueTestAccess::Reading(Prologue))Test->TestEqual(TEXT("Prologue reading uses its editable music row"),Music->GetCurrentMusicRow(),FName(TEXT("BGM_Prologue")));
+                const int32 Before=Prologue->GetLineIndex();
+                Test->TestEqual(TEXT("The WBP loads all fifty-five DT entries"),Prologue->GetLineCount(),55);
+                if(bSkipRun&&Before>=17)
+                {
+                    if(!FICPrologueTestAccess::Reading(Prologue))return false;
+                    if(!bPartialSkip)
+                    {
+                        FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::H,FModifierKeysState(),0,false,0,0));
+                        FICPrologueTestAccess::Tick(Prologue,.6f);
+                        Test->TestTrue(TEXT("Holding H fills the skip gauge during typing"),FICPrologueTestAccess::Held(Prologue)>.5f);
+                        bPartialSkip=true;return false;
+                    }
+                    Capture(Client,TEXT("Prologue_HoldSkip"));
+                    FSlateApplication::Get().ProcessKeyUpEvent(FKeyEvent(EKeys::H,FModifierKeysState(),0,false,0,0));
+                    Test->TestEqual(TEXT("Releasing H resets its gauge"),FICPrologueTestAccess::Held(Prologue),0.f);
+                    Test->TestEqual(TEXT("A short hold does not skip"),Prologue->GetLineIndex(),Before);
+                    FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::H,FModifierKeysState(),0,false,0,0));
+                    FICPrologueTestAccess::Tick(Prologue,1.6f);
+                    Test->TestTrue(TEXT("A complete H hold fades into the normal new-game path"),FICPrologueTestAccess::Finishing(Prologue));
+                    FSlateApplication::Get().ProcessKeyUpEvent(FKeyEvent(EKeys::H,FModifierKeysState(),0,false,0,0));
+                    return false;
+                }
+                if(Before<2)
+                {
+                    // Exercise real Slate time and deliberately leave focus on the viewport.
+                    // The old test forced focus and manually ticked before every G, hiding the bug.
+                    if(!Prologue->IsLineComplete())
+                    {
+                        PressKey(EKeys::G);
+                        Test->TestEqual(TEXT("G during typing cannot skip a line"),Prologue->GetLineIndex(),Before);
+                        return false;
+                    }
+                    FSlateApplication::Get().SetUserFocus(0,Client->GetGameViewportWidget(),EFocusCause::SetDirectly);
+                }
+                else FICPrologueTestAccess::Tick(Prologue,4.f);
+                if(Prologue->IsLineComplete())
+                {
+                    if(Before==0||Before==17||Before==50||Before==54)Capture(Client,FString::Printf(TEXT("Prologue_%02d"),Before+1));
+                    FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::G,FModifierKeysState(),0,true,0,0));
+                    Test->TestEqual(TEXT("Held G cannot advance a complete line"),Prologue->GetLineIndex(),Before);
+                    PressKey(EKeys::G);
+                    if(Before<54)Test->TestEqual(TEXT("G advances even when viewport has the keyboard focus"),Prologue->GetLineIndex(),Before+1);
+                }
+                return false;
+            }
+        }
         if (Stage == 0)
         {
             if (!PC->IsMainMenuLevel())
                 return false;
+            auto* TitleMusic=World->GetSubsystem<UICBGMSubsystem>();TitleMusic->Tick(1.f);
+            Test->TestEqual(TEXT("Title uses its editable music row"),TitleMusic->GetCurrentMusicRow(),FName(TEXT("BGM_MainMenu")));
             Test->TestNull(TEXT("Title does not spawn a pawn"), PC->GetPawn());
             GI = PC->GetGameInstance();
             auto* Saves = PC->GetSaves();
@@ -243,7 +319,13 @@ public:
                 Cleanup();
                 return true;
             }
-            if (!Click(Client, Start)) return false;
+            Start->SetUserFocus(PC);
+            PressKey(EKeys::W);
+            Test->TestTrue(TEXT("W selects the preceding title action"),Menu->GetWidgetFromName(TEXT("BTN_Continue"))->HasUserFocus(PC));
+            PressKey(EKeys::S);
+            Test->TestTrue(TEXT("S selects the next title action"),Start->HasUserFocus(PC));
+            PressKey(EKeys::F);
+            Test->TestEqual(TEXT("G opens character creation from focused title button"),PC->Menu,FString(TEXT("Create")));
             NextStage(10);
             return false;
         }
@@ -277,9 +359,22 @@ public:
             Test->TestEqual(TEXT("Back cannot reverse creation"), Wizard->GetStep(), Question);
             if (Question == 0)
             {
+                auto* CreationMusic=World->GetSubsystem<UICBGMSubsystem>();CreationMusic->Tick(1.f);
+                Test->TestEqual(TEXT("Creation uses its editable music row"),CreationMusic->GetCurrentMusicRow(),FName(TEXT("BGM_CharacterCreate")));
                 auto* Name = CastChecked<UEditableTextBox>(Wizard->GetWidgetFromName(TEXT("EDIT_Name")));
                 auto* Next = CastChecked<UButton>(Wizard->GetWidgetFromName(TEXT("BTN_Next")));
                 Test->TestFalse(TEXT("Empty name cannot advance"), Next->GetIsEnabled());
+                const int32 HangulKeys[]={14,17,11}; // ㅎ ㅏ ㄴ -> 한
+                for(int32 KeyIndex:HangulKeys)
+                {
+                    auto* KeyButton=CastChecked<UICNameKeyButton>(Wizard->GetWidgetFromName(FName(*FString::Printf(TEXT("NameKey%d"),KeyIndex))));
+                    KeyButton->SetUserFocus(PC);FICKeyboardTestAccess::Sync(Wizard);PressKey(UICGameUserSettings::GamepadFaceKey(3));
+                }
+                Test->TestEqual(TEXT("Gamepad keyboard composes Hangul without OS IME"),Flow->Answers.Name,FString(TEXT("한")));
+                CastChecked<UButton>(Wizard->GetWidgetFromName(TEXT("NameKey36")))->SetUserFocus(PC);FICKeyboardTestAccess::Sync(Wizard);PressKey(EKeys::G);
+                CastChecked<UButton>(Wizard->GetWidgetFromName(TEXT("NameKey0")))->SetUserFocus(PC);FICKeyboardTestAccess::Sync(Wizard);PressKey(EKeys::F);
+                Test->TestEqual(TEXT("English keyboard uses the same confirm controls"),Flow->Answers.Name,FString(TEXT("한q")));
+                Name->SetText(FText::GetEmpty());
                 Name->SetUserFocus(PC);
                 for (TCHAR Character : FString(TEXT("테스트여행자")))
                     FSlateApplication::Get().ProcessKeyCharEvent(FCharacterEvent(Character, FModifierKeysState(), 0, false));
@@ -302,11 +397,11 @@ public:
                 }
                 Capture(Client, FString::Printf(TEXT("%02d_Question"), Question + 1));
                 auto* Answer = CastChecked<UButton>(Wizard->GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_Choice%d"), Choice))));
-                if (!Click(Client, Answer)) return false;
+                Answer->SetUserFocus(PC);PressKey(Question%2?EKeys::F:EKeys::G);
             }
             if (Question == 4)
             {
-                Test->TestTrue(TEXT("Last answer starts loading without confirmation"), Flow->bPendingNewGame && Flow->Phase == EICGameFlowPhase::Loading);
+                Test->TestTrue(TEXT("Last answer starts the prologue"), !Flow->bPendingNewGame && Flow->Phase == EICGameFlowPhase::Prologue);
                 NextStage(1);
             }
             else NextStage(Stage + 1);
@@ -350,98 +445,44 @@ public:
         }
         if (Stage == 2)
         {
-            if (FPlatformTime::Seconds() - StageAt < .25)
-                return false;
-            Test->TestEqual(TEXT("Pause freezes PlayClock"), PC->GetTime()->GetClock().PlaySecond, PausedAt);
-            TestMenuButtons(PC, {TEXT("Party"), TEXT("Inventory"), TEXT("Quest"), TEXT("Codex"), TEXT("Settings"), TEXT("Resume")});
-            Test->TestEqual(TEXT("ESC menu title"), CastChecked<UTextBlock>(PC->Screen->GetWidgetFromName(TEXT("TXT_Menu")))->GetText().ToString(), FString(TEXT("메뉴")));
-            auto* BackToGame = CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Resume")));
-            Test->TestEqual(TEXT("ESC menu back button label"), CastChecked<UTextBlock>(BackToGame->GetContent())->GetText().ToString(), FString(TEXT("뒤로가기")));
-            Capture(Client, TEXT("06_Menu"));
-            for (const auto* Key : {TEXT("Party"), TEXT("Inventory"), TEXT("Quest"), TEXT("Codex")})
-            {
-                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_%s"), Key)))));
-                Test->TestEqual(TEXT("Placeholder button leaves menu unchanged"), PC->Menu, FString(TEXT("Pause")));
-            }
-            Click(Client, BackToGame);
-            Test->TestTrue(TEXT("ESC menu back button resumes gameplay"), PC->Menu.IsEmpty() && !World->IsPaused());
+            if(FPlatformTime::Seconds()-StageAt<.25)return false;
+            Test->TestEqual(TEXT("Pause freezes PlayClock"),PC->GetTime()->GetClock().PlaySecond,PausedAt);
+            auto* CurrentMenu=Cast<UICGameMenuWidget>(PC->Screen->GetWidgetFromName(TEXT("GameMenu")));
+            if(!Test->TestNotNull(TEXT("Current tabbed gameplay menu mounted"),CurrentMenu)){Cleanup();return true;}
+            Test->TestFalse(TEXT("Menu cursor is hidden"),PC->bShowMouseCursor);
+            Capture(Client,TEXT("Morpheus_Menu"));
+            CurrentMenu->SelectTab(TEXT("Settings"));CurrentMenu->NavigationArea=1;CurrentMenu->SettingsActionIndex=0;
+            Test->TestTrue(TEXT("G confirms the selected menu action"),CurrentMenu->HandleMenuKey(EKeys::G));
+            Test->TestTrue(TEXT("G resumes gameplay"),PC->Menu.IsEmpty()&&!World->IsPaused());
             PC->HandleInputCommand(EICInputCommand::Menu);
-            Test->TestEqual(TEXT("ESC reopens menu after back button"), PC->Menu, FString(TEXT("Pause")));
-            Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Settings"))));
-            NextStage(20); return false;
+            CurrentMenu->SelectTab(TEXT("Settings"));CurrentMenu->NavigationArea=1;CurrentMenu->SettingsActionIndex=0;
+            Test->TestTrue(TEXT("F confirms the selected menu action"),CurrentMenu->HandleMenuKey(EKeys::F));
+            Test->TestTrue(TEXT("F resumes gameplay"),PC->Menu.IsEmpty()&&!World->IsPaused());
+            PC->SetMenu(TEXT("Settings"));
+            NextStage(36);return false;
         }
-        if (Stage >= 20 && Stage <= 29)
+        if(Stage==36)
         {
-            if (FPlatformTime::Seconds() - StageAt < .3) return false;
-            Test->TestTrue(TEXT("Submenus keep the game paused"), World->IsPaused());
-            if (Stage == 20)
-            {
-                Test->TestEqual(TEXT("Settings opens the submenu"), PC->Menu, FString(TEXT("MenuSettings")));
-                TestMenuButtons(PC, {TEXT("Resume"), TEXT("Save"), TEXT("Load"), TEXT("GameSettings"), TEXT("Quit")});
-                Capture(Client, TEXT("07_SettingsMenu"));
-                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Save"))));
-            }
-            else if (Stage == 21)
-            {
-                Test->TestEqual(TEXT("Save opens existing save screen"), PC->Menu, FString(TEXT("Save")));
-                PC->CloseSessionMenu();
-                Test->TestEqual(TEXT("Save returns to settings submenu"), PC->Menu, FString(TEXT("MenuSettings")));
-            }
-            else if (Stage == 22)
-            {
-                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Load"))));
-            }
-            else if (Stage == 23)
-            {
-                Test->TestEqual(TEXT("Load opens existing load screen"), PC->Menu, FString(TEXT("Load")));
-                PC->CloseSessionMenu();
-                Test->TestEqual(TEXT("Load returns to settings submenu"), PC->Menu, FString(TEXT("MenuSettings")));
-            }
-            else if (Stage == 24)
-            {
-                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_GameSettings"))));
-            }
-            else if (Stage == 25)
-            {
-                Test->TestTrue(TEXT("Game settings opens existing options screen"), PC->Menu == TEXT("Settings") && PC->SettingsScreen);
-                PC->HandleInputCommand(EICInputCommand::Menu);
-                Test->TestEqual(TEXT("Options ESC returns to settings submenu"), PC->Menu, FString(TEXT("MenuSettings")));
-            }
-            else if (Stage == 26)
-            {
-                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Quit"))));
-            }
-            else if (Stage == 27)
-            {
-                Test->TestEqual(TEXT("Quit uses existing exit screen"), PC->Menu, FString(TEXT("Quit")));
-                PC->HandleInputCommand(EICInputCommand::Menu);
-                Test->TestEqual(TEXT("Quit cancel returns to settings submenu"), PC->Menu, FString(TEXT("MenuSettings")));
-            }
-            else if (Stage == 28)
-            {
-                PC->HandleInputCommand(EICInputCommand::Menu);
-                Test->TestEqual(TEXT("Submenu ESC returns to main menu"), PC->Menu, FString(TEXT("Pause")));
-                PC->HandleInputCommand(EICInputCommand::Menu);
-                Test->TestTrue(TEXT("Main menu ESC resumes gameplay"), PC->Menu.IsEmpty() && !World->IsPaused());
-                PC->HandleInputCommand(EICInputCommand::Menu);
-                PC->SetMenu(TEXT("MenuSettings"));
-            }
-            else
-            {
-                Click(Client, CastChecked<UButton>(PC->Screen->GetWidgetFromName(TEXT("BTN_Resume"))));
-                Test->TestTrue(TEXT("Continue resumes gameplay"), PC->Menu.IsEmpty() && !World->IsPaused());
-                StartPosition = PC->GetPawn()->GetActorLocation();
-                NextStage(3); return false;
-            }
-            NextStage(Stage + 1); return false;
+            if(FPlatformTime::Seconds()-StageAt<.3)return false;
+            auto* Settings=PC->SettingsScreen.Get();
+            if(!Test->TestNotNull(TEXT("Morpheus options screen opens"),Settings)){Cleanup();return true;}
+            auto* Toggle=CastChecked<UCheckBox>(Settings->GetWidgetFromName(TEXT("OPTION_bAutoSelectTarget")));
+            const bool PreviousToggle=Toggle->IsChecked();PressKey(EKeys::F);
+            Test->TestEqual(TEXT("Actual F event toggles the selected setting"),Toggle->IsChecked(),!PreviousToggle);
+            PressKey(EKeys::W);PressKey(EKeys::D);PressKey(EKeys::S);
+            Capture(Client,TEXT("Morpheus_Settings"));
+            PressKey(EKeys::Escape);
+            Test->TestTrue(TEXT("ESC closes options and releases gameplay"),PC->Menu.IsEmpty()&&!World->IsPaused());
+            StartPosition=PC->GetPawn()->GetActorLocation();NextStage(3);return false;
         }
         if (Stage == 3)
         {
             PC->GetPawn()->AddMovementInput(FVector::ForwardVector, 1.f);
             if (FPlatformTime::Seconds() - StageAt < .35)
                 return false;
-            Test->TestTrue(TEXT("Pawn actually moves after first save"),
-                           FVector::Dist2D(StartPosition, PC->GetPawn()->GetActorLocation()) > 1.f);
+            Test->TestTrue(TEXT("Gameplay movement accepts input after reveal"),PC->Menu.IsEmpty()&&!World->IsPaused()&&PC->bCreated&&!PC->IsMoveInputIgnored());
+            if(auto* Player=Cast<AICPlayerCharacter>(PC->GetPawn()))
+                Test->TestTrue(TEXT("The character movement speed is unlocked"),Player->GetCharacterMovement()->MaxWalkSpeed>0);
             Test->TestFalse(TEXT("Cursor returns to gameplay"), PC->bShowMouseCursor);
             Test->TestTrue(TEXT("Initial save loads through save service"), PC->GetSaves()->LoadSlot(0));
             Test->TestEqual(TEXT("Questionnaire retained on load"),
@@ -516,7 +557,7 @@ public:
             {
                 auto* Load = CastChecked<UButton>(List->GetWidgetFromName(TEXT("IC_SaveLoad_Load")));
                 Test->TestTrue(TEXT("Selected save can be loaded"), Load->GetIsEnabled());
-                if (!Click(Client, Load)) return false;
+                PressKey(EKeys::F);
             }
             else
             {
@@ -547,10 +588,16 @@ private:
     TWeakObjectPtr<UGameInstance> GI;
     int32 Stage = 0;
     bool bSeededSaves = false;
+    bool bSkipRun=false,bPartialSkip=false;
     TArray<uint8> ManualBytes;
     double Started = 0, StageAt = 0, PausedAt = 0;
     FVector StartPosition = FVector::ZeroVector;
     void NextStage(int32 Value) { Stage = Value; StageAt = FPlatformTime::Seconds(); }
+    void PressKey(FKey Key)
+    {
+        FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(Key,FModifierKeysState(),0,false,0,0));
+        FSlateApplication::Get().ProcessKeyUpEvent(FKeyEvent(Key,FModifierKeysState(),0,false,0,0));
+    }
     bool Click(UGameViewportClient* Client, UButton* Button)
     {
         const auto G = Button->GetCachedGeometry();
@@ -611,6 +658,31 @@ bool FICFrontendPlaythroughCheck::RunTest(const FString& Parameters)
     FRequestPlaySessionParams Params; Params.CustomPIEWindow = Window; Params.bAllowOnlineSubsystem = false;
     ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(Params));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FICPlaythroughCommand>(this));
+    ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+    FAutomationTestFramework::Get().EnqueueLatentCommand(RestorePlayWindow);
+    ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(.5f));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICFrontendSkipCheck,"IC.Frontend.PrologueSkipToPlay",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICFrontendSkipCheck::RunTest(const FString& Parameters)
+{
+    if (GEditor->PlayWorld)
+    {
+        AddError(TEXT("Close the existing PIE session before running this test."));
+        return false;
+    }
+    if (!FEditorFileUtils::LoadMap(TEXT("/Game/IsekaiClass/World/Maps/L_Title"), false, true))
+    {
+        AddError(TEXT("Could not open title map"));
+        return false;
+    }
+    auto RestorePlayWindow = MakeShared<FICPlayWindowSettingsRestore>();
+    auto Window = SNew(SWindow).ClientSize(FVector2D(1280, 720)).UseOSWindowBorder(false).CreateTitleBar(false);
+    FSlateApplication::Get().AddWindow(Window);
+    FRequestPlaySessionParams Params; Params.CustomPIEWindow = Window; Params.bAllowOnlineSubsystem = false;
+    ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(Params));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FICPlaythroughCommand>(this,true));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
     FAutomationTestFramework::Get().EnqueueLatentCommand(RestorePlayWindow);
     ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(.5f));

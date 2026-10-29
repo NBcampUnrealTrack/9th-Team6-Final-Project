@@ -27,7 +27,7 @@ void AICPlayerController::InitializeMainMenu()
     }
     if (UICSaveSubsystem* Saves = GetSaves()) Saves->SetAutoSaveSuspended(true);
     if (AICGameState* State = GetWorld()->GetGameState<AICGameState>()) State->SetPhase(EICGamePhase::Menu);
-    bShowMouseCursor = true;
+    bShowMouseCursor = false;
     if (!MainMenuWidgetClass)
     {
         UE_LOG(LogICUI, Error, TEXT("[MainMenu.WidgetMissing] Controller=%s: BP_ICPlayerController의 MainMenuWidgetClass를 지정하세요."), *GetNameSafe(this));

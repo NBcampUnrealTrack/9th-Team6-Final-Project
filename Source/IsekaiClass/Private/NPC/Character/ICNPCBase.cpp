@@ -21,6 +21,8 @@
 #include "NPC/Schedule/ICNPCScheduleLibrary.h"
 #include "Components/WidgetComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "NPC/LifeObject/ICLifeObjectActor.h"
+#include "EngineUtils.h"
 #include "UI/Quest/ICNPCQuestMarkerWidget.h"
 #include "NPC/LifeObject/ICLifeObjectUserComponent.h"
 #include "AI/ICNPCAIController.h"
@@ -47,7 +49,13 @@ AICNPCBase::AICNPCBase()
     Movement->AvoidanceConsiderationRadius=300.f;
     Movement->AvoidanceWeight=.5f;
 }
-void AICNPCBase::BeginPlay() { IC_TRACE_FUNCTION();Super::BeginPlay();if(!bInitialized&&!NPCDefinitionID.IsNone())InitializeNPC(NPCDefinitionID); }
+void AICNPCBase::BeginPlay()
+{
+    IC_TRACE_FUNCTION();Super::BeginPlay();
+    for(TActorIterator<AICLifeObjectActor> It(GetWorld());It;++It)
+        if(It->ObjectType==EICLifeObjectType::Bed)GetCapsuleComponent()->IgnoreActorWhenMoving(*It,true);
+    if(!bInitialized&&!NPCDefinitionID.IsNone())InitializeNPC(NPCDefinitionID);
+}
 void AICNPCBase::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);

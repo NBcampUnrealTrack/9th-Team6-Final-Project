@@ -1,5 +1,6 @@
 #include "Debug/ICBlueprintMaintenanceLibrary.h"
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Framework/ICUITheme.h"
 #include "UI/Gameplay/ICGameplayLayout.h"
 #include "NPC/LifeObject/ICLifeObjectActor.h"
 #include "SmartObjectComponent.h"
@@ -7,6 +8,11 @@
 #include "Internationalization/StringTable.h"
 #include "Internationalization/StringTableCore.h"
 #include "Engine/Font.h"
+#include "Components/Image.h"
+#include "Components/Border.h"
+#include "Components/WidgetSwitcher.h"
+#include "Serialization/JsonSerializer.h"
+#include "Dom/JsonObject.h"
 #if WITH_EDITOR
 #include "Engine/FontFace.h"
 #include "Misc/Paths.h"
@@ -29,6 +35,7 @@
 #include "UI/Dialogue/ICAffinityHeartsWidget.h"
 #include "UI/Gameplay/ICCombatFeedbackWidget.h"
 #include "UI/Gameplay/ICMovementCooldownWidget.h"
+#include "UI/Gameplay/ICCharacterStatusWidget.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Core/Flow/ICGameFlowSubsystem.h"
@@ -138,6 +145,29 @@ TArray<FName> UICBlueprintMaintenanceLibrary::GetFrontendWidgetNames(UBlueprint*
     return Names;
 }
 
+FString UICBlueprintMaintenanceLibrary::InspectFrontendWidget(UBlueprint* Blueprint)
+{
+    FString Result;
+#if WITH_EDITOR
+    auto* BP=Cast<UWidgetBlueprint>(Blueprint);if(!BP||!BP->WidgetTree)return Result;
+    TArray<TSharedPtr<FJsonValue>> Rows;
+    BP->WidgetTree->ForEachWidget([&](UWidget* Widget)
+    {
+        auto Row=MakeShared<FJsonObject>();Row->SetStringField(TEXT("name"),Widget->GetName());Row->SetStringField(TEXT("class"),Widget->GetClass()->GetPathName());
+        Row->SetStringField(TEXT("parent"),GetNameSafe(Widget->GetParent()));
+        auto Brush=[&](const TCHAR* Key,const FSlateBrush& Value){Row->SetStringField(Key,GetPathNameSafe(Value.GetResourceObject()));Row->SetStringField(FString(Key)+TEXT("_tint"),Value.TintColor.GetSpecifiedColor().ToString());};
+        if(auto* Image=Cast<UImage>(Widget))Brush(TEXT("image"),Image->GetBrush());
+        if(auto* Border=Cast<UBorder>(Widget)){Brush(TEXT("border"),Border->Background);Row->SetStringField(TEXT("color"),Border->GetBrushColor().ToString());}
+        if(auto* Button=Cast<UButton>(Widget)){Brush(TEXT("normal"),Button->GetStyle().Normal);Brush(TEXT("hovered"),Button->GetStyle().Hovered);}
+        if(auto* Text=Cast<UTextBlock>(Widget)){Row->SetStringField(TEXT("text"),Text->GetText().ToString());Row->SetNumberField(TEXT("font"),Text->GetFont().Size);}
+        if(auto* Placement=Cast<UCanvasPanelSlot>(Widget->Slot)){Row->SetStringField(TEXT("position"),Placement->GetPosition().ToString());Row->SetStringField(TEXT("size"),Placement->GetSize().ToString());}
+        Rows.Add(MakeShared<FJsonValueObject>(Row));
+    });
+    auto Writer=TJsonWriterFactory<>::Create(&Result);FJsonSerializer::Serialize(Rows,Writer);
+#endif
+    return Result;
+}
+
 bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint,const FString& File,int32 Width,int32 Height,int32 Question)
 {
 #if WITH_EDITOR
@@ -155,6 +185,7 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
         SetText(TEXT("TXT_Question"),ICFrontendLayout::Text(*FString::Printf(TEXT("Question%d"),Question+1)));
         if(auto* Name=Preview->WidgetTree->FindWidget(TEXT("EDIT_Name")))Name->SetVisibility(Question==0?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
         if(auto* Next=Preview->WidgetTree->FindWidget(TEXT("BTN_Next")))Next->SetVisibility(Question==0?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
+        if(auto* Keyboard=Preview->WidgetTree->FindWidget(TEXT("NameKeyboard")))Keyboard->SetVisibility(Question==0?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
         auto* Table=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Settings/DT_IC_CreationOptions.DT_IC_CreationOptions"));
         for(int32 I=0;I<4;++I)
         {
@@ -164,6 +195,12 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
             if(Table&&Question>1&&Question<5)if(auto* Row=Table->FindRow<FICCreationOptionRow>(FName(*FString::Printf(TEXT("Q%d_%d"),Question+1,I+1)),TEXT("Preview")))Value=Row->Label;
             if(auto* Text=Cast<UTextBlock>(Button->GetContent()))Text->SetText(Value);
         }
+    }
+    if(BP->GetFName()==TEXT("WBP_IC_GameMenu")&&Question>=0&&Question<5)
+    {
+        if(auto* Pages=Cast<UWidgetSwitcher>(Preview->WidgetTree->FindWidget(TEXT("MenuPages"))))Pages->SetActiveWidgetIndex(Question);
+        const TCHAR* Tabs[]={TEXT("Party"),TEXT("Inventory"),TEXT("Quest"),TEXT("Codex"),TEXT("Settings")};
+        for(int32 I=0;I<5;++I)ICUITheme::SetSelected(Cast<UButton>(Preview->WidgetTree->FindWidget(FName(*(TEXT("TAB_")+FString(Tabs[I]))))),I==Question);
     }
     FWidgetRenderer Renderer(true);
     FAssetCompilingManager::Get().FinishAllCompilation();
@@ -187,6 +224,42 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
 #endif
 }
 
+bool UICBlueprintMaintenanceLibrary::PrepareManagedWidget(UBlueprint* Blueprint,FName Kind)
+{
+#if WITH_EDITOR
+    auto* BP=Cast<UWidgetBlueprint>(Blueprint);if(!BP||!BP->WidgetTree)return false;
+    BP->Modify();
+    if(Kind==TEXT("Prologue"))
+        for(const auto* Name:{TEXT("Prompt"),TEXT("SkipPrompt")})
+            if(auto* Label=Cast<UTextBlock>(BP->WidgetTree->FindWidget(Name))){Label->SetAutoWrapText(false);Label->SetWrapTextAt(0);}
+    if(Kind==TEXT("Status"))
+    {
+        UICCharacterStatusWidget::BuildSkillCooldownOverlay(BP->WidgetTree);
+    }
+    if(Kind==TEXT("HUD"))
+    {
+        ICGameplayLayout::EnsureGameClock(BP->WidgetTree);
+        if(!BP->WidgetTree->FindWidget(TEXT("HUD_AimReticle")))
+        {
+            auto* Type=LoadClass<UUserWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Crosshair.WBP_IC_Crosshair_C"));
+            auto* Canvas=Cast<UCanvasPanel>(BP->WidgetTree->RootWidget);if(!Type||!Canvas)return false;
+            auto* Aim=BP->WidgetTree->ConstructWidget<UUserWidget>(Type,TEXT("HUD_AimReticle"));Aim->SetVisibility(ESlateVisibility::Collapsed);
+            auto* S=Canvas->AddChildToCanvas(Aim);S->SetAnchors(FAnchors(.5,.5));S->SetAlignment({.5,.5});S->SetSize({64,64});
+        }
+    }
+    if(Kind==TEXT("Feedback")&&!BP->WidgetTree->FindWidget(TEXT("TXT_LockOn")))
+    {
+        auto* Canvas=Cast<UCanvasPanel>(BP->WidgetTree->FindWidget(TEXT("FeedbackCanvas")));if(!Canvas)return false;
+        auto* Marker=BP->WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),TEXT("TXT_LockOn"));Marker->SetText(NSLOCTEXT("ICCombat","LockOnMarker","◎"));Marker->SetFont(ICFrontendLayout::Font(34,true));Marker->SetJustification(ETextJustify::Center);Marker->SetColorAndOpacity(FLinearColor(1,.76f,.18f));Marker->SetVisibility(ESlateVisibility::Collapsed);
+        auto* S=Canvas->AddChildToCanvas(Marker);S->SetSize({64,64});S->SetAlignment({.5f,.5f});
+    }
+    BP->WidgetTree->ForEachWidget([&](UWidget* W){W->bIsVariable=true;BP->WidgetVariableNameToGuidMap.FindOrAdd(W->GetFName(),FGuid::NewGuid());});
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);return true;
+#else
+    return false;
+#endif
+}
+
 bool UICBlueprintMaintenanceLibrary::BuildFrontendWidget(UBlueprint* Blueprint,FName Kind)
 {
 #if WITH_EDITOR
@@ -198,6 +271,17 @@ bool UICBlueprintMaintenanceLibrary::BuildFrontendWidget(UBlueprint* Blueprint,F
     for(auto It=Widget->WidgetVariableNameToGuidMap.CreateIterator();It;++It)if(!Names.Contains(It.Key()))It.RemoveCurrent();
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Widget);
     return Widget->WidgetTree->RootWidget!=nullptr;
+#else
+    return false;
+#endif
+}
+
+bool UICBlueprintMaintenanceLibrary::ApplyFrontendTheme(UBlueprint* Blueprint)
+{
+#if WITH_EDITOR
+    auto* Widget=Cast<UWidgetBlueprint>(Blueprint);if(!Widget||!Widget->WidgetTree)return false;
+    ICUITheme::Apply(Widget->WidgetTree);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Widget);return true;
 #else
     return false;
 #endif

@@ -12,10 +12,12 @@ public:
 
 protected:
     virtual void NativeOnInitialized() override;
+    virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event) override;
     virtual UWidget* NativeGetDesiredFocusTarget() const override;
 
 private:
     UPROPERTY(Transient) TObjectPtr<UButton> StartButton;
+    int32 Selected=0;
     UFUNCTION() void Start();
     UFUNCTION() void Continue();
     UFUNCTION() void SaveList();

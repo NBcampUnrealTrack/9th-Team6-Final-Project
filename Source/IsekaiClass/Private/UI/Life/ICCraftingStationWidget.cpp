@@ -1,4 +1,5 @@
 #include "UI/Life/ICCraftingStationWidget.h"
+#include "UI/Framework/ICWidgetTemplates.h"
 #include "Settings/ICGameUserSettings.h"
 #include "UI/Life/ICEnhancementWidget.h"
 #include "Components/HorizontalBox.h"
@@ -96,7 +97,7 @@ void UICCraftingStationWidget::BuildLayout(UWidgetTree* T)
 }
 void UICCraftingStationWidget::NativeConstruct()
 {
-    Super::NativeConstruct();if(!GetWidgetFromName(TEXT("StationPages")))BuildLayout(WidgetTree);
+    Super::NativeConstruct();
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Make"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::MakeRecipe);
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Back"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::ShowRecipeList);
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_CloseStation"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::CloseStation);
@@ -132,9 +133,8 @@ void UICCraftingStationWidget::RefreshList()
     auto* Scroll=Cast<UScrollBox>(GetWidgetFromName(TEXT("RecipeScroll")));if(!Scroll)return;Scroll->ClearChildren();
     for(FName ID:Recipes)
     {
-        auto* B=WidgetTree->ConstructWidget<UICRecipeChoiceButton>();B->RecipeID=ID;B->StationUI=this;B->OnClicked.AddDynamic(B,&UICRecipeChoiceButton::Choose);
-        auto* Name=Caption(WidgetTree,NAME_None,PC->GetCrafting()->Find(ID)->DisplayName);Name->SetAutoWrapText(false);
-        auto* ChoiceSlot=Cast<UButtonSlot>(B->SetContent(Name));ChoiceSlot->SetPadding(FMargin(14,9));Scroll->AddChild(B);
+        auto* B=ICWidgetTemplates::Create<UICRecipeChoiceButton>(this,TEXT("WBP_IC_RecipeChoice"));B->RecipeID=ID;B->StationUI=this;B->OnClicked.AddDynamic(B,&UICRecipeChoiceButton::Choose);
+        B->SetCaption(PC->GetCrafting()->Find(ID)->DisplayName);Scroll->AddChild(B);
     }
     Text(this,TEXT("TXT_Empty"),Recipes.IsEmpty()?NSLOCTEXT("ICCraft","NoRecipes","아직 사용할 수 있는 레시피가 없습니다."):FText::GetEmpty());
     Highlight(FMath::Max(0,Recipes.IndexOfByKey(SelectedRecipe)));
@@ -144,7 +144,7 @@ void UICCraftingStationWidget::Highlight(int32 Index)
     if(!Recipes.IsValidIndex(Index))return;SelectedRecipe=Recipes[Index];
     if(auto* Scroll=Cast<UScrollBox>(GetWidgetFromName(TEXT("RecipeScroll"))))
     {
-        for(int32 I=0;I<Scroll->GetChildrenCount();++I)if(auto* B=Cast<UButton>(Scroll->GetChildAt(I)))B->SetBackgroundColor(I==Index?FLinearColor(.18f,.48f,.48f):FLinearColor(.08f,.13f,.18f));
+        for(int32 I=0;I<Scroll->GetChildrenCount();++I)if(auto* B=Cast<UICActionButtonWidget>(Scroll->GetChildAt(I)))B->SetSelected(I==Index);
         Scroll->ScrollWidgetIntoView(Scroll->GetChildAt(Index),true,EDescendantScrollDestination::IntoView);
     }
 }
@@ -217,7 +217,7 @@ void UICCraftingStationWidget::NativeTick(const FGeometry& Geometry,float DeltaS
 }
 FReply UICCraftingStationWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event)
 {
-    if(Event.IsRepeat()&&Event.GetKey()==EKeys::Enter)return FReply::Handled();
+    if(Event.IsRepeat()&&UICGameUserSettings::MenuKey(Event.GetKey())==EKeys::Enter)return FReply::Handled();
     return HandleStationKey(UICGameUserSettings::MenuKey(Event.GetKey()))?FReply::Handled():Super::NativeOnPreviewKeyDown(Geometry,Event);
 }
 bool UICCraftingStationWidget::HandleStationKey(FKey Key)
@@ -227,12 +227,12 @@ bool UICCraftingStationWidget::HandleStationKey(FKey Key)
     {if(bEnhancing)CraftTab();else EnhanceTab();return true;}
     if(bEnhancing){if(auto* E=Cast<UICEnhancementWidget>(GetWidgetFromName(TEXT("EnhancementContent")))){if(E->HandleKey(Key))return true;if(Key==EKeys::Escape){CloseStation();return true;}}return false;}
     if(Key==EKeys::Escape){if(bDetails)ShowRecipeList();else CloseStation();return true;}
-    if(bDetails&&Key==EKeys::Enter)
+    if(bDetails&&(Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter))
     {if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Make")));B&&B->GetIsEnabled())MakeRecipe();return true;}
     if(!ActiveJob.IsValid()&&!bDetails)
     {
         if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down){const int32 Step=Key==EKeys::W||Key==EKeys::Up?-1:1;Highlight(FMath::Clamp(Recipes.IndexOfByKey(SelectedRecipe)+Step,0,Recipes.Num()-1));return true;}
-        if(Key==EKeys::Enter){SelectRecipe(SelectedRecipe);return true;}
+        if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)){SelectRecipe(SelectedRecipe);return true;}
     }
     return false;
 }

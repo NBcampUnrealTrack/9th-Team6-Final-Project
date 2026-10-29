@@ -7,7 +7,7 @@
 void UICGatherProgressWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-    if (WidgetTree && !WidgetTree->RootWidget) ICGameplayLayout::Build(WidgetTree, TEXT("GatherProgress"));
+
     SetIsFocusable(false);
 }
 

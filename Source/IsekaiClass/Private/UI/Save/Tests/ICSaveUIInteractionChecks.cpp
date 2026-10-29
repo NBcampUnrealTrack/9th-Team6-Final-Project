@@ -14,6 +14,7 @@
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
+#include "Components/TextBlock.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Save/ICSaveSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -56,6 +57,7 @@ public:
         {
             // Wait for gameplay initialization to bind its save completion handler.
             if(!PC->CharacterCreateScreen||!PC->CharacterCreateScreen->IsActivated())return false;
+            if(!Saves->OnSaveFinished.Contains(PC,TEXT("SaveFinished")))return false;
             GI=PC->GetGameInstance();
             if(!Test->TestTrue(TEXT("UI saves use an isolated prefix"),Saves->ConfigureServices(PC->GetWorldState(),PC->GetTime(),TEXT("IC_SaveUI_")+FGuid::NewGuid().ToString(EGuidFormats::Digits))))return true;
             PC->PlayerName=TEXT("저장UI검증");
@@ -122,17 +124,26 @@ public:
             const auto Max=FVector2D(VG.AbsoluteToLocal(UI.LocalToAbsolute(UI.GetLocalSize())))*Scale;
             Test->TestTrue(TEXT("Save UI follows the WBP 1920x1080 ScaleBox after resize"),Min.Equals(FVector2D(Rect.Min),2)&&Max.Equals(FVector2D(Rect.Max),2));
             auto* Row=FindRow(World,2);if(!Row)return false;
-            if(!Click(Client,Row,TEXT("IC_SaveSlot_Button")))return false;
+            const int32 Before=PC->SelectedSaveSlot;
+            Press(EKeys::D);Press(EKeys::Right);Press(EKeys::A);Press(EKeys::Left);
+            Test->TestEqual(TEXT("Horizontal keys never change the selected save"),PC->SelectedSaveSlot,Before);
+            Press(EKeys::S);Press(EKeys::W);
+            Test->TestEqual(TEXT("W returns to the previous row"),PC->SelectedSaveSlot,Before);
+            FSlateApplication::Get().ProcessAnalogInputEvent(FAnalogInputEvent(EKeys::Gamepad_LeftY,FModifierKeysState(),0,false,0,0,-1.f));
+            FSlateApplication::Get().ProcessAnalogInputEvent(FAnalogInputEvent(EKeys::Gamepad_LeftY,FModifierKeysState(),0,false,0,0,0.f));
+            Test->TestEqual(TEXT("Gamepad stick selects the next row"),PC->SelectedSaveSlot,2);
+            FSlateApplication::Get().ProcessAnalogInputEvent(FAnalogInputEvent(EKeys::Gamepad_LeftX,FModifierKeysState(),0,false,0,0,1.f));
+            Test->TestEqual(TEXT("Horizontal stick movement never changes rows"),PC->SelectedSaveSlot,2);
             Next(4);return false;
         }
         if(Stage==4)
         {
-            Test->TestEqual(TEXT("Real pointer selects visible manual slot after resize"),PC->SelectedSaveSlot,2);
+            Test->TestEqual(TEXT("Down selects the next manual row after resize"),PC->SelectedSaveSlot,2);
             Capture(Client,FString::Printf(TEXT("Save_%d"),SizeIndex));
             if(++SizeIndex<UE_ARRAY_COUNT(Sizes)){Stage=2;return false;}
             PC->SelectSessionSlot(1);Next(5);return false;
         }
-        if(Stage==5){if(!Click(Client,View,TEXT("IC_SaveLoad_Save")))return false;Next(6);return false;}
+        if(Stage==5){Press(EKeys::F);Next(6);return false;}
         if(Stage==6)
         {
             if(Saves->bSaving||!Saves->GetSlotList()[1].bValid)return false;
@@ -140,11 +151,13 @@ public:
             Test->TestNull(TEXT("Save screen has no screenshot widget"),View->GetWidgetFromName(TEXT("IC_SaveLoad_Thumbnail")));
             if(auto* Row=FindRow(World,1))
             {
-                for(int32 I=1;I<4;++I)
-                    Test->TestTrue(TEXT("Missing companion shows a question mark"),Row->GetWidgetFromName(FName(*FString::Printf(TEXT("IC_SaveSlot_Party%d_Empty"),I)))->GetVisibility()==ESlateVisibility::HitTestInvisible);
+                auto* Label=CastChecked<UTextBlock>(Row->GetWidgetFromName(TEXT("IC_SaveSlot_Label")));
+                Test->TestTrue(TEXT("The complete save summary stays on one line"),!Label->GetAutoWrapText()&&!Label->GetText().ToString().Contains(TEXT("\n")));
+                Test->TestNotNull(TEXT("Single-line rows retain the player portrait"),Row->GetWidgetFromName(TEXT("IC_SaveSlot_Party0")));
+                Test->TestNull(TEXT("The list has no separate details pane"),View->GetWidgetFromName(TEXT("IC_SaveLoad_Detail")));
             }
             Test->TestTrue(TEXT("Menu keeps game paused during save UI"),World->IsPaused());Capture(Client,TEXT("Saved"));
-            Click(Client,View,TEXT("IC_SaveLoad_Save"));Next(7);return false;
+            Press(EKeys::F);Next(7);return false;
         }
         auto* Popup=Mounted<UICLoadConfirmWidget>(World);
         if(Stage==7)
@@ -156,20 +169,20 @@ public:
         if(Stage==8)
         {
             Test->TestTrue(TEXT("Cancel overwrite preserves save and restores controls"),PC->Menu==TEXT("Save")&&Saves->GetSlotList()[1].bValid&&View->GetIsEnabled());
-            Click(Client,View,TEXT("IC_SaveLoad_Save"));Next(9);return false;
+            Press(EKeys::F);Next(9);return false;
         }
         if(Stage==9){if(!Popup)return false;Click(Client,Popup,TEXT("IC_LoadConfirm_Confirm"));Next(10);return false;}
         if(Stage==10)
         {
             if(Saves->bSaving||PC->Menu==TEXT("Confirm"))return false;
             Test->TestTrue(TEXT("Confirmed overwrite leaves valid save"),Saves->GetSlotList()[1].bValid);
-            Click(Client,View,TEXT("IC_SaveLoad_Delete"));Next(11);return false;
+            Press(EKeys::Delete);Next(11);return false;
         }
         if(Stage==11){if(!Popup)return false;Click(Client,Popup,TEXT("IC_LoadConfirm_Cancel"));Next(12);return false;}
         if(Stage==12)
         {
             Test->TestTrue(TEXT("Cancel delete preserves file"),Saves->GetSlotList()[1].bValid);
-            Click(Client,View,TEXT("IC_SaveLoad_Delete"));Next(13);return false;
+            Press(EKeys::Delete);Next(13);return false;
         }
         if(Stage==13){if(!Popup)return false;Click(Client,Popup,TEXT("IC_LoadConfirm_Confirm"));Next(14);return false;}
         if(Stage==14)
@@ -181,15 +194,15 @@ public:
         {
             auto* Load=Cast<UButton>(View->GetWidgetFromName(TEXT("IC_SaveLoad_Load")));
             Test->TestTrue(TEXT("Load mode shows enabled load action"),Load&&Load->IsVisible()&&Load->GetIsEnabled());
-            Capture(Client,TEXT("Load"));Click(Client,View,TEXT("IC_SaveLoad_Load"));Next(16);return false;
+            Capture(Client,TEXT("Load"));Press(EKeys::F);Next(16);return false;
         }
         if(Stage==16){if(!Popup)return false;Capture(Client,TEXT("LoadConfirm"));Click(Client,Popup,TEXT("IC_LoadConfirm_Cancel"));Next(17);return false;}
         if(Stage==17)
         {
             Test->TestTrue(TEXT("Cancel load preserves current session"),PC->Menu==TEXT("Load")&&PC->bCreated);
-            Click(Client,View,TEXT("IC_SaveLoad_Close"));Next(18);return false;
+            Press(EKeys::Escape);Next(18);return false;
         }
-        if(Stage==20){Click(Client,View,TEXT("IC_SaveLoad_Load"));Next(21);return false;}
+        if(Stage==20){Press(EKeys::F);Next(21);return false;}
         if(Stage==21){if(!Popup)return false;Click(Client,Popup,TEXT("IC_LoadConfirm_Confirm"));Next(23);return false;}
         return false;
     }
@@ -209,6 +222,11 @@ private:
         TArray<UUserWidget*> Rows;UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World,Rows,UICSaveSlotWidget::StaticClass(),false);
         for(auto* Widget:Rows)if(auto* Row=Cast<UICSaveSlotWidget>(Widget))if(Row->GetParent()&&Row->GetSlotIndex()==Slot)return Row;
         return nullptr;
+    }
+    void Press(FKey Key)
+    {
+        FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(Key,FModifierKeysState(),0,false,0,0));
+        FSlateApplication::Get().ProcessKeyUpEvent(FKeyEvent(Key,FModifierKeysState(),0,false,0,0));
     }
     bool Click(UGameViewportClient* Client,UUserWidget* View,const TCHAR* Name)
     {

@@ -31,7 +31,8 @@ enum class EICGameFlowPhase : uint8
     Loading,
     Initializing,
     Playing,
-    Failed
+    Failed,
+    Prologue
 };
 
 USTRUCT(BlueprintType)

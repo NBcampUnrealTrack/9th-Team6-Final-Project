@@ -17,6 +17,8 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Cooldown", meta=(ClampMin="0", ClampMax="1")) float Progress = 1.f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Cooldown") FLinearColor FillColor = FLinearColor(1.f,.77f,.3f);
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Cooldown", meta=(ClampMin="1")) float Thickness = 14.f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Cooldown") float StartAngleDegrees=0.f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Cooldown", meta=(ClampMin="1",ClampMax="360")) float SweepAngleDegrees=360.f;
     UFUNCTION(BlueprintCallable, Category="Cooldown") void SetProgress(float Value);
     virtual void SynchronizeProperties() override;
     virtual void ReleaseSlateResources(bool bReleaseChildren) override;

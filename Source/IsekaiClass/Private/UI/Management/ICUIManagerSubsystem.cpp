@@ -6,6 +6,7 @@
 #include "Time/ICTimeSubsystem.h"
 #include "Debug/ICLog.h"
 #include "UI/Framework/ICUIRootWidget.h"
+#include "UI/Framework/ICUITheme.h"
 #include "CommonActivatableWidget.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/NavigationConfig.h"
@@ -67,6 +68,10 @@ public:
     virtual EUINavigation GetNavigationDirectionFromAnalog(const FAnalogInputEvent& Event) override {return Fallback->GetNavigationDirectionFromAnalog(Event);}
     virtual EUINavigationAction GetNavigationActionFromKey(const FKeyEvent& Event) const override
     {
+        const auto Focus=FSlateApplication::Get().GetUserFocusedWidget(Event.GetUserIndex());
+        const FName Type=Focus.IsValid()?Focus->GetType():NAME_None;
+        const bool Editing=Type==TEXT("SEditableText")||Type==TEXT("SEditableTextBox")||Type==TEXT("SMultiLineEditableText")||Type==TEXT("SMultiLineEditableTextBox")||Type==TEXT("SInputKeySelector");
+        if(!Editing&&(Event.GetKey()==EKeys::G||Event.GetKey()==EKeys::F))return EUINavigationAction::Accept;
         if(UICGameUserSettings::IsGamepadAcceptKey(Event.GetKey()))return EUINavigationAction::Accept;
         if(UICGameUserSettings::IsGamepadBackKey(Event.GetKey()))return EUINavigationAction::Back;
         return Fallback->GetNavigationActionFromKey(Event);
@@ -98,7 +103,8 @@ bool UICUIManagerSubsystem::EnsureRoot()
     auto* PC = GetLocalPlayer()->GetPlayerController(GetWorld());
     if (!PC)
         return false;
-    Root = CreateWidget<UICUIRootWidget>(PC, UICUIRootWidget::StaticClass());
+    auto* Type=LoadClass<UICUIRootWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Root.WBP_IC_Root_C"));
+    Root = Type?CreateWidget<UICUIRootWidget>(PC,Type):nullptr;
     return Root && Root->AddToPlayerScreen(0);
 }
 void UICUIManagerSubsystem::SetHUD(UUserWidget* Widget)
@@ -119,6 +125,7 @@ bool UICUIManagerSubsystem::OpenScreen(UUserWidget* Widget, bool PauseWorld, int
     if (!EnsureRoot())
         return false;
     Root->Mount(Widget, ZOrder);
+    if(Widget->WidgetTree)ICUITheme::Apply(Widget->WidgetTree);
     Screens.Add({Widget, PauseWorld, ZOrder});
     RefreshContext();
     return true;
@@ -175,14 +182,16 @@ void UICUIManagerSubsystem::RefreshContext()
             Focus = S.Widget.Get();
             Z = S.Z;
         }
-    PC->bShowMouseCursor = bMenuOpen || !Screens.IsEmpty();
+    const bool HasMenu=bMenuOpen||!Screens.IsEmpty();
+    PC->bShowMouseCursor=false;
+    PC->bEnableClickEvents=false;PC->bEnableMouseOverEvents=false;
     // These screens use focused-widget key navigation. A synthetic mouse click bypasses their A-key handlers.
     if(auto* Variable=IConsoleManager::Get().FindConsoleVariable(TEXT("CommonUI.ShouldVirtualAcceptSimulateMouseButton")))
         Variable->Set(0,ECVF_SetByGameOverride);
-    if (PC->bShowMouseCursor)
+    if (HasMenu)
     {
         FInputModeGameAndUI Mode;
-        Mode.SetHideCursorDuringCapture(false);
+        Mode.SetHideCursorDuringCapture(true);
         if (Focus)
         {
             Mode.SetWidgetToFocus(Focus->TakeWidget());
@@ -190,12 +199,15 @@ void UICUIManagerSubsystem::RefreshContext()
             if (auto* Active = Cast<UCommonActivatableWidget>(Focus))
                 Desired=Active->GetDesiredFocusTarget();
             if(!Desired)Desired=FirstKeyboardTarget(Focus);
+            if(Desired&&(!Desired->IsVisible()||!Desired->GetIsEnabled()))Desired=nullptr;
             if(Desired)Mode.SetWidgetToFocus(Desired->TakeWidget());
+            PendingFocus=Desired?Desired:Focus;
         }
         PC->SetInputMode(Mode);
     }
     else
     {
+        PendingFocus.Reset();
         FInputModeGameOnly Mode;
         PC->SetInputMode(Mode);
     }
@@ -230,7 +242,19 @@ void UICUIManagerSubsystem::CloseAllScreens()
 void UICUIManagerSubsystem::Tick(float DeltaTime)
 {
     IC_TRACE_FUNCTION();
+    // Newly mounted screens may not have a Slate path until the next layout pass.
+    // Complete the original focus request once; never take focus back on every key.
+    if(auto* Target=PendingFocus.Get())
+    {
+        if(auto* PC=GetLocalPlayer()->GetPlayerController(GetWorld());PC&&Target->IsVisible()&&Target->GetIsEnabled())
+        {
+            Target->SetUserFocus(PC);
+            if(Target->HasUserFocus(PC)||Target->HasFocusedDescendants())PendingFocus.Reset();
+        }
+        else PendingFocus.Reset();
+    }
     if(Root)ApplyUserTextScale(Root,FMath::Clamp(UICGameUserSettings::Get()->UIScale,.75f,1.3f));
+    for(const auto& Screen:Screens)if(Screen.Widget.IsValid())ICUITheme::UpdateFocus(Screen.Widget.Get());
     if(ScaledFonts.Num()>4096)for(auto It=ScaledFonts.CreateIterator();It;++It)if(!It.Key().IsValid())It.RemoveCurrent();
     bool Changed = false;
     for (int32 I = Screens.Num() - 1; I >= 0; --I)

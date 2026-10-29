@@ -1,6 +1,7 @@
 #include "UI/Gameplay/ICGameMenuWidget.h"
 #include "Settings/ICGameUserSettings.h"
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Framework/ICUITheme.h"
 #include "UI/Gameplay/ICPartyMenuWidget.h"
 #include "UI/Gameplay/ICInventoryMenuWidget.h"
 #include "UI/Quest/ICQuestMenuWidget.h"
@@ -20,7 +21,7 @@ const TArray<FName>& UICGameMenuWidget::Tabs()
 void UICGameMenuWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-    if (!WidgetTree->RootWidget) ICFrontendLayout::Build(WidgetTree, TEXT("GameMenu"));
+
     SetIsFocusable(true);
     for (int32 Index = 0; Index < Tabs().Num(); ++Index)
         if (auto* Button = Cast<UButton>(GetWidgetFromName(FName(*(TEXT("TAB_") + Tabs()[Index].ToString())))))
@@ -51,7 +52,7 @@ bool UICGameMenuWidget::SelectTab(FName Tab)
     Pages->SetActiveWidgetIndex(Index);
     for (const FName Name : Tabs())
         if (auto* Button = Cast<UButton>(GetWidgetFromName(FName(*(TEXT("TAB_") + Name.ToString())))))
-            Button->SetBackgroundColor(Name == Tab ? FLinearColor(.72f, .57f, .31f) : FLinearColor(.29f, .36f, .47f));
+            ICUITheme::SetSelected(Button,Name==Tab);
     if(auto* Party=Cast<UICPartyMenuWidget>(GetWidgetFromName(TEXT("PartyContent"))))Party->RefreshParty();
     if(Tab==TEXT("Inventory"))if(auto* Inventory=Cast<UICInventoryMenuWidget>(GetWidgetFromName(TEXT("InventoryContent"))))Inventory->Activate();
     if(Tab==TEXT("Quest"))if(auto* Quests=Cast<UICQuestMenuWidget>(GetWidgetFromName(TEXT("QuestContent"))))Quests->Activate();
@@ -100,13 +101,12 @@ void UICGameMenuWidget::RefreshNavigation()
     for(const auto* Name:{TEXT("BTN_Resume"),TEXT("BTN_Save"),TEXT("BTN_Load"),TEXT("BTN_GameSettings"),TEXT("BTN_Quit")})
         if(auto* Button=Cast<UButton>(GetWidgetFromName(Name));Button&&Button->IsVisible()&&Button->GetIsEnabled())Actions.Add(Button);
     SettingsActionIndex=FMath::Clamp(SettingsActionIndex,0,FMath::Max(0,Actions.Num()-1));
-    for(int32 Index=0;Index<Actions.Num();++Index)Actions[Index]->SetBackgroundColor(
-        SelectedTab==TEXT("Settings")&&NavigationArea==1&&Index==SettingsActionIndex?FLinearColor(.72f,.57f,.31f):FLinearColor(.29f,.36f,.47f));
+    for(int32 Index=0;Index<Actions.Num();++Index)ICUITheme::SetSelected(Actions[Index],SelectedTab==TEXT("Settings")&&NavigationArea==1&&Index==SettingsActionIndex);
     FText Hint;
-    if(NavigationArea==0)Hint=NSLOCTEXT("ICParty","TabsHint","A / D  탭 이동     S / Enter  열기     ESC  닫기");
+    if(NavigationArea==0)Hint=NSLOCTEXT("ICParty","TabsHint","A / D  탭 이동     S / G  열기     ESC  닫기");
     else if(SelectedTab==TEXT("Party")&&NavigationArea==2)Hint=NSLOCTEXT("ICParty","StoryHint","W / S  이야기 스크롤     A  인물 목록     D  상단 탭     ESC  닫기");
     else if(SelectedTab==TEXT("Party"))Hint=NSLOCTEXT("ICParty","PartyHint","W / S  인물 선택     D  이야기 읽기     A  상단 탭     ESC  닫기");
-    else if(SelectedTab==TEXT("Settings"))Hint=NSLOCTEXT("ICParty","SettingsHint","W / S  버튼 이동     Enter / Space  선택     A / D  상단 탭     ESC  닫기");
+    else if(SelectedTab==TEXT("Settings"))Hint=NSLOCTEXT("ICParty","SettingsHint","W / S  버튼 이동     G / F  선택     A / D  상단 탭     ESC  닫기");
     else if(Inventory)Hint=Inventory->NavigationHint();
     else if(SelectedTab==TEXT("Quest")){if(auto* Quests=Cast<UICQuestMenuWidget>(GetWidgetFromName(TEXT("QuestContent"))))Hint=Quests->NavigationHint();}
     else if(CodexContent)Hint=CodexContent->NavigationHint();
@@ -145,7 +145,7 @@ bool UICGameMenuWidget::HandleMenuKey(FKey Key,bool bRepeat)
     const bool Down=Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down;
     const bool Left=Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left;
     const bool Right=Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right;
-    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key);
+    const bool Accept=(Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key);
     if(!Up&&!Down&&!Left&&!Right&&!Accept)return false;
     auto* TabsWidget=GetWidgetFromName(TEXT("MenuTabs"));const bool TabsVisible=!TabsWidget||TabsWidget->IsVisible();
     if(!TabsVisible)NavigationArea=1;

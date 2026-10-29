@@ -25,6 +25,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Save UI") void RefreshSlots();
 protected:
     virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& KeyEvent) override;
+    virtual FReply NativeOnAnalogValueChanged(const FGeometry& Geometry,const FAnalogInputEvent& Event) override;
     UPROPERTY(BlueprintReadOnly,meta=(BindWidgetOptional)) TObjectPtr<UButton> IC_SaveLoad_Delete;
     virtual void NativeOnInitialized() override;
     virtual void NativeConstruct() override;
@@ -52,6 +53,7 @@ private:
     TSoftObjectPtr<UWorld> GameplayMap;
     bool bAllowSave = false;
     bool bClosing = false;
+    double NextStickMove=0;
     UFUNCTION() void HandleDeleteClicked();
     UFUNCTION() void HandleMenuChanged(const FString& Menu);
     UFUNCTION() void HandleNoticeChanged(const FString& Notice);

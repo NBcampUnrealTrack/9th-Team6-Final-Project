@@ -11,8 +11,7 @@
 void UICUIRootWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-    if (!WidgetTree->RootWidget)
-        ICFrontendLayout::Build(WidgetTree, TEXT("Root"));
+
     HUDLayer = Cast<UOverlay>(GetWidgetFromName(TEXT("Layer_HUD")));
     LegacyLayer = Cast<UCanvasPanel>(GetWidgetFromName(TEXT("Layer_Legacy")));
     ScreenLayer = Cast<UCommonActivatableWidgetStack>(GetWidgetFromName(TEXT("Layer_Screen")));

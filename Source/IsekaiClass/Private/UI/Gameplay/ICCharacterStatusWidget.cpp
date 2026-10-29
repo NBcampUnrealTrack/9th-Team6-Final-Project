@@ -1,4 +1,5 @@
 #include "UI/Gameplay/ICCharacterStatusWidget.h"
+#include "UI/Framework/ICWidgetTemplates.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Image.h"
@@ -30,7 +31,6 @@ void UICCharacterStatusWidget::NativePreConstruct()
 
 void UICCharacterStatusWidget::RefreshPresentation()
 {
-    EnsureSkillCooldownOverlay();
     if (auto* Name = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Name"))))
     {Name->SetText(bDowned?FText::Format(NSLOCTEXT("ICStatus","Downed","{0} · 전투불능"),DisplayName):DisplayName);Name->SetColorAndOpacity(bDowned?FLinearColor(.5f,.5f,.5f):FLinearColor(.92f,.94f,.98f));}
     if (auto* Image = Cast<UImage>(GetWidgetFromName(TEXT("IMG_Portrait"))))
@@ -55,14 +55,14 @@ void UICCharacterStatusWidget::RefreshPresentation()
     if(auto* Badge=GetWidgetFromName(TEXT("StatusBuffBadge")))Badge->SetVisibility(ESlateVisibility::Collapsed);
 }
 
-void UICCharacterStatusWidget::EnsureSkillCooldownOverlay()
+void UICCharacterStatusWidget::BuildSkillCooldownOverlay(UWidgetTree* Tree)
 {
-    if (!WidgetTree || GetWidgetFromName(TEXT("PortraitCooldownOverlay"))) return;
-    auto* Image = Cast<UImage>(GetWidgetFromName(TEXT("IMG_Portrait")));
+    if (!Tree || Tree->FindWidget(TEXT("PortraitCooldownOverlay"))) return;
+    auto* Image = Cast<UImage>(Tree->FindWidget(TEXT("IMG_Portrait")));
     auto* PortraitBox = Image ? Cast<USizeBox>(Image->GetParent()) : nullptr;
     if (!PortraitBox) return;
 
-    auto* Overlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("PortraitCooldownOverlay"));
+    auto* Overlay = Tree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("PortraitCooldownOverlay"));
     PortraitBox->SetContent(Overlay);
     auto Fill = [](UOverlaySlot* OverlaySlot)
     {
@@ -71,7 +71,7 @@ void UICCharacterStatusWidget::EnsureSkillCooldownOverlay()
     };
     Fill(Overlay->AddChildToOverlay(Image));
 
-    auto* Remaining = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TXT_SkillCooldown"));
+    auto* Remaining = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TXT_SkillCooldown"));
     Remaining->SetFont(ICFrontendLayout::Font(24, true));
     Remaining->SetJustification(ETextJustify::Center);
     Remaining->SetColorAndOpacity(FLinearColor::White);
@@ -82,7 +82,7 @@ void UICCharacterStatusWidget::EnsureSkillCooldownOverlay()
     RemainingSlot->SetHorizontalAlignment(HAlign_Fill);
     RemainingSlot->SetVerticalAlignment(VAlign_Center);
 
-    auto* Key = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TXT_SkillKey"));
+    auto* Key = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TXT_SkillKey"));
     Key->SetText(FText::FromString(TEXT("Q")));
     Key->SetFont(ICFrontendLayout::Font(16, true));
     Key->SetColorAndOpacity(FLinearColor(1.f, .77f, .3f));
@@ -93,14 +93,13 @@ void UICCharacterStatusWidget::EnsureSkillCooldownOverlay()
     KeySlot->SetHorizontalAlignment(HAlign_Left);
     KeySlot->SetVerticalAlignment(VAlign_Bottom);
     KeySlot->SetPadding(FMargin(3.f));
-    auto* Badge=WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("StatusBuffBadge"));Badge->SetBrushColor(FLinearColor(.05f,.55f,.16f));Badge->SetPadding(FMargin(2,0));Badge->SetVisibility(ESlateVisibility::Collapsed);
-    auto* Plus=WidgetTree->ConstructWidget<UTextBlock>();Plus->SetText(FText::FromString(TEXT("+")));Plus->SetFont(ICFrontendLayout::Font(18,true));Plus->SetJustification(ETextJustify::Center);Badge->SetContent(Plus);
+    auto* Badge=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("StatusBuffBadge"));Badge->SetBrushColor(FLinearColor(.05f,.55f,.16f));Badge->SetPadding(FMargin(2,0));Badge->SetVisibility(ESlateVisibility::Collapsed);
+    auto* Plus=Tree->ConstructWidget<UTextBlock>();Plus->SetText(FText::FromString(TEXT("+")));Plus->SetFont(ICFrontendLayout::Font(18,true));Plus->SetJustification(ETextJustify::Center);Badge->SetContent(Plus);
     auto* BadgeSlot=Overlay->AddChildToOverlay(Badge);BadgeSlot->SetHorizontalAlignment(HAlign_Right);BadgeSlot->SetVerticalAlignment(VAlign_Bottom);
 }
 
 void UICCharacterStatusWidget::UpdateSkillCooldown(bool bHasSkill, float Progress, double RemainingSeconds)
 {
-    EnsureSkillCooldownOverlay();
     const float SafeProgress = FMath::IsFinite(Progress) ? FMath::Clamp(Progress, 0.f, 1.f) : 1.f;
     const double SafeRemaining = FMath::IsFinite(RemainingSeconds) ? FMath::Max(0., RemainingSeconds) : 0.;
     const bool bCoolingDown = bHasSkill && SafeRemaining > KINDA_SMALL_NUMBER;
@@ -186,20 +185,14 @@ void UICCharacterStatusWidget::UpdateStatusEffects(const FICCharacterState& Stat
         auto* Cell=EffectWidgets.FindRef(Badge.ID).Get();
         if(!Cell)
         {
-            Cell=WidgetTree->ConstructWidget<UBorder>();Cell->SetPadding(FMargin(2));
-            auto* Layer=WidgetTree->ConstructWidget<UOverlay>();Cell->SetContent(Layer);
-            auto* Icon=WidgetTree->ConstructWidget<UImage>();
+            Cell=ICWidgetTemplates::Create(this,TEXT("WBP_IC_StatusEffect"));if(!Cell)continue;
+            auto* Icon=CastChecked<UImage>(Cell->GetWidgetFromName(TEXT("IMG_Icon")));
             Icon->SetBrush(Prototype->GetBrush());
             if(Badge.Icon)Icon->SetBrushFromTexture(Badge.Icon);
-            auto Brush=Icon->GetBrush();Brush.TintColor=FLinearColor::White;Brush.ImageSize=FVector2D(24,24);Icon->SetBrush(Brush);
-            auto* IconSize=WidgetTree->ConstructWidget<USizeBox>();IconSize->SetWidthOverride(24);IconSize->SetHeightOverride(24);IconSize->SetContent(Icon);Layer->AddChildToOverlay(IconSize);
-            auto* Count=WidgetTree->ConstructWidget<UTextBlock>();Count->SetFont(ICFrontendLayout::Font(10,true));Count->SetShadowColorAndOpacity(FLinearColor::Black);Count->SetShadowOffset({1,1});
-            auto* CountSlot=Layer->AddChildToOverlay(Count);CountSlot->SetHorizontalAlignment(HAlign_Right);CountSlot->SetVerticalAlignment(VAlign_Bottom);
             Row->AddChildToHorizontalBox(Cell)->SetPadding(FMargin(2,0,0,0));EffectWidgets.Add(Badge.ID,Cell);
         }
-        Cell->SetBrushColor(Badge.Harmful?FLinearColor(.75f,.08f,.08f,.9f):FLinearColor(.08f,.55f,.18f,.9f));
-        auto* Layer=CastChecked<UOverlay>(Cell->GetContent());
-        CastChecked<UTextBlock>(Layer->GetChildAt(1))->SetText(Badge.Stacks>1?FText::AsNumber(Badge.Stacks):FText::GetEmpty());
+        CastChecked<UBorder>(Cell->GetWidgetFromName(TEXT("Frame")))->SetBrushColor(Badge.Harmful?FLinearColor(.75f,.08f,.08f,.9f):FLinearColor(.08f,.55f,.18f,.9f));
+        CastChecked<UTextBlock>(Cell->GetWidgetFromName(TEXT("TXT_Count")))->SetText(Badge.Stacks>1?FText::AsNumber(Badge.Stacks):FText::GetEmpty());
         Cell->SetToolTipText(Badge.Remaining>=0?FText::Format(NSLOCTEXT("ICStatus","EffectTime","{0} · {1}초"),Badge.Name,FText::AsNumber(FMath::CeilToInt(Badge.Remaining))):Badge.Name);
     }
 }

@@ -182,7 +182,7 @@ void AICPlayerController::OpenContainer(FName ID,bool Home,bool Access)
     if(OpenStorage.IsNone())return;
     const FName Container=OpenStorage;GetInventory()->EnsureStorage(Container);SetMenu(TEXT(""));SelectedStorage=INDEX_NONE;
     auto* Type=LoadClass<UICStorageWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Storage.WBP_IC_Storage_C"));
-    StorageScreen=CreateWidget<UICStorageWidget>(this,Type?Type:UICStorageWidget::StaticClass());
+    StorageScreen=CreateWidget<UICStorageWidget>(this,Type);
     if(!StorageScreen||!StorageScreen->OpenStorage(Container)){StorageScreen=nullptr;OpenStorage=NAME_None;}
 }
 void AICPlayerController::CloseChestPresentation()

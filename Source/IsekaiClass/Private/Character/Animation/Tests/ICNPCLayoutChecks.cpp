@@ -40,6 +40,7 @@ public:
         if(Stage==0)
         {
             if(PC->Menu!=TEXT("Create"))return false;
+            if(!PC->GetSaves()->OnSaveFinished.Contains(PC,TEXT("SaveFinished")))return false;
             GI=PC->GetGameInstance();
             Test->TestTrue(TEXT("Layout test isolates save files"),PC->GetSaves()->ConfigureServices(State,PC->GetTime(),TEXT("IC_NPCLayout_")+FGuid::NewGuid().ToString(EGuidFormats::Digits)));
             if(!PC->DebugCreatePlayer()){Test->AddError(TEXT("Cannot create test player"));Cleanup();return true;}

@@ -22,15 +22,8 @@ FICDialoguePresentationRow AICPlayerController::GetDialoguePresentation() const
 }
 bool AICPlayerController::IsLiveNPCDialogue() const
 {return Menu==TEXT("Dialogue")&&bInDialogue&&DialogueScreen!=nullptr;}
-bool AICPlayerController::ForwardDialogueMovementKey(FKey Key,bool Pressed)
+bool AICPlayerController::ForwardDialogueMovementKey(FKey,bool)
 {
-    if(!IsLiveNPCDialogue()||!GetDialoguePresentation().bAllowPlayerMovement||IsPaused())return false;
-    const auto* Context=AppliedMappingContext?AppliedMappingContext.Get():DefaultMappingContext.Get();if(!Context)return false;
-    for(const auto& Mapping:Context->GetMappings())if(Mapping.Action==MoveAction&&Mapping.Key==Key)
-    {
-        if(!PlayerInput||!Pressed||!PlayerInput->IsPressed(Key))InputKey(FInputKeyEventArgs::CreateSimulated(Key,Pressed?IE_Pressed:IE_Released,Pressed?1.f:0.f));
-        return true;
-    }
     return false;
 }
 namespace

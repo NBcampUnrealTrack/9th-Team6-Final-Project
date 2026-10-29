@@ -1,4 +1,5 @@
 #include "Core/Controller/ICPlayerController.h"
+#include "UI/Framework/ICPrologueWidget.h"
 #include "UI/Life/ICStorageWidget.h"
 #include "UI/Map/ICMapWidget.h"
 #include "UI/Gameplay/ICDeathWidget.h"
@@ -281,7 +282,7 @@ void AICPlayerController::UpdateScreens()
         if(!LoadingScreen)
         {
             auto* Class=LoadClass<UICLoadingWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_Loading.WBP_Loading_C"));
-            LoadingScreen=CreateWidget<UICLoadingWidget>(this,Class?Class:UICLoadingWidget::StaticClass());
+            LoadingScreen=CreateWidget<UICLoadingWidget>(this,Class);
             if(LoadingScreen&&FrontendUI)FrontendUI->OpenScreen(LoadingScreen,true,10000);
         }
     }
@@ -291,7 +292,7 @@ void AICPlayerController::UpdateScreens()
         if(!MapScreen)
         {
             auto* Class=LoadClass<UICMapWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Map.WBP_IC_Map_C"));
-            MapScreen=CreateWidget<UICMapWidget>(this,Class?Class:UICMapWidget::StaticClass());
+            MapScreen=CreateWidget<UICMapWidget>(this,Class);
             if(MapScreen&&FrontendUI)FrontendUI->OpenScreen(MapScreen,true,200);
         }
     }
@@ -301,7 +302,7 @@ void AICPlayerController::UpdateScreens()
         if(!SettingsScreen)
         {
             auto* Class=LoadClass<UICSettingsWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Settings.WBP_IC_Settings_C"));
-            SettingsScreen=CreateWidget<UICSettingsWidget>(this,Class?Class:UICSettingsWidget::StaticClass());
+            SettingsScreen=CreateWidget<UICSettingsWidget>(this,Class);
             if(SettingsScreen&&FrontendUI)FrontendUI->OpenScreen(SettingsScreen,false,1000);
         }
     }
@@ -343,7 +344,7 @@ void AICPlayerController::UpdateScreens()
         if(!DeathScreen)
         {
             auto* Class=LoadClass<UICDeathWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Death.WBP_IC_Death_C"));
-            DeathScreen=CreateWidget<UICDeathWidget>(this,Class?Class:UICDeathWidget::StaticClass());
+            DeathScreen=CreateWidget<UICDeathWidget>(this,Class);
             if(DeathScreen&&FrontendUI)FrontendUI->OpenScreen(DeathScreen,true,200);
         }
     }
@@ -444,8 +445,9 @@ void AICPlayerController::SaveFinished(int32 Slot,bool bSuccess,const FString& M
         if(bSuccess)
         {
             bInitialSavePending=false;
-            GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->CompleteNewGame();
-            SetMenu(TEXT(""));
+            if(GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->bPendingNewGame)
+                UICPrologueWidget::Show(this,true);
+            else {GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->CompleteNewGame();SetMenu(TEXT(""));}
             const FName Jobs[]={TEXT("Warrior"),TEXT("Archer"),TEXT("Mage"),TEXT("Healer")};
             OnPlayerInitialized.Broadcast(Jobs[Job],FirstSkill);
         }
@@ -484,12 +486,13 @@ void AICPlayerController::SetMenu(const FString& RequestedMenu)
         bInDialogue = false;
     }
     ResetHeldInput();CancelTarget();
+    if(NewMenu==TEXT("Dialogue"))if(auto* DialoguePlayer=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=DialoguePlayer->GetICAbilitySystem())ASC->CancelAction();
     if(Menu!=NewMenu)UE_LOG(LogICUI, Log, TEXT("[UI.Menu] From=%s To=%s Created=%d Dead=%d"),*Menu,*NewMenu,bCreated,bDead);
     if (NewMenu == TEXT("Settings") && Menu != NewMenu) SettingsReturnMenu = Menu;
     Menu=NewMenu;
-    if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(bDead||NewMenu==TEXT("MainMenu")||NewMenu==TEXT("Loading")||NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
+    if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(bDead||NewMenu==TEXT("MainMenu")||NewMenu==TEXT("Loading")||NewMenu==TEXT("Prologue")||NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
     UpdateScreens();
-    InteractionHint.Empty();bShowMouseCursor=!NewMenu.IsEmpty();
+    InteractionHint.Empty();bShowMouseCursor=false;
     if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);}
     UUserWidget* Focus=LoadingScreen?static_cast<UUserWidget*>(LoadingScreen.Get()):MapScreen?static_cast<UUserWidget*>(MapScreen.Get()):SettingsScreen?static_cast<UUserWidget*>(SettingsScreen.Get()):SessionSaveLoadScreen?static_cast<UUserWidget*>(SessionSaveLoadScreen.Get()):DeathScreen?static_cast<UUserWidget*>(DeathScreen.Get()):CharacterCreateScreen&&CharacterCreateScreen->IsActivated()?static_cast<UUserWidget*>(CharacterCreateScreen.Get()):IsMainMenuLevel()?static_cast<UUserWidget*>(MainMenuWidget.Get()):static_cast<UUserWidget*>(Screen.Get());
     if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->SetMenuContext(this,Focus,!NewMenu.IsEmpty()&&NewMenu!=TEXT("Dialogue"));

@@ -15,6 +15,7 @@ public:
     SLATE_BEGIN_ARGS(SICRadialCooldown) {} SLATE_END_ARGS()
     void Construct(const FArguments&) {}
     float Progress = 1, Thickness = 14;
+    float StartAngle=0,SweepAngle=360;
     FLinearColor Fill;
     virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(UICRadialCooldownBar::Diameter); }
     virtual int32 OnPaint(const FPaintArgs&, const FGeometry& Geometry, const FSlateRect&,
@@ -29,7 +30,7 @@ public:
             const int32 Segments=FMath::Max(1,FMath::CeilToInt(128*Fraction));
             TArray<FVector2D> Points;Points.Reserve(Segments+1);
             for(int32 Index=0;Index<=Segments;++Index)
-                Points.Add(Size*.5+UICRadialCooldownBar::ClockwisePoint(Fraction*Index/Segments)*Radius);
+                Points.Add(Size*.5+UICRadialCooldownBar::ClockwisePoint((StartAngle+SweepAngle*Fraction*Index/Segments)/360.f)*Radius);
             FSlateDrawElement::MakeLines(Elements,Z,Geometry.ToPaintGeometry(),Points,
                 ESlateDrawEffect::None,Color*Style.GetColorAndOpacityTint(),true,Width);
         };
@@ -57,7 +58,7 @@ void UICRadialCooldownBar::SynchronizeProperties()
     Super::SynchronizeProperties();
     if(!Ring)return;
     Ring->Progress=FMath::IsFinite(Progress)?FMath::Clamp(Progress,0.f,1.f):0.f;
-    Ring->Thickness=Thickness;Ring->Fill=FillColor;
+    Ring->Thickness=Thickness;Ring->Fill=FillColor;Ring->StartAngle=StartAngleDegrees;Ring->SweepAngle=SweepAngleDegrees;
     Ring->Invalidate(EInvalidateWidgetReason::Paint);
 }
 
@@ -76,7 +77,7 @@ void UICRadialCooldownBar::ReleaseSlateResources(bool bReleaseChildren)
 void UICMovementCooldownWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-    if(WidgetTree&&!WidgetTree->RootWidget)ICGameplayLayout::Build(WidgetTree,TEXT("MovementCooldown"));
+
     RefreshCooldown();
 }
 

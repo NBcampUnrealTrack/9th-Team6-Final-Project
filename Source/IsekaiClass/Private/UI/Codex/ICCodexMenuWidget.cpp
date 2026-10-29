@@ -67,12 +67,12 @@ UVerticalBox* Modal(UWidgetTree* T,float Width)
     auto* Column=T->ConstructWidget<UVerticalBox>();Frame->SetContent(Column);return Column;
 }
 UClass* WClass(const TCHAR* Name,UClass* Fallback)
-{auto* C=LoadClass<UUserWidget>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Name,Name));return C?C:Fallback;}
+{auto* C=LoadClass<UUserWidget>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Name,Name));return C;}
 bool Up(FKey K){return K==EKeys::W||K==EKeys::Up||K==EKeys::Gamepad_DPad_Up;}
 bool Down(FKey K){return K==EKeys::S||K==EKeys::Down||K==EKeys::Gamepad_DPad_Down;}
 bool Left(FKey K){return K==EKeys::A||K==EKeys::Left||K==EKeys::Gamepad_DPad_Left;}
 bool Right(FKey K){return K==EKeys::D||K==EKeys::Right||K==EKeys::Gamepad_DPad_Right;}
-bool Accept(FKey K){return K==EKeys::Enter||K==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(K);}
+bool Accept(FKey K){return (K==EKeys::G||K==EKeys::F||K==EKeys::Enter)||K==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(K);}
 bool BackKey(FKey K){return K==EKeys::Escape||K==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(K);}
 const TCHAR* Categories[]={TEXT("스킬"),TEXT("펫"),TEXT("생산물"),TEXT("제작물"),TEXT("NPC")};
 const TCHAR* Products[]={TEXT("채집"),TEXT("농사"),TEXT("낚시"),TEXT("채광"),TEXT("목축")};
@@ -93,7 +93,7 @@ bool UICCodexCellWidget::BuildLayout(UWidgetTree* T)
     auto* ProgressBounds=T->ConstructWidget<USizeBox>(USizeBox::StaticClass(),TEXT("ProgressBounds"));ProgressBounds->SetContent(Progress);ProgressBounds->SetClipping(EWidgetClipping::ClipToBounds);Row(Column,ProgressBounds,0);return true;
 }
 void UICCodexCellWidget::NativeOnInitialized()
-{Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Cell")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Pick);}
+{Super::NativeOnInitialized();CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Cell")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Pick);}
 void UICCodexCellWidget::Present(int32 Index,FText Name,FText Progress,UTexture2D* Icon,bool Unknown,bool Selected,float Width,float Height)
 {
     CellIndex=Index;bUnknown=Unknown;auto* S=CastChecked<USizeBox>(GetWidgetFromName(TEXT("CellSize")));S->SetWidthOverride(Width);S->SetHeightOverride(Height);
@@ -118,7 +118,7 @@ bool UICCodexPopupWidget::BuildLayout(UWidgetTree* T)
 }
 void UICCodexPopupWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Primary")))->OnClicked.AddUniqueDynamic(this,&ThisClass::PrimaryAction);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Back")))->OnClicked.AddUniqueDynamic(this,&ThisClass::BackAction);
 }
@@ -149,7 +149,7 @@ bool UICCodexTargetsWidget::BuildLayout(UWidgetTree* T)
     Row(Column,Button(T,TEXT("BTN_Back"),Txt(TEXT("뒤로가기"))),0);return true;
 }
 void UICCodexTargetsWidget::NativeOnInitialized()
-{Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Back")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Back);}
+{Super::NativeOnInitialized();CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Back")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Back);}
 void UICCodexTargetsWidget::Present(UICCodexSubsystem* C)
 {
     Members=C?C->GetPartyMembers():TArray<FName>();SelectedIndex=FMath::Clamp(SelectedIndex,0,Members.Num());
@@ -192,7 +192,7 @@ bool UICCodexMenuWidget::BuildLayout(UWidgetTree* T)
 UICCodexSubsystem* UICCodexMenuWidget::Codex() const{return GetGameInstance()?GetGameInstance()->GetSubsystem<UICCodexSubsystem>():nullptr;}
 void UICCodexMenuWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     const FName Actions[]={TEXT("Category0"),TEXT("Category1"),TEXT("Category2"),TEXT("Category3")};
     for(int32 I=0;I<4;++I){FScriptDelegate D;D.BindUFunction(this,Actions[I]);CastChecked<UButton>(GetWidgetFromName(FName(*FString::Printf(TEXT("BTN_Category%d"),I))))->OnClicked.AddUnique(D);CastChecked<UICCodexCellWidget>(GetWidgetFromName(FName(*FString::Printf(TEXT("Equipped%d"),I))))->OnPicked.AddUniqueDynamic(this,&ThisClass::CellPicked);}
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Category4")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Category4);
@@ -318,8 +318,8 @@ void UICCodexMenuWidget::Category4(){SelectCategory(4);}
 void UICCodexMenuWidget::Tab0(){SelectSubTab(0);}void UICCodexMenuWidget::Tab1(){SelectSubTab(1);}void UICCodexMenuWidget::Tab2(){SelectSubTab(2);}void UICCodexMenuWidget::Tab3(){SelectSubTab(3);}void UICCodexMenuWidget::Tab4(){SelectSubTab(4);}
 FText UICCodexMenuWidget::NavigationHint() const
 {
-    if(IsModalOpen())return Txt(Popup==2&&!bNoticeOpen?TEXT("W A S D  캐릭터 선택     Enter  선택     ESC  뒤로가기"):TEXT("A / D  버튼 선택     W / S  설명 스크롤     Enter  선택     ESC  뒤로가기"));
-    return Txt(NavigationArea==0?TEXT("W / S  분류 선택     A / Enter  열기     D  상단 탭     ESC  닫기"):TEXT("W A S D  이동     Enter / Space  상세 보기     A / W  상단 탭     ESC  닫기"));
+    if(IsModalOpen())return Txt(Popup==2&&!bNoticeOpen?TEXT("W A S D  캐릭터 선택     G/F  선택     ESC  뒤로가기"):TEXT("A / D  버튼 선택     W / S  설명 스크롤     G/F  선택     ESC  뒤로가기"));
+    return Txt(NavigationArea==0?TEXT("W / S  분류 선택     A / Enter  열기     D  상단 탭     ESC  닫기"):TEXT("W A S D  이동     G / F  상세 보기     A / W  상단 탭     ESC  닫기"));
 }
 bool UICCodexMenuWidget::HandleMenuKey(FKey K,bool Repeat)
 {

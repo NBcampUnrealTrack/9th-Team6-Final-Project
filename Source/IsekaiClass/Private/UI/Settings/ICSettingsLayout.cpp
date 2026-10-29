@@ -15,6 +15,10 @@
 #include "Components/Slider.h"
 #include "Components/TextBlock.h"
 #include "Components/WidgetSwitcher.h"
+#include "Components/BorderSlot.h"
+#include "Components/ButtonSlot.h"
+#include "Components/Spacer.h"
+#include "UI/Framework/ICUITheme.h"
 #define LOCTEXT_NAMESPACE "ICSettings"
 
 FText ICSettingsLayout::ControllerHelp(int32 Layout)
@@ -103,63 +107,79 @@ UButton* SettingsButton(UWidgetTree* Tree,FName Name,FText Text)
 }
 void ICSettingsLayout::Build(UWidgetTree* Tree)
 {
-    auto* Back=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("SettingsBackdrop"));Back->SetBrushColor(FLinearColor(.009f,.014f,.025f,.98f));Back->SetPadding(FMargin(32));Tree->RootWidget=Back;
+    auto* Back=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("SettingsBackdrop"));
+    Back->SetBrushColor(FLinearColor(.0024f,.0052f,.011f,.97f));Back->SetPadding(FMargin(52,34));Tree->RootWidget=Back;
     auto* Scale=Tree->ConstructWidget<UScaleBox>();Back->SetContent(Scale);
-    auto* Size=Tree->ConstructWidget<USizeBox>();Size->SetWidthOverride(1400);Size->SetHeightOverride(860);Scale->SetContent(Size);
+    auto* Size=Tree->ConstructWidget<USizeBox>();Size->SetWidthOverride(1720);Size->SetHeightOverride(960);Scale->SetContent(Size);
     auto* Main=Tree->ConstructWidget<UVerticalBox>();Size->SetContent(Main);
-    Main->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_SettingsTitle"),LOCTEXT("Settings","설정"),36))->SetPadding(FMargin(0,0,0,8));
-    Main->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_SettingsDescription"),LOCTEXT("Description","플레이 환경을 조정하세요. 변경 사항은 적용한 뒤 저장됩니다."),17,FLinearColor(.56f,.64f,.73f)))->SetPadding(FMargin(0,0,0,24));
-    auto* Body=Tree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("SettingsBody"));Main->AddChildToVerticalBox(Body)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    auto* NavSize=Tree->ConstructWidget<USizeBox>();NavSize->SetWidthOverride(250);Body->AddChildToHorizontalBox(NavSize)->SetPadding(FMargin(0,0,28,0));
-    auto* Nav=Tree->ConstructWidget<UVerticalBox>();NavSize->SetContent(Nav);
+    Main->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_SettingsTitle"),LOCTEXT("Settings","설정"),34,FLinearColor(.55f,.9f,1.f)))->SetPadding(FMargin(0,0,0,10));
+    Main->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_SettingsDescription"),LOCTEXT("Description","당신의 모험에 맞춰 플레이 환경을 조정하세요."),16,FLinearColor(.42f,.58f,.67f)))->SetPadding(FMargin(0,0,0,24));
+    auto* Nav=Tree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("SettingsCategories"));Main->AddChildToVerticalBox(Nav)->SetPadding(FMargin(0,0,0,24));
     for(int32 I=0;I<Tabs().Num();++I)
-    {auto* Height=Tree->ConstructWidget<USizeBox>();Height->SetHeightOverride(58);Height->SetContent(SettingsButton(Tree,FName(*FString::Printf(TEXT("BTN_SettingsTab_%d"),I)),Tabs()[I]));Nav->AddChildToVerticalBox(Height)->SetPadding(FMargin(0,0,0,10));}
+    {
+        auto* Height=Tree->ConstructWidget<USizeBox>();Height->SetHeightOverride(58);
+        Height->SetContent(SettingsButton(Tree,FName(*FString::Printf(TEXT("BTN_SettingsTab_%d"),I)),Tabs()[I]));
+        auto* TabSlot=Nav->AddChildToHorizontalBox(Height);TabSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));TabSlot->SetPadding(FMargin(0,0,8,0));
+    }
+    auto* Body=Tree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("SettingsBody"));Main->AddChildToVerticalBox(Body)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     auto* Switcher=Tree->ConstructWidget<UWidgetSwitcher>(UWidgetSwitcher::StaticClass(),TEXT("SettingsTabSwitcher"));Body->AddChildToHorizontalBox(Switcher)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     for(int32 Tab=0;Tab<Tabs().Num();++Tab)
     {
-        auto* Scroll=Tree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),FName(*FString::Printf(TEXT("SettingsScroll_%d"),Tab)));Scroll->SetScrollbarThickness(FVector2D(7,7));Switcher->AddChild(Scroll);
+        auto* Scroll=Tree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),FName(*FString::Printf(TEXT("SettingsScroll_%d"),Tab)));
+        Scroll->SetScrollbarThickness(FVector2D(3,3));Switcher->AddChild(Scroll);
         auto* Content=Tree->ConstructWidget<UVerticalBox>();Scroll->AddChild(Content);
-        Content->AddChildToVerticalBox(SettingsText(Tree,NAME_None,Tabs()[Tab],27))->SetPadding(FMargin(4,0,16,20));
         for(const auto& Spec:Specs())if(Spec.Tab==Tab)
         {
-            auto* Card=Tree->ConstructWidget<UBorder>();Card->SetBrushColor(FLinearColor(.025f,.04f,.064f));Card->SetPadding(FMargin(18,13));Content->AddChildToVerticalBox(Card)->SetPadding(FMargin(0,0,14,8));
+            auto* Card=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),FName(*(TEXT("ROW_")+Spec.ID.ToString())));
+            Card->SetBrush(ICUITheme::PanelBrush());Card->SetBrushColor(FLinearColor(.107f,.175f,.258f,.18f));Card->SetPadding(FMargin(22,19));
+            Content->AddChildToVerticalBox(Card)->SetPadding(FMargin(0,0,22,10));
             auto* Line=Tree->ConstructWidget<UHorizontalBox>();Card->SetContent(Line);
-            auto* Left=Tree->ConstructWidget<UVerticalBox>();Line->AddChildToHorizontalBox(Left)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-            Left->AddChildToVerticalBox(SettingsText(Tree,NAME_None,Spec.Label,19));
-            auto* Help=SettingsText(Tree,NAME_None,Spec.Help,14,FLinearColor(.52f,.61f,.72f));Help->SetWrapTextAt(550);Left->AddChildToVerticalBox(Help)->SetPadding(FMargin(0,5,25,0));
-            auto* ControlSize=Tree->ConstructWidget<USizeBox>();ControlSize->SetWidthOverride(320);auto* Placement=Line->AddChildToHorizontalBox(ControlSize);Placement->SetVerticalAlignment(VAlign_Center);
+            auto* Caption=SettingsText(Tree,NAME_None,Spec.Label,20);Line->AddChildToHorizontalBox(Caption)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+            auto* ControlSize=Tree->ConstructWidget<USizeBox>();ControlSize->SetWidthOverride(340);auto* Placement=Line->AddChildToHorizontalBox(ControlSize);Placement->SetVerticalAlignment(VAlign_Center);Placement->SetPadding(FMargin(22,0,0,0));
             const FName ControlName(*(FString(TEXT("OPTION_"))+Spec.ID.ToString()));
             if(Spec.Control==EICSettingControl::Toggle)
             {auto* Check=Tree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(),ControlName);ControlSize->SetContent(Check);}
             else if(Spec.Control==EICSettingControl::Choice)
             {
-                auto* Choice=Tree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass(),ControlName);
+                auto* Choice=Tree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass(),ControlName);Choice->SetEnableGamepadNavigationMode(true);
                 PRAGMA_DISABLE_DEPRECATION_WARNINGS
-                Choice->Font=ICFrontendLayout::Font(17);
+                Choice->Font=ICFrontendLayout::Font(18);
                 PRAGMA_ENABLE_DEPRECATION_WARNINGS
                 for(const auto& Option:Spec.Choices)Choice->AddOption(Option.ToString());ControlSize->SetContent(Choice);
             }
             else
             {
                 auto* Controls=Tree->ConstructWidget<UHorizontalBox>();ControlSize->SetContent(Controls);
-                auto* Slider=Tree->ConstructWidget<USlider>(USlider::StaticClass(),ControlName);Slider->SetMinValue(Spec.Min);Slider->SetMaxValue(Spec.Max);Slider->SetStepSize(Spec.Step);Slider->RequiresControllerLock=false;Controls->AddChildToHorizontalBox(Slider)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-                auto* ValueSize=Tree->ConstructWidget<USizeBox>();ValueSize->SetWidthOverride(68);Controls->AddChildToHorizontalBox(ValueSize)->SetPadding(FMargin(12,0,0,0));ValueSize->SetContent(SettingsText(Tree,FName(*(TEXT("VALUE_")+Spec.ID.ToString())),FText::GetEmpty(),17));
+                auto* Slider=Tree->ConstructWidget<USlider>(USlider::StaticClass(),ControlName);Slider->SetMinValue(Spec.Min);Slider->SetMaxValue(Spec.Max);Slider->SetStepSize(Spec.Step);
+                Slider->SetSliderBarColor(FLinearColor(.12f,.25f,.32f));Slider->SetSliderHandleColor(FLinearColor(.38f,.83f,1.f));Slider->RequiresControllerLock=false;
+                Controls->AddChildToHorizontalBox(Slider)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+                auto* ValueSize=Tree->ConstructWidget<USizeBox>();ValueSize->SetWidthOverride(78);Controls->AddChildToHorizontalBox(ValueSize)->SetPadding(FMargin(16,0,0,0));
+                ValueSize->SetContent(SettingsText(Tree,FName(*(TEXT("VALUE_")+Spec.ID.ToString())),FText::GetEmpty(),18));
             }
         }
         if(Tab==1)
         {
-            Content->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_ControllerHelp"),ControllerHelp(1),16,FLinearColor(.56f,.64f,.73f)))->SetPadding(FMargin(4,12,14,15));
-            Content->AddChildToVerticalBox(SettingsText(Tree,NAME_None,LOCTEXT("BindingsTitle","키 변경"),25))->SetPadding(FMargin(4,24,14,10));
-            Content->AddChildToVerticalBox(SettingsText(Tree,NAME_None,LOCTEXT("BindingsHelp","키 버튼을 선택한 뒤 새 키를 누르세요. ESC는 취소 및 메뉴 복귀용으로 유지됩니다. 중복 키는 적용 전에 확인합니다."),16,FLinearColor(.56f,.64f,.73f)))->SetPadding(FMargin(4,0,14,15));
+            Content->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_ControllerHelp"),ControllerHelp(1),16,FLinearColor(.5f,.68f,.76f)))->SetPadding(FMargin(4,20,24,20));
+            Content->AddChildToVerticalBox(SettingsText(Tree,NAME_None,LOCTEXT("BindingsTitle","키 변경"),24))->SetPadding(FMargin(4,8,24,14));
             Content->AddChildToVerticalBox(Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("LIST_KeyBindings")));
         }
     }
-    Main->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_SettingsStatus"),FText::GetEmpty(),17,FLinearColor(.8f,.68f,.4f)))->SetPadding(FMargin(0,15,0,12));
-    auto* Footer=Tree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("SettingsFooter"));Main->AddChildToVerticalBox(Footer);
+    auto* Separator=Tree->ConstructWidget<UBorder>();Separator->SetBrushColor(FLinearColor(.17f,.48f,.58f,.5f));
+    auto* Rule=Tree->ConstructWidget<USizeBox>();Rule->SetWidthOverride(1);Rule->SetContent(Separator);Body->AddChildToHorizontalBox(Rule)->SetPadding(FMargin(20,0,40,0));
+    auto* HelpWidth=Tree->ConstructWidget<USizeBox>();HelpWidth->SetWidthOverride(530);Body->AddChildToHorizontalBox(HelpWidth);
+    auto* Help=Tree->ConstructWidget<UVerticalBox>();HelpWidth->SetContent(Help);
+    Help->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_SelectedSetting"),LOCTEXT("SettingDetail","설정 안내"),29,FLinearColor(.55f,.9f,1.f)))->SetPadding(FMargin(0,8,0,24));
+    auto* Explanation=SettingsText(Tree,TEXT("TXT_SelectedSettingHelp"),LOCTEXT("SelectedHelp","왼쪽에서 항목을 고르면 자세한 설명이 표시됩니다."),20,FLinearColor(.72f,.82f,.87f));Explanation->SetWrapTextAt(510);Help->AddChildToVerticalBox(Explanation);
+    auto* Space=Tree->ConstructWidget<USpacer>();Help->AddChildToVerticalBox(Space)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    Help->AddChildToVerticalBox(SettingsText(Tree,NAME_None,LOCTEXT("NavigationHelp","W / S   항목 이동\nA / D   값 변경\nF / G   선택 · 전환\nESC     돌아가기"),18,FLinearColor(.35f,.7f,.8f)))->SetPadding(FMargin(0,24,0,24));
+    Main->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_SettingsStatus"),FText::GetEmpty(),16,FLinearColor(.45f,.75f,.85f)))->SetPadding(FMargin(0,18,0,14));
+    auto* FooterPanel=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("SettingsFooterPanel"));FooterPanel->SetBrushColor(FLinearColor(.007f,.045f,.065f));FooterPanel->SetPadding(FMargin(18,12));Main->AddChildToVerticalBox(FooterPanel);
+    auto* Footer=Tree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("SettingsFooter"));FooterPanel->SetContent(Footer);
     const FName Names[]={TEXT("BTN_Reset"),TEXT("BTN_Apply"),TEXT("BTN_KeepDisplay"),TEXT("BTN_RevertDisplay"),TEXT("BTN_Close")};
     const FText Labels[]={LOCTEXT("Reset","기본값"),LOCTEXT("Apply","적용 · 저장"),LOCTEXT("Keep","변경 유지"),LOCTEXT("Revert","되돌리기"),LOCTEXT("Close","닫기")};
     for(int32 I=0;I<5;++I)
-    {auto* S=Tree->ConstructWidget<USizeBox>();S->SetHeightOverride(48);S->SetWidthOverride(I==1?200:150);S->SetContent(SettingsButton(Tree,Names[I],Labels[I]));Footer->AddChildToHorizontalBox(S)->SetPadding(FMargin(0,0,12,0));}
-    Main->AddChildToVerticalBox(SettingsText(Tree,NAME_None,LOCTEXT("KeyboardHelp","Tab  이동     방향키  변경     Space / Enter  선택     ESC  닫기"),14,FLinearColor(.46f,.55f,.65f)))->SetPadding(FMargin(0,13,0,0));
+    {auto* S=Tree->ConstructWidget<USizeBox>();S->SetHeightOverride(48);S->SetWidthOverride(I==1?220:160);S->SetContent(SettingsButton(Tree,Names[I],Labels[I]));Footer->AddChildToHorizontalBox(S)->SetPadding(FMargin(0,0,12,0));}
+    Main->AddChildToVerticalBox(SettingsText(Tree,TEXT("TXT_SettingsKeys"),LOCTEXT("KeyboardHelpMorpheus","상단: A/D 분류   ·   목록: W/S 이동, A/D 변경   ·   하단: A/D 이동, F 확인"),14,FLinearColor(.38f,.6f,.69f)))->SetPadding(FMargin(0,12,0,0));
+    ICUITheme::Apply(Tree);
 }
 #undef LOCTEXT_NAMESPACE

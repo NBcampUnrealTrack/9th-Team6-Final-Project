@@ -52,7 +52,7 @@ UVerticalBox* Panel(UWidgetTree* Tree,UOverlay* Root,float Width,float Height)
 }
 UICUIManagerSubsystem* Manager(UUserWidget* Widget){auto* Local=Widget->GetOwningLocalPlayer();return Local?Local->GetSubsystem<UICUIManagerSubsystem>():nullptr;}
 UClass* WidgetClass(const TCHAR* Name,UClass* Fallback)
-{auto* Type=LoadClass<UUserWidget>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Name,Name));return Type?Type:Fallback;}
+{auto* Type=LoadClass<UUserWidget>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Name,Name));return Type;}
 }
 
 bool UICStorageTransferPopup::BuildLayout(UWidgetTree* Tree)
@@ -73,7 +73,7 @@ bool UICStorageTransferPopup::BuildLayout(UWidgetTree* Tree)
 }
 void UICStorageTransferPopup::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Less")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Decrease);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_More")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Increase);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Transfer")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Move);
@@ -99,7 +99,7 @@ bool UICStorageTransferPopup::HandleKey(FKey Key,bool Repeat)
     if((Key==EKeys::Escape||UICGameUserSettings::IsGamepadBackKey(Key))){if(!Repeat)Back();return true;}
     if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left){Decrease();return true;}if(Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right){Increase();return true;}
     if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up){Action=0;Highlight();return true;}if(Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down){Action=1;Highlight();return true;}
-    if(Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Repeat){if(Action==0)Move();else Back();}return true;}return false;
+    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Repeat){if(Action==0)Move();else Back();}return true;}return false;
 }
 
 bool UICStorageWidget::BuildLayout(UWidgetTree* Tree)
@@ -124,7 +124,7 @@ bool UICStorageWidget::BuildLayout(UWidgetTree* Tree)
 }
 void UICStorageWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();SetIsFocusable(true);if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();SetIsFocusable(true);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_StorageClose")))->OnClicked.AddUniqueDynamic(this,&ThisClass::CloseStorage);
     auto* Popup=CastChecked<UICStorageTransferPopup>(GetWidgetFromName(TEXT("TransferPopup")));Popup->OnQuantity.AddUniqueDynamic(this,&ThisClass::AdjustQuantity);Popup->OnMove.AddUniqueDynamic(this,&ThisClass::MovePressed);Popup->OnBack.AddUniqueDynamic(this,&ThisClass::CloseItem);
 }
@@ -223,7 +223,7 @@ FReply UICStorageWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const 
     if(Key==EKeys::Tab||Key==EKeys::Gamepad_LeftShoulder||Key==EKeys::Gamepad_RightShoulder){if(!Event.IsRepeat()){bStorageSide=!bStorageSide;Selected=0;RefreshStorage();}return FReply::Handled();}
     int32 Delta=0;if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up)Delta=-8;else if(Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down)Delta=8;else if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left)Delta=-1;else if(Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right)Delta=1;
     if(Delta){const int32 Count=bStorageSide?40:Inventory->GetSnapshot().Bag.Slots.Num();Selected=FMath::Clamp(Selected+Delta,0,Count-1);RefreshStorage();auto* Grid=CastChecked<UUniformGridPanel>(GetWidgetFromName(bStorageSide?TEXT("ChestGrid"):TEXT("StorageBagGrid")));CastChecked<UScrollBox>(GetWidgetFromName(bStorageSide?TEXT("ChestScroll"):TEXT("StorageBagScroll")))->ScrollWidgetIntoView(Grid->GetChildAt(Selected));return FReply::Handled();}
-    if(Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Event.IsRepeat())OpenItem(bStorageSide,Selected);return FReply::Handled();}
+    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Event.IsRepeat())OpenItem(bStorageSide,Selected);return FReply::Handled();}
     return Super::NativeOnPreviewKeyDown(Geometry,Event);
 }
 

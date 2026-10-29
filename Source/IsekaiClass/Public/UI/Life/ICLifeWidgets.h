@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
+#include "UI/Framework/ICActionButtonWidget.h"
 #include "Data/Rows/Common/ICDefinitionTypes.h"
 #include "ICLifeWidgets.generated.h"
 class UWidgetTree;
@@ -10,7 +11,7 @@ class AICLifeActor;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FICLifeChoice,int32,Index);
 
 UCLASS()
-class ISEKAICLASS_API UICLifeChoiceButton : public UButton
+class ISEKAICLASS_API UICLifeChoiceButton : public UICActionButtonWidget
 {
     GENERATED_BODY()
 public:

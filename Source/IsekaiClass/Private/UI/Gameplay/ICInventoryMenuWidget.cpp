@@ -63,7 +63,7 @@ UButton* InventoryButton(UWidgetTree* T,FName Name,FText Text,bool WithCaption=t
 UClass* WidgetClass(const TCHAR* Asset,UClass* Fallback)
 {
     const FString Path=FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Asset,Asset);
-    auto* C=LoadClass<UUserWidget>(nullptr,*Path);return C?C:Fallback;
+    auto* C=LoadClass<UUserWidget>(nullptr,*Path);return C;
 }
 void Caption(UUserWidget* W,const TCHAR* Name,FText Text)
 {if(auto* T=Cast<UTextBlock>(W->GetWidgetFromName(Name)))T->SetText(Text);}
@@ -83,7 +83,7 @@ bool UICInventorySlotWidget::BuildLayout(UWidgetTree* T)
 }
 void UICInventorySlotWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     auto* Name=CastChecked<UTextBlock>(GetWidgetFromName(TEXT("TXT_Name")));
     Name->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);Name->SetClipping(EWidgetClipping::ClipToBounds);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Select")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Pick);
@@ -115,7 +115,7 @@ bool UICItemConfirmWidget::BuildLayout(UWidgetTree* T)
 }
 void UICItemConfirmWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Accept")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Accept);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Cancel")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Cancel);
 }
@@ -129,7 +129,7 @@ bool UICItemConfirmWidget::HandleKey(FKey Key,bool Repeat)
 {
     if(Key==EKeys::A||Key==EKeys::Left||Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Left||Key==EKeys::Gamepad_DPad_Up)Choice=0;
     else if(Key==EKeys::D||Key==EKeys::Right||Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Right||Key==EKeys::Gamepad_DPad_Down)Choice=1;
-    else if(Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Repeat)OnResolved.Broadcast(Choice==0);}
+    else if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Repeat)OnResolved.Broadcast(Choice==0);}
     else if(Key==EKeys::Escape||Key==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(Key)){if(!Repeat)Cancel();}
     else return false;
     RefreshChoice();return true;
@@ -157,7 +157,7 @@ bool UICInventoryItemPopupWidget::BuildLayout(UWidgetTree* T)
 }
 void UICInventoryItemPopupWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Equip")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Equip);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Lock")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Lock);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Split")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Split);
@@ -200,7 +200,7 @@ bool UICInventoryItemPopupWidget::HandleKey(FKey Key,bool Repeat)
     else if(Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right)ActionIndex=FMath::Min(Buttons.Num()-1,ActionIndex+1);
     else if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down)
     {auto* Scroll=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("DescriptionScroll")));Scroll->SetScrollOffset(FMath::Clamp(Scroll->GetScrollOffset()+(Key==EKeys::S||Key==EKeys::Down?60:-60),0.f,Scroll->GetScrollOffsetOfEnd()));}
-    else if(Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Repeat&&Buttons.IsValidIndex(ActionIndex)){auto* B=CastChecked<UButton>(GetWidgetFromName(Buttons[ActionIndex]));if(B->GetIsEnabled())B->OnClicked.Broadcast();}}
+    else if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key)){if(!Repeat&&Buttons.IsValidIndex(ActionIndex)){auto* B=CastChecked<UButton>(GetWidgetFromName(Buttons[ActionIndex]));if(B->GetIsEnabled())B->OnClicked.Broadcast();}}
     else return false;RefreshSelection();return true;
 }
 void UICInventoryItemPopupWidget::Equip(){OnEquip.Broadcast();}void UICInventoryItemPopupWidget::Use(){OnUse.Broadcast();}void UICInventoryItemPopupWidget::Quick(){OnQuick.Broadcast();}void UICInventoryItemPopupWidget::Trash(){OnTrash.Broadcast();}void UICInventoryItemPopupWidget::Back(){OnBack.Broadcast();}
@@ -267,7 +267,7 @@ FText UICInventoryMenuWidget::ItemName(FName ID) const
 }
 void UICInventoryMenuWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     for(int32 I=0;I<4;++I)
     {
         CastChecked<UICPartyPortraitWidget>(GetWidgetFromName(Indexed(TEXT("Member"),I)))->OnPicked.AddUniqueDynamic(this,&ThisClass::PortraitPicked);
@@ -559,7 +559,7 @@ FText UICInventoryMenuWidget::NavigationHint() const
     if(bPickingUseTarget)return NSLOCTEXT("ICInventory","UseTargetHint","A / D  대상 선택     Enter  사용     ESC  취소");
     if(bConfirming)return NSLOCTEXT("ICInventory","ConfirmHint","WASD  수락 / 취소 선택     Enter  결정     ESC  취소");
     if(bPickingQuickSlot)return NSLOCTEXT("ICInventory","PickHint","A / D  슬롯 선택     Enter  등록 확인     ESC  취소");
-    if(bDetailOpen)return NSLOCTEXT("ICInventory","DetailHint","A / D  버튼 선택     W / S  설명 스크롤     Enter  선택     ESC  뒤로가기");
+    if(bDetailOpen)return NSLOCTEXT("ICInventory","DetailHint","A / D  버튼 선택     W / S  설명 스크롤     G/F  선택     ESC  뒤로가기");
     if(NavigationArea==0)return NSLOCTEXT("ICInventory","RosterHint","W / S  캐릭터 선택     D  장비     A  상단 탭     ESC  닫기");
     if(NavigationArea==1)return NSLOCTEXT("ICInventory","EquipmentHint","A / D  무기 선택     S  퀵슬롯     Enter  무기 해제");
     if(NavigationArea==2)return NSLOCTEXT("ICInventory","ItemTabsHint","A / D  일반 / 퀘스트     S  아이템     W  상단 탭");
@@ -575,7 +575,7 @@ bool UICInventoryMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
     if(bConfirming)return CastChecked<UICItemConfirmWidget>(GetWidgetFromName(TEXT("ItemConfirm")))->HandleKey(Key,Repeat);
     const bool Up=Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up,Down=Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down;
     const bool Left=Key==EKeys::A||Key==EKeys::Left||Key==EKeys::Gamepad_DPad_Left,Right=Key==EKeys::D||Key==EKeys::Right||Key==EKeys::Gamepad_DPad_Right;
-    const bool Accept=Key==EKeys::Enter||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key);
+    const bool Accept=(Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Key);
     const bool Back=Key==EKeys::Escape||Key==EKeys::Equals||UICGameUserSettings::IsGamepadBackKey(Key);
     if(bPickingQuickSlot)
     {

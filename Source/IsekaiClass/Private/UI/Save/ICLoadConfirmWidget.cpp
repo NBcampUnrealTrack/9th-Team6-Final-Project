@@ -34,7 +34,7 @@ void UICLoadConfirmWidget::NativeConstruct()
 FReply UICLoadConfirmWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& KeyEvent)
 {
     IC_TRACE_FUNCTION();
-    if(KeyEvent.GetKey()==EKeys::Enter&&HasFocusedDescendants())return Super::NativeOnPreviewKeyDown(Geometry,KeyEvent);
+    if((KeyEvent.GetKey()==EKeys::G||KeyEvent.GetKey()==EKeys::F||KeyEvent.GetKey()==EKeys::Enter)&&HasFocusedDescendants())return Super::NativeOnPreviewKeyDown(Geometry,KeyEvent);
     if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))if(PC->HandleSessionKey(KeyEvent.GetKey(),KeyEvent.IsRepeat()))return FReply::Handled();
     return Super::NativeOnPreviewKeyDown(Geometry,KeyEvent);
 }
