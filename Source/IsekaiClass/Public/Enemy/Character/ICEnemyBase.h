@@ -10,7 +10,18 @@ class ISEKAICLASS_API AICEnemyBase : public AICCharacterBase
     GENERATED_BODY()
 public:
     AICEnemyBase();
-    bool InitializeEnemy(FName SpawnerID,const FICSpawnSlotDefinition& Slot,const FTransform& Origin);
+    virtual void BeginPlay() override;
+    virtual void PostActorCreated() override;
+    virtual void PostLoad() override;
+#if WITH_EDITOR
+    virtual void PostEditImport() override;
+#endif
+    bool InitializeEnemy(FName SpawnerID,const FICSpawnSlotDefinition& Slot,const FTransform& Origin,bool bRestoreSavedSlot=false);
+    bool HasInitializedEnemy() const { return bEnemyInitialized; }
+    UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="IC|Monster") FName MonsterID;
+    UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="IC|Monster|Placement") bool bInitializeWhenPlaced=true;
+    UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="IC|Monster|Placement",meta=(ClampMin="50",Units="cm")) double PlacedLeashRadiusCm=1000.;
+    UPROPERTY(VisibleInstanceOnly,BlueprintReadOnly,NonPIEDuplicateTransient,Category="IC|Monster|Placement") FGuid PlacementGuid;
     virtual void HandleZeroHP() override;
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     virtual void Tick(float DeltaSeconds) override;
@@ -32,6 +43,7 @@ private:
     FTransform OriginTransform;
     bool bReturning=false,bDefeatCommitted=false;
     bool bEnemyInitialized=false;
+    bool bPreserveSavedSlot=false;
     FGuid PresentedAction;
     double HitAnimationUntil=0;
     UPROPERTY(Transient) TObjectPtr<class UAnimSequence> PresentedAnimation;

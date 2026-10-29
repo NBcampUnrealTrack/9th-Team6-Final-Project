@@ -4,6 +4,27 @@
 기존 몬스터 BP와 AI 컨트롤러는 유지한다.
 DT_IC_Monster의 BehaviorTree / Blackboard 열에서 팀원이 만든 에셋을 참조한다.
 
+개별 BP 직접 배치:
+/Game/IsekaiClass/Enemy/Blueprints/Monsters의 BP 11종은 이제 맵에 직접 배치해 사용한다.
+각 BP 기본값의 MonsterID가 해당 DT 행으로 미리 지정되어 있다.
+NavMesh가 있는 지면에 배치하면 캐릭터 생성 완료 후 DT 능력치·애니메이션과 기존 BT / BB를 초기화한다.
+별도 BP_R01MonsterTestLayout이나 배치마다 추가하는 Spawner DT 행은 필요하지 않다.
+배치 지점이 복귀·리스폰 원점이며, PlacedLeashRadiusCm에서 복귀 범위를 조절한다.
+기본 복귀 범위는 일반 몬스터 1000cm, 보스 1600cm다.
+배치 액터마다 PlacementGuid를 자동 발급하고, 에디터에서 복제하면 다른 ID가 생긴다.
+죽은 뒤에도 내부 출현 지점이 유지되어 몬스터 DT의 RespawnGameMinutes 후 같은 BP로 다시 생성한다.
+처치 보상은 기존 DT·보상 영수증을 사용하며, 불러오기 중 보상 중복이나 즉시 부활을 방지한다.
+살아 있는 몬스터의 HP·효과·처치 식별자와 죽은 몬스터의 쿨타임은 기존 SpawnSlots에 저장한다.
+불러오기·스트리밍 재진입 시 살아 있는 몬스터는 배치 원점으로 복귀해 재개한다.
+내부 출현 지점은 해당 레벨이 해제될 때 함께 정리한다.
+새 BP 또는 다른 DT 행을 쓰려면 MonsterID를 지정한다. 기존 테스트 스포너 방식도 계속 지원한다.
+
+BP 기본값 설정 도구: Tools/Combat/setup_placed_monster_defaults.py
+직접 배치 통합 검사: IC.AI.Monsters.PlacedBlueprints
+검증 결과: Saved/PlacedMonsterReview/TestsFinal/index.json
+직접 배치 13마리(11종 + 같은 BP 추가 2마리)의 이동·공격·복귀·보상·저장·리스폰과
+기존 DT 스폰·공통 BT/BB·기존 전투 검사를 포함한 4개 자동화 검사 통과.
+
 데이터 테이블: /Game/IsekaiClass/Data/DataTable/Combat/DT_IC_Monster
 CSV 원본: Data/Combat/DT_IC_Monster.csv
 BehaviorTree: /Game/IsekaiClass/Enemy/AI/BehaviorTrees/BT_ICMonsterBase
