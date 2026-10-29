@@ -8,6 +8,7 @@ Companions use party state and NPC DT portraits.
 Quick slots use registered item IDs, item DT icons and bag counts.
 Use -ICUpdateCompanionHUDOnly to update only companion cards, their group and HUD.
 Use -ICUpdatePlayerHUDOnly to update both status cards and the containing HUDs.
+Use -ICUpdateHUDReadabilityOnly to update status cards, quest tracker and HUD.
 Use -ICUpdateQuickSlotsOnly to update the quick slot cards, their group and HUD.
 Use -ICUpdateGameMenuOnly to update the tabbed menu and its containing HUD.
 """
@@ -36,6 +37,7 @@ assets = {}
 names = {}
 arguments = u.SystemLibrary.get_command_line()
 scopes = (
+    ('-ICUpdateHUDReadabilityOnly', ('PlayerStatus', 'CompanionStatus', 'CompanionStatusAlternate', 'CompanionGroup', 'Minimap', 'QuestTracker', 'HUD')),
     ('-ICUpdateCompanionHUDOnly', ('CompanionStatus', 'CompanionStatusAlternate', 'CompanionGroup', 'HUD')),
     ('-ICUpdatePlayerHUDOnly', ('PlayerStatus', 'CompanionStatus', 'CompanionStatusAlternate', 'CompanionGroup', 'HUD')),
     ('-ICUpdateQuickSlotsOnly', ('QuickSlot', 'QuickSlots', 'HUD')),
@@ -63,6 +65,7 @@ for name, parent, kind in specs:
     default = u.get_default_object(bp.generated_class())
     if kind == 'Minimap':
         default.set_editor_property('bMinimap', True)
+        default.set_editor_property('minimap_zoom', 4.0)
     if kind in ('PlayerStatus', 'CompanionStatus', 'CompanionStatusAlternate'):
         default.set_editor_property('display_name', '')
         default.set_editor_property('portrait', None)
@@ -74,13 +77,15 @@ for name, parent, kind in specs:
 
 assert {'IMG_Portrait', 'TXT_Name', 'BAR_HP', 'BAR_MP', 'BAR_SP'} <= set(names['WBP_IC_PlayerStatus'])
 for name in ('WBP_IC_PlayerStatus', 'WBP_IC_CompanionStatus'):
+    assert {'StatusEffectsPanel', 'StatusEffects', 'StatusOverflow', 'TXT_StatusOverflow'} <= set(names[name]), name
     assert not any(widget.startswith(('TXT_HP', 'TXT_MP', 'TXT_SP', 'VALUE_')) for widget in names[name]), name
 assert {'IMG_Portrait', 'TXT_Name', 'BAR_HP', 'BAR_MP'} <= set(names['WBP_IC_CompanionStatus'])
 assert 'BAR_SP' not in names['WBP_IC_CompanionStatus']
 assert {'Companion1', 'Companion2', 'Companion3'} <= set(names['WBP_IC_CompanionGroup'])
 assert {'QuickSlot1', 'QuickSlot2', 'QuickSlot3', 'QuickSlot4'} <= set(names['WBP_IC_QuickSlots'])
 assert {'IMG_ItemIcon', 'TXT_Count'} <= set(names['WBP_IC_QuickSlot'])
-assert {'HUD_Minimap', 'HUD_PlayerStatus', 'HUD_Companions', 'HUD_QuestTracker', 'HUD_QuickSlots', 'GameMenu'} <= set(names['WBP_GameHUD'])
+assert {'MapSurface', 'MapContent', 'IMG_Map', 'TXT_MiniNorth', 'TXT_MiniHelp', 'TXT_MiniLegend'} <= set(names['WBP_IC_Minimap'])
+assert {'HUDNavigationPanel', 'TXT_GameClock', 'HUD_Minimap', 'HUD_PlayerStatus', 'HUD_Companions', 'HUD_QuestTracker', 'HUD_QuickSlots', 'GameMenu'} <= set(names['WBP_GameHUD'])
 assert 'BAR_HP' not in names['WBP_GameHUD'], 'Player resources must belong to the separate status WBP'
 tabs = ('Party', 'Inventory', 'Quest', 'Codex', 'Settings')
 assert {'MenuPages', *('TAB_' + tab for tab in tabs), *('Page_' + tab for tab in tabs)} <= set(names['WBP_IC_GameMenu'])

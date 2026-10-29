@@ -76,6 +76,16 @@ void UICQuestTrackerWidget::RefreshQuests()
         }
     }
 
+    // A HUD tracker is a quick glance, not the full quest menu. Keep it inside
+    // its panel and point players to the remaining entries without clipping.
+    constexpr int32 MaxHUDLines = 8;
+    if (Lines.Num() > MaxHUDLines)
+    {
+        const int32 Hidden = Lines.Num() - (MaxHUDLines - 1);
+        Lines.SetNum(MaxHUDLines - 1);
+        Lines.Add(FText::Format(NSLOCTEXT("ICQuest", "HUDMoreLines", "… 외 {0}개 항목"), FText::AsNumber(Hidden)));
+    }
+
     QuestText->SetText(FText::Join(FText::FromString(TEXT("\n")), Lines));
     SetVisibility(Lines.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 }

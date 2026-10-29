@@ -13,11 +13,14 @@
 #include "UI/Map/ICMapWidget.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Enemy/Character/ICEnemyBase.h"
+#include "NPC/Character/ICNPCBase.h"
+#include "GameFramework/Actor.h"
 #include "Components/TextBlock.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "Components/ProgressBar.h"
 #include "Components/HorizontalBox.h"
+#include "Components/Border.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
@@ -82,9 +85,20 @@ bool FICFirefightPresentationCheck::RunTest(const FString&)
         for(int32 I=0;I<2;++I){auto& Effect=State.Combat.Effects.AddDefaulted_GetRef();Effect.InstanceID=FGuid::NewGuid();Effect.EffectID=IDs[I];Effect.ExpiresAtPlaySecond=I+2.;}
         FICWorldState World;Card->UpdateStatusEffects(State,World,D,0.);
         auto* Row=CastChecked<UHorizontalBox>(Card->GetWidgetFromName(TEXT("StatusEffects")));
-        TestEqual(TEXT("Each active effect has its own badge"),Row->GetChildrenCount(),2);
-        Card->UpdateStatusEffects(State,World,D,2.5);TestEqual(TEXT("Only expired effect disappears"),Row->GetChildrenCount(),1);
-        Card->UpdateStatusEffects(State,World,D,4.);TestEqual(TEXT("Last expired effect disappears"),Row->GetChildrenCount(),0);
+        auto VisibleChildren=[Row](){int32 Count=0;for(auto* Child:Row->GetAllChildren())if(Child->GetVisibility()!=ESlateVisibility::Collapsed)++Count;return Count;};
+        TestEqual(TEXT("Each active effect has its own badge"),VisibleChildren(),2);
+        Card->UpdateStatusEffects(State,World,D,2.5);TestEqual(TEXT("Only expired effect disappears"),VisibleChildren(),1);
+        Card->UpdateStatusEffects(State,World,D,4.);TestEqual(TEXT("Last expired effect disappears"),VisibleChildren(),0);
+        State.Combat.Effects.Reset();
+        for(int32 I=0;I<6;++I){auto& Effect=State.Combat.Effects.AddDefaulted_GetRef();Effect.InstanceID=FGuid::NewGuid();Effect.EffectID=IDs[I%IDs.Num()];Effect.ExpiresAtPlaySecond=20.;Effect.bHarmful=I==5;}
+        Card->UpdateStatusEffects(State,World,D,0.);
+        TestEqual(TEXT("Player card keeps a fixed four-cell status rail"),VisibleChildren(),4);
+        auto* Overflow=CastChecked<UBorder>(Card->GetWidgetFromName(TEXT("StatusOverflow")));
+        TestEqual(TEXT("Overflow badge is visible"),Overflow->GetVisibility(),ESlateVisibility::HitTestInvisible);
+        TestEqual(TEXT("Overflow badge summarizes hidden effects"),CastChecked<UTextBlock>(Card->GetWidgetFromName(TEXT("TXT_StatusOverflow")))->GetText().ToString(),FString(TEXT("+3")));
+        Card->UpdateStatusEffects(State,World,D,21.);
+        TestEqual(TEXT("Expired overflow effects clear the whole rail"),VisibleChildren(),0);
+        TestEqual(TEXT("Overflow badge collapses when empty"),Overflow->GetVisibility(),ESlateVisibility::Collapsed);
     }
     TestEqual(TEXT("Map centre stays opaque"),UICMapWidget::MinimapOpacity({.5,.5}),1.f);
     TestEqual(TEXT("Map edge becomes fully transparent"),UICMapWidget::MinimapOpacity({0,.5}),0.f);
@@ -94,6 +108,29 @@ bool FICFirefightPresentationCheck::RunTest(const FString&)
     TestTrue(TEXT("Minimap hides positions outside its zoom window"),UICMapWidget::MinimapDisplayUV({.9,.5},{.5,.5},3.f).Equals(FVector2D(1.7,.5)));
     auto* World=GI->GetWorld();GI->Shutdown();World->DestroyWorld(false);return !HasAnyErrors();
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICMinimapWorldMarkerCheck,"IC.UI.Firefight.MinimapWorldMarkers",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICMinimapWorldMarkerCheck::RunTest(const FString&)
+{
+    TestTrue(TEXT("Medieval building core is auto detected"),UICMapWidget::IsAutomaticBuildingMeshPath(TEXT("/Game/IsekaiClass/World/SampleLevel/Medieval_Village/meshes/building/SM_building_block_05.SM_building_block_05")));
+    TestTrue(TEXT("Ruined village building core is auto detected"),UICMapWidget::IsAutomaticBuildingMeshPath(TEXT("/Game/IsekaiClass/World/SampleLevel/Ruined_Village/meshes/building/SM_building_box.SM_building_box")));
+    TestFalse(TEXT("Roof pieces do not create duplicate markers"),UICMapWidget::IsAutomaticBuildingMeshPath(TEXT("/Game/IsekaiClass/World/SampleLevel/Medieval_Village/meshes/building/SM_roof_07.SM_roof_07")));
+    TestTrue(TEXT("Modular house floors provide a representative marker"),UICMapWidget::IsAutomaticBuildingMeshPath(TEXT("/Game/IsekaiClass/World/SampleLevel/Medieval_House/meshes/building/SM_floor_01.SM_floor_01")));
+    auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* World=GI->GetWorld();World->InitializeActorsForPlay(FURL(),false);
+    auto* Building=World->SpawnActor<AActor>();Building->Tags.Add(TEXT("IC.Map.Building"));
+    World->SpawnActor<AActor>(); // Ordinary props must not become building markers.
+    auto* NPC=World->SpawnActor<AICNPCBase>();
+    auto* Monster=World->SpawnActorDeferred<AICEnemyBase>(AICEnemyBase::StaticClass(),FTransform::Identity);Monster->bInitializeWhenPlaced=false;Monster->FinishSpawning(FTransform::Identity);
+    auto* Map=NewObject<UICMapWidget>(GI);Map->bMinimap=true;Map->RefreshMap();
+    TestEqual(TEXT("Only explicitly tagged buildings are tracked"),Map->GetTrackedBuildingCount(),1);
+    TestEqual(TEXT("NPC actors are tracked automatically"),Map->GetTrackedNPCCount(),1);
+    TestEqual(TEXT("Monster actors are tracked automatically"),Map->GetTrackedMonsterCount(),1);
+    TestTrue(TEXT("Tagged building is the tracked building"),Map->Buildings.Contains(Building));
+    TestTrue(TEXT("Spawned NPC is the tracked NPC"),Map->NPCs.Contains(NPC));
+    TestTrue(TEXT("Spawned monster is the tracked monster"),Map->Monsters.Contains(Monster));
+    GI->Shutdown();World->DestroyWorld(false);return !HasAnyErrors();
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICFirefightTargetCheck,"IC.UI.Firefight.MonsterTargetLifecycle",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FICFirefightTargetCheck::RunTest(const FString&)
 {
