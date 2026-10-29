@@ -1,4 +1,5 @@
 #include "Quest/ICQuestSubsystem.h"
+#include "ICQuestObjectiveEvaluator.h"
 
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Core/Controller/ICPlayerController.h"
@@ -12,6 +13,19 @@
 #include "Subsystems/SubsystemCollection.h"
 #include "Time/ICTimeSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
+
+namespace
+{
+bool IsRunningQuest(const FICQuestState& Quest)
+{
+    return Quest.bAccepted && Quest.bStarted && !Quest.bCompleted && !Quest.bAbandoned;
+}
+
+FICQuestObjectiveEvaluator MakeObjectiveEvaluator(const UICQuestSubsystem& Subsystem)
+{
+    return FICQuestObjectiveEvaluator(Subsystem.GetWorld());
+}
+}
 
 void UICQuestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -50,38 +64,14 @@ void UICQuestSubsystem::ConfigureServices(UICDefinitionSubsystem* InDefinitions,
     }
 }
 
-bool UICQuestSubsystem::CompareValues(double Value, double RequiredValue, EICComparison Comparison)
+bool UICQuestSubsystem::CommitQuestState(const FICWorldState& Candidate, FGuid TransactionID)
 {
-    switch (Comparison)
-    {
-    case EICComparison::Equal: return Value == RequiredValue;
-    case EICComparison::NotEqual: return Value != RequiredValue;
-    case EICComparison::Greater: return Value > RequiredValue;
-    case EICComparison::GreaterOrEqual: return Value >= RequiredValue;
-    case EICComparison::Less: return Value < RequiredValue;
-    case EICComparison::LessOrEqual: return Value <= RequiredValue;
-    default: return false;
-    }
-}
-
-int32 UICQuestSubsystem::CountOwnedItem(const FICInventoryState& Inventory, FName ItemID) const
-{
-    int64 Count = 0;
-    for (const FPlayerItemInstance& Item : Inventory.Bag.Slots)
-    {
-        if (Item.ItemID == ItemID) Count += Item.Count;
-    }
-    for (const FPlayerItemInstance& Item : Inventory.QuestItems)
-    {
-        if (Item.ItemID == ItemID) Count += Item.Count;
-    }
-    for (const FPlayerItemInstance& Item : Inventory.Equipment)
-    {
-        if (Item.ItemID == ItemID) Count += Item.Count;
-    }
-    for (const FPlayerItemInstance& Item : Inventory.WeaponSlots)
-        if (Item.ItemID == ItemID) Count += Item.Count;
-    return static_cast<int32>(FMath::Min<int64>(Count, MAX_int32));
+    if (!State || !TransactionID.IsValid()) return false;
+    TGuardValue<bool> Guard(IsProcessing, true);
+    if (!State->CommitGameplayTransaction(Candidate, TransactionID)) return false;
+    InventoryBaseline = State->GetInventorySnapshot();
+    IsBaselineReady = true;
+    return true;
 }
 
 bool UICQuestSubsystem::CanAccept(const FICQuestRow& Definition, const FICWorldState& World) const
@@ -131,6 +121,12 @@ bool UICQuestSubsystem::CanAccept(const FICQuestRow& Definition, const FICWorldS
 
 bool UICQuestSubsystem::AcceptQuest(FName QuestID)
 {
+    if (IsProcessing) return false;
+    return AcceptQuestInternal(QuestID);
+}
+
+bool UICQuestSubsystem::AcceptQuestInternal(FName QuestID)
+{
     if (!Definitions || !State || !Time)
     {
         return false;
@@ -173,7 +169,7 @@ bool UICQuestSubsystem::AcceptQuest(FName QuestID)
                 return false;
             }
             const int32 Count = Previous && Previous->bAbandoned
-                ? FMath::Max(0, Grant.Value - CountOwnedItem(Candidate.Inventory, Grant.Key)) : Grant.Value;
+                ? FMath::Max(0, Grant.Value - FICQuestObjectiveEvaluator::CountOwnedItem(Candidate.Inventory, Grant.Key)) : Grant.Value;
             if (Count > 0 && !Staging->AddItem(Grant.Key, Count, false))
             {
                 return false;
@@ -194,13 +190,8 @@ bool UICQuestSubsystem::AcceptQuest(FName QuestID)
     Quest.RewardTransactionID.Invalidate();
     Quest.Objectives.Reset();
     Quest.AcceptedAtGameMinute = Time->GetClock().GameMinute;
-    {
-        // Acceptance and automatic tracking are one transaction. Existing progress stays intact.
-        TGuardValue<bool> Guard(IsProcessing, true);
-        if (!State->CommitGameplayTransaction(Candidate, FGuid::NewGuid())) return false;
-        InventoryBaseline = State->GetInventorySnapshot();
-        IsBaselineReady = true;
-    }
+    // Acceptance and automatic tracking are one transaction. Existing progress stays intact.
+    if (!CommitQuestState(Candidate, FGuid::NewGuid())) return false;
     UE_LOG(LogICWorldState, Log, TEXT("[Quest.Accepted] Quest=%s"), *QuestID.ToString());
     if (!IsProcessing)
     {
@@ -211,213 +202,122 @@ bool UICQuestSubsystem::AcceptQuest(FName QuestID)
 
 bool UICQuestSubsystem::StartQuest(FName QuestID)
 {
-    if(!Definitions||!State||!Time||IsProcessing)return false;
-    FICQuestRow Definition;auto Candidate=State->ExportState();
-    auto* Selected=Candidate.Quests.Find(QuestID);
-    if(!Selected||!Selected->bAccepted||Selected->bCompleted||!Definitions->GetQuest(QuestID,Definition).bSuccess)return false;
-    if(Selected->bStarted)return true; // Starting the same quest never erases its progress.
-    for(auto& Pair:Candidate.Quests)if(Pair.Value.bStarted&&!Pair.Value.bCompleted)
-    {Pair.Value.bStarted=false;Pair.Value.Objectives.Reset();Pair.Value.AcceptedAtGameMinute=0;}
-    Selected=Candidate.Quests.Find(QuestID);Selected->bStarted=true;Selected->Objectives.Reset();
-    Selected->AcceptedAtGameMinute=Time->GetClock().GameMinute;
+    if (!Definitions || !State || !Time || IsProcessing) return false;
+    FICQuestRow Definition;
+    FICWorldState Candidate = State->ExportState();
+    FICQuestState* Selected = Candidate.Quests.Find(QuestID);
+    if (!Selected || !Selected->bAccepted || Selected->bCompleted || Selected->bAbandoned
+        || !Definitions->GetQuest(QuestID, Definition).bSuccess) return false;
+    if (Selected->bStarted) return true;
+
+    // Switching the tracked quest restarts its event objectives by design.
+    for (auto& Pair : Candidate.Quests)
     {
-        TGuardValue<bool> Guard(IsProcessing,true);
-        if(!State->CommitGameplayTransaction(Candidate,FGuid::NewGuid()))return false;
-        InventoryBaseline=State->GetInventorySnapshot();IsBaselineReady=true;
+        if (Pair.Value.bStarted && !Pair.Value.bCompleted)
+        {
+            Pair.Value.bStarted = false;
+            Pair.Value.Objectives.Reset();
+            Pair.Value.AcceptedAtGameMinute = 0;
+        }
     }
-    EvaluateQuests();return true;
+    Selected->bStarted = true;
+    Selected->Objectives.Reset();
+    Selected->AcceptedAtGameMinute = Time->GetClock().GameMinute;
+    if (!CommitQuestState(Candidate, FGuid::NewGuid())) return false;
+    EvaluateQuests();
+    return true;
 }
 
 bool UICQuestSubsystem::AbandonQuest(FName QuestID)
 {
-    if(!Definitions||!State||IsProcessing)return false;
-    FICQuestRow Definition;auto Candidate=State->ExportState();auto* Quest=Candidate.Quests.Find(QuestID);
-    if(!Quest||!Quest->bAccepted||Quest->bCompleted||!Definitions->GetQuest(QuestID,Definition).bSuccess||!Definition.bAllowAbandon)return false;
-    Quest->bAccepted=false;Quest->bStarted=false;Quest->bAbandoned=true;Quest->Objectives.Reset();Quest->AcceptedAtGameMinute=0;
-    TGuardValue<bool> Guard(IsProcessing,true);
-    if(!State->CommitGameplayTransaction(Candidate,FGuid::NewGuid()))return false;
-    InventoryBaseline=State->GetInventorySnapshot();IsBaselineReady=true;return true;
+    if (!Definitions || !State || IsProcessing) return false;
+    FICQuestRow Definition;
+    FICWorldState Candidate = State->ExportState();
+    FICQuestState* Quest = Candidate.Quests.Find(QuestID);
+    if (!Quest || !Quest->bAccepted || Quest->bCompleted
+        || !Definitions->GetQuest(QuestID, Definition).bSuccess || !Definition.bAllowAbandon) return false;
+    Quest->bAccepted = false;
+    Quest->bStarted = false;
+    Quest->bAbandoned = true;
+    Quest->Objectives.Reset();
+    Quest->AcceptedAtGameMinute = 0;
+    return CommitQuestState(Candidate, FGuid::NewGuid());
 }
 
 bool UICQuestSubsystem::IsObjectiveComplete(const FICQuestObjectiveDefinition& Objective,
     const FICQuestState& Quest, const FICWorldState& World) const
 {
-    switch (Objective.Type)
-    {
-    case EICQuestObjectiveType::PossessItem:
-        return CountOwnedItem(World.Inventory, Objective.Target.ID) >= Objective.RequiredCount;
-    case EICQuestObjectiveType::Affinity:
-        if (const FICCharacterState* Character = World.Characters.Find(Objective.Target.ID))
-        {
-            return CompareValues(Character->Affinity, Objective.RequiredValue, Objective.Compare);
-        }
-        return false;
-    case EICQuestObjectiveType::Stat:
-    {
-        const FICCharacterState* Player = World.Characters.Find(UICWorldStateSubsystem::PlayerId());
-        if (!Player)
-        {
-            return false;
-        }
-        double Value = 0;
-        if (Objective.bUseEffectiveStats)
-        {
-            const AICPlayerController* Controller = GetWorld()
-                ? Cast<AICPlayerController>(GetWorld()->GetFirstPlayerController()) : nullptr;
-            const AICPlayerCharacter* Character = Controller
-                ? Cast<AICPlayerCharacter>(Controller->GetPawn()) : nullptr;
-            const UICAbilitySystemComponent* Ability = Character ? Character->GetICAbilitySystem() : nullptr;
-            if (!Ability)
-            {
-                return false;
-            }
-            Value = Ability->Stat(Objective.RequiredStat);
-        }
-        else
-        {
-            switch (Objective.RequiredStat)
-            {
-            case EICStat::STR: Value = Player->MainStats.STR; break;
-            case EICStat::DEX: Value = Player->MainStats.DEX; break;
-            case EICStat::INT: Value = Player->MainStats.INT; break;
-            case EICStat::CON: Value = Player->MainStats.CON; break;
-            case EICStat::CHA: return false; // Serialized legacy stat; no gameplay conditions.
-            case EICStat::LUK: Value = Player->MainStats.LUK; break;
-            default: return false;
-            }
-        }
-        return CompareValues(Value, Objective.RequiredValue, Objective.Compare);
-    }
-    case EICQuestObjectiveType::Visit:
-        if (Objective.bAllowCurrentState && Objective.RequiredCount == 1)
-        {
-            if (Objective.Target.Type == EICDefinitionType::Anchor
-                && World.DiscoveredAnchorIDs.Contains(Objective.Target.ID))
-            {
-                return true;
-            }
-            if (Objective.Target.Type == EICDefinitionType::Region
-                && World.DiscoveredRegionIDs.Contains(Objective.Target.ID))
-            {
-                return true;
-            }
-        }
-        return Quest.Objectives.FindRef(Objective.ObjectiveID) >= Objective.RequiredCount;
-    default:
-        return Quest.Objectives.FindRef(Objective.ObjectiveID) >= Objective.RequiredCount;
-    }
+    return MakeObjectiveEvaluator(*this).IsComplete(Objective, Quest, World);
 }
 
 bool UICQuestSubsystem::GetObjectiveProgress(const FICQuestObjectiveDefinition& Objective,
     const FICQuestState& Quest, const FICWorldState& World, int32& CurrentCount) const
 {
-    if (Objective.Type == EICQuestObjectiveType::Affinity || Objective.Type == EICQuestObjectiveType::Stat)
-    {
-        return false;
-    }
-
-    int64 Progress = Quest.Objectives.FindRef(Objective.ObjectiveID);
-    if (Objective.Type == EICQuestObjectiveType::PossessItem)
-    {
-        Progress = CountOwnedItem(World.Inventory, Objective.Target.ID);
-    }
-    else if (Objective.Type == EICQuestObjectiveType::DeliverItem)
-    {
-        Progress += CountOwnedItem(World.Inventory, Objective.Target.ID);
-    }
-    else if (Objective.Type == EICQuestObjectiveType::Visit && IsObjectiveComplete(Objective, Quest, World))
-    {
-        Progress = Objective.RequiredCount;
-    }
-
-    CurrentCount = static_cast<int32>(FMath::Clamp<int64>(Progress, 0, Objective.RequiredCount));
-    return true;
+    return MakeObjectiveEvaluator(*this).GetProgress(Objective, Quest, World, CurrentCount);
 }
 
 bool UICQuestSubsystem::IsObjectiveGroupComplete(const FICQuestObjectiveGroup& Group,
     const FICQuestState& Quest, const FICWorldState& World) const
 {
-    if (Group.Objectives.IsEmpty()) return false;
-    bool bComplete = Group.Policy == EICConditionPolicy::All;
-    for (const FICQuestObjectiveDefinition& Objective : Group.Objectives)
-    {
-        const bool bObjectiveComplete = IsObjectiveComplete(Objective, Quest, World);
-        bComplete = Group.Policy == EICConditionPolicy::All
-            ? bComplete && bObjectiveComplete : bComplete || bObjectiveComplete;
-    }
-    return bComplete;
+    return MakeObjectiveEvaluator(*this).IsGroupComplete(Group, Quest, World);
 }
 
 bool UICQuestSubsystem::AreObjectivesComplete(const FICQuestRow& Definition,
     const FICQuestState& Quest, const FICWorldState& World) const
 {
-    if (Definition.ObjectiveGroups.IsEmpty())
+    return MakeObjectiveEvaluator(*this).AreObjectivesComplete(Definition, Quest, World);
+}
+
+bool UICQuestSubsystem::TryCompleteDeliveryGroup(const FICQuestRow& Definition,
+    const FICQuestObjectiveGroup& Group, FICWorldState& Candidate) const
+{
+    FICQuestState& Quest = Candidate.Quests.FindChecked(Definition.ID);
+    if (IsObjectiveGroupComplete(Group, Quest, Candidate)) return true;
+
+    UICInventoryComponent* Staging = NewObject<UICInventoryComponent>();
+    Staging->BeginStaging(Definitions, Candidate.Job);
+    for (const FICQuestObjectiveDefinition& Objective : Group.Objectives)
     {
-        return false;
+        if (Objective.Type != EICQuestObjectiveType::DeliverItem
+            || IsObjectiveComplete(Objective, Quest, Candidate)) continue;
+
+        const int32 Remaining = Objective.RequiredCount - Quest.Objectives.FindRef(Objective.ObjectiveID);
+        FICInventoryState UpdatedInventory;
+        if (Remaining <= 0 || !Staging->ApplySnapshot(Candidate.Inventory)
+            || !Staging->BuildQuestItemConsumption(Objective.Target.ID, Remaining, UpdatedInventory))
+        {
+            if (Group.Policy == EICConditionPolicy::All) return false;
+            continue;
+        }
+        Candidate.Inventory = MoveTemp(UpdatedInventory);
+        Quest.Objectives.Add(Objective.ObjectiveID, Objective.RequiredCount);
+        if (Group.Policy == EICConditionPolicy::Any) break;
     }
-    bool IsComplete = Definition.ObjectiveGroupPolicy == EICConditionPolicy::All;
-    for (const FICQuestObjectiveGroup& Group : Definition.ObjectiveGroups)
-    {
-        if (Group.Objectives.IsEmpty())
-        {
-            return false;
-        }
-        const bool IsGroupComplete = IsObjectiveGroupComplete(Group, Quest, World);
-        if (Definition.ObjectiveGroupPolicy == EICConditionPolicy::All)
-        {
-            IsComplete &= IsGroupComplete;
-        }
-        else
-        {
-            IsComplete |= IsGroupComplete;
-        }
-    }
-    return IsComplete;
+    return IsObjectiveGroupComplete(Group, Quest, Candidate);
 }
 
 bool UICQuestSubsystem::PrepareDeliveryObjectives(const FICQuestRow& Definition,
     FICWorldState& World) const
 {
-    FICQuestState* Quest = World.Quests.Find(Definition.ID);
-    if (!Quest || !Quest->bAccepted || !Quest->bStarted || Quest->bCompleted)
-    {
-        return false;
-    }
-    if (AreObjectivesComplete(Definition, *Quest, World))
-    {
-        return true;
-    }
+    const FICQuestState* Quest = World.Quests.Find(Definition.ID);
+    if (!Quest || !IsRunningQuest(*Quest)) return false;
+    if (AreObjectivesComplete(Definition, *Quest, World)) return true;
 
-    UICInventoryComponent* Staging = NewObject<UICInventoryComponent>();
-    Staging->BeginStaging(Definitions, World.Job);
-    if (!Staging->ApplySnapshot(World.Inventory))
-    {
-        return false;
-    }
+    FICWorldState Working = World;
     for (const FICQuestObjectiveGroup& Group : Definition.ObjectiveGroups)
     {
-        for (const FICQuestObjectiveDefinition& Objective : Group.Objectives)
+        FICWorldState Trial = Working;
+        if (!TryCompleteDeliveryGroup(Definition, Group, Trial))
         {
-            if (Objective.Type != EICQuestObjectiveType::DeliverItem)
-            {
-                continue;
-            }
-            const int32 Remaining = Objective.RequiredCount - Quest->Objectives.FindRef(Objective.ObjectiveID);
-            if (Remaining <= 0)
-            {
-                continue;
-            }
-            FICInventoryState UpdatedInventory;
-            if (!Staging->BuildQuestItemConsumption(Objective.Target.ID, Remaining, UpdatedInventory)
-                || !Staging->ApplySnapshot(UpdatedInventory))
-            {
-                return false;
-            }
-            Quest->Objectives.Add(Objective.ObjectiveID, Objective.RequiredCount);
+            if (Definition.ObjectiveGroupPolicy == EICConditionPolicy::All) return false;
+            continue;
         }
+        Working = MoveTemp(Trial);
+        if (Definition.ObjectiveGroupPolicy == EICConditionPolicy::Any) break;
     }
-    World.Inventory = Staging->GetSnapshot();
-    return AreObjectivesComplete(Definition, *Quest, World);
+    if (!AreObjectivesComplete(Definition, Working.Quests.FindChecked(Definition.ID), Working)) return false;
+    World = MoveTemp(Working);
+    return true;
 }
 
 bool UICQuestSubsystem::ApplyReward(FICWorldState& Candidate, const FICRewardRow& Reward)
@@ -503,7 +403,7 @@ bool UICQuestSubsystem::CompleteQuest(FName QuestID, const FICQuestRow& Definiti
     Quest->RewardTransactionID = IsRewardApplied ? TransactionID : FGuid();
     Quest->CompletionCount++;
     Quest->CompletedAtGameMinute = Time->GetClock().GameMinute;
-    if (!State->CommitGameplayTransaction(Candidate, TransactionID))
+    if (!CommitQuestState(Candidate, TransactionID))
     {
         return false;
     }
@@ -514,7 +414,7 @@ bool UICQuestSubsystem::CompleteQuest(FName QuestID, const FICQuestRow& Definiti
 
 int32 UICQuestSubsystem::ForceCompleteActiveQuests()
 {
-    if (!Definitions || !State || !Time)
+    if (!Definitions || !State || !Time || IsProcessing)
     {
         return 0;
     }
@@ -540,7 +440,7 @@ int32 UICQuestSubsystem::ForceCompleteActiveQuests()
 
 bool UICQuestSubsystem::TurnInQuest(FName QuestID, FName NPCID)
 {
-    if (!Definitions || !State)
+    if (!Definitions || !State || IsProcessing)
     {
         return false;
     }
@@ -576,7 +476,7 @@ bool UICQuestSubsystem::AreQuestObjectivesReady(FName QuestID) const
 
 bool UICQuestSubsystem::DeliverItem(FName QuestID, FName ObjectiveID)
 {
-    if (!Definitions || !State || !Time)
+    if (!Definitions || !State || !Time || IsProcessing)
     {
         return false;
     }
@@ -620,7 +520,7 @@ bool UICQuestSubsystem::DeliverItem(FName QuestID, FName ObjectiveID)
         return false;
     }
     Quest->Objectives.Add(ObjectiveID, Objective->RequiredCount);
-    if (!State->CommitGameplayTransaction(Candidate, FGuid::NewGuid()))
+    if (!CommitQuestState(Candidate, FGuid::NewGuid()))
     {
         return false;
     }
@@ -636,7 +536,7 @@ bool UICQuestSubsystem::DeliverItem(FName QuestID, FName ObjectiveID)
 bool UICQuestSubsystem::ReportObjectiveEvent(EICQuestObjectiveType Type, FName TargetID,
     int32 Count, FGuid EventID, EICLifeActivity Activity, FName OutputItemID, FName DialogueID)
 {
-    if (!Definitions || !State || !EventID.IsValid() || TargetID.IsNone() || Count <= 0
+    if (!Definitions || !State || IsProcessing || !EventID.IsValid() || TargetID.IsNone() || Count <= 0
         || Type == EICQuestObjectiveType::DeliverItem || Type == EICQuestObjectiveType::PossessItem
         || Type == EICQuestObjectiveType::Affinity || Type == EICQuestObjectiveType::Stat)
     {
@@ -648,21 +548,16 @@ bool UICQuestSubsystem::ReportObjectiveEvent(EICQuestObjectiveType Type, FName T
     {
         return false;
     }
-    TArray<FName> QuestIDs;
-    if (!Definitions->GetDefinitionIDs(EICDefinitionType::Quest, QuestIDs).bSuccess)
-    {
-        return false;
-    }
     bool IsChanged = false;
-    for (FName QuestID : QuestIDs)
+    for (auto& Entry : Candidate.Quests)
     {
-        FICQuestState* Quest = Candidate.Quests.Find(QuestID);
-        if (!Quest || !Quest->bAccepted || !Quest->bStarted || Quest->bCompleted)
+        FICQuestState& Quest = Entry.Value;
+        if (!IsRunningQuest(Quest))
         {
             continue;
         }
         FICQuestRow Definition;
-        if (!Definitions->GetQuest(QuestID, Definition).bSuccess)
+        if (!Definitions->GetQuest(Entry.Key, Definition).bSuccess)
         {
             continue;
         }
@@ -682,10 +577,14 @@ bool UICQuestSubsystem::ReportObjectiveEvent(EICQuestObjectiveType Type, FName T
                 {
                     continue;
                 }
-                const int32 Progress = Quest->Objectives.FindRef(Objective.ObjectiveID);
-                Quest->Objectives.Add(Objective.ObjectiveID, static_cast<int32>(
-                    FMath::Min<int64>(Objective.RequiredCount, static_cast<int64>(Progress) + Count)));
-                IsChanged = true;
+                const int32 Progress = Quest.Objectives.FindRef(Objective.ObjectiveID);
+                const int32 Updated = static_cast<int32>(FMath::Min<int64>(
+                    Objective.RequiredCount, static_cast<int64>(Progress) + Count));
+                if (Updated > Progress)
+                {
+                    Quest.Objectives.Add(Objective.ObjectiveID, Updated);
+                    IsChanged = true;
+                }
             }
         }
     }
@@ -694,10 +593,7 @@ bool UICQuestSubsystem::ReportObjectiveEvent(EICQuestObjectiveType Type, FName T
         return false;
     }
     Candidate.ProcessedEventIDs.Add(EventID);
-    IsProcessing = true;
-    const bool IsCommitted = State->CommitGameplayTransaction(Candidate, FGuid::NewGuid());
-    IsProcessing = false;
-    if (!IsCommitted)
+    if (!CommitQuestState(Candidate, FGuid::NewGuid()))
     {
         return false;
     }
@@ -721,7 +617,6 @@ void UICQuestSubsystem::HandleInventoryChanged()
     }
     const FICInventoryState PreviousInventory = InventoryBaseline;
     InventoryBaseline = CurrentInventory;
-    EvaluateQuests();
 
     TSet<FName> ItemIDs;
     const auto AddIDs = [&ItemIDs](const FICInventoryState& Inventory)
@@ -741,24 +636,20 @@ void UICQuestSubsystem::HandleInventoryChanged()
 
     if (!Definitions || ItemIDs.IsEmpty())
     {
-        return;
-    }
-    TArray<FName> QuestIDs;
-    if (!Definitions->GetDefinitionIDs(EICDefinitionType::Quest, QuestIDs).bSuccess)
-    {
+        EvaluateQuests();
         return;
     }
     FICWorldState Candidate = State->ExportState();
     bool IsChanged = false;
-    for (FName QuestID : QuestIDs)
+    for (auto& Entry : Candidate.Quests)
     {
-        FICQuestState* Quest = Candidate.Quests.Find(QuestID);
-        if (!Quest || !Quest->bAccepted || !Quest->bStarted || Quest->bCompleted)
+        FICQuestState& Quest = Entry.Value;
+        if (!IsRunningQuest(Quest))
         {
             continue;
         }
         FICQuestRow Definition;
-        if (!Definitions->GetQuest(QuestID, Definition).bSuccess)
+        if (!Definitions->GetQuest(Entry.Key, Definition).bSuccess)
         {
             continue;
         }
@@ -772,29 +663,28 @@ void UICQuestSubsystem::HandleInventoryChanged()
                 {
                     continue;
                 }
-                const int32 Added = CountOwnedItem(CurrentInventory, Objective.Target.ID)
-                    - CountOwnedItem(PreviousInventory, Objective.Target.ID);
+                const int64 Added = static_cast<int64>(FICQuestObjectiveEvaluator::CountOwnedItem(CurrentInventory, Objective.Target.ID))
+                    - FICQuestObjectiveEvaluator::CountOwnedItem(PreviousInventory, Objective.Target.ID);
                 if (Added <= 0)
                 {
                     continue;
                 }
-                const int32 Progress = Quest->Objectives.FindRef(Objective.ObjectiveID);
-                Quest->Objectives.Add(Objective.ObjectiveID, static_cast<int32>(
-                    FMath::Min<int64>(Objective.RequiredCount, static_cast<int64>(Progress) + Added)));
-                IsChanged = true;
+                const int32 Progress = Quest.Objectives.FindRef(Objective.ObjectiveID);
+                const int32 Updated = static_cast<int32>(FMath::Min<int64>(
+                    Objective.RequiredCount, static_cast<int64>(Progress) + Added));
+                if (Updated > Progress)
+                {
+                    Quest.Objectives.Add(Objective.ObjectiveID, Updated);
+                    IsChanged = true;
+                }
             }
         }
     }
     if (IsChanged)
     {
-        IsProcessing = true;
-        const bool IsCommitted = State->CommitGameplayTransaction(Candidate, FGuid::NewGuid());
-        IsProcessing = false;
-        if (IsCommitted)
-        {
-            EvaluateQuests();
-        }
+        CommitQuestState(Candidate, FGuid::NewGuid());
     }
+    EvaluateQuests();
     InventoryBaseline = State->GetInventorySnapshot();
 }
 
@@ -836,7 +726,7 @@ void UICQuestSubsystem::EvaluateQuests()
             *Lookup.Row.ToString(), *Lookup.Field, *Lookup.Reason);
         return;
     }
-    IsProcessing = true;
+    TGuardValue<bool> Guard(IsProcessing, true);
     for (int32 Pass = 0; Pass < QuestIDs.Num() * 2; ++Pass)
     {
         bool IsChanged = false;
@@ -851,7 +741,7 @@ void UICQuestSubsystem::EvaluateQuests()
             const FICQuestState* Quest = World.Quests.Find(QuestID);
             if ((!Quest || (!Quest->bAccepted&&!Quest->bAbandoned)) && Definition.IsAutoAccept && CanAccept(Definition, World))
             {
-                if (AcceptQuest(QuestID))
+                if (AcceptQuestInternal(QuestID))
                 {
                     IsChanged = true;
                     World = State->ExportState();
@@ -871,7 +761,6 @@ void UICQuestSubsystem::EvaluateQuests()
             break;
         }
     }
-    IsProcessing = false;
     InventoryBaseline = State->GetInventorySnapshot();
     IsBaselineReady = true;
 }

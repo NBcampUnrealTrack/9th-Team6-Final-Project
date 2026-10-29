@@ -8,7 +8,8 @@ void FICQuestDisplay::GetActiveQuestIDs(const FICWorldState& World, TArray<FName
 {
     for (const TPair<FName, FICQuestState>& Entry : World.Quests)
     {
-        if (Entry.Value.bAccepted && Entry.Value.bStarted && !Entry.Value.bCompleted)
+        if (Entry.Value.bAccepted && Entry.Value.bStarted && !Entry.Value.bCompleted
+            && !Entry.Value.bAbandoned)
         {
             QuestIDs.Add(Entry.Key);
         }
