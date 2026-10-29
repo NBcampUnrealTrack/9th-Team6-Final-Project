@@ -346,12 +346,22 @@ void HUD(UWidgetTree* Tree)
             Place(Canvas, Widget, Anchor, Alignment, Position, Extent);
         }
     };
-    Add(TEXT("WBP_IC_Minimap"), TEXT("HUD_Minimap"), {0, 0}, {0, 0}, {32, 32}, {240, 140});
-    Add(TEXT("WBP_IC_PlayerStatus"), TEXT("HUD_PlayerStatus"), {0, 1}, {0, 1}, {45, -28}, {223, 194});
-    Add(TEXT("WBP_IC_CompanionGroup"), TEXT("HUD_Companions"), {0, 1}, {0, 1}, {46, -232}, {223, 390});
+    // Keep the three navigation facts the player checks together in one
+    // high-contrast block instead of scattering the clock above the minimap.
+    auto* Navigation=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("HUDNavigationPanel"));
+    Navigation->SetBrushColor(FLinearColor(.012f,.02f,.035f,.78f));Navigation->SetPadding(FMargin(8));
+    auto* NavigationStack=Tree->ConstructWidget<UVerticalBox>();Navigation->SetContent(NavigationStack);
+    auto* Clock=Label(Tree,TEXT("TXT_GameClock"),FText::GetEmpty(),22);Clock->SetJustification(ETextJustify::Center);Clock->SetVisibility(ESlateVisibility::HitTestInvisible);
+    Row(NavigationStack,Size(Tree,Clock,276,32),6);
+    if(auto* Minimap=Child(Tree,TEXT("WBP_IC_Minimap"),TEXT("HUD_Minimap")))
+    {Minimap->SetVisibility(ESlateVisibility::HitTestInvisible);Row(NavigationStack,Size(Tree,Minimap,276,240),0);}
+    Place(Canvas,Navigation,{0,0},{0,0},{24,24},{292,294});
+
+    Add(TEXT("WBP_IC_PlayerStatus"), TEXT("HUD_PlayerStatus"), {0, 1}, {0, 1}, {32, -24}, {280, 194});
+    Add(TEXT("WBP_IC_CompanionGroup"), TEXT("HUD_Companions"), {0, 1}, {0, 1}, {32, -230}, {223, 390});
     if (auto* Companions = Tree->FindWidget(TEXT("HUD_Companions")))
         if (auto* Slot = Cast<UCanvasPanelSlot>(Companions->Slot)) Slot->SetAutoSize(true);
-    Add(TEXT("WBP_IC_QuestTracker"), TEXT("HUD_QuestTracker"), {1, 0}, {1, 0}, {-32, 32}, {350, 240});
+    Add(TEXT("WBP_IC_QuestTracker"), TEXT("HUD_QuestTracker"), {1, 0}, {1, 0}, {-24, 24}, {390, 280});
     Add(TEXT("WBP_IC_QuickSlots"), TEXT("HUD_QuickSlots"), {.5f, 1}, {.5f, 1}, {0, -28}, {580, 140});
     ICFirefightHUDLayout::Target(Tree, Canvas);
     auto* Boss=Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("HUD_BossBar"));
@@ -512,8 +522,8 @@ bool Build(UWidgetTree* Tree, FName Kind)
         Tree->RootWidget = Card;
         auto* Content = Tree->ConstructWidget<UVerticalBox>();
         Card->SetContent(Content);
-        Row(Content, Label(Tree, TEXT("QuestHeading"), ICFrontendLayout::Text(TEXT("Quest")), 22), 12);
-        auto* Text = Label(Tree, TEXT("QuestText"), FText::GetEmpty(), 17);
+        Row(Content, Label(Tree, TEXT("QuestHeading"), ICFrontendLayout::Text(TEXT("Quest")), 24), 12);
+        auto* Text = Label(Tree, TEXT("QuestText"), FText::GetEmpty(), 18);
         Text->SetAutoWrapText(true);
         Row(Content, Text, 0);
     }
@@ -531,7 +541,10 @@ bool EnsureGameClock(UWidgetTree* Tree)
         Clock->SetJustification(ETextJustify::Center);Clock->SetVisibility(ESlateVisibility::HitTestInvisible);
         Place(Canvas,Clock,{0,0},{0,0},{32,20},{240,30});
     }
-    if(auto* Map=Tree->FindWidget(TEXT("HUD_Minimap")))if(auto* Slot=Cast<UCanvasPanelSlot>(Map->Slot)){Slot->SetPosition(FVector2D(32,58));Slot->SetSize(FVector2D(240,140));}
+    // Legacy HUD assets still receive a readable fallback. Newly authored HUDs
+    // keep the clock and minimap inside HUDNavigationPanel.
+    if(!Tree->FindWidget(TEXT("HUDNavigationPanel")))
+        if(auto* Map=Tree->FindWidget(TEXT("HUD_Minimap")))if(auto* Slot=Cast<UCanvasPanelSlot>(Map->Slot)){Slot->SetPosition(FVector2D(32,58));Slot->SetSize(FVector2D(276,240));}
     return true;
 }
 }

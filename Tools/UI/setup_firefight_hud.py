@@ -56,15 +56,18 @@ for name, parent, kind in SPECS:
             default.set_editor_property(resource, 0.0)
     if kind == 'Minimap':
         default.set_editor_property('bMinimap', True)
+        default.set_editor_property('minimap_zoom', 4.0)
     assert u.EditorAssetLibrary.save_loaded_asset(bp, only_if_is_dirty=False), path
     names = set(str(x) for x in u.ICBlueprintMaintenanceLibrary.get_frontend_widget_names(bp))
     report['widgets'][name] = sorted(names)
     if kind in ('PlayerStatus', 'CompanionStatus', 'CompanionStatusAlternate'):
-        assert {'IMG_Portrait', 'BAR_HP', 'BAR_MP1', 'BAR_MP2', 'BAR_MP3', 'TXT_Name', 'StatusEffects'} <= names
+        assert {'IMG_Portrait', 'BAR_HP', 'BAR_MP1', 'BAR_MP2', 'BAR_MP3', 'TXT_Name', 'StatusEffectsPanel', 'StatusEffects', 'StatusOverflow', 'TXT_StatusOverflow'} <= names
         assert not {'Image_73', 'Image_76', 'Image_80'} & names
         assert ('BAR_SP' in names) == (kind == 'PlayerStatus')
     if kind == 'HUD':
-        assert {'HUD_TargetInfo', 'Image_65', 'Image_66', 'TextBlock_49', 'ProgressBar_13'} <= names
+        assert {'HUDNavigationPanel', 'TXT_GameClock', 'HUD_Minimap', 'HUD_QuestTracker', 'HUD_TargetInfo', 'Image_65', 'Image_66', 'TextBlock_49', 'ProgressBar_13'} <= names
+    if kind == 'Minimap':
+        assert {'MapSurface', 'MapContent', 'TXT_MiniNorth', 'TXT_MiniHelp', 'TXT_MiniLegend'} <= names
     if kind == 'QuickSlots':
         assert {'CanvasPanel_94', 'QuickSlot1', 'QuickSlot2', 'QuickSlot3', 'QuickSlot4'} <= names
 
@@ -91,7 +94,7 @@ with csv_path.open('w', encoding='utf-8', newline='') as file:
     writer.writeheader()
     writer.writerows(csv_rows)
 
-for name, size in [('WBP_IC_PlayerStatus', (223, 194)), ('WBP_IC_CompanionStatus', (223, 126)),
+for name, size in [('WBP_IC_PlayerStatus', (280, 194)), ('WBP_IC_CompanionStatus', (220, 126)),
                    ('WBP_IC_QuickSlots', (580, 140)), ('WBP_IC_GameMenu', (1920, 1080)), ('WBP_GameHUD', (1920, 1080))]:
     if '-nullrhi' not in u.SystemLibrary.get_command_line().lower():
         assert u.ICBlueprintMaintenanceLibrary.render_frontend_preview(u.load_asset(FOLDER + name), str(OUT / (name + '.png')), *size)

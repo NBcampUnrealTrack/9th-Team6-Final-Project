@@ -62,12 +62,24 @@ def tick(delta):
                 index = next(i for i, v in enumerate(bag.get_snapshot().bag.slots) if str(v.item_id) == item)
                 assert bag.bind_quick_slot(slot, index)
             assert state.set_vitals('CHR_PLAYER', 25, 50, 70)
+            # L_TestMap intentionally has no authored building root. Tag one
+            # test block only in PIE so the building marker path is visible too.
+            building_candidates = u.GameplayStatics.get_all_actors_of_class(S['world'], u.StaticMeshActor)
+            test_building = next((actor for actor in building_candidates if 'TestStep' in actor.get_name()),
+                                 building_candidates[0] if building_candidates else None)
+            assert test_building
+            test_building.set_editor_property('tags', list(prop(test_building, 'tags')) + ['IC.Map.Building'])
             hud = prop(pc, 'screen')
             hud.refresh_current_screen()
             S.update(hud=hud, state=state, bag=bag)
             phase('party')
             return
         if S['phase'] == 'party' and elapsed > 1:
+            minimap = prop(S['hud'], 'HUD_Minimap')
+            assert minimap.get_tracked_building_count() >= 1
+            assert minimap.get_tracked_npc_count() >= 1
+            assert minimap.get_tracked_monster_count() >= 1
+            S['checks']['building_npc_monster_minimap_markers'] = True
             group = prop(S['hud'], 'HUD_Companions')
             for i in range(1, 4):
                 card = prop(group, 'Companion' + str(i))
