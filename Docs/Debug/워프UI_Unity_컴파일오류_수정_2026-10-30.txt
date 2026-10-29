@@ -1,0 +1,21 @@
+2026-10-30 — 워프 UI의 C4459 컴파일 오류 수정
+
+원인
+- 커밋/PR 통합 후 Unity 묶음 컴파일에서 ICMapWidget.cpp의 지역 변수 Gold가
+  ICInventoryMenuWidget.cpp 익명 네임스페이스의 색상 상수 Gold를 가림.
+- MSVC C4459: declaration of 'Gold' hides global declaration.
+- 수정 파일을 개별 컴파일하는 Adaptive Unity에서는 드러나지 않았던 이름 충돌임.
+
+수정
+- UICMapWidget::RefreshLabels의 보유 골드 변수명을 PlayerGold로 변경.
+- 워프 목록 및 확인 팝업의 표시 인수 두 곳도 함께 변경.
+
+검증
+- Tools/BuildProject.ps1 -FullUnity: IsekaiClassEditor Win64 Development 성공.
+- 실제 Module.IsekaiClass.7.cpp에 인벤토리 UI와 워프 UI가 함께 포함된 상태에서 확인.
+- IC.OpenWorld.WarpRequestGating / IC.UI.InventoryMenu: 2개 Success, 실패 0.
+- 테스트 월드의 입력 액션 미설정 경고를 포함한 성공이며 C4459는 재발하지 않음.
+- 빌드 로그: Saved/BuildWarpGoldUnityFix.log
+- 테스트 보고서: Saved/WarpGoldUnityFix/Tests/index.json
+- git diff --check 통과. 맵/블루프린트 에셋 변경 없음.
+- 커밋/푸시는 수행하지 않음.
