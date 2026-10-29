@@ -418,7 +418,7 @@ public:
             if (Flow->Phase != EICGameFlowPhase::Playing || !PC->bCreated)
                 return false;
             Test->TestFalse(TEXT("Title replaced by gameplay map"), PC->IsMainMenuLevel());
-            Test->TestTrue(TEXT("Gameplay uses L_TestMap"), World->GetName().Contains(TEXT("L_TestMap")));
+            Test->TestEqual(TEXT("Gameplay uses the configured play map"), UWorld::RemovePIEPrefix(World->GetOutermost()->GetName()), GetDefault<UICGameFlowSettings>()->PlayMap.GetLongPackageName());
             Test->TestTrue(TEXT("Playable pawn possessed"), PC->GetPawn() != nullptr);
             Test->TestTrue(TEXT("Gameplay input unlocked"), PC->Menu.IsEmpty() && !World->IsPaused());
             const auto Snapshot = PC->GetWorldState()->ExportState();

@@ -1,0 +1,61 @@
+몬스터 공통 Behavior Tree / Blackboard 연결
+2026-10-29
+
+기존 몬스터 BP와 AI 컨트롤러는 유지한다.
+DT_IC_Monster의 BehaviorTree / Blackboard 열에서 팀원이 만든 에셋을 참조한다.
+
+개별 BP 직접 배치:
+/Game/IsekaiClass/Enemy/Blueprints/Monsters의 BP 11종은 이제 맵에 직접 배치해 사용한다.
+각 BP 기본값의 MonsterID가 해당 DT 행으로 미리 지정되어 있다.
+NavMesh가 있는 지면에 배치하면 캐릭터 생성 완료 후 DT 능력치·애니메이션과 기존 BT / BB를 초기화한다.
+별도 BP_R01MonsterTestLayout이나 배치마다 추가하는 Spawner DT 행은 필요하지 않다.
+배치 지점이 복귀·리스폰 원점이며, PlacedLeashRadiusCm에서 복귀 범위를 조절한다.
+기본 복귀 범위는 일반 몬스터 1000cm, 보스 1600cm다.
+배치 액터마다 PlacementGuid를 자동 발급하고, 에디터에서 복제하면 다른 ID가 생긴다.
+죽은 뒤에도 내부 출현 지점이 유지되어 몬스터 DT의 RespawnGameMinutes 후 같은 BP로 다시 생성한다.
+처치 보상은 기존 DT·보상 영수증을 사용하며, 불러오기 중 보상 중복이나 즉시 부활을 방지한다.
+살아 있는 몬스터의 HP·효과·처치 식별자와 죽은 몬스터의 쿨타임은 기존 SpawnSlots에 저장한다.
+불러오기·스트리밍 재진입 시 살아 있는 몬스터는 배치 원점으로 복귀해 재개한다.
+내부 출현 지점은 해당 레벨이 해제될 때 함께 정리한다.
+새 BP 또는 다른 DT 행을 쓰려면 MonsterID를 지정한다. 기존 테스트 스포너 방식도 계속 지원한다.
+
+BP 기본값 설정 도구: Tools/Combat/setup_placed_monster_defaults.py
+직접 배치 통합 검사: IC.AI.Monsters.PlacedBlueprints
+검증 결과: Saved/PlacedMonsterReview/TestsFinal/index.json
+직접 배치 13마리(11종 + 같은 BP 추가 2마리)의 이동·공격·복귀·보상·저장·리스폰과
+기존 DT 스폰·공통 BT/BB·기존 전투 검사를 포함한 4개 자동화 검사 통과.
+
+데이터 테이블: /Game/IsekaiClass/Data/DataTable/Combat/DT_IC_Monster
+CSV 원본: Data/Combat/DT_IC_Monster.csv
+BehaviorTree: /Game/IsekaiClass/Enemy/AI/BehaviorTrees/BT_ICMonsterBase
+Blackboard: /Game/IsekaiClass/Enemy/AI/Blackboards/BB_ICMonsterBase
+
+적용 대상은 SPN_R01_TEST_001의 일반 몬스터 10종과 보스 1종이다.
+MON_R01_001 ~ MON_R01_010, MON_R01_BOSS_001 모두 공통 BT / BB를 참조한다.
+별도 전투 테스트용 MON_COMBAT_TEST_001의 기존 설정은 유지한다.
+
+실행 흐름:
+몬스터 BP 스폰 → InitializeEnemy가 DT 행 로드 → 기존 AICAIController가 BehaviorTree 실행.
+엔진은 트리의 BlackboardAsset으로 Blackboard 컴포넌트를 초기화한다.
+DT의 Blackboard 참조도 해당 트리에 지정된 BB_ICMonsterBase와 맞춘다.
+트리·블랙보드·태스크 원본과 복귀 → 공격 → 추격 → 탐색 → 배회 우선순위는 수정하지 않았다.
+
+이후 편집:
+- 개별 몬스터의 BP는 PawnClass에서, BT / BB는 위 두 DT 열에서 설정한다.
+- 감지·공격 거리, ChaseLimitCm, InvestigationAdvanceDistanceCm 등은 몬스터 DT에서 조절한다.
+- 배회 및 이동 노드의 설정은 기존 BT 에디터에서 조절한다.
+- Tools/Combat/setup_monster_prototype.py를 다시 실행해도 공통 BT / BB 연결을 유지한다.
+- 기존 DT의 연결만 보완하려면 Unreal Python에서 Tools/Combat/connect_test_monster_behavior.py를 실행한다.
+  이 도구는 지정된 11행의 연결을 갱신하며 BT / BB 원본 에셋을 저장하지 않는다.
+- Tools/Combat/audit_monster_behavior_tree.py는 저장 없이 DT 연결과 트리 구조를 점검한다.
+
+자동화 검증:
+- IC.AI.Monsters.SharedTreeBindings: 실제 DT 11행의 참조 및 원본 트리 우선순위·이동 키 확인.
+- IC.AI.Monsters.TestMapRuntime: L_TestMap PIE에서 11마리 모두 공통 BT / BB 실행 및 배회 목적지 생성 확인.
+  실제 GAS 액터로 추격, 공격, 표적 상실 후 탐색, 탐색 완료 후 복귀, 귀환 완료, 영역 이탈 우선 복귀 확인.
+- IC.GAS.MonsterPrototype: 기존 C++ 대체 AI와 전투·보상 회귀 검사.
+- IC.Life.Expansion.AtomicSeedCart: 현재 씨앗 상점 DT 항목 수·ID와 원자적 구매/판매 확인.
+
+검증 기록: Saved/MonsterBehaviorTestsFinal/index.json
+몬스터별 실행 기록: Saved/MonsterBehaviorReview/Runtime.txt
+BT / BB 원본 SHA-256: Saved/MonsterBehaviorReview/Connected.json

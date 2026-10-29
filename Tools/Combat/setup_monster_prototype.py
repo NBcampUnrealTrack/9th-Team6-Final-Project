@@ -117,6 +117,10 @@ for index,number in enumerate(numbers+('Boss',)):
     capsule.set_capsule_size(radius,half_height)
     save(bp)
     monster_id='MON_R01_BOSS_001' if boss else 'MON_R01_%03d'%(index+1)
+    cdo.set_editor_property('monster_id',monster_id)
+    cdo.set_editor_property('initialize_when_placed',True)
+    cdo.set_editor_property('placed_leash_radius_cm',1600. if boss else 1000.)
+    save(bp)
     name='R01 보스' if boss else 'DragonSD_'+number
     row=metadata(monster_id,name)
     row.update({'Kind':'RegionalBoss' if boss else 'Normal','RegionID':'R01',
@@ -124,7 +128,8 @@ for index,number in enumerate(numbers+('Boss',)):
         'DetectionRangeCm':'1200' if boss else '700','SightAngleDegrees':'360','bRequiresLineOfSight':'True',
         'AttackRangeCm':'260' if boss else '180','AttackIntervalPlaySeconds':'2' if boss else '1.2',
         'PathFailurePlaySeconds':'3','ReturnAcceptanceRadiusCm':'80','Skills':'()',
-        'BehaviorTree':'None','Blackboard':'None','RespawnPlaySeconds':'90',
+        'BehaviorTree':GAME+'/Enemy/AI/BehaviorTrees/BT_ICMonsterBase.BT_ICMonsterBase',
+        'Blackboard':GAME+'/Enemy/AI/Blackboards/BB_ICMonsterBase.BB_ICMonsterBase','RespawnPlaySeconds':'90',
         'DropTableID':'DRP_R01_BOSS_001' if boss else 'DRP_R01_NORMAL_001',
         'FirstKillRewardID':'None','RepeatKillRewardID':'None',
         'bImmuneToOrdinaryHitStagger':'True' if boss else 'False','BossEntryConditions':'()',

@@ -11,6 +11,8 @@
 #include "Life/Production/ICProductionSubsystem.h"
 #include "Life/World/ICPlayerHomeActors.h"
 #include "NPC/LifeNPC/ICShopSubsystem.h"
+#include "Data/Rows/NPC/ICServiceRow.h"
+#include "Data/Rows/NPC/ICShopRow.h"
 #include "Codex/ICCodexSubsystem.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Time/ICTimeSubsystem.h"
@@ -33,7 +35,7 @@ struct FSession
         PC=World->SpawnActor<AICPlayerController>();Player=World->SpawnActor<AICPlayerCharacter>();PC->Possess(Player);PC->bCreated=true;PC->Menu.Reset();
         Player->InitializeState(Character.CharacterId);Bag=Player->Inventory;Bag->BindWorldState(State);Time->SetRunning(true);Time->SetMenuPaused(false);
     }
-    ~FSession(){Player->ReleaseForLoad();GI->Shutdown();World->DestroyWorld(false);}
+    ~FSession(){Player->ReleaseForLoad();GI->Shutdown();GEngine->DestroyWorldContext(World);World->DestroyWorld(false);}
 };
 }
 
@@ -41,8 +43,24 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICLifeCartCheck,"IC.Life.Expansion.AtomicSeedC
 bool FICLifeCartCheck::RunTest(const FString&)
 {
     ICLifeExpansionChecks::FSession F;auto* Shop=F.GI->GetSubsystem<UICShopSubsystem>();TArray<FICShopOffer> Offers;FString Failure;FText Reason;
-    const FName Service=TEXT("SRV_R01_006_SHOP");TestTrue(TEXT("NPC06 serves seeds independently of work schedule"),Shop->GetOffers(Service,Offers,Failure));TestEqual(TEXT("Exactly five seed offers"),Offers.Num(),5);
-    if(Offers.Num()!=5)return false;
+    const FName Service=TEXT("SRV_R01_006_SHOP");FICDefinitionResult Lookup;
+    const auto* ServiceDefinition=F.Definitions->Find<FICServiceRow>(Service,Lookup);
+    if(!TestNotNull(TEXT("Seed service is configured in the current DT"),ServiceDefinition))return false;
+    const auto* ShopDefinition=F.Definitions->Find<FICShopRow>(ServiceDefinition->ShopID,Lookup);
+    if(!TestNotNull(TEXT("Seed service resolves its current shop DT"),ShopDefinition))return false;
+    TestTrue(TEXT("NPC06 serves seeds independently of work schedule"),Shop->GetOffers(Service,Offers,Failure));
+    TestEqual(TEXT("Seed offers match the current shop DT entry count"),Offers.Num(),ShopDefinition->Entries.Num());
+    TSet<FName> ExpectedItems;
+    for(const auto& Entry:ShopDefinition->Entries)
+    {
+        ExpectedItems.Add(Entry.ItemID);
+        const auto* Item=F.Definitions->Find<FICItemRow>(Entry.ItemID,Lookup);
+        TestTrue(TEXT("Every configured seed has a valid positive purchase price"),Item&&Item->BuyPrice>0);
+        TestTrue(TEXT("Every configured seed is offered"),Offers.ContainsByPredicate([&](const auto& Offer){return Offer.ItemID==Entry.ItemID;}));
+    }
+    TestEqual(TEXT("Seed shop DT contains no duplicate items"),ExpectedItems.Num(),ShopDefinition->Entries.Num());
+    for(const auto& Offer:Offers)TestTrue(TEXT("No unconfigured seed is offered"),ExpectedItems.Contains(Offer.ItemID));
+    if(!TestTrue(TEXT("Atomic cart test has at least two configured seed offers"),Offers.Num()>=2))return false;
     auto Line=[](FName ID,int32 Count){FICItemAmount Value;Value.ItemID=ID;Value.Count=Count;return Value;};
     const auto A=Offers[0],B=Offers[1];const int32 Before=F.State->ExportState().Gold;
     TestTrue(TEXT("One cart purchases multiple seeds atomically"),Shop->Checkout(F.PC,Service,{Line(A.ItemID,2),Line(B.ItemID,3)},false,Reason));
