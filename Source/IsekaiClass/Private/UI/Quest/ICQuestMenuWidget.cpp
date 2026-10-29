@@ -64,11 +64,18 @@ FText DefinitionName(const FString& Key,FName ID)
 void QuestMenuSetText(UUserWidget* W,const TCHAR* Name,FText Text)
 {if(auto* T=Cast<UTextBlock>(W->GetWidgetFromName(Name)))T->SetText(Text);}
 void SetMessage(UICQuestDetailWidget* W,FText Text)
-{QuestMenuSetText(W,TEXT("TXT_Message"),Text);W->GetWidgetFromName(TEXT("TXT_Message"))->SetVisibility(Text.IsEmpty()?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);}
-UClass* QuestMenuWidgetClass(const TCHAR* Asset,UClass* Fallback)
+{
+    if (!W) return;
+    if (UWidget* Message = W->GetWidgetFromName(TEXT("TXT_Message")))
+    {
+        QuestMenuSetText(W, TEXT("TXT_Message"), Text);
+        Message->SetVisibility(Text.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+    }
+}
+UClass* QuestMenuWidgetClass(const TCHAR* Asset)
 {
     const auto Path=FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Asset,Asset);
-    auto* C=LoadClass<UUserWidget>(nullptr,*Path);return C;
+    return LoadClass<UUserWidget>(nullptr,*Path);
 }
 void PresentRewards(UICQuestDetailWidget* Widget,const FICQuestRow& Quest,UICDefinitionSubsystem* Definitions)
 {
@@ -248,7 +255,7 @@ bool UICQuestMenuWidget::BuildLayout(UWidgetTree* T)
     auto* Scroll=T->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("QuestScroll"));
     List->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     Scroll->AddChild(T->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("QuestEntries")));
-    auto* Detail=T->ConstructWidget<UICQuestDetailWidget>(QuestMenuWidgetClass(TEXT("WBP_IC_QuestDetail"),UICQuestDetailWidget::StaticClass()),TEXT("QuestDetail"));Pages->AddChild(Detail);
+    auto* Detail=T->ConstructWidget<UICQuestDetailWidget>(QuestMenuWidgetClass(TEXT("WBP_IC_QuestDetail")),TEXT("QuestDetail"));Pages->AddChild(Detail);
     for(int32 I=0;I<Pages->GetNumWidgets();++I){auto* S=CastChecked<UWidgetSwitcherSlot>(Pages->GetWidgetAtIndex(I)->Slot);S->SetHorizontalAlignment(HAlign_Fill);S->SetVerticalAlignment(VAlign_Fill);}
     return true;
 }
@@ -284,7 +291,7 @@ void UICQuestMenuWidget::RefreshQuests()
     auto* Entries=CastChecked<UVerticalBox>(GetWidgetFromName(TEXT("QuestEntries")));
     if(Entries->GetChildrenCount()!=QuestIDs.Num())
     {
-        Entries->ClearChildren();auto* C=QuestMenuWidgetClass(TEXT("WBP_IC_QuestMenuEntry"),UICQuestMenuEntryWidget::StaticClass());
+        Entries->ClearChildren();auto* C=QuestMenuWidgetClass(TEXT("WBP_IC_QuestMenuEntry"));
         for(int32 I=0;I<QuestIDs.Num();++I){auto* Entry=WidgetTree->ConstructWidget<UICQuestMenuEntryWidget>(C);Entry->OnPicked.AddUniqueDynamic(this,&ThisClass::QuestPicked);QuestMenuRow(Entries,Entry,12);}
     }
     for(int32 I=0;I<QuestIDs.Num();++I)

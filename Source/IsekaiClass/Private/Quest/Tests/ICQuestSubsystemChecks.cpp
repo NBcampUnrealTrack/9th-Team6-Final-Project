@@ -453,4 +453,173 @@ bool FICQuestObjectiveDialogueCheck::RunTest(const FString& Parameters)
         Fixture.Quests->GetNPCObjectiveDialogue(Dialogue.NPCID).IsNone());
     return !HasAnyErrors();
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestCappedEventCheck, "IC.Runtime.QuestCappedEvent",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FICQuestCappedEventCheck::RunTest(const FString& Parameters)
+{
+    FICQuestFixture Fixture;
+    FICQuestRow Definition;
+    TestTrue(TEXT("Defeat definition exists"),
+        Fixture.Definitions->GetQuest(TEXT("QST_DEFEAT_998"), Definition).bSuccess);
+    Definition.ID = TEXT("QST_CAPPED_998");
+    Definition.IsAutoAccept = false;
+    Definition.CompletionMode = EICQuestCompletionMode::NPCInteraction;
+    Definition.TurnInNPCID = TEXT("NPC_TEST_998");
+    Definition.RewardID = NAME_None;
+    Fixture.Catalog->Tables.Last().Table.LoadSynchronous()->AddRow(Definition.ID, Definition);
+
+    FICWorldState World = Fixture.State->ExportState();
+    World.Quests.Reset();
+    FICQuestState& Progress = World.Quests.Add(Definition.ID);
+    Progress.bAccepted = true;
+    Progress.bStarted = true;
+    TestTrue(TEXT("Restore started quest"), Fixture.State->RestoreState(World));
+
+    const FName Target = Definition.ObjectiveGroups[0].Objectives[0].Target.ID;
+    TestTrue(TEXT("First event reaches required count"), Fixture.Quests->ReportObjectiveEvent(
+        EICQuestObjectiveType::Defeat, Target, 1, FGuid::NewGuid()));
+    const int32 ReceiptCount = Fixture.State->ExportState().ProcessedEventIDs.Num();
+    TestFalse(TEXT("New event cannot advance a capped objective"), Fixture.Quests->ReportObjectiveEvent(
+        EICQuestObjectiveType::Defeat, Target, 1, FGuid::NewGuid()));
+    TestEqual(TEXT("No event receipt is stored for unchanged progress"),
+        Fixture.State->ExportState().ProcessedEventIDs.Num(), ReceiptCount);
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestInventoryTransitionCheck, "IC.Runtime.QuestInventoryTransition",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FICQuestInventoryTransitionCheck::RunTest(const FString& Parameters)
+{
+    FICQuestFixture Fixture;
+    FICQuestRow Definition;
+    TestTrue(TEXT("Defeat definition exists"),
+        Fixture.Definitions->GetQuest(TEXT("QST_DEFEAT_998"), Definition).bSuccess);
+    Definition.ID = TEXT("QST_INVENTORY_998");
+    Definition.IsAutoAccept = false;
+    Definition.RewardID = NAME_None;
+    FICQuestObjectiveDefinition& Collect = Definition.ObjectiveGroups[0].Objectives[0];
+    Collect.Type = EICQuestObjectiveType::Collect;
+    Collect.Target.Type = EICDefinitionType::Item;
+    Collect.Target.ID = TEXT("ITM_QST_998");
+    FICQuestObjectiveDefinition Possess = Collect;
+    Possess.ObjectiveID = TEXT("OBJ_POSSESS");
+    Possess.Type = EICQuestObjectiveType::PossessItem;
+    Definition.ObjectiveGroups[0].Objectives.Add(Possess);
+    Fixture.Catalog->Tables.Last().Table.LoadSynchronous()->AddRow(Definition.ID, Definition);
+
+    FICWorldState World = Fixture.State->ExportState();
+    World.Quests.Reset();
+    FICQuestState& Progress = World.Quests.Add(Definition.ID);
+    Progress.bAccepted = true;
+    Progress.bStarted = true;
+    TestTrue(TEXT("Restore active inventory quest"), Fixture.State->RestoreState(World));
+    TestTrue(TEXT("Picking up the item succeeds"), Fixture.Inventory->AddItem(Collect.Target.ID, 1, false));
+    const FICWorldState Result = Fixture.State->ExportState();
+    const FICQuestState& Updated = Result.Quests.FindChecked(Definition.ID);
+    TestEqual(TEXT("Acquisition counts once"), Updated.Objectives.FindRef(Collect.ObjectiveID), 1);
+    TestTrue(TEXT("Acquisition and possession complete in the same inventory update"), Updated.bCompleted);
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestAnyDeliveryCheck, "IC.Runtime.QuestAnyDelivery",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FICQuestAnyDeliveryCheck::RunTest(const FString& Parameters)
+{
+    const FName RingID(TEXT("ITM_QST_998"));
+    const FName FoodID(TEXT("ITM_FOOD_998"));
+    for (int32 Scenario = 0; Scenario < 3; ++Scenario)
+    {
+        FICQuestFixture Fixture;
+        FICQuestRow Definition;
+        Definition.ID = TEXT("QST_ANY_DELIVERY_998");
+        Definition.CompletionMode = EICQuestCompletionMode::NPCInteraction;
+        Definition.TurnInNPCID = TEXT("NPC_R01_101");
+
+        FICQuestObjectiveDefinition Ring;
+        Ring.ObjectiveID = TEXT("OBJ_RING");
+        Ring.Type = EICQuestObjectiveType::DeliverItem;
+        Ring.Target.Type = EICDefinitionType::Item;
+        Ring.Target.ID = RingID;
+        FICQuestObjectiveDefinition Food = Ring;
+        Food.ObjectiveID = TEXT("OBJ_FOOD");
+        Food.Target.ID = FoodID;
+        if (Scenario == 2)
+        {
+            Definition.ObjectiveGroupPolicy = EICConditionPolicy::Any;
+            FICQuestObjectiveGroup RingGroup;
+            RingGroup.Objectives.Add(Ring);
+            FICQuestObjectiveGroup FoodGroup;
+            FoodGroup.Objectives.Add(Food);
+            Definition.ObjectiveGroups = {RingGroup, FoodGroup};
+        }
+        else
+        {
+            FICQuestObjectiveGroup Group;
+            Group.Policy = EICConditionPolicy::Any;
+            Group.Objectives = {Ring, Food};
+            Definition.ObjectiveGroups.Add(Group);
+        }
+        Fixture.Catalog->Tables.Last().Table.LoadSynchronous()->AddRow(Definition.ID, Definition);
+
+        FICWorldState World = Fixture.State->ExportState();
+        World.Quests.Reset();
+        FICQuestState& Progress = World.Quests.Add(Definition.ID);
+        Progress.bAccepted = true;
+        Progress.bStarted = true;
+        TestTrue(TEXT("Restore active delivery quest"), Fixture.State->RestoreState(World));
+        if (Scenario != 1)
+            TestTrue(TEXT("Add ring"), Fixture.Inventory->AddItem(RingID, 1, false));
+        TestTrue(TEXT("Add food"), Fixture.Inventory->AddItem(FoodID, 1, false));
+
+        TestTrue(TEXT("One available alternative is enough"), Fixture.Quests->AreQuestObjectivesReady(Definition.ID));
+        TestEqual(TEXT("Readiness preview does not consume food"), Fixture.Inventory->CountItem(FoodID), 1);
+        TestTrue(TEXT("Turn in the selected alternative"),
+            Fixture.Quests->TurnInQuest(Definition.ID, Definition.TurnInNPCID));
+        const FICWorldState Result = Fixture.State->ExportState();
+        const FICQuestState& Updated = Result.Quests.FindChecked(Definition.ID);
+        TestTrue(TEXT("Quest completes"), Updated.bCompleted);
+        TestEqual(TEXT("Only the chosen ring is delivered"), Updated.Objectives.FindRef(Ring.ObjectiveID), Scenario == 1 ? 0 : 1);
+        TestEqual(TEXT("Food is delivered only when ring is unavailable"), Updated.Objectives.FindRef(Food.ObjectiveID), Scenario == 1 ? 1 : 0);
+        TestEqual(TEXT("Unchosen ring remains in inventory"),
+            Fixture.Inventory->CountItem(RingID), 0);
+        TestEqual(TEXT("Unchosen food remains in inventory"),
+            Fixture.Inventory->CountItem(FoodID), Scenario == 1 ? 0 : 1);
+    }
+
+    // An All group must never commit a successful partial delivery.
+    {
+        FICQuestFixture Fixture;
+        FICQuestRow Definition;
+        Definition.ID = TEXT("QST_ALL_DELIVERY_998");
+        Definition.CompletionMode = EICQuestCompletionMode::NPCInteraction;
+        Definition.TurnInNPCID = TEXT("NPC_R01_101");
+        FICQuestObjectiveGroup Group;
+        for (const FName ItemID : {RingID, FoodID})
+        {
+            FICQuestObjectiveDefinition Objective;
+            Objective.ObjectiveID = ItemID;
+            Objective.Type = EICQuestObjectiveType::DeliverItem;
+            Objective.Target.Type = EICDefinitionType::Item;
+            Objective.Target.ID = ItemID;
+            Group.Objectives.Add(Objective);
+        }
+        Definition.ObjectiveGroups.Add(Group);
+        Fixture.Catalog->Tables.Last().Table.LoadSynchronous()->AddRow(Definition.ID, Definition);
+        FICWorldState World = Fixture.State->ExportState();
+        World.Quests.Reset();
+        FICQuestState& Progress = World.Quests.Add(Definition.ID);
+        Progress.bAccepted = true;
+        Progress.bStarted = true;
+        TestTrue(TEXT("Restore All delivery quest"), Fixture.State->RestoreState(World));
+        TestTrue(TEXT("Add only the first required item"), Fixture.Inventory->AddItem(RingID, 1, false));
+        TestFalse(TEXT("All group is not ready with one item"), Fixture.Quests->AreQuestObjectivesReady(Definition.ID));
+        TestFalse(TEXT("Incomplete delivery is rejected"),
+            Fixture.Quests->TurnInQuest(Definition.ID, Definition.TurnInNPCID));
+        TestEqual(TEXT("Rejected transaction keeps the first item"), Fixture.Inventory->CountItem(RingID), 1);
+        TestEqual(TEXT("Rejected transaction keeps objective progress"),
+            Fixture.State->ExportState().Quests.FindChecked(Definition.ID).Objectives.Num(), 0);
+    }
+    return !HasAnyErrors();
+}
 #endif

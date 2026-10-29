@@ -89,6 +89,9 @@ private:
     void HandleCharacterChanged(FName CharacterID);
 
     void EvaluateQuests();
+    bool AcceptQuestInternal(FName QuestID);
+    /** Commit a quest mutation without treating its state notifications as new gameplay events. */
+    bool CommitQuestState(const FICWorldState& Candidate, FGuid TransactionID);
     bool CanAccept(const FICQuestRow& Definition, const FICWorldState& World) const;
     bool IsObjectiveComplete(const FICQuestObjectiveDefinition& Objective, const FICQuestState& Quest,
         const FICWorldState& World) const;
@@ -96,10 +99,10 @@ private:
         const FICWorldState& World) const;
     bool AreObjectivesComplete(const FICQuestRow& Definition, const FICQuestState& Quest,
         const FICWorldState& World) const;
+    bool TryCompleteDeliveryGroup(const FICQuestRow& Definition, const FICQuestObjectiveGroup& Group,
+        FICWorldState& Candidate) const;
     bool PrepareDeliveryObjectives(const FICQuestRow& Definition, FICWorldState& World) const;
     bool CompleteQuest(FName QuestID, const FICQuestRow& Definition, bool IsForced = false,
         const FICWorldState* PreparedWorld = nullptr);
     bool ApplyReward(FICWorldState& Candidate, const FICRewardRow& Reward);
-    int32 CountOwnedItem(const FICInventoryState& Inventory, FName ItemID) const;
-    static bool CompareValues(double Value, double RequiredValue, EICComparison Comparison);
 };
