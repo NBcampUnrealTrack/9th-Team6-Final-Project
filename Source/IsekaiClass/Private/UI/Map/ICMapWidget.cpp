@@ -216,10 +216,10 @@ void UICMapWidget::RefreshLabels()
     if(bMinimap)return;
     auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
     const auto* Player=PC?Cast<AICPlayerCharacter>(PC->GetPawn()):nullptr;
-    const int32 Gold=PC&&PC->GetWorldState()?PC->GetWorldState()->ExportState().Gold:0;
+    const int32 PlayerGold=PC&&PC->GetWorldState()?PC->GetWorldState()->ExportState().Gold:0;
     if(auto* T=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_MapTitle"))))T->SetText(NSLOCTEXT("ICMap","WarpListTitle","워프 · 목적지 선택"));
     if(auto* T=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_MapHelp"))))
-        T->SetText(FText::Format(NSLOCTEXT("ICMap","WarpListHelp","목적지 클릭 / ↑↓ 선택 · 확인  |  이동 {0}G · 보유 {1}G\n잠긴 목적지는 현장의 워프돌과 상호작용하면 열립니다."),Rules.TravelCostGold,Gold));
+        T->SetText(FText::Format(NSLOCTEXT("ICMap","WarpListHelp","목적지 클릭 / ↑↓ 선택 · 확인  |  이동 {0}G · 보유 {1}G\n잠긴 목적지는 현장의 워프돌과 상호작용하면 열립니다."),Rules.TravelCostGold,PlayerGold));
     for(const auto* Name:{TEXT("TXT_MapStatus"),TEXT("TXT_WarpConfirmError")})
         if(auto* T=Cast<UTextBlock>(GetWidgetFromName(Name)))T->SetText(Status);
     for(int32 I=0;I<4;++I)
@@ -247,7 +247,7 @@ void UICMapWidget::RefreshLabels()
         const int32 Final=Last>=0xac00&&Last<=0xd7a3?(Last-0xac00)%28:0;
         const FText Particle=FText::FromString(Final!=0&&Final!=8?TEXT("으로"):TEXT("로"));
         if(auto* T=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_WarpQuestion"))))
-            T->SetText(FText::Format(NSLOCTEXT("ICMap","WarpNamedQuestion","{0}{1} 이동하겠습니까?\n\n이동 비용: {2}G · 보유 {3}G"),Name,Particle,Rules.TravelCostGold,Gold));
+            T->SetText(FText::Format(NSLOCTEXT("ICMap","WarpNamedQuestion","{0}{1} 이동하겠습니까?\n\n이동 비용: {2}G · 보유 {3}G"),Name,Particle,Rules.TravelCostGold,PlayerGold));
         if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_WarpConfirm"))))B->SetBackgroundColor(bConfirmSelected?FLinearColor(.04f,.24f,.36f):FLinearColor(.06f,.09f,.14f));
         if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_WarpCancel"))))B->SetBackgroundColor(!bConfirmSelected?FLinearColor(.04f,.24f,.36f):FLinearColor(.06f,.09f,.14f));
     }
