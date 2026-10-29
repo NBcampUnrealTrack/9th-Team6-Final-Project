@@ -56,7 +56,12 @@ void UICMapWidget::BuildLayout(UWidgetTree* Tree,bool Mini)
 }
 void UICMapWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();SetIsFocusable(!bMinimap);
+    Super::NativeOnInitialized();
+    // Blueprint defaults can be reset when the native parent gains new properties.
+    // The minimap-only help widget is a stable runtime signal, so do not let the
+    // HUD silently fall back to full-map coordinates when that happens.
+    bMinimap=bMinimap||GetWidgetFromName(TEXT("TXT_MiniHelp"))!=nullptr||GetClass()->GetName().Contains(TEXT("Minimap"));
+    SetIsFocusable(!bMinimap);
 
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_MapClose"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::CloseMap);
     RefreshMap();RefreshLabels();
@@ -78,7 +83,7 @@ void UICMapWidget::RefreshMap()
     if(PresentationTable.IsNull())PresentationTable=TSoftObjectPtr<UDataTable>(FSoftObjectPath(TEXT("/Game/IsekaiClass/Data/DataTable/Settings/DT_IC_MapPresentation.DT_IC_MapPresentation")));
     if(auto* T=PresentationTable.LoadSynchronous())if(auto* R=T->FindRow<FICMapPresentationRow>(TEXT("Default"),TEXT("Map"),false))Rules=*R;
     if(auto* T=MapTable.LoadSynchronous())if(auto* R=T->FindRow<FICMapRow>(Rules.MapID,TEXT("Map"),false);R&&!R->Layers.IsEmpty())
-    {Layer=R->Layers[0];MapTexture=Layer.MapTexture.LoadSynchronous();}
+    {Layer=R->Layers[0];MapTexture=Layer.MapTexture.LoadSynchronous();MapMinimumZoom=R->MinimumZoom;MapMaximumZoom=R->MaximumZoom;}
     Portals.Reset();if(auto* World=GetWorld())for(TActorIterator<AICWarpStone> It(World);It;++It)if(!It->WarpID.IsNone())Portals.Add(*It);
     Portals.Sort([](const auto& A,const auto& B){return A->WarpID.LexicalLess(B->WarpID);});
     if(!bRegistered&&Rules.bUnlockPlacedPortals)if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer());PC&&PC->bCreated&&PC->GetWorldState())
@@ -100,6 +105,13 @@ FVector2D UICMapWidget::WorldToMapUV(FVector P) const
     const FVector2D D=FVector2D(P.X,P.Y)-Layer.WorldOriginCm;
     return Layer.MapOriginUV+FVector2D(FVector2D::DotProduct(D,Layer.WorldAxisU)/FMath::Max(1.,Layer.WorldCmPerUV.X),FVector2D::DotProduct(D,Layer.WorldAxisV)/FMath::Max(1.,Layer.WorldCmPerUV.Y));
 }
+FVector2D UICMapWidget::MinimapDisplayUV(FVector2D MapUV,FVector2D CenterUV,float Zoom)
+{return FVector2D(.5,.5)+(MapUV-CenterUV)*FMath::Max(1.f,Zoom);}
+FVector2D UICMapWidget::DisplayUV(FVector P) const
+{
+    const FVector2D MapUV=WorldToMapUV(P);
+    return bMinimap?MinimapDisplayUV(MapUV,MinimapCenterUV,FMath::Clamp(double(MinimapZoom),MapMinimumZoom,MapMaximumZoom)):MapUV;
+}
 FSlateRect UICMapWidget::ImageRect(const FGeometry& G) const
 {
     auto* Surface=GetWidgetFromName(TEXT("MapSurface"));if(!Surface)return FSlateRect();
@@ -111,7 +123,7 @@ FSlateRect UICMapWidget::ImageRect(const FGeometry& G) const
     return FSlateRect(Min.X,Min.Y,Min.X+W,Min.Y+H);
 }
 FVector2D UICMapWidget::MarkerPosition(const FSlateRect& R,FVector P) const
-{const auto UV=WorldToMapUV(P);return {R.Left+UV.X*(R.Right-R.Left),R.Top+UV.Y*(R.Bottom-R.Top)};}
+{const auto UV=DisplayUV(P);return {R.Left+UV.X*(R.Right-R.Left),R.Top+UV.Y*(R.Bottom-R.Top)};}
 float UICMapWidget::MinimapOpacity(FVector2D UV)
 {
     const double X=FMath::Abs(UV.X*2-1),Y=FMath::Abs(UV.Y*2-1);
@@ -121,10 +133,18 @@ void UICMapWidget::RefreshVisuals(const FGeometry& G)
 {
     auto* Canvas=Cast<UCanvasPanel>(GetWidgetFromName(TEXT("MapContent")));
     auto* Image=Cast<UICMapTextureImage>(GetWidgetFromName(TEXT("IMG_Map")));if(!Canvas||!Image)return;
+    auto* PC=Cast<AICPlayerController>(GetOwningPlayer());auto* Player=PC?Cast<AICPlayerCharacter>(PC->GetPawn()):nullptr;
+    const double Zoom=bMinimap?FMath::Clamp(double(MinimapZoom),MapMinimumZoom,MapMaximumZoom):1.;
+    if(bMinimap&&Player)
+    {
+        const FVector2D Desired=WorldToMapUV(Player->GetActorLocation());const double Half=.5/Zoom;
+        MinimapCenterUV={FMath::Clamp(Desired.X,Half,1.-Half),FMath::Clamp(Desired.Y,Half,1.-Half)};
+    }
     const auto Rect=ImageRect(G);const FVector2D Size(Rect.Right-Rect.Left,Rect.Bottom-Rect.Top);
     Image->SetTexture(MapTexture);
+    const FVector2D HalfUV(.5/Zoom,.5/Zoom);
+    Image->SetUVRegion(bMinimap?MinimapCenterUV-HalfUV:FVector2D::ZeroVector,bMinimap?MinimapCenterUV+HalfUV:FVector2D(1,1));
     if(auto* S=Cast<UCanvasPanelSlot>(Image->Slot)){S->SetPosition({Rect.Left,Rect.Top});S->SetSize(Size);}
-    auto* PC=Cast<AICPlayerController>(GetOwningPlayer());auto* Player=PC?Cast<AICPlayerCharacter>(PC->GetPawn()):nullptr;
     TSet<FName> Active;
     for(int32 I=0;I<Portals.Num();++I)if(auto* Portal=Portals[I].Get())
     {
@@ -135,7 +155,7 @@ void UICMapWidget::RefreshVisuals(const FGeometry& G)
             PortalMarkers.Add(Portal->WarpID,Marker);auto* S=Canvas->AddChildToCanvas(Marker);S->SetAutoSize(true);S->SetZOrder(1);
             Marker->SetVisibility(ESlateVisibility::HitTestInvisible);
         }
-        const auto UV=WorldToMapUV(Portal->GetActorLocation());
+        const auto UV=DisplayUV(Portal->GetActorLocation());
         Marker->SetVisibility(UV.X>=0&&UV.X<=1&&UV.Y>=0&&UV.Y<=1?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
         const bool Unlocked=Player&&Player->PartyWarp&&Player->PartyWarp->IsWarpUnlocked(Portal->WarpID);
         const bool Selected=!bMinimap&&I==SelectedPortal;
@@ -157,7 +177,7 @@ void UICMapWidget::RefreshVisuals(const FGeometry& G)
     }
     if(PlayerMarker)
     {
-        const auto UV=Player?WorldToMapUV(Player->GetActorLocation()):FVector2D(-1);
+        const auto UV=Player?DisplayUV(Player->GetActorLocation()):FVector2D(-1);
         PlayerMarker->SetVisibility(Player&&UV.X>=0&&UV.X<=1&&UV.Y>=0&&UV.Y<=1?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
         if(Player)
         {

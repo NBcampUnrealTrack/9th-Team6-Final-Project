@@ -106,7 +106,10 @@ void UICCharacterStatusWidget::UpdateSkillCooldown(bool bHasSkill, float Progres
     const float Brightness = bDowned?.6f:bCoolingDown ? FMath::Lerp(.3f, 1.f, SafeProgress) : 1.f;
 
     if (auto* Image = Cast<UImage>(GetWidgetFromName(TEXT("IMG_Portrait"))))
+    {
         Image->SetColorAndOpacity(FLinearColor(Brightness, Brightness, Brightness, 1.f));
+        Image->SetRenderOpacity(Brightness);
+    }
     if (auto* Remaining = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_SkillCooldown"))))
     {
         Remaining->SetText(FText::AsNumber(FMath::CeilToInt(SafeRemaining)));

@@ -14,6 +14,7 @@
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Internationalization/StringTable.h"
 #include "UI/Quest/ICQuestTrackerWidget.h"
+#include "UI/Map/ICMapWidget.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -359,7 +360,9 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
         QuickSlots->ReleaseSlateResources(true);
     }
     TestNotNull(TEXT("Existing quest tracker is embedded"), HUD ? Cast<UICQuestTrackerWidget>(HUD->GetWidgetFromName(TEXT("HUD_QuestTracker"))) : nullptr);
-    TestNotNull(TEXT("Map placeholder exists"), HUD ? HUD->GetWidgetFromName(TEXT("HUD_Minimap")) : nullptr);
+    auto* Minimap=HUD?Cast<UICMapWidget>(HUD->GetWidgetFromName(TEXT("HUD_Minimap"))):nullptr;
+    TestNotNull(TEXT("Minimap widget exists"),Minimap);
+    TestTrue(TEXT("HUD map always initializes in minimap mode"),Minimap&&Minimap->bMinimap);
     TestNull(TEXT("Standalone Q skill panel is removed"), HUD ? HUD->GetWidgetFromName(TEXT("HUD_SkillCooldown")) : nullptr);
     TestNotNull(TEXT("Player portrait contains the Q cooldown overlay"), Status ? Status->GetWidgetFromName(TEXT("PortraitCooldownOverlay")) : nullptr);
     TestNotNull(TEXT("Player portrait contains remaining seconds"), Status ? Status->GetWidgetFromName(TEXT("TXT_SkillCooldown")) : nullptr);

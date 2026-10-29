@@ -72,6 +72,9 @@ bool FICFirefightPresentationCheck::RunTest(const FString&)
     TestEqual(TEXT("Last MP segment is empty at half MP"),CastChecked<UProgressBar>(Card->GetWidgetFromName(TEXT("BAR_MP3")))->GetPercent(),0.f);
     Card->UpdateSkillCooldown(true,0,5);
     TestEqual(TEXT("Portrait cooldown remains visible"),Card->GetWidgetFromName(TEXT("TXT_SkillCooldown"))->GetVisibility(),ESlateVisibility::HitTestInvisible);
+    TestEqual(TEXT("Portrait visibly dims at cooldown start"),Card->GetWidgetFromName(TEXT("IMG_Portrait"))->GetRenderOpacity(),.3f);
+    Card->UpdateSkillCooldown(true,1,0);
+    TestEqual(TEXT("Portrait returns to full brightness when ready"),Card->GetWidgetFromName(TEXT("IMG_Portrait"))->GetRenderOpacity(),1.f);
     auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();
     TArray<FName> IDs;D->GetDefinitionIDs(EICDefinitionType::StatusEffect,IDs);
     if(TestTrue(TEXT("Existing effect definitions available"),IDs.Num()>=2))
@@ -86,6 +89,9 @@ bool FICFirefightPresentationCheck::RunTest(const FString&)
     TestEqual(TEXT("Map centre stays opaque"),UICMapWidget::MinimapOpacity({.5,.5}),1.f);
     TestEqual(TEXT("Map edge becomes fully transparent"),UICMapWidget::MinimapOpacity({0,.5}),0.f);
     TestTrue(TEXT("Map fades toward edge"),UICMapWidget::MinimapOpacity({.25,.5})>UICMapWidget::MinimapOpacity({.1,.5}));
+    TestTrue(TEXT("Minimap keeps the player at its centre"),UICMapWidget::MinimapDisplayUV({.7,.3},{.7,.3},3.f).Equals(FVector2D(.5,.5)));
+    TestTrue(TEXT("Minimap zoom maps nearby positions into view"),UICMapWidget::MinimapDisplayUV({.6,.5},{.5,.5},3.f).Equals(FVector2D(.8,.5)));
+    TestTrue(TEXT("Minimap hides positions outside its zoom window"),UICMapWidget::MinimapDisplayUV({.9,.5},{.5,.5},3.f).Equals(FVector2D(1.7,.5)));
     auto* World=GI->GetWorld();GI->Shutdown();World->DestroyWorld(false);return !HasAnyErrors();
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICFirefightTargetCheck,"IC.UI.Firefight.MonsterTargetLifecycle",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
