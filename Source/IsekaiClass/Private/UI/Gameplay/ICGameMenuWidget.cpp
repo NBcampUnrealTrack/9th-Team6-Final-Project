@@ -130,7 +130,6 @@ bool UICGameMenuWidget::HandleMenuKey(FKey Key,bool bRepeat)
         if(CodexContent->HandleMenuKey(Key,bRepeat)){RefreshNavigation();return true;}
     }
     auto* Inventory=SelectedTab==TEXT("Inventory")?Cast<UICInventoryMenuWidget>(GetWidgetFromName(TEXT("InventoryContent"))):nullptr;
-    if(Inventory&&Inventory->IsSearchFocused())return false;
     if(Inventory&&(NavigationArea!=0||Inventory->IsBusy()))
     {
         if(Inventory->HandleMenuKey(Key,bRepeat)){RefreshNavigation();return true;}

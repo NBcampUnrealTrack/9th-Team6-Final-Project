@@ -26,7 +26,6 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
-#include "Components/EditableTextBox.h"
 #include "Components/SpinBox.h"
 #include "Components/WrapBox.h"
 #include "Components/WrapBoxSlot.h"
@@ -239,7 +238,6 @@ bool UICInventoryMenuWidget::BuildLayout(UWidgetTree* T)
     auto* GoldLabel=InventoryLabel(T,TEXT("TXT_Gold"),FText::GetEmpty(),22);GoldLabel->SetJustification(ETextJustify::Right);GoldLabel->SetColorAndOpacity(Gold);InventoryRow(Bag,GoldLabel,8);
     auto* Notice=InventoryLabel(T,TEXT("TXT_InventoryNotice"),FText::GetEmpty(),15);Notice->SetAutoWrapText(true);Notice->SetColorAndOpacity(Gold);InventoryRow(Bag,Notice,4);
     auto* Tabs=T->ConstructWidget<UHorizontalBox>();InventoryRow(Bag,Tabs,8);
-    auto* Search=T->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(),TEXT("InventorySearch"));Search->SetHintText(NSLOCTEXT("ICInventory","Search","아이템 이름 / ID 검색"));auto SearchStyle=Search->GetWidgetStyle();SearchStyle.SetFont(ICFrontendLayout::Font(16));Search->SetWidgetStyle(SearchStyle);InventoryRow(Bag,Search,6);
     auto* Tools=T->ConstructWidget<UHorizontalBox>();InventoryRow(Bag,Tools,6);
     Tools->AddChildToHorizontalBox(InventoryButton(T,TEXT("BTN_SortItems"),NSLOCTEXT("ICInventory","Sort","가방 정렬")));
     Tools->AddChildToHorizontalBox(InventoryButton(T,TEXT("BTN_FilterItems"),NSLOCTEXT("ICInventory","AllFilter","분류: 전체")));
@@ -277,7 +275,6 @@ void UICInventoryMenuWidget::NativeOnInitialized()
     const FName Names[]={TEXT("TAB_Normal"),TEXT("TAB_Quest"),TEXT("BTN_CancelQuick")};
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_SortItems")))->OnClicked.AddUniqueDynamic(this,&ThisClass::SortItems);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_FilterItems")))->OnClicked.AddUniqueDynamic(this,&ThisClass::CycleFilter);
-    CastChecked<UEditableTextBox>(GetWidgetFromName(TEXT("InventorySearch")))->OnTextChanged.AddUniqueDynamic(this,&ThisClass::SearchChanged);
     auto* Actions=CastChecked<UICInventoryItemPopupWidget>(GetWidgetFromName(TEXT("ItemPopup")));Actions->OnLock.AddUniqueDynamic(this,&ThisClass::LockSelected);Actions->OnSplit.AddUniqueDynamic(this,&ThisClass::SplitSelected);
     const FName Functions[]={TEXT("NormalTab"),TEXT("QuestTab"),TEXT("CancelAction")};
     for(int32 I=0;I<UE_ARRAY_COUNT(Names);++I){FScriptDelegate Click;Click.BindUFunction(this,Functions[I]);CastChecked<UButton>(GetWidgetFromName(Names[I]))->OnClicked.AddUnique(Click);}
@@ -370,11 +367,10 @@ void UICInventoryMenuWidget::RefreshItems()
     for(int32 I=0;I<Data.Bag.Slots.Num();++I)
     {const auto& S=Data.Bag.Slots[I];const auto* D=Inv?Inv->Find(S.ItemID):nullptr;
      const bool Tab=ItemTab==EPlayerItemTab::Normal?(!D||D->Tab==EPlayerItemTab::Normal):(D&&D->Tab==EPlayerItemTab::Quest);
-     const bool Match=SearchText.IsEmpty()||(D&&(ItemName(S.ItemID).ToString().Contains(SearchText)||S.ItemID.ToString().Contains(SearchText)));
      const bool Filter=FilterKind==0||(D&&(FilterKind==1?D->Kind==EPlayerItemKind::Equipment:FilterKind==2?D->Kind==EPlayerItemKind::Consumable:FilterKind==3?D->Category==EPlayerItemCategory::Food:FilterKind==4?D->Category==EPlayerItemCategory::Book:FilterKind==5?D->Kind==EPlayerItemKind::Material:S.bLocked));
-     if(Tab&&Match&&Filter)VisibleBagIndices.Add(I);}
+     if(Tab&&Filter)VisibleBagIndices.Add(I);}
     if(ItemTab==EPlayerItemTab::Quest&&FilterKind==0)for(int32 I=0;I<Data.QuestItems.Num();++I)
-        if(SearchText.IsEmpty()||ItemName(Data.QuestItems[I].ItemID).ToString().Contains(SearchText)||Data.QuestItems[I].ItemID.ToString().Contains(SearchText))VisibleBagIndices.Add(-I-1);
+        VisibleBagIndices.Add(-I-1);
     SelectedItem=FMath::Clamp(SelectedItem,0,FMath::Max(0,VisibleBagIndices.Num()-1));
     if(Grid->GetChildrenCount()!=VisibleBagIndices.Num())
     {
@@ -568,7 +564,6 @@ FText UICInventoryMenuWidget::NavigationHint() const
 }
 bool UICInventoryMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
 {
-    if(IsSearchFocused())return false;
     if(!IsBusy()&&(Key==EKeys::V||Key==EKeys::Gamepad_FaceButton_Left)){if(!Repeat)SortItems();return true;}
     if(!IsBusy()&&(Key==EKeys::C||Key==EKeys::Gamepad_FaceButton_Top)){if(!Repeat)CycleFilter();return true;}
     if(bPickingUseTarget)return CastChecked<UICCodexTargetsWidget>(GetWidgetFromName(TEXT("UseTargets")))->HandleKey(Key,Repeat);

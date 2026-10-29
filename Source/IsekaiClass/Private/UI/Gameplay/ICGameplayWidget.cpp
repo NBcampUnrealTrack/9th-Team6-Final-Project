@@ -33,8 +33,7 @@ AICPlayerController* UICGameplayWidget::GetICPlayerController() const
 void UICGameplayWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-
-
+    ICGameplayLayout::EnsureAdventureHUD(WidgetTree);
     RefreshSkillCooldown();
     SetIsFocusable(true);
     if (auto* Menu = Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu"))))
@@ -81,6 +80,7 @@ void UICGameplayWidget::NativeTick(const FGeometry& Geometry, float DeltaSeconds
     }
     RefreshSkillCooldown();
     RefreshTargetInfo();
+    RefreshControlGuide();
 }
 FText UICGameplayWidget::FormatGameClock(double GameMinute)
 {

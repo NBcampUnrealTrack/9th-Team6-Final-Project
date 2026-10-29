@@ -125,7 +125,8 @@ bool FICLifePlantFishPetCheck::RunTest(const FString&)
     TestTrue(TEXT("Fishing completion grants a fish"),Spot->CompletePlayerAction(F.PC,NAME_None,Failure));TestTrue(TEXT("A second catch is immediately possible"),Spot->CompletePlayerAction(F.PC,NAME_None,Failure));
     int32 FishCount=0;for(int32 I=1;I<=10;++I)FishCount+=F.Bag->CountItem(FName(*FString::Printf(TEXT("ITM_R01_FISH_%02d"),I)));TestEqual(TEXT("Two catches grant two fish"),FishCount,2);
     TArray<FName> Monsters;F.Definitions->GetDefinitionIDs(EICDefinitionType::Monster,Monsters);TestEqual(TEXT("Pet codex has one cell per actual monster"),Codex->GetPetIDs().Num(),Monsters.Num());
-    const auto* Monster=F.Definitions->Find<FICMonsterRow>(TEXT("MON_COMBAT_TEST_001"),R);if(!TestNotNull(TEXT("Test creature participates in pet essence"),Monster))return false;
+    const auto* Definition=F.Definitions->Find<FICMonsterRow>(TEXT("MON_R01_001"),R);if(!TestNotNull(TEXT("A runtime monster participates in pet essence"),Definition))return false;
+    FICMonsterRow EssenceMonster=*Definition;EssenceMonster.DropTableID=NAME_None;const auto* Monster=&EssenceMonster;
     auto Candidate=F.State->ExportState();const FName Key=TEXT("TEST_ESSENCE:0");auto& Slot=Candidate.SpawnSlots.Add(Key);Slot.MonsterID=Monster->ID;Slot.SpawnerID=TEXT("TEST_ESSENCE");Slot.IncarnationID=FGuid::NewGuid();Slot.bDefeated=true;Slot.bRewardPending=true;
     const FGuid Receipt=Slot.IncarnationID;FString Reason;TestTrue(TEXT("Real defeat reward grants essence even without an item drop table"),FICRewardService::PrepareMonsterDefeat(Candidate,Key,*Monster,F.Definitions,0,Reason));
     const int32 Count=Candidate.Codex.PetEssence.FindRef(Monster->PetCodexIndex);TestTrue(TEXT("Each kill grants one to ten essence"),Count>=1&&Count<=10);

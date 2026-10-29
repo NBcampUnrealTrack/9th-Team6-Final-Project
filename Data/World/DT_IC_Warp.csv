@@ -1,4 +1,5 @@
-﻿---,RegionID,ServiceID,VisitAnchorID,ArrivalAnchorID,VisitRadiusCm,Availability,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
-WRP_TEST_01,"R01","None","ANC_WRP_TEST_VISIT_01","ANC_WRP_TEST_ARRIVAL_01","350.000000","(Policy=All,Conditions=)","WRP_TEST_01","WRP_TEST_01.NAME","","(GameplayTags=)","1","False","False"
-WRP_TEST_02,"R01","None","ANC_WRP_TEST_VISIT_02","ANC_WRP_TEST_ARRIVAL_02","350.000000","(Policy=All,Conditions=)","WRP_TEST_02","WRP_TEST_02.NAME","","(GameplayTags=)","1","False","False"
-WRP_TEST_03,"R01","None","ANC_WRP_TEST_VISIT_03","ANC_WRP_TEST_ARRIVAL_03","350.000000","(Policy=All,Conditions=)","WRP_TEST_03","WRP_TEST_03.NAME","","(GameplayTags=)","1","False","False"
+﻿---,RegionID,ServiceID,VisitAnchorID,ArrivalAnchorID,bUnlockedByDefault,VisitRadiusCm,Availability,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+WRP_OW_01_HOME,"R01","None","ANC_WRP_OW_VISIT_01_HOME","ANC_WRP_OW_ARRIVAL_01_HOME","True","400.000000","(Policy=All,Conditions=)","WRP_OW_01_HOME","WRP_OW_01_HOME.NAME","","(GameplayTags=)","1","False","False"
+WRP_OW_02_INN,"R01","None","ANC_WRP_OW_VISIT_02_INN","ANC_WRP_OW_ARRIVAL_02_INN","False","400.000000","(Policy=All,Conditions=)","WRP_OW_02_INN","WRP_OW_02_INN.NAME","","(GameplayTags=)","1","False","False"
+WRP_OW_03_BRIDGE,"R01","None","ANC_WRP_OW_VISIT_03_BRIDGE","ANC_WRP_OW_ARRIVAL_03_BRIDGE","False","400.000000","(Policy=All,Conditions=)","WRP_OW_03_BRIDGE","WRP_OW_03_BRIDGE.NAME","","(GameplayTags=)","1","False","False"
+WRP_OW_04_RUINS,"R01","None","ANC_WRP_OW_VISIT_04_RUINS","ANC_WRP_OW_ARRIVAL_04_RUINS","False","400.000000","(Policy=All,Conditions=)","WRP_OW_04_RUINS","WRP_OW_04_RUINS.NAME","","(GameplayTags=)","1","False","False"

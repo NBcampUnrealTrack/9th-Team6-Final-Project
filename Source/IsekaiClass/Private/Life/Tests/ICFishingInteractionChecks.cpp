@@ -26,6 +26,8 @@
 #include "NPC/LifeObject/ICLifeObjectActor.h"
 #include "Components/StaticMeshComponent.h"
 #include "UI/Dialogue/ICNPCDialogueWidget.h"
+#include "Editor.h"
+#include "EngineUtils.h"
 
 namespace ICFishingChecks
 {
@@ -84,6 +86,64 @@ bool FICFishingLandingCheck::RunTest(const FString&)
     TestEqual(TEXT("A float that loses its zone cannot grant a catch"),F.FishCount(),1);
     return !HasAnyErrors();
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICHiddenFishingRegionsCheck,"IC.Life.Fishing.HiddenAndMultipleRegions",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICHiddenFishingRegionsCheck::RunTest(const FString&)
+{
+    ICFishingChecks::FSession F;
+    auto* Zone=F.World->SpawnActor<AICLifeActor>();Zone->LifeType=EICDefinitionType::FishingPoint;Zone->DefinitionID=TEXT("FPT_R01_RANDOM_001");
+    auto* Plane=LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Plane.Plane"));
+    Zone->VisualMesh->SetStaticMesh(Plane);Zone->VisualMesh->SetWorldLocation(FVector(600,-500,60));Zone->VisualMesh->SetWorldScale3D(FVector(3,3,1));
+    auto* Extra=NewObject<UStaticMeshComponent>(Zone);Zone->AddInstanceComponent(Extra);Extra->SetStaticMesh(Plane);Extra->SetCollisionEnabled(ECollisionEnabled::NoCollision);Extra->RegisterComponent();Extra->AttachToComponent(Zone->Shape,FAttachmentTransformRules::KeepWorldTransform);Extra->SetWorldLocation(FVector(700,500,60));Extra->SetWorldScale3D(FVector(3,3,1));
+    Zone->SetActorHiddenInGame(true);Zone->SetActorEnableCollision(false);
+    const FVector Target(700,500,60),Camera(-250,0,280);
+    F.Pawn->Camera->SetWorldLocationAndRotation(Camera,(Target-Camera).Rotation());
+    FVector Landing;TestEqual(TEXT("Hidden actor's second mesh is a usable fishing region"),F.Pawn->LifeActions->ResolveFishingCast(Landing),Zone);
+    TestTrue(TEXT("A float is accepted in the added mesh"),Zone->ContainsFishingLanding(Target));
+    TestFalse(TEXT("Space between separated meshes is not a fishing region"),Zone->ContainsFishingLanding(FVector(650,0,60)));
+    // A visible surface exactly at the float should not count as an intervening wall.
+    auto* Water=F.World->SpawnActor<AActor>();auto* WaterBox=NewObject<UBoxComponent>(Water);Water->AddInstanceComponent(WaterBox);Water->SetRootComponent(WaterBox);WaterBox->SetBoxExtent(FVector(100,100,5));WaterBox->SetCollisionResponseToAllChannels(ECR_Block);WaterBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);WaterBox->RegisterComponent();Water->SetActorLocation(Target-FVector(0,0,5));
+    TestEqual(TEXT("The landing surface itself does not block a cast"),F.Pawn->LifeActions->ResolveFishingCast(Landing),Zone);
+    Water->SetActorLocation(Target);
+    TestEqual(TEXT("A shallow cast tolerates water five centimetres above the zone"),F.Pawn->LifeActions->ResolveFishingCast(Landing),Zone);
+    TestTrue(TEXT("The float uses the real water height"),FMath::IsNearlyEqual(Landing.Z,Target.Z+5.f,.1f));
+    F.PC->HandleInputCommand(EICInputCommand::Fishing,0);TestTrue(TEXT("H starts fishing on the hidden additional region"),F.Gather->IsGathering());
+    auto* Line=F.Pawn->LifeActions->GetFishingLine();
+    if(TestNotNull(TEXT("Shallow shore cast owns a fishing line"),Line))TestTrue(TEXT("Line float rests on real water"),Line->GetLandingPoint().Equals(Landing,.1f));
+    F.Step(20);TestEqual(TEXT("Hidden additional region grants the normal catch"),F.FishCount(),1);
+    Water->SetActorLocation((Camera+Target)*.5);WaterBox->SetBoxExtent(FVector(80,80,200));
+    TestNull(TEXT("A real obstacle before the float still blocks casting"),F.Pawn->LifeActions->ResolveFishingCast(Landing));
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICPlacedFishingRegionsCheck,"IC.Life.Fishing.PlacedOpenWorldRegions",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICPlacedFishingRegionsCheck::RunTest(const FString&)
+{
+    auto* World=GEditor?GEditor->GetEditorWorldContext().World():nullptr;
+    if(!World||World->GetName()!=TEXT("L_OpenWorld")){AddInfo(TEXT("Open L_OpenWorld to validate its placed fishing areas."));return true;}
+    TestFalse(TEXT("Current open world supports Actor Foliage painting"),World->IsPartitionedWorld());
+    int32 Zones=0,Regions=0;
+    for(TActorIterator<AICLifeActor> It(World);It;++It)
+    {
+        if(It->LifeType!=EICDefinitionType::FishingPoint)continue;++Zones;
+        const int32 BeforeRegions=Regions;
+        TInlineComponentArray<UStaticMeshComponent*> Meshes;It->GetComponents(Meshes);
+        for(auto* Mesh:Meshes)
+        {
+            if(Mesh==It->Shape||!Mesh->GetStaticMesh())continue;++Regions;
+            const auto Bounds=Mesh->GetStaticMesh()->GetBoundingBox();
+            FVector Local=Bounds.GetCenter();Local.Z=Bounds.Max.Z;
+            const FVector Point=Mesh->GetComponentTransform().TransformPosition(Local);
+            const FVector Camera=Point+Mesh->GetUpVector()*450+FVector(-600,-200,0);FVector Landing;
+            TestTrue(FString::Printf(TEXT("Placed mesh %s accepts its surface, including hidden actors"),*Mesh->GetName()),It->ContainsFishingLanding(Point));
+            TestTrue(FString::Printf(TEXT("Placed mesh %s is reached by aimed casting"),*Mesh->GetName()),It->ResolveFishingLanding(Camera,(Point-Camera).GetSafeNormal(),Landing));
+        }
+        TestTrue(FString::Printf(TEXT("Fishing actor %s has a usable water region"),*It->GetName()),Regions>BeforeRegions);
+    }
+    TestTrue(TEXT("Saved open world has a fishing actor"),Zones>0);
+    AddInfo(FString::Printf(TEXT("Validated all %d water regions across %d placed fishing actors."),Regions,Zones));
+    return !HasAnyErrors();
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICNPCInteractionCameraCheck,"IC.UI.DialogueFaceCamera",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FICNPCInteractionCameraCheck::RunTest(const FString&)
 {

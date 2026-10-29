@@ -38,6 +38,7 @@ bool FICInventoryMenuCheck::RunTest(const FString&)
     {
         const auto Slate=Menu->TakeWidget();Menu->SelectTab(TEXT("Inventory"));UI->RefreshInventory();
         TestNull(TEXT("Retired armor section is removed"),UI->GetWidgetFromName(TEXT("ArmorHeading")));
+        TestNull(TEXT("Inventory search is removed"),UI->GetWidgetFromName(TEXT("InventorySearch")));
         TestNull(TEXT("Global equipment action bar is removed"),UI->GetWidgetFromName(TEXT("BTN_Equip")));
         TestEqual(TEXT("Only one held weapon slot is stored"),Inv->GetSnapshot().Equipment.Num(),1);
         TestNull(TEXT("Class DT no longer exposes starting armor"),FICClassRow::StaticStruct()->FindPropertyByName(TEXT("StartingClothesID")));

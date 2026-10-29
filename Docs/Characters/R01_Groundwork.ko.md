@@ -5,21 +5,21 @@
 
 | 표시 이름 | 영속 NPC ID | 직업 | 애니메이션 팩 | 반친구 |
 |---|---|---|---|---|
-| R01_01 | NPC_R01_001 | 마법사 | Mage | 아니오 |
-| R01_02 | NPC_R01_002 | 검사 | Sword_Animations | 아니오 |
-| R01_03 | NPC_R01_003 | 힐러 | Mage | 아니오 |
-| R01_04 | NPC_R01_004 | 궁수 | Archer | 아니오 |
-| R01_05 | NPC_R01_005 | 검사 | Sword_Animations | 아니오 |
-| R01_06 | NPC_R01_006 | 마법사 | Mage | 아니오 |
-| R01_07 | NPC_R01_007 | 궁수 | Archer | 아니오 |
-| R01_08 | NPC_R01_008 | 마법사 | Mage | 아니오 |
-| R01_09 | NPC_R01_009 | 힐러 | Mage | 예 |
-| R01_10 | NPC_R01_010 | 검사 | Sword_Animations | 예 |
-| R01_11 | NPC_R01_011 | 궁수 | Archer | 예 |
+| NPC 1 | NPC_R01_001 | 마법사 | Mage | 아니오 |
+| NPC 2 | NPC_R01_002 | 검사 | Sword_Animations | 아니오 |
+| NPC 3 | NPC_R01_003 | 힐러 | Mage | 아니오 |
+| NPC 4 | NPC_R01_004 | 궁수 | Archer | 아니오 |
+| NPC 5 | NPC_R01_005 | 검사 | Sword_Animations | 아니오 |
+| NPC 6 | NPC_R01_006 | 마법사 | Mage | 아니오 |
+| NPC 7 | NPC_R01_007 | 궁수 | Archer | 아니오 |
+| NPC 8 | NPC_R01_008 | 마법사 | Mage | 아니오 |
+| NPC 9 | NPC_R01_009 | 힐러 | Mage | 예 |
+| NPC 10 | NPC_R01_010 | 검사 | Sword_Animations | 예 |
+| NPC 11 | NPC_R01_011 | 궁수 | Archer | 예 |
 
 진엔딩용 bEndingTarget은 아직 설정하지 않는다. bClassmate만 반영하며,
 R04까지 명단을 확정할 때 엔딩 정의와 함께 등록한다. 기존 NPC_R01_101은 기존
-상점·퀘스트 참조가 있는 별도 시제품 인물로 유지한다.
+상점·퀘스트 참조가 있는 별도 인물이며 표시 이름은 ‘마을 상인’으로 유지한다.
 
 ## 코드·BP·데이터의 책임
 

@@ -1,22 +1,21 @@
-Key,SourceString
+﻿Key,SourceString
 ANC_FORGE_001.NAME,대장간
 ANC_KITCHEN_001.NAME,조리대
 ANC_MERCHANT_BED.NAME,상인 침대
 ANC_MERCHANT_HOME.NAME,상인 집
 ANC_MERCHANT_SHOP.NAME,상인 상점
 HOME_MERCHANT_001.NAME,상인 집
-NPC_R01_101.NAME,테스트 상인
-NPC_R01_001.NAME,R01_01
-HOME_RECRUIT_001.NAME,테스트 동료의 집
-ANC_RECRUIT_BED.NAME,테스트 동료 침대
-ANC_RECRUIT_HOME.NAME,테스트 동료 집
-ANC_RECRUIT_WORK.NAME,테스트 동료 작업대
-SCH_RECRUIT_001.NAME,테스트 동료 일과
-RCB_RECRUIT_001.NAME,테스트 동료 전투 설정
-SKL_RECRUIT_001.NAME,테스트 동료 고유 스킬
-R01.NAME,NPC 테스트 지역
+NPC_R01_101.NAME,마을 상인
+NPC_R01_001.NAME,NPC 1
+HOME_RECRUIT_001.NAME,NPC 1의 집
+ANC_RECRUIT_BED.NAME,NPC 1 침대
+ANC_RECRUIT_HOME.NAME,NPC 1 집
+ANC_RECRUIT_WORK.NAME,NPC 1 작업대
+SCH_RECRUIT_001.NAME,NPC 1 시간표
+RCB_RECRUIT_001.NAME,NPC 1 전투 설정
+R01.NAME,R01 지역
 SCH_MERCHANT_001.NAME,상인 일과
-SHOP_MERCHANT_001.NAME,테스트 상점
+SHOP_MERCHANT_001.NAME,마을 상점
 SRV_MERCHANT_SHOP.NAME,상점
 ENH_WPN_BOW_001.NAME,초보자 활 강화
 ENH_WPN_STAFF_001.NAME,초보자 마법스태프 강화
@@ -63,48 +62,48 @@ PRD_COOK_001.NAME,빵
 PRD_CRAFT_001.NAME,초보자 검 제작
 RCP_COOK_001.NAME,빵
 RCP_CRAFT_001.NAME,초보자 검
-SFE_START_PHYSICAL_001.NAME,시작 테스트 효과
+SFE_START_PHYSICAL_001.NAME,초기 물리 공격 효과
 SFE_START_PHYSICAL_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
-SFE_START_MAGIC_001.NAME,시작 테스트 효과
+SFE_START_MAGIC_001.NAME,초기 마법 공격 효과
 SFE_START_MAGIC_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
-SFE_START_HEAL_001.NAME,시작 테스트 효과
+SFE_START_HEAL_001.NAME,초기 치유 효과
 SFE_START_HEAL_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
-SKL_START_SWORD_001.NAME,검 시작 기술 (테스트)
+SKL_START_SWORD_001.NAME,검 시작 기술
 SKL_START_SWORD_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
 CLS_WARRIOR_001.NAME,검 무기 프로필
 CLS_WARRIOR_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
-SKL_START_BOW_001.NAME,활 시작 기술 (테스트)
+SKL_START_BOW_001.NAME,활 시작 기술
 SKL_START_BOW_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
 CLS_ARCHER_001.NAME,활 무기 프로필
 CLS_ARCHER_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
-SKL_START_STAFF_001.NAME,스태프 시작 기술 (테스트)
+SKL_START_STAFF_001.NAME,스태프 시작 기술
 SKL_START_STAFF_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
 CLS_MAGE_001.NAME,스태프 무기 프로필
 CLS_MAGE_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
-SKL_START_WAND_001.NAME,완드 시작 기술 (테스트)
+SKL_START_WAND_001.NAME,완드 시작 기술
 SKL_START_WAND_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
 CLS_HEALER_001.NAME,완드 무기 프로필
 CLS_HEALER_001.DESCRIPTION,플레이 흐름 확인용 임시 데이터. 최종 NPC 기술과 밸런스로 교체합니다.
 SKL_NPC_R01_001.NAME,선형 폭발
-NPC_R01_002.NAME,R01_02
+NPC_R01_002.NAME,NPC 2
 SKL_NPC_R01_002.NAME,섬광 베기
-NPC_R01_003.NAME,R01_03
+NPC_R01_003.NAME,NPC 3
 SKL_NPC_R01_003.NAME,치유의 빛
-NPC_R01_004.NAME,R01_04
+NPC_R01_004.NAME,NPC 4
 SKL_NPC_R01_004.NAME,마력 화살
-NPC_R01_005.NAME,R01_05
+NPC_R01_005.NAME,NPC 5
 SKL_NPC_R01_005.NAME,원형 충격파
-NPC_R01_006.NAME,R01_06
+NPC_R01_006.NAME,NPC 6
 SKL_NPC_R01_006.NAME,마력 참격
-NPC_R01_007.NAME,R01_07
+NPC_R01_007.NAME,NPC 7
 SKL_NPC_R01_007.NAME,관통 화살
-NPC_R01_008.NAME,R01_08
+NPC_R01_008.NAME,NPC 8
 SKL_NPC_R01_008.NAME,별빛 대폭발
-NPC_R01_009.NAME,R01_09
+NPC_R01_009.NAME,NPC 9
 SKL_NPC_R01_009.NAME,회복의 선율
-NPC_R01_010.NAME,R01_10
+NPC_R01_010.NAME,NPC 10
 SKL_NPC_R01_010.NAME,수호의 방패
-NPC_R01_011.NAME,R01_11
+NPC_R01_011.NAME,NPC 11
 SKL_NPC_R01_011.NAME,연속 화살
 DLG_RECRUIT_001.NAME,DLG_RECRUIT_001
 ANC_R01_002_HOME.NAME,ANC_R01_002_HOME
@@ -191,9 +190,9 @@ RES_NPC_R01_008.NAME,RES_NPC_R01_008
 RES_NPC_R01_009.NAME,RES_NPC_R01_009
 RES_NPC_R01_010.NAME,RES_NPC_R01_010
 RES_NPC_R01_011.NAME,RES_NPC_R01_011
-GIFT_R01_HERO.NAME,R01_08 선호 선물
+GIFT_R01_HERO.NAME,NPC 8 선호 선물
 GIFT_R01_HERO.DESCRIPTION,유채나물과 닭고기 구이를 선호합니다.
-CDX_NPC_R01_008.NAME,R01_08 · 용사
+CDX_NPC_R01_008.NAME,NPC 8 · 용사
 CDX_NPC_R01_008.DESCRIPTION,지역 1의 용사. 선호 선물은 유채나물과 닭고기 구이입니다.
 MON_R01_001.NAME,DragonSD_07
 MON_R01_002.NAME,DragonSD_03
@@ -206,18 +205,17 @@ MON_R01_008.NAME,DragonSD_10
 MON_R01_009.NAME,DragonSD_38
 MON_R01_010.NAME,DragonSD_08
 MON_R01_BOSS_001.NAME,R01 보스
-ANC_R01_MON_001.NAME,몬스터 테스트 01
-ANC_R01_MON_002.NAME,몬스터 테스트 02
-ANC_R01_MON_003.NAME,몬스터 테스트 03
-ANC_R01_MON_004.NAME,몬스터 테스트 04
-ANC_R01_MON_005.NAME,몬스터 테스트 05
-ANC_R01_MON_006.NAME,몬스터 테스트 06
-ANC_R01_MON_007.NAME,몬스터 테스트 07
-ANC_R01_MON_008.NAME,몬스터 테스트 08
-ANC_R01_MON_009.NAME,몬스터 테스트 09
-ANC_R01_MON_010.NAME,몬스터 테스트 10
-ANC_R01_MON_011.NAME,몬스터 테스트 11
-SPN_R01_TEST_001.NAME,테스트 몬스터
+ANC_R01_MON_001.NAME,몬스터 출현 지점 01
+ANC_R01_MON_002.NAME,몬스터 출현 지점 02
+ANC_R01_MON_003.NAME,몬스터 출현 지점 03
+ANC_R01_MON_004.NAME,몬스터 출현 지점 04
+ANC_R01_MON_005.NAME,몬스터 출현 지점 05
+ANC_R01_MON_006.NAME,몬스터 출현 지점 06
+ANC_R01_MON_007.NAME,몬스터 출현 지점 07
+ANC_R01_MON_008.NAME,몬스터 출현 지점 08
+ANC_R01_MON_009.NAME,몬스터 출현 지점 09
+ANC_R01_MON_010.NAME,몬스터 출현 지점 10
+ANC_R01_MON_011.NAME,몬스터 출현 지점 11
 RES_R01_GATHER_01.NAME,들꽃 줄기
 ITM_R01_PLANT_01.NAME,들꽃 줄기
 PRD_R01_GATHER_01.NAME,들꽃 줄기 채집
@@ -685,43 +683,43 @@ RCP_WPN_WAND_005.NAME,무지개 치유완드 제작
 RCP_WPN_WAND_005.DESCRIPTION,무지개 치유완드 제작법. 재료와 제작 시간은 DT에서 변경할 수 있습니다.
 SFE_NPC_R01_001.NAME,선형 폭발 효과
 SFE_NPC_R01_001.DESCRIPTION,선형 폭발의 피해·회복·상태 효과 수치입니다.
-SKL_NPC_R01_001.DESCRIPTION,R01_01 고유 스킬. 시전 0.45초 · 재사용 9초 · MP 12. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SKL_NPC_R01_001.DESCRIPTION,NPC 1 고유 스킬. 시전 0.45초 · 재사용 9초 · MP 12. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
 SFE_NPC_R01_002.NAME,섬광 베기 효과
 SFE_NPC_R01_002.DESCRIPTION,섬광 베기의 피해·회복·상태 효과 수치입니다.
-SKL_NPC_R01_002.DESCRIPTION,R01_02 고유 스킬. 시전 0.12초 · 재사용 6초 · MP 8. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SKL_NPC_R01_002.DESCRIPTION,NPC 2 고유 스킬. 시전 0.12초 · 재사용 6초 · MP 8. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
 SFE_NPC_R01_003.NAME,치유의 빛 효과
 SFE_NPC_R01_003.DESCRIPTION,치유의 빛의 피해·회복·상태 효과 수치입니다.
-SKL_NPC_R01_003.DESCRIPTION,R01_03 고유 스킬. 시전 0.6초 · 재사용 8초 · MP 14. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SKL_NPC_R01_003.DESCRIPTION,NPC 3 고유 스킬. 시전 0.6초 · 재사용 8초 · MP 14. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
 SFE_NPC_R01_004.NAME,마력 화살 효과
 SFE_NPC_R01_004.DESCRIPTION,마력 화살의 피해·회복·상태 효과 수치입니다.
-SKL_NPC_R01_004.DESCRIPTION,R01_04 고유 스킬. 시전 0.25초 · 재사용 5초 · MP 7. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SKL_NPC_R01_004.DESCRIPTION,NPC 4 고유 스킬. 시전 0.25초 · 재사용 5초 · MP 7. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
 SFE_NPC_R01_005.NAME,원형 충격파 효과
 SFE_NPC_R01_005.DESCRIPTION,원형 충격파의 피해·회복·상태 효과 수치입니다.
-SKL_NPC_R01_005.DESCRIPTION,R01_05 고유 스킬. 시전 0.4초 · 재사용 11초 · MP 14. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SKL_NPC_R01_005.DESCRIPTION,NPC 5 고유 스킬. 시전 0.4초 · 재사용 11초 · MP 14. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
 SFE_NPC_R01_006.NAME,마력 참격 효과
 SFE_NPC_R01_006.DESCRIPTION,마력 참격의 피해·회복·상태 효과 수치입니다.
-SKL_NPC_R01_006.DESCRIPTION,R01_06 고유 스킬. 시전 0.25초 · 재사용 7초 · MP 9. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SKL_NPC_R01_006.DESCRIPTION,NPC 6 고유 스킬. 시전 0.25초 · 재사용 7초 · MP 9. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
 SFE_NPC_R01_007.NAME,관통 화살 효과
 SFE_NPC_R01_007.DESCRIPTION,관통 화살의 피해·회복·상태 효과 수치입니다.
-SKL_NPC_R01_007.DESCRIPTION,R01_07 고유 스킬. 시전 0.3초 · 재사용 7초 · MP 9. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SKL_NPC_R01_007.DESCRIPTION,NPC 7 고유 스킬. 시전 0.3초 · 재사용 7초 · MP 9. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
 SFE_NPC_R01_008.NAME,별빛 대폭발 효과
 SFE_NPC_R01_008.DESCRIPTION,별빛 대폭발의 피해·회복·상태 효과 수치입니다.
-SKL_NPC_R01_008.DESCRIPTION,R01_08 고유 스킬. 시전 0.9초 · 재사용 25초 · MP 30. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SKL_NPC_R01_008.DESCRIPTION,NPC 8 고유 스킬. 시전 0.9초 · 재사용 25초 · MP 30. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
 SFE_NPC_R01_009.NAME,회복의 선율 효과
 SFE_NPC_R01_009.DESCRIPTION,회복의 선율의 피해·회복·상태 효과 수치입니다.
 STE_NPC_R01_009.NAME,회복의 선율
 STE_NPC_R01_009.DESCRIPTION,회복의 선율 지속 효과
-SKL_NPC_R01_009.DESCRIPTION,R01_09 고유 스킬. 시전 0.5초 · 재사용 15초 · MP 18. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SKL_NPC_R01_009.DESCRIPTION,NPC 9 고유 스킬. 시전 0.5초 · 재사용 15초 · MP 18. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
 SFE_NPC_R01_010.NAME,수호의 방패 효과
 SFE_NPC_R01_010.DESCRIPTION,수호의 방패의 피해·회복·상태 효과 수치입니다.
 STE_NPC_R01_010.NAME,수호의 방패
 STE_NPC_R01_010.DESCRIPTION,수호의 방패 지속 효과
-SKL_NPC_R01_010.DESCRIPTION,R01_10 고유 스킬. 시전 0.35초 · 재사용 18초 · MP 15. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SKL_NPC_R01_010.DESCRIPTION,NPC 10 고유 스킬. 시전 0.35초 · 재사용 18초 · MP 15. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
 SFE_NPC_R01_011.NAME,연속 화살 효과
 SFE_NPC_R01_011.DESCRIPTION,연속 화살의 피해·회복·상태 효과 수치입니다.
-SKL_NPC_R01_011.DESCRIPTION,R01_11 고유 스킬. 시전 0.25초 · 재사용 9초 · MP 12. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
-SRV_R01_006_SHOP.NAME,R01_06 씨앗 상점
-SRV_R01_006_SHOP.DESCRIPTION,R01_06 씨앗 상점
+SKL_NPC_R01_011.DESCRIPTION,NPC 11 고유 스킬. 시전 0.25초 · 재사용 9초 · MP 12. 범위와 피해·회복 수치는 스킬/효과 DT에서 변경합니다.
+SRV_R01_006_SHOP.NAME,NPC 6 씨앗 상점
+SRV_R01_006_SHOP.DESCRIPTION,NPC 6 씨앗 상점
 SHOP_R01_006_SEEDS.NAME,씨앗 상점
 SHOP_R01_006_SEEDS.DESCRIPTION,씨앗 상점
 ANC_PLAYER_PLOT_01.NAME,플레이어 밭 1
@@ -756,10 +754,6 @@ RCP_PLAYER_STORAGE_02.NAME,개인 창고 추가 설치 2/2
 RCP_PLAYER_STORAGE_02.DESCRIPTION,체력 20 이상. 광석1 1개와 광석2 1개로 개인 창고 1개(40칸)를 설치합니다.
 DRP_FURNITURE_BOOKSHELF.NAME,책장 보상
 DRP_FURNITURE_WARDROBE.NAME,옷장 보상
-MAP_TEST_001.NAME,테스트맵
-WRP_TEST_01.NAME,왼쪽 포탈
-WRP_TEST_02.NAME,중앙 포탈
-WRP_TEST_03.NAME,오른쪽 포탈
 ITM_CONS_REVIVE_SCROLL.NAME,부활서
 ITM_CONS_REVIVE_SCROLL.DESCRIPTION,"전투불능인 동료 한 명을 최대 HP의 50%, MP 최소 30%로 소생시킵니다. 살아 있는 대상에게는 사용할 수 없습니다."
 SYN_CLASS_SWORD.NAME,검사 3인
@@ -775,9 +769,9 @@ SYN_HERO_DOUBLE.DESCRIPTION,용사파티 구성원 2명: 파티 전체 물리·�
 SYN_HERO_TRIPLE.NAME,용사파티 트리플
 SYN_HERO_TRIPLE.DESCRIPTION,용사파티 구성원 3명 이상: 파티 전체 물리·마법 공격력 +30%. 더블을 대체합니다.
 SYN_CLASSMATES.NAME,반친구들
-SYN_CLASSMATES.DESCRIPTION,"R01_09, R01_10, R01_11이 함께 생존 중: 파티 전체 물리·마법 공격력 +30%."
+SYN_CLASSMATES.DESCRIPTION,"NPC 9, NPC 10, NPC 11이 함께 생존 중: 파티 전체 물리·마법 공격력 +30%."
 SYN_VILLAGERS.NAME,마을 주민
-SYN_VILLAGERS.DESCRIPTION,"R01_05, R01_06, R01_07이 함께 생존 중: 파티 전체 물리·마법 공격력 +20%."
+SYN_VILLAGERS.DESCRIPTION,"NPC 5, NPC 6, NPC 7이 함께 생존 중: 파티 전체 물리·마법 공격력 +20%."
 ANC_SCN_R01_SIGNPOST.NAME,마을 길목
 ANC_SCN_R01_SIGNPOST.DESCRIPTION,시나리오 방문 지점 정의. 실제 좌표와 방문 액터는 별도 배치 필요.
 ANC_SCN_R01_FOREST_EDGE.NAME,숲 가장자리
@@ -1226,3 +1220,17 @@ DLG_SCN_R01_055_ACTIVE.NAME,영주성으로 향하는 길 · ACTIVE
 DLG_SCN_R01_055_ACTIVE.DESCRIPTION,
 RWD_SCN_R01_055.NAME,영주성으로 향하는 길 보상
 RWD_SCN_R01_055.DESCRIPTION,800골드.
+MAP_OPENWORLD_001.NAME,오픈월드
+WRP_OW_01_HOME.NAME,집
+WRP_OW_02_INN.NAME,마을여관
+WRP_OW_03_BRIDGE.NAME,추억의 다리
+WRP_OW_04_RUINS.NAME,폐허 마을
+SPN_R01_001.NAME,R01 몬스터 출현 그룹
+ANC_WRP_OW_VISIT_01_HOME.NAME,집 워프돌
+ANC_WRP_OW_ARRIVAL_01_HOME.NAME,집 워프 도착 지점
+ANC_WRP_OW_VISIT_02_INN.NAME,마을여관 워프돌
+ANC_WRP_OW_ARRIVAL_02_INN.NAME,마을여관 워프 도착 지점
+ANC_WRP_OW_VISIT_03_BRIDGE.NAME,추억의 다리 워프돌
+ANC_WRP_OW_ARRIVAL_03_BRIDGE.NAME,추억의 다리 워프 도착 지점
+ANC_WRP_OW_VISIT_04_RUINS.NAME,폐허 마을 워프돌
+ANC_WRP_OW_ARRIVAL_04_RUINS.NAME,폐허 마을 워프 도착 지점

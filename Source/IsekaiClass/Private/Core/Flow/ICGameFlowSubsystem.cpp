@@ -11,6 +11,18 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
 
+void UICGameFlowSubsystem::CancelPendingTravel()
+{
+    FTSTicker::GetCoreTicker().RemoveTicker(PendingTravel);
+    PendingTravel.Reset();
+}
+
+void UICGameFlowSubsystem::Deinitialize()
+{
+    CancelPendingTravel();
+    Super::Deinitialize();
+}
+
 bool FICCreationAnswers::IsNameValid(const FString& Value)
 {
     const FString Clean = Value.TrimStartAndEnd();
@@ -53,6 +65,7 @@ FICCreationOptionRow UICGameFlowSubsystem::GetOption(int32 Question, int32 Optio
 
 void UICGameFlowSubsystem::BeginQuestions()
 {
+    CancelPendingTravel();
     Answers = FICCreationAnswers();
     LastError.Empty();
     bPendingNewGame = false;
@@ -105,10 +118,22 @@ bool UICGameFlowSubsystem::BeginNewGame(AICPlayerController* Controller)
         if (auto* UI = Controller->GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())
             UI->CloseAllScreens();
     Controller->SetMenu(TEXT("Loading"));
-    Time->PrepareForTravel();
-    GetGameInstance()->GetSubsystem<UICLoadingScreenSubsystem>()->Arm();
-    UGameplayStatics::SetGamePaused(Controller, false);
-    UGameplayStatics::OpenLevel(Controller, FName(*Map));
+    // Let the newly mounted loading screen paint before OpenLevel blocks the
+    // game thread. PIE does not run MoviePlayer, and fast initial saves used to
+    // replace this screen before it could appear on even a single frame.
+    CancelPendingTravel();
+    const TWeakObjectPtr<AICPlayerController> WeakController(Controller);
+    PendingTravel=FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,[this,WeakController,Map](float)
+    {
+        PendingTravel.Reset();
+        auto* PC=WeakController.Get();
+        if(!PC||!bPendingNewGame||Phase!=EICGameFlowPhase::Loading)return false;
+        GetGameInstance()->GetSubsystem<UICTimeSubsystem>()->PrepareForTravel();
+        GetGameInstance()->GetSubsystem<UICLoadingScreenSubsystem>()->Arm();
+        UGameplayStatics::SetGamePaused(PC,false);
+        UGameplayStatics::OpenLevel(PC,FName(*Map));
+        return false;
+    }),1.2f);
     return true;
 }
 
@@ -131,6 +156,7 @@ void UICGameFlowSubsystem::CompleteNewGame()
 
 void UICGameFlowSubsystem::Fail(const FString& Reason)
 {
+    CancelPendingTravel();
     LastError = Reason;
     Phase = EICGameFlowPhase::Failed;
     OnChanged.Broadcast();
@@ -143,6 +169,7 @@ void UICGameFlowSubsystem::ReturnToTitle(AICPlayerController* Controller)
     auto* Saves = GetGameInstance()->GetSubsystem<UICSaveSubsystem>();
     if (Saves && Saves->bSaving)
         return;
+    CancelPendingTravel();
     bPendingNewGame = false;
     Phase = EICGameFlowPhase::Title;
     LastError.Empty();

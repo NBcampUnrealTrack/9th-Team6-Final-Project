@@ -36,6 +36,7 @@ public:
     /** Uses the placed water mesh bounds, so editing the box/plane also edits the catch area. */
     UFUNCTION(BlueprintPure, Category="IC|Fishing") bool ContainsFishingLanding(FVector Point) const;
     void GetFishingSurface(FVector& Center,FVector& Normal) const;
+    bool ResolveFishingLanding(const FVector& Origin,const FVector& Direction,FVector& Landing) const;
     static int32 ResolveGrowthStage(const FICCropRow& Crop,double ElapsedMinutes);
 private:
     friend class UICGatheringSubsystem;
@@ -44,6 +45,7 @@ private:
 #endif
     bool CompleteResourceGather(AICPlayerController* Controller, FText& Failure);
     FName PointKey() const;
+    void GetFishingRegions(TArray<class UStaticMeshComponent*>& Regions) const;
     FTimerHandle RefreshTimer;
     int32 PresentedStage=INDEX_NONE;
     UFUNCTION() void GameTimeJumped(double From,double To);

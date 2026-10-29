@@ -40,6 +40,7 @@ AICEnemyBase::AICEnemyBase()
     HealthBar->SetupAttachment(GetRootComponent());HealthBar->SetWidgetSpace(EWidgetSpace::Screen);
     HealthBar->SetDrawSize({180,16});HealthBar->SetRelativeLocation({0,0,140});
     HealthBar->SetCollisionEnabled(ECollisionEnabled::NoCollision);HealthBar->SetCanEverAffectNavigation(false);
+    HealthBar->SetVisibility(false);
 }
 void AICEnemyBase::PostActorCreated()
 {
@@ -131,6 +132,7 @@ bool AICEnemyBase::IsOutsideLeash(const FVector& WorldLocation) const
 void AICEnemyBase::BeginReturn()
 {
     IC_TRACE_FUNCTION();if(bReturning||!AbilitySystem->IsAlive())return;bReturning=true;AbilitySystem->CancelAction();AbilitySystem->SetGuarding(false);
+    HealthBarHitUntil=-1;if(HealthBar)HealthBar->SetVisibility(false);
     const auto C=AbilitySystem->Capture();for(const auto& E:C.Combat.Effects)AbilitySystem->RemoveStatus(E.InstanceID);
     AbilitySystem->SetLooseGameplayTagCount(ICTags::Returning,1);AbilitySystem->SetVitals(C.MaxHP,C.MaxMP,0);
     HitAnimationUntil=0;
@@ -171,6 +173,7 @@ void AICEnemyBase::PresentAnimation(UAnimSequence* Animation,bool Loop,float Rat
 void AICEnemyBase::PlayHitReaction()
 {
     if(!bEnemyInitialized)return;
+    HealthBarHitUntil=AbilitySystem->PlaySecond()+8.;
     if(!UICBGMSubsystem::CanPlayEffects(GetWorld()))
     {UE_LOG(LogICCore,Verbose,TEXT("[Enemy.HitCue.Suppressed] Actor=%s"),*GetName());return;}
     UE_LOG(LogICCore,Verbose,TEXT("[Enemy.HitCue.Play] Actor=%s"),*GetName());
@@ -184,10 +187,24 @@ void AICEnemyBase::PlayHitReaction()
             PresentAnimation(Animation,false,FMath::Max(.1f,Animation->GetPlayLength()/.3f));
         }
 }
+bool AICEnemyBase::ShouldShowHealthBar() const
+{
+    if(!bEnemyInitialized||bDefeatCommitted||bReturning||!AbilitySystem||!AbilitySystem->IsAlive()
+        ||!UICGameUserSettings::Get()->bEnemyHealthBars)return false;
+    const auto* AI=Cast<AICAIController>(GetController());
+    const auto* Target=AI?AI->GetAttackTarget():nullptr;
+    const bool Chasing=IsValid(Target)&&IsHostileTo(Target)&&Target->GetICAbilitySystem()&&Target->GetICAbilitySystem()->IsAlive();
+    return Chasing||AbilitySystem->PlaySecond()<HealthBarHitUntil;
+}
 void AICEnemyBase::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-    if(HealthBar)HealthBar->SetVisibility(UICGameUserSettings::Get()->bEnemyHealthBars&&!bDefeatCommitted&&AbilitySystem&&AbilitySystem->IsAlive());
+    if(HealthBar)
+    {
+        const bool Show=ShouldShowHealthBar();HealthBar->SetVisibility(Show);
+        // A collapsed UUserWidget cannot tick itself back into view.
+        if(Show)if(auto* Widget=Cast<UICMonsterHealthWidget>(HealthBar->GetUserWidgetObject()))Widget->RefreshHealth();
+    }
     if(!bEnemyInitialized||bDefeatCommitted||!AbilitySystem->IsAlive()||!Definition.AnimationClass.IsNull())return;
     if(AbilitySystem->PlaySecond()<HitAnimationUntil)return;
     const FGuid Action=AbilitySystem->GetActionID();

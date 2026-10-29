@@ -4,6 +4,7 @@
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "InputMappingContext.h"
+#include "UI/Gameplay/ICGameplayWidget.h"
 
 namespace
 {
@@ -30,11 +31,18 @@ bool AICPlayerController::IsUsingGamepad() const
 {const int32 Mode=UICGameUserSettings::Get()->InputDeviceMode;return Mode==2||(Mode==0&&bLastInputGamepad);}
 bool AICPlayerController::RouteGameplayGamepadKey(FKey Key,bool Pressed)
 {
+    if(Screen&&Screen->IsControlGuideVisible()&&UICGameUserSettings::IsGamepadAcceptKey(Key))
+    {if(Pressed)Screen->AdvanceControlGuide();return true;}
     if(!Key.IsGamepadKey()||!Menu.IsEmpty()||!CanHandleGameplayInput())return false;
     bLastInputGamepad=true;return RouteGamepadButton(Key,Pressed);
 }
 bool AICPlayerController::InputKey(const FInputKeyEventArgs& Args)
 {
+    if(Screen&&Screen->IsControlGuideVisible()&&(Args.Key==EKeys::F||UICGameUserSettings::IsGamepadAcceptKey(Args.Key)))
+    {
+        if(Args.Event==IE_Pressed)Screen->AdvanceControlGuide();
+        return true;
+    }
     if(Args.Key.IsGamepadKey())
     {
         if(Args.Event!=IE_Axis||FMath::Abs(Args.AmountDepressed)>.15f||Args.AmountDepressed2D.SizeSquared()>.0225f)bLastInputGamepad=true;

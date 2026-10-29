@@ -202,7 +202,17 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
         const TCHAR* Tabs[]={TEXT("Party"),TEXT("Inventory"),TEXT("Quest"),TEXT("Codex"),TEXT("Settings")};
         for(int32 I=0;I<5;++I)ICUITheme::SetSelected(Cast<UButton>(Preview->WidgetTree->FindWidget(FName(*(TEXT("TAB_")+FString(Tabs[I]))))),I==Question);
     }
-    FWidgetRenderer Renderer(true);
+    if(BP->GetFName()==TEXT("WBP_IC_Map"))
+    {
+        auto SetText=[Preview](const TCHAR* Name,const FText& Value){if(auto* T=Cast<UTextBlock>(Preview->WidgetTree->FindWidget(Name)))T->SetText(Value);};
+        SetText(TEXT("TXT_MapTitle"),FText::FromString(TEXT("워프 · 목적지 선택")));
+        SetText(TEXT("TXT_MapHelp"),FText::FromString(TEXT("목적지 클릭 / ↑↓ 선택 · 확인  |  이동 500G · 보유 2,000G\n잠긴 목적지는 현장의 워프돌과 상호작용하면 열립니다.")));
+        const TCHAR* Names[]={TEXT("집"),TEXT("마을여관"),TEXT("추억의 다리"),TEXT("폐허 마을")};
+        for(int32 I=0;I<4;++I)SetText(*FString::Printf(TEXT("TXT_Warp%d"),I),FText::FromString(FString(Names[I])+(I<2?TEXT("\n이동 가능"):TEXT("\n잠김 · 워프돌에서 활성화"))));
+        if(auto* W=Preview->WidgetTree->FindWidget(TEXT("WarpConfirm")))W->SetVisibility(Question==1?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
+        SetText(TEXT("TXT_WarpQuestion"),FText::FromString(TEXT("집으로 이동하겠습니까?\n\n이동 비용: 500G · 보유 2,000G")));
+    }
+    FWidgetRenderer Renderer(BP->GetFName()!=TEXT("WBP_IC_Map"));
     FAssetCompilingManager::Get().FinishAllCompilation();
     TSharedRef<SWidget> Surface=Preview->TakeWidget();
     if(auto* Settings=Cast<UICSettingsWidget>(Preview))Settings->SelectTab(FMath::Clamp(Question,0,4));
@@ -308,6 +318,22 @@ bool UICBlueprintMaintenanceLibrary::AddGameClockHUD(UBlueprint* Blueprint)
     return false;
 #endif
 }
+bool UICBlueprintMaintenanceLibrary::AddAdventureHUD(UBlueprint* Blueprint)
+{
+#if WITH_EDITOR
+    auto* BP=Cast<UWidgetBlueprint>(Blueprint);if(!BP||!BP->WidgetTree)return false;
+    BP->Modify();BP->WidgetTree->Modify();
+    if(!ICGameplayLayout::EnsureAdventureHUD(BP->WidgetTree))return false;
+    for(const auto* Name:{TEXT("HUD_BossBar"),TEXT("BAR_BossHP"),TEXT("TXT_BossName"),TEXT("TXT_BossHP"),
+        TEXT("HUD_ControlGuide"),TEXT("TXT_GuideTitle"),TEXT("TXT_GuideBody"),TEXT("TXT_GuideNext"),TEXT("GuideFocus")})
+        if(auto* Widget=BP->WidgetTree->FindWidget(Name))
+        {Widget->bIsVariable=true;BP->WidgetVariableNameToGuidMap.FindOrAdd(Widget->GetFName(),FGuid::NewGuid());}
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);return true;
+#else
+    return false;
+#endif
+}
+
 bool UICBlueprintMaintenanceLibrary::AddDialogueAffinityHearts(UBlueprint* Blueprint)
 {
 #if WITH_EDITOR

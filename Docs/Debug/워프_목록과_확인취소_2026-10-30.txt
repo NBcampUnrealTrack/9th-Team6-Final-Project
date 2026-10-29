@@ -1,0 +1,44 @@
+2026-10-30 — 워프 목적지 목록 및 확인/취소 팝업
+
+최신 사용자 요청
+- 워프 선택 화면을 지도 이미지 대신 세로 목록으로 변경.
+- 목적지를 선택하면 "○○으로 이동하겠습니까?" 및 확인/취소 표시.
+- 기존 HUD 미니맵은 유지. 이전 dev 지도 원본 유지 지시 이후에 추가된 새 요청임.
+
+현재 동작
+- M 또는 워프돌 F 상호작용 → 집/마을여관/추억의 다리/폐허 마을 목록.
+- 활성 목적지 선택 → 목적지 이름/비용/보유 골드가 표시되는 팝업.
+- 집으로 / 마을여관으로 / 추억의 다리로 / 폐허 마을로 조사 처리.
+- 확인을 눌렀을 때 상태·해금·도착 앵커·골드를 다시 검증한 뒤 기존 로딩/동료 워프 시작.
+- 취소 버튼/Esc/M은 팝업을 닫고 목록으로 돌아감. 이동/골드 차감 없음.
+- 잔액이 부족해도 질문은 열리며, 확인 시 오류를 팝업 안에 표시하고 이동하지 않음.
+- 방향키/WASD로 목록 선택, Enter/F/G/Space로 질문 열기 또는 확인.
+- 팝업에서는 방향키/Tab으로 확인·취소 선택. 키보드 취소도 지원.
+- 반복 확인으로 추가 이동/차감이 생기지 않도록 상태 검사.
+- 워프 비용 500G, 집 기본 해금/나머지 현장 해금 및 기존 네 음수-X 배치는 유지.
+- 시작 조작 가이드의 지도 안내도 워프 목록에 맞게 변경.
+
+구현/보존
+- ICMapWidget.cpp/h: 전체 화면 목록/팝업만 추가하고 dev 미니맵의 좌표·배율·마커 로직 유지.
+- WBP_IC_Map.uasset을 새 native 목록 레이아웃으로 저장.
+- WBP_IC_Minimap/WBP_GameHUD/L_OpenWorld 파일은 이번 UI 적용 전후 SHA256 동일.
+- Tools/World/refresh_warp_list.py: 전체 화면 에셋만 저장하고 보존 검사/미리보기 렌더링.
+- ICBlueprintMaintenanceLibrary의 지도 미리보기 문구를 목적지 이름을 넣는 방식으로 맞춤.
+
+검증
+- IsekaiClassEditor Win64 Development 빌드 성공.
+- RHI 검증: 기존 HUD/미니맵/보스/가이드/포탈 배치 등 9개 Success.
+- 확인창 테스트의 잔액 설정을 정식 SetPlayerGold API로 고친 뒤 재실행 Success.
+  ApplyWorldProgress는 골드를 변경하지 않는 API이므로 잔액 설정에 사용하지 말 것.
+- IC.OpenWorld.WarpRequestGating: 클릭 취소/키보드 Esc/키보드 취소/골드 부족/중복 확인 검증 통과.
+- 목록/팝업 PNG에서 배치·글자·대비 확인.
+
+로컬 자료
+- Saved/WarpListUpdate/Applied.json
+- Saved/WarpListUpdate/Tests/index.json (9 Success, 잔액 설정이 잘못된 초기 테스트 결과 포함)
+- Saved/WarpListUpdate/ConfirmationTests/index.json (수정된 최종 확인창 테스트 Success, failed=0)
+- Saved/WarpListUpdate/Destinations.png
+- Saved/WarpListUpdate/Confirmation.png
+- Saved/WarpListUpdate/WBP_IC_Map.before.uasset
+
+코드/에셋/테스트를 함께 유지할 것. 커밋·푸시는 수행하지 않음.

@@ -78,7 +78,7 @@ def main():
     source_skills = {family: next(row.copy() for row in skills if row["ID"] == f"SKL_START_{family}_001") for family in WEAPON.values()}
     for number, role in enumerate(ROLES, 1):
         npc = f"NPC_R01_{number:03}"
-        display = f"R01_{number:02}"
+        display = f"NPC {number}"
         home = "HOME_RECRUIT_001" if number == 1 else f"HOME_R01_{number:03}"
         schedule = "SCH_RECRUIT_001" if number == 1 else f"SCH_R01_{number:03}"
         anchors = {kind: f"ANC_RECRUIT_{kind}" if number == 1 else f"ANC_R01_{number:03}_{kind}" for kind in ["HOME", "BED", "WORK"]}

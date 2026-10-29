@@ -3,6 +3,7 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Engine/DataTable.h"
 #include "Engine/DeveloperSettings.h"
+#include "Containers/Ticker.h"
 #include "ICGameFlowSubsystem.generated.h"
 
 class AICPlayerController;
@@ -71,6 +72,7 @@ class ISEKAICLASS_API UICGameFlowSubsystem : public UGameInstanceSubsystem
 {
     GENERATED_BODY()
 public:
+    virtual void Deinitialize() override;
     UPROPERTY(BlueprintReadOnly) EICGameFlowPhase Phase = EICGameFlowPhase::Title;
     UPROPERTY(BlueprintReadOnly) FICCreationAnswers Answers;
     UPROPERTY(BlueprintReadOnly) FString LastError;
@@ -88,5 +90,7 @@ public:
 
 private:
     UPROPERTY(Transient) TObjectPtr<UDataTable> Options;
+    FTSTicker::FDelegateHandle PendingTravel;
+    void CancelPendingTravel();
     UDataTable* GetOptions() const;
 };

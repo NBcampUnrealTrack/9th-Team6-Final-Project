@@ -2,6 +2,7 @@
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/BlendSpace1D.h"
+#include "Character/Animation/ICHandGrip.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/SkeletalMeshSocket.h"
 #if WITH_EDITOR
@@ -202,6 +203,21 @@ bool UICCharacterSetupLibrary::PrepareCharacterMesh(USkeletalMesh* Mesh)
             // Put the grip in the palm rather than at the wrist bone origin.
             Socket->RelativeLocation=(A+B)*.5f;
             Socket->RelativeRotation=FRotationMatrix::MakeFromZX((A-B).GetSafeNormal(),(A+B).GetSafeNormal()).Rotator();
+        }
+    }
+    if(Mesh->GetPathName().Contains(TEXT("/Player/SamplePlayer/")))
+    {
+        const auto Pose=ICHandGrip::ReferenceComponentPose(Ref);
+        for(const auto Family:{EICWeaponFamily::Sword,EICWeaponFamily::Bow,EICWeaponFamily::Staff,EICWeaponFamily::Wand})
+        {
+            const FName Name=ICHandGrip::Socket(Family);if(Mesh->FindSocket(Name))continue;
+            const bool Left=Family==EICWeaponFamily::Bow;const auto Basis=ICHandGrip::Palm(Ref,Pose,Left);if(!Basis.bValid)continue;
+            const auto* Original=Mesh->FindSocket(Left?TEXT("weapon_l"):TEXT("weapon_r"));if(!Original)continue;
+            auto* Socket=NewObject<USkeletalMeshSocket>(Mesh);Socket->SocketName=Name;Socket->BoneName=Original->BoneName;
+            Socket->RelativeRotation=Original->RelativeRotation;
+            Socket->RelativeLocation=Original->RelativeLocation+Basis.Hand.InverseTransformVectorNoScale(Basis.Normal*(Left?.95:Family==EICWeaponFamily::Sword?1.15:1.)+Basis.Forward*.65);
+            if(Family==EICWeaponFamily::Staff)Socket->RelativeLocation+=Socket->RelativeRotation.RotateVector(FVector(0,0,12));
+            Mesh->GetMeshOnlySocketList().Add(Socket);
         }
     }
     Mesh->MarkPackageDirty();return true;

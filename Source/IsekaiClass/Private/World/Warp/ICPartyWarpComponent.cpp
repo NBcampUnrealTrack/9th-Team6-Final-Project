@@ -84,7 +84,10 @@ bool UICPartyWarpComponent::UnlockWarp(FName WarpID, FVector StoneLocation, FStr
 bool UICPartyWarpComponent::IsWarpUnlocked(FName WarpID) const
 {
     const UICWorldStateSubsystem* State = GetWorldState();
-    return State && !WarpID.IsNone() && State->ExportState().UnlockedWarps.Contains(WarpID);
+    if(!State||WarpID.IsNone())return false;
+    if(State->ExportState().UnlockedWarps.Contains(WarpID))return true;
+    FICWarpRow Warp;FString Reason;
+    return ResolveWarp(WarpID,Warp,Reason)&&Warp.bUnlockedByDefault;
 }
 
 bool UICPartyWarpComponent::CanWarp(FName DestinationWarpID, int32 CostGold, FString& OutReason) const
@@ -92,7 +95,7 @@ bool UICPartyWarpComponent::CanWarp(FName DestinationWarpID, int32 CostGold, FSt
     if (CostGold < 0) { OutReason = TEXT("워프 비용은 0 이상이어야 합니다."); return false; }
     FICWarpRow Destination;
     if (!ResolveWarp(DestinationWarpID, Destination, OutReason)) return false;
-    if (!IsWarpUnlocked(DestinationWarpID)) { OutReason = TEXT("아직 해금하지 않은 워프게이트입니다."); return false; }
+    if (!IsWarpUnlocked(DestinationWarpID)) { OutReason = TEXT("아직 잠긴 목적지입니다. 현장의 워프돌과 먼저 상호작용하세요."); return false; }
 
     const UICWorldStateSubsystem* State = GetWorldState();
     if (!State || State->ExportState().Gold < CostGold) { OutReason = TEXT("골드가 부족합니다."); return false; }
@@ -180,6 +183,13 @@ TArray<FName> UICPartyWarpComponent::GetUnlockedWarpIDs() const
     TArray<FName> WarpIDs;
     if (const UICWorldStateSubsystem* State = GetWorldState())
         for (const FName& WarpID : State->ExportState().UnlockedWarps) WarpIDs.Add(WarpID);
+    const auto* Player=GetPlayerCharacter();
+    const auto* Definitions=Player&&Player->GetGameInstance()?Player->GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;
+    if(Definitions)
+    {
+        TArray<FName> IDs;Definitions->GetDefinitionIDs(EICDefinitionType::Warp,IDs);
+        for(FName ID:IDs){FICDefinitionResult Result;if(const auto* Warp=Definitions->Find<FICWarpRow>(ID,Result);Warp&&Warp->bUnlockedByDefault)WarpIDs.AddUnique(ID);}
+    }
     WarpIDs.Sort([](const FName& A, const FName& B) { return A.LexicalLess(B); });
     return WarpIDs;
 }

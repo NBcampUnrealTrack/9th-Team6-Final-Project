@@ -116,6 +116,7 @@ void AICPlayerController::CreatePlayer()
         Initial.Preset = Preset;
         Initial.Job = Job;
         Initial.FirstSkill = StartingSkill;
+        if(Flow&&Flow->bPendingNewGame)Initial.Flags.Add(TEXT("TUT_CONTROLS_PENDING"),true);
         if(Choice)
         {
             Initial.CreationAnswers=Flow->Answers;

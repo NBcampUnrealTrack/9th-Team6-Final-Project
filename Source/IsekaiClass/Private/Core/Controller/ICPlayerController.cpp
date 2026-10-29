@@ -445,9 +445,10 @@ void AICPlayerController::SaveFinished(int32 Slot,bool bSuccess,const FString& M
         if(bSuccess)
         {
             bInitialSavePending=false;
-            if(GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->bPendingNewGame)
-                UICPrologueWidget::Show(this,true);
-            else {GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->CompleteNewGame();SetMenu(TEXT(""));}
+            // The loading screen waits for an evaluated character pose before
+            // revealing the world. Saving alone does not initialize animation.
+            if(!GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->bPendingNewGame)
+                {GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->CompleteNewGame();SetMenu(TEXT(""));}
             const FName Jobs[]={TEXT("Warrior"),TEXT("Archer"),TEXT("Mage"),TEXT("Healer")};
             OnPlayerInitialized.Broadcast(Jobs[Job],FirstSkill);
         }

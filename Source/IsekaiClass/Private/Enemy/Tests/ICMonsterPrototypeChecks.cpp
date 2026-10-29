@@ -48,7 +48,7 @@ bool FICMonsterPrototypeCheck::RunTest(const FString& Parameters)
     Time->SetRunning(true);Time->SetMenuPaused(false);
     TArray<AICEnemyBase*> Enemies;
     const TCHAR* Numbers[]={TEXT("07"),TEXT("03"),TEXT("164"),TEXT("153"),TEXT("150"),TEXT("114"),TEXT("107"),TEXT("10"),TEXT("38"),TEXT("08")};
-    FICDefinitionResult R;const auto* Spawner=D->Find<FICSpawnerRow>(TEXT("SPN_R01_TEST_001"),R);
+    FICDefinitionResult R;const auto* Spawner=D->Find<FICSpawnerRow>(TEXT("SPN_R01_001"),R);
     if(TestNotNull(TEXT("Test spawner exists"),Spawner))
     {
         TestEqual(TEXT("10 normal dragons and one boss"),Spawner->Slots.Num(),11);

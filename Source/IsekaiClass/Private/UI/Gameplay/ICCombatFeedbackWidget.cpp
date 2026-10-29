@@ -34,7 +34,7 @@ void UICMonsterHealthWidget::RefreshHealth()
         const auto Snapshot=ASC?ASC->Capture():FICCharacterState();
         Bar->SetPercent(Snapshot.MaxHP>0?FMath::Clamp(Snapshot.HP/Snapshot.MaxHP,0.f,1.f):0);
     }
-    SetVisibility(ASC&&ASC->IsAlive()?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
+    SetVisibility(Enemy.IsValid()&&Enemy->ShouldShowHealthBar()?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
 }
 void UICMonsterHealthWidget::NativeTick(const FGeometry& Geometry,float DeltaSeconds)
 {Super::NativeTick(Geometry,DeltaSeconds);RefreshHealth();}

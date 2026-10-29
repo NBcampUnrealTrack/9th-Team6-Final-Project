@@ -27,6 +27,9 @@
 #include "Camera/CameraComponent.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Combat/VFX/ICCombatVFX.h"
+#include "Audio/ICBGMSubsystem.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 
 namespace
 {
@@ -249,6 +252,9 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
         if(PlaySecond()>ComboReadyUntil||ComboWeaponFamily!=Family)ComboIndex=0;
         ComboWeaponFamily=Family;const auto& Stage=Class->NormalAttackStages[ComboIndex];
         Skill.Hits={Stage.Hit};Skill.Montage=Stage.Montage;Skill.CastSection=Stage.MontageSection;Skill.Presentation.Visuals=Stage.Visuals;
+        const TCHAR* AttackAudio=Family==EICWeaponFamily::Bow?TEXT("S_IC_Arrow"):Family==EICWeaponFamily::Staff?TEXT("S_IC_Magic"):Family==EICWeaponFamily::Wand?TEXT("S_IC_Healing"):TEXT("S_IC_Slash");
+        Skill.Presentation.CastSound=Stage.AttackSound.IsNull()?TSoftObjectPtr<USoundBase>(FSoftObjectPath(FString::Printf(TEXT("/Game/IsekaiClass/Audio/Combat/%s.%s"),AttackAudio,AttackAudio))):Stage.AttackSound;
+        Skill.Presentation.ImpactSound=Stage.ImpactSound.IsNull()?TSoftObjectPtr<USoundBase>(FSoftObjectPath(TEXT("/Game/IsekaiClass/Audio/Combat/S_IC_Impact.S_IC_Impact"))):Stage.ImpactSound;
         const auto* Profile=Character->GetAnimationProfile();
         const auto* Set=Profile?Profile->FindSet(Family):nullptr;
         if(Set&&Set->AttackCombo.IsValidIndex(ComboIndex)&&Set->AttackCombo[ComboIndex])
@@ -340,6 +346,10 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
         auto* Recipient=Visuals&&Visuals->bCastAtTarget&&TargetActor.IsValid()?TargetActor.Get():Character;
         PlayCombatCue(false,Skill.Presentation,Recipient,Recipient->GetActorLocation());
     }
+    // Normal attacks already spawn their stage visuals at the hit window.
+    // Play only the swing/release audio here, including attacks that miss.
+    if(RequestedAction==TEXT("Attack")&&Primary&&UICBGMSubsystem::CanPlayEffects(Character->GetWorld()))
+        if(auto* Sound=Skill.Presentation.CastSound.LoadSynchronous())UGameplayStatics::PlaySoundAtLocation(Character,Sound,Character->GetActorLocation());
     UE_LOG(LogICCore, Log, TEXT("[Combat.Start] Entity=%s Action=%s Skill=%s ID=%s"),*Runtime.CharacterId.ToString(),*RequestedAction.ToString(),*RequestedSkill.ToString(),*CurrentID.ToString());
     OnStateChanged.Broadcast();return true;
 }

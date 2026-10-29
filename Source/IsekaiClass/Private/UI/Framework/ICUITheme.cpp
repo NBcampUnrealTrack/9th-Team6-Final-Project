@@ -48,6 +48,8 @@ void Apply(UWidgetTree* Tree)
     {
         if(auto* Button=Cast<UButton>(Widget))
         {
+            // The warp list supplies opaque button styles for readable destination and modal text.
+            if(Button->GetName().StartsWith(TEXT("BTN_Warp"))||Button->GetFName()==TEXT("BTN_MapClose"))return;
             auto Style=Button->GetStyle();
             Style.Normal=MorpheusBrush(FLinearColor(.107f,.175f,.258f,.22f));
             Style.Hovered=MorpheusBrush(FLinearColor(.258f,.896f,1.f,.32f));

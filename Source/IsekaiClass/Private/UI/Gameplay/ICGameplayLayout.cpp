@@ -1,5 +1,6 @@
 #include "UI/Gameplay/ICGameplayLayout.h"
 #include "UI/Gameplay/ICFirefightHUDLayout.h"
+#include "UI/Gameplay/ICControlGuide.h"
 #include "UI/Gameplay/ICCharacterStatusWidget.h"
 #include "UI/Gameplay/ICGameMenuWidget.h"
 #include "UI/Gameplay/ICMovementCooldownWidget.h"
@@ -380,6 +381,7 @@ void HUD(UWidgetTree* Tree)
         Slot->SetZOrder(10);
         Menu->SetVisibility(ESlateVisibility::Collapsed);
     }
+    EnsureAdventureHUD(Tree);
 }
 }
 
@@ -519,6 +521,27 @@ bool Build(UWidgetTree* Tree, FName Kind)
     else return false;
     return true;
 }
+bool EnsureAdventureHUD(UWidgetTree* Tree)
+{
+    auto* Canvas=Tree?Cast<UCanvasPanel>(Tree->FindWidget(TEXT("HUDCanvas"))):nullptr;if(!Canvas)return false;
+    if(!Tree->FindWidget(TEXT("HUD_BossBar")))
+    {
+        auto* Boss=Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("HUD_BossBar"));
+        auto* BossSlot=Place(Canvas,Boss,{.5f,0},{.5f,0},{0,26},{720,78});BossSlot->SetZOrder(6);
+        auto* Frame=Tree->ConstructWidget<UBorder>();Frame->SetBrushColor(FLinearColor(.2f,.12f,.08f,.95f));
+        Place(Boss,Frame,{0,0},{0,0},{0,29},{720,29});
+        auto* HP=Tree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(),TEXT("BAR_BossHP"));
+        HP->SetFillColorAndOpacity(FLinearColor(.82f,.09f,.12f));HP->SetPercent(1.f);
+        Place(Boss,HP,{0,0},{0,0},{3,32},{714,23});
+        auto* Name=Label(Tree,TEXT("TXT_BossName"),FText::GetEmpty(),23);Name->SetColorAndOpacity(FLinearColor(1,.8f,.47f));
+        Place(Boss,Name,{0,0},{0,0},{0,0},{520,30});
+        auto* Health=Label(Tree,TEXT("TXT_BossHP"),FText::GetEmpty(),16);Health->SetJustification(ETextJustify::Right);
+        Place(Boss,Health,{0,0},{0,0},{500,4},{220,25});Boss->SetVisibility(ESlateVisibility::Collapsed);
+    }
+    if(!Tree->FindWidget(TEXT("HUD_ControlGuide")))ICControlGuide::Build(Tree,Canvas);
+    return true;
+}
+
 bool EnsureGameClock(UWidgetTree* Tree)
 {
     auto* Canvas=Tree?Cast<UCanvasPanel>(Tree->FindWidget(TEXT("HUDCanvas"))):nullptr;if(!Canvas)return false;
