@@ -103,7 +103,8 @@ bool UICUIManagerSubsystem::EnsureRoot()
     auto* PC = GetLocalPlayer()->GetPlayerController(GetWorld());
     if (!PC)
         return false;
-    Root = CreateWidget<UICUIRootWidget>(PC, UICUIRootWidget::StaticClass());
+    auto* Type=LoadClass<UICUIRootWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Root.WBP_IC_Root_C"));
+    Root = Type?CreateWidget<UICUIRootWidget>(PC,Type):nullptr;
     return Root && Root->AddToPlayerScreen(0);
 }
 void UICUIManagerSubsystem::SetHUD(UUserWidget* Widget)

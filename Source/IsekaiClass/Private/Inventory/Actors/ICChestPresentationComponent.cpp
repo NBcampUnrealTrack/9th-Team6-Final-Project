@@ -9,13 +9,14 @@ UICChestPresentationComponent::UICChestPresentationComponent()
 {
     PrimaryComponentTick.bCanEverTick=true;PrimaryComponentTick.bStartWithTickEnabled=false;
     Lid=CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ChestLid"));Lid->SetupAttachment(this);
-    Lid->SetCollisionEnabled(ECollisionEnabled::NoCollision);Lid->SetCanEverAffectNavigation(false);
+    Lid->SetCollisionProfileName(TEXT("BlockAllDynamic"));Lid->SetCanEverAffectNavigation(false);
 }
 void UICChestPresentationComponent::OnRegister()
 {
     Super::OnRegister();
     if(Lid&&!IsTemplate())
     {
+        Lid->SetCollisionProfileName(TEXT("BlockAllDynamic"));
         // Nested component templates retain a template attachment when a BP instance is duplicated.
         if(Lid->GetAttachParent()!=this)
         {if(Lid->IsRegistered())Lid->AttachToComponent(this,FAttachmentTransformRules::KeepRelativeTransform);else Lid->SetupAttachment(this);}

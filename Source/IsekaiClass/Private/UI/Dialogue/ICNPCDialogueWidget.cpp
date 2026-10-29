@@ -543,7 +543,6 @@ void UICNPCDialogueWidget::CloseDialogue()
 FReply UICNPCDialogueWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
 {
     const FKey Key=KeyEvent.GetKey();
-    if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer());PC&&PC->ForwardDialogueMovementKey(Key,true))return FReply::Handled();
     if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up)
     {MoveSelection(-1);return FReply::Handled();}
     if(Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down)
@@ -566,6 +565,5 @@ FReply UICNPCDialogueWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry, c
 }
 FReply UICNPCDialogueWidget::NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& KeyEvent)
 {
-    if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer());PC&&PC->ForwardDialogueMovementKey(KeyEvent.GetKey(),false))return FReply::Handled();
     return Super::NativeOnKeyUp(Geometry,KeyEvent);
 }

@@ -129,6 +129,9 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
 struct FICPrologueTestAccess
 {
     static void Tick(UICPrologueWidget* Widget,float Delta){Widget->NativeTick(Widget->GetCachedGeometry(),Delta);}
+    static bool Reading(UICPrologueWidget* W){return W->State==UICPrologueWidget::EState::Reading;}
+    static bool Finishing(UICPrologueWidget* W){return W->State==UICPrologueWidget::EState::FadeOut;}
+    static float Held(UICPrologueWidget* W){return W->SkipElapsed;}
 };
 struct FICKeyboardTestAccess
 {
@@ -139,7 +142,7 @@ namespace
 class FICPlaythroughCommand : public IAutomationLatentCommand
 {
 public:
-    explicit FICPlaythroughCommand(FAutomationTestBase* InTest) : Test(InTest), Started(FPlatformTime::Seconds())
+    explicit FICPlaythroughCommand(FAutomationTestBase* InTest,bool Skip=false) : Test(InTest), bSkipRun(Skip), Started(FPlatformTime::Seconds())
     {
     }
     virtual bool Update() override
@@ -167,8 +170,29 @@ public:
             {
                 Test->TestFalse(TEXT("Cursor stays hidden during prologue"),PC->bShowMouseCursor);
                 auto* Music=World->GetSubsystem<UICBGMSubsystem>();Music->Tick(1.f);
-                Test->TestEqual(TEXT("Prologue uses its editable music row"),Music->GetCurrentMusicRow(),FName(TEXT("BGM_Prologue")));
+                if(FICPrologueTestAccess::Reading(Prologue))Test->TestEqual(TEXT("Prologue reading uses its editable music row"),Music->GetCurrentMusicRow(),FName(TEXT("BGM_Prologue")));
                 const int32 Before=Prologue->GetLineIndex();
+                Test->TestEqual(TEXT("The WBP loads all fifty-five DT entries"),Prologue->GetLineCount(),55);
+                if(bSkipRun&&Before>=17)
+                {
+                    if(!FICPrologueTestAccess::Reading(Prologue))return false;
+                    if(!bPartialSkip)
+                    {
+                        FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::H,FModifierKeysState(),0,false,0,0));
+                        FICPrologueTestAccess::Tick(Prologue,.6f);
+                        Test->TestTrue(TEXT("Holding H fills the skip gauge during typing"),FICPrologueTestAccess::Held(Prologue)>.5f);
+                        bPartialSkip=true;return false;
+                    }
+                    Capture(Client,TEXT("Prologue_HoldSkip"));
+                    FSlateApplication::Get().ProcessKeyUpEvent(FKeyEvent(EKeys::H,FModifierKeysState(),0,false,0,0));
+                    Test->TestEqual(TEXT("Releasing H resets its gauge"),FICPrologueTestAccess::Held(Prologue),0.f);
+                    Test->TestEqual(TEXT("A short hold does not skip"),Prologue->GetLineIndex(),Before);
+                    FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::H,FModifierKeysState(),0,false,0,0));
+                    FICPrologueTestAccess::Tick(Prologue,1.6f);
+                    Test->TestTrue(TEXT("A complete H hold fades into the normal new-game path"),FICPrologueTestAccess::Finishing(Prologue));
+                    FSlateApplication::Get().ProcessKeyUpEvent(FKeyEvent(EKeys::H,FModifierKeysState(),0,false,0,0));
+                    return false;
+                }
                 if(Before<2)
                 {
                     // Exercise real Slate time and deliberately leave focus on the viewport.
@@ -296,7 +320,11 @@ public:
                 return true;
             }
             Start->SetUserFocus(PC);
-            PressKey(EKeys::G);
+            PressKey(EKeys::W);
+            Test->TestTrue(TEXT("W selects the preceding title action"),Menu->GetWidgetFromName(TEXT("BTN_Continue"))->HasUserFocus(PC));
+            PressKey(EKeys::S);
+            Test->TestTrue(TEXT("S selects the next title action"),Start->HasUserFocus(PC));
+            PressKey(EKeys::F);
             Test->TestEqual(TEXT("G opens character creation from focused title button"),PC->Menu,FString(TEXT("Create")));
             NextStage(10);
             return false;
@@ -529,7 +557,7 @@ public:
             {
                 auto* Load = CastChecked<UButton>(List->GetWidgetFromName(TEXT("IC_SaveLoad_Load")));
                 Test->TestTrue(TEXT("Selected save can be loaded"), Load->GetIsEnabled());
-                if (!Click(Client, Load)) return false;
+                PressKey(EKeys::F);
             }
             else
             {
@@ -560,6 +588,7 @@ private:
     TWeakObjectPtr<UGameInstance> GI;
     int32 Stage = 0;
     bool bSeededSaves = false;
+    bool bSkipRun=false,bPartialSkip=false;
     TArray<uint8> ManualBytes;
     double Started = 0, StageAt = 0, PausedAt = 0;
     FVector StartPosition = FVector::ZeroVector;
@@ -629,6 +658,31 @@ bool FICFrontendPlaythroughCheck::RunTest(const FString& Parameters)
     FRequestPlaySessionParams Params; Params.CustomPIEWindow = Window; Params.bAllowOnlineSubsystem = false;
     ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(Params));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FICPlaythroughCommand>(this));
+    ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+    FAutomationTestFramework::Get().EnqueueLatentCommand(RestorePlayWindow);
+    ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(.5f));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICFrontendSkipCheck,"IC.Frontend.PrologueSkipToPlay",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICFrontendSkipCheck::RunTest(const FString& Parameters)
+{
+    if (GEditor->PlayWorld)
+    {
+        AddError(TEXT("Close the existing PIE session before running this test."));
+        return false;
+    }
+    if (!FEditorFileUtils::LoadMap(TEXT("/Game/IsekaiClass/World/Maps/L_Title"), false, true))
+    {
+        AddError(TEXT("Could not open title map"));
+        return false;
+    }
+    auto RestorePlayWindow = MakeShared<FICPlayWindowSettingsRestore>();
+    auto Window = SNew(SWindow).ClientSize(FVector2D(1280, 720)).UseOSWindowBorder(false).CreateTitleBar(false);
+    FSlateApplication::Get().AddWindow(Window);
+    FRequestPlaySessionParams Params; Params.CustomPIEWindow = Window; Params.bAllowOnlineSubsystem = false;
+    ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(Params));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FICPlaythroughCommand>(this,true));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
     FAutomationTestFramework::Get().EnqueueLatentCommand(RestorePlayWindow);
     ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(.5f));

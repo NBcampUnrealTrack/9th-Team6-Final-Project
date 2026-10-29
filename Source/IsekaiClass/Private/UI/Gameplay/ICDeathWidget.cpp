@@ -10,7 +10,7 @@
 void UICDeathWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-    if(!WidgetTree->RootWidget)ICFrontendLayout::Build(WidgetTree,TEXT("Death"));
+
     SetIsFocusable(true);
     if(auto* Button=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Load"))))Button->OnClicked.AddUniqueDynamic(this,&ThisClass::LoadGame);
     if(auto* Button=Cast<UButton>(GetWidgetFromName(TEXT("BTN_MainMenu"))))Button->OnClicked.AddUniqueDynamic(this,&ThisClass::MainMenu);

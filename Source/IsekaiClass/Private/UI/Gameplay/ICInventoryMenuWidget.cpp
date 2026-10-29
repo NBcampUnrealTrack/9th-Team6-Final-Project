@@ -63,7 +63,7 @@ UButton* InventoryButton(UWidgetTree* T,FName Name,FText Text,bool WithCaption=t
 UClass* WidgetClass(const TCHAR* Asset,UClass* Fallback)
 {
     const FString Path=FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Asset,Asset);
-    auto* C=LoadClass<UUserWidget>(nullptr,*Path);return C?C:Fallback;
+    auto* C=LoadClass<UUserWidget>(nullptr,*Path);return C;
 }
 void Caption(UUserWidget* W,const TCHAR* Name,FText Text)
 {if(auto* T=Cast<UTextBlock>(W->GetWidgetFromName(Name)))T->SetText(Text);}
@@ -83,7 +83,7 @@ bool UICInventorySlotWidget::BuildLayout(UWidgetTree* T)
 }
 void UICInventorySlotWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     auto* Name=CastChecked<UTextBlock>(GetWidgetFromName(TEXT("TXT_Name")));
     Name->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);Name->SetClipping(EWidgetClipping::ClipToBounds);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Select")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Pick);
@@ -115,7 +115,7 @@ bool UICItemConfirmWidget::BuildLayout(UWidgetTree* T)
 }
 void UICItemConfirmWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Accept")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Accept);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Cancel")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Cancel);
 }
@@ -157,7 +157,7 @@ bool UICInventoryItemPopupWidget::BuildLayout(UWidgetTree* T)
 }
 void UICInventoryItemPopupWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Equip")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Equip);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Lock")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Lock);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Split")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Split);
@@ -267,7 +267,7 @@ FText UICInventoryMenuWidget::ItemName(FName ID) const
 }
 void UICInventoryMenuWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     for(int32 I=0;I<4;++I)
     {
         CastChecked<UICPartyPortraitWidget>(GetWidgetFromName(Indexed(TEXT("Member"),I)))->OnPicked.AddUniqueDynamic(this,&ThisClass::PortraitPicked);

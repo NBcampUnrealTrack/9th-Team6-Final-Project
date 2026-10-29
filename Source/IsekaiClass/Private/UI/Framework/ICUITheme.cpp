@@ -28,6 +28,7 @@ void Visit(UWidget* Widget,TFunctionRef<void(UWidget*)> Action)
     else {Action(Widget);if(auto* Panel=Cast<UPanelWidget>(Widget))for(auto* Child:Panel->GetAllChildren())Visit(Child,Action);}
 }
 TMap<TWeakObjectPtr<UButton>,bool> FocusedButtons;
+TMap<TWeakObjectPtr<UButton>,FButtonStyle> AuthoredStyles;
 }
 namespace ICUITheme
 {
@@ -35,9 +36,10 @@ FSlateBrush PanelBrush(){return MorpheusBrush(FLinearColor::White);}
 void SetSelected(UButton* Button,bool Selected)
 {
     if(!Button)return;
-    auto Style=Button->GetStyle();
-    Style.Normal=MorpheusBrush(Selected?FLinearColor(.258f,.896f,1.f,.32f):FLinearColor(.107f,.175f,.258f,.22f));
-    Button->SetStyle(Style);Button->SetBackgroundColor(FLinearColor::White);
+    if(!AuthoredStyles.Contains(Button))AuthoredStyles.Add(Button,Button->GetStyle());
+    auto Style=AuthoredStyles.FindChecked(Button);
+    if(Selected)Style.Normal=Style.Hovered;
+    Button->SetStyle(Style);
 }
 void Apply(UWidgetTree* Tree)
 {
@@ -75,5 +77,6 @@ void UpdateFocus(UWidget* Root)
         FocusedButtons.Add(Button,Focus);SetSelected(Button,Focus);
     });
     if(FocusedButtons.Num()>1024)for(auto It=FocusedButtons.CreateIterator();It;++It)if(!It.Key().IsValid())It.RemoveCurrent();
+    if(AuthoredStyles.Num()>1024)for(auto It=AuthoredStyles.CreateIterator();It;++It)if(!It.Key().IsValid())It.RemoveCurrent();
 }
 }

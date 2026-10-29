@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/Button.h"
 #include "World/State/ICWorldStateTypes.h"
 #include "ICSaveSlotWidget.generated.h"
 class UButton;
@@ -8,6 +9,15 @@ class UTextBlock;
 class UTexture2D;
 class UImage;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FICSlotPicked, int32, SlotIndex);
+/** The list owns keyboard and stick navigation; rows remain pointer-clickable. */
+UCLASS()
+class ISEKAICLASS_API UICSaveRowButton : public UButton
+{
+    GENERATED_BODY()
+public:
+    UICSaveRowButton(const FObjectInitializer& Initializer) : Super(Initializer) { InitIsFocusable(false); }
+};
+
 UCLASS(Blueprintable)
 class ISEKAICLASS_API UICSaveSlotWidget : public UUserWidget
 {
@@ -19,7 +29,6 @@ public:
     void SetSelected(bool bSelected);
     void ConfigureData(const FICSaveSlotInfo& InInfo, const TMap<FName, TObjectPtr<UTexture2D>>& Portraits);
 protected:
-    virtual TSharedRef<SWidget> RebuildWidget() override;
     virtual void NativeConstruct() override;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UButton> IC_SaveSlot_Button;
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> IC_SaveSlot_Label;

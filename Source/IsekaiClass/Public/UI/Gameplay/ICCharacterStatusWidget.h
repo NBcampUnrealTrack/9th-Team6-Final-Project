@@ -25,6 +25,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Status", meta=(ClampMin="0", ClampMax="1")) float MPPercent = 1.f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Status", meta=(ClampMin="0", ClampMax="1")) float SPPercent = 1.f;
     UFUNCTION(BlueprintCallable, Category="Status") void RefreshPresentation();
+    static void BuildSkillCooldownOverlay(class UWidgetTree* Tree);
     UFUNCTION(BlueprintCallable, Category="Status") void UpdateSkillCooldown(bool bHasSkill, float Progress, double RemainingSeconds);
     void UpdateVitals(const FICCharacterState& State);
     void UpdateStatusEffects(const FICCharacterState& State, const FICWorldState& World, UICDefinitionSubsystem* Definitions, double Now);
@@ -32,7 +33,7 @@ protected:
     virtual void NativePreConstruct() override;
     virtual void NativeTick(const FGeometry& Geometry,float DeltaSeconds) override;
 private:
+    friend class UICBlueprintMaintenanceLibrary;
     float StatusRefreshAt=0;
-    void EnsureSkillCooldownOverlay();
-    UPROPERTY(Transient) TMap<FName, TObjectPtr<UBorder>> EffectWidgets;
+    UPROPERTY(Transient) TMap<FName, TObjectPtr<UUserWidget>> EffectWidgets;
 };

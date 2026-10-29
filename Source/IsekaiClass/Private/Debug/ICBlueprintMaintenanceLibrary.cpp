@@ -35,6 +35,7 @@
 #include "UI/Dialogue/ICAffinityHeartsWidget.h"
 #include "UI/Gameplay/ICCombatFeedbackWidget.h"
 #include "UI/Gameplay/ICMovementCooldownWidget.h"
+#include "UI/Gameplay/ICCharacterStatusWidget.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Core/Flow/ICGameFlowSubsystem.h"
@@ -218,6 +219,42 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
     if(!Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels,Flags))return false;
     TArray64<uint8> PNG;FImageUtils::PNGCompressImageArray(Width,Height,Pixels,PNG);
     return FFileHelper::SaveArrayToFile(PNG,*File);
+#else
+    return false;
+#endif
+}
+
+bool UICBlueprintMaintenanceLibrary::PrepareManagedWidget(UBlueprint* Blueprint,FName Kind)
+{
+#if WITH_EDITOR
+    auto* BP=Cast<UWidgetBlueprint>(Blueprint);if(!BP||!BP->WidgetTree)return false;
+    BP->Modify();
+    if(Kind==TEXT("Prologue"))
+        for(const auto* Name:{TEXT("Prompt"),TEXT("SkipPrompt")})
+            if(auto* Label=Cast<UTextBlock>(BP->WidgetTree->FindWidget(Name))){Label->SetAutoWrapText(false);Label->SetWrapTextAt(0);}
+    if(Kind==TEXT("Status"))
+    {
+        UICCharacterStatusWidget::BuildSkillCooldownOverlay(BP->WidgetTree);
+    }
+    if(Kind==TEXT("HUD"))
+    {
+        ICGameplayLayout::EnsureGameClock(BP->WidgetTree);
+        if(!BP->WidgetTree->FindWidget(TEXT("HUD_AimReticle")))
+        {
+            auto* Type=LoadClass<UUserWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Crosshair.WBP_IC_Crosshair_C"));
+            auto* Canvas=Cast<UCanvasPanel>(BP->WidgetTree->RootWidget);if(!Type||!Canvas)return false;
+            auto* Aim=BP->WidgetTree->ConstructWidget<UUserWidget>(Type,TEXT("HUD_AimReticle"));Aim->SetVisibility(ESlateVisibility::Collapsed);
+            auto* S=Canvas->AddChildToCanvas(Aim);S->SetAnchors(FAnchors(.5,.5));S->SetAlignment({.5,.5});S->SetSize({64,64});
+        }
+    }
+    if(Kind==TEXT("Feedback")&&!BP->WidgetTree->FindWidget(TEXT("TXT_LockOn")))
+    {
+        auto* Canvas=Cast<UCanvasPanel>(BP->WidgetTree->FindWidget(TEXT("FeedbackCanvas")));if(!Canvas)return false;
+        auto* Marker=BP->WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),TEXT("TXT_LockOn"));Marker->SetText(NSLOCTEXT("ICCombat","LockOnMarker","◎"));Marker->SetFont(ICFrontendLayout::Font(34,true));Marker->SetJustification(ETextJustify::Center);Marker->SetColorAndOpacity(FLinearColor(1,.76f,.18f));Marker->SetVisibility(ESlateVisibility::Collapsed);
+        auto* S=Canvas->AddChildToCanvas(Marker);S->SetSize({64,64});S->SetAlignment({.5f,.5f});
+    }
+    BP->WidgetTree->ForEachWidget([&](UWidget* W){W->bIsVariable=true;BP->WidgetVariableNameToGuidMap.FindOrAdd(W->GetFName(),FGuid::NewGuid());});
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);return true;
 #else
     return false;
 #endif

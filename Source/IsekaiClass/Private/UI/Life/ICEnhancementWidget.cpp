@@ -1,4 +1,5 @@
 #include "UI/Life/ICEnhancementWidget.h"
+#include "UI/Framework/ICWidgetTemplates.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "UI/Framework/ICFrontendLayout.h"
@@ -35,7 +36,7 @@ void UICEnhancementWidget::BuildLayout(UWidgetTree* T)
 }
 void UICEnhancementWidget::NativeConstruct()
 {
-    Super::NativeConstruct();if(!GetWidgetFromName(TEXT("EnhancePages")))BuildLayout(WidgetTree);
+    Super::NativeConstruct();
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_AttemptEnhance"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::Attempt);
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_CancelEnhance"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::Cancel);
 }
@@ -46,10 +47,10 @@ void UICEnhancementWidget::RefreshWeapons()
     Weapons=I->GetEnhancementTargets();auto* Scroll=CastChecked<UScrollBox>(GetWidgetFromName(TEXT("EnhanceWeapons")));Scroll->ClearChildren();WeaponIndex=FMath::Clamp(WeaponIndex,0,FMath::Max(0,Weapons.Num()-1));
     for(int32 N=0;N<Weapons.Num();++N)
     {
-        const auto& W=Weapons[N];auto* B=WidgetTree->ConstructWidget<UICEnhancementChoiceButton>();B->WeaponID=W.Item.InstanceID;B->Screen=this;B->OnClicked.AddDynamic(B,&UICEnhancementChoiceButton::Choose);
-        B->SetContent(Label(WidgetTree,NAME_None,FText::Format(NSLOCTEXT("ICEnhance","WeaponRow","{0} +{1} · {2}{3}"),Name(I,W.Item.ItemID),W.Item.Upgrade,W.Location,W.Item.bLocked?NSLOCTEXT("ICEnhance","Locked"," · 잠금"):FText::GetEmpty())));B->SetBackgroundColor(N==WeaponIndex?FLinearColor(.2f,.5f,.45f):FLinearColor(.08f,.13f,.2f));Scroll->AddChild(B);
+        const auto& W=Weapons[N];auto* B=ICWidgetTemplates::Create<UICEnhancementChoiceButton>(this,TEXT("WBP_IC_EnhancementChoice"));B->WeaponID=W.Item.InstanceID;B->Screen=this;B->OnClicked.AddDynamic(B,&UICEnhancementChoiceButton::Choose);
+        B->SetCaption(FText::Format(NSLOCTEXT("ICEnhance","WeaponRow","{0} +{1} · {2}{3}"),Name(I,W.Item.ItemID),W.Item.Upgrade,W.Location,W.Item.bLocked?NSLOCTEXT("ICEnhance","Locked"," · 잠금"):FText::GetEmpty()));B->SetSelected(N==WeaponIndex);Scroll->AddChild(B);
     }
-    if(Weapons.IsEmpty())Scroll->AddChild(Label(WidgetTree,NAME_None,NSLOCTEXT("ICEnhance","NoWeapons","강화할 무기가 없습니다.")));
+    if(Weapons.IsEmpty())Scroll->AddChild(ICWidgetTemplates::Text(this,NSLOCTEXT("ICEnhance","NoWeapons","강화할 무기가 없습니다.")));
 }
 void UICEnhancementWidget::SelectWeapon(FGuid ID)
 {
@@ -66,13 +67,13 @@ void UICEnhancementWidget::RefreshDetails()
     auto* Table=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Equipment/DT_IC_EnhancementOre.DT_IC_EnhancementOre"));
     if(Table)for(const auto& Row:Table->GetRowNames())if(const auto* R=Table->FindRow<FICEnhancementOreRow>(Row,TEXT("Enhance"),false);R&&I->CountItem(R->ItemID)>0)
     {
-        Ores.Add(R->ItemID);auto* B=WidgetTree->ConstructWidget<UICEnhancementChoiceButton>();B->OreID=R->ItemID;B->Screen=this;B->OnClicked.AddDynamic(B,&UICEnhancementChoiceButton::Choose);
-        B->SetContent(Label(WidgetTree,NAME_None,FText::Format(NSLOCTEXT("ICEnhance","OreRow","{0} · 보유 {1}개 · 소모 {2}개 · 확률 +{3}%"),Name(I,R->ItemID),I->CountItem(R->ItemID),R->Count,FText::AsNumber(R->SuccessBonus*100)),16));B->SetBackgroundColor(SelectedOre==R->ItemID?FLinearColor(.2f,.5f,.45f):FLinearColor(.08f,.13f,.2f));Scroll->AddChild(B);
+        Ores.Add(R->ItemID);auto* B=ICWidgetTemplates::Create<UICEnhancementChoiceButton>(this,TEXT("WBP_IC_EnhancementChoice"));B->OreID=R->ItemID;B->Screen=this;B->OnClicked.AddDynamic(B,&UICEnhancementChoiceButton::Choose);
+        B->SetCaption(FText::Format(NSLOCTEXT("ICEnhance","OreRow","{0} · 보유 {1}개 · 소모 {2}개 · 확률 +{3}%"),Name(I,R->ItemID),I->CountItem(R->ItemID),R->Count,FText::AsNumber(R->SuccessBonus*100)));B->SetSelected(SelectedOre==R->ItemID);Scroll->AddChild(B);
     }
     double P=0;int32 Cost=0,Count=0;FText Reason;const bool Ready=I->GetEnhancementOffer(SelectedWeapon,SelectedOre,P,Cost,Count,Reason);
     Set(this,TEXT("EnhanceOffer"),Ready?FText::Format(NSLOCTEXT("ICEnhance","Offer","다음 +{0} · 성공 확률 {1}% · {2}G / 보유 {3}G"),W->Item.Upgrade+1,FText::AsNumber(P*100),Cost,PC->Gold):Reason);
     GetWidgetFromName(TEXT("BTN_AttemptEnhance"))->SetIsEnabled(Ready&&!SelectedOre.IsNone()&&PC->Gold>=Cost);
-    if(Ores.IsEmpty())Scroll->AddChild(Label(WidgetTree,NAME_None,NSLOCTEXT("ICEnhance","NoOres","가방에 강화용 광석이 없습니다.")));
+    if(Ores.IsEmpty())Scroll->AddChild(ICWidgetTemplates::Text(this,NSLOCTEXT("ICEnhance","NoOres","가방에 강화용 광석이 없습니다.")));
 }
 void UICEnhancementWidget::Attempt()
 {

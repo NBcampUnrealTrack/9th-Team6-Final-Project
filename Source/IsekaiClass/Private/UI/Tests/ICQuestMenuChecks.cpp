@@ -37,7 +37,39 @@ bool FICQuestMenuCheck::RunTest(const FString&)
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* Q=GI->GetSubsystem<UICQuestSubsystem>();
     const FName Talk=TEXT("QST_TEST_TALK_001"),Collect=TEXT("QST_TEST_COLLECT_001");FICDefinitionResult R;
     auto* TalkRow=const_cast<FICQuestRow*>(D->Find<FICQuestRow>(Talk,R));auto* CollectRow=const_cast<FICQuestRow*>(D->Find<FICQuestRow>(Collect,R));
-    if(!TestNotNull(TEXT("Real talk definition"),TalkRow)||!TestNotNull(TEXT("Real collect definition"),CollectRow))return false;
+    if(!TalkRow||!CollectRow)
+    {
+        // Production scenarios replaced the original sample quests. Exercise the current DT
+        // and its WBP reward rows without changing project definitions or leaking this world.
+        FICWorldState Current;Current.bPlayerCreated=true;Current.PlayerName=TEXT("퀘스트 UI 검증");Current.FirstSkill=TEXT("SKL_START_SWORD_001");
+        FICCharacterState Character;Character.CharacterId=UICWorldStateSubsystem::PlayerId();Character.Kind=EICCharacterKind::Player;Current.Characters.Add(Character.CharacterId,Character);
+        TestTrue(TEXT("Initialize current scenario preview"),State->RestoreState(Current));Player->InitializeState(Character.CharacterId);Player->Inventory->BindWorldState(State);PC->bCreated=true;
+        TArray<FName> IDs;D->GetDefinitionIDs(EICDefinitionType::Quest,IDs);IDs.Sort(FNameLexicalLess());
+        auto* Type=LoadClass<UICQuestDetailWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_QuestDetail.WBP_IC_QuestDetail_C"));
+        auto* Detail=Type?CreateWidget<UICQuestDetailWidget>(PC,Type):nullptr;
+        if(TestNotNull(TEXT("Current quest detail WBP loads"),Detail)&&TestTrue(TEXT("Current quest DT is populated"),!IDs.IsEmpty()))
+        {
+            const auto Surface=Detail->TakeWidget();const int32 Gold=State->ExportState().Gold;
+            Detail->Present(IDs[0]);auto* Entries=Cast<UVerticalBox>(Detail->GetWidgetFromName(TEXT("RewardEntries")));
+            if(TestNotNull(TEXT("Reward entries are saved in the WBP"),Entries))
+            {
+                const int32 Count=Entries->GetChildrenCount();TestTrue(TEXT("Current quest displays reward information"),Count>0);
+                for(auto* Child:Entries->GetAllChildren())
+                {
+                    auto* Row=Cast<UUserWidget>(Child);
+                    if(TestNotNull(TEXT("Every reward row is a WBP instance"),Row))
+                    {
+                        TestTrue(TEXT("Reward row uses the designer asset"),Row->GetClass()->GetPathName().Contains(TEXT("WBP_IC_QuestReward")));
+                        TestNotNull(TEXT("Reward label is editable in WBP"),Row->GetWidgetFromName(TEXT("TXT_Label")));
+                    }
+                }
+                Detail->Present(IDs[0]);TestEqual(TEXT("Refreshing current rewards replaces rather than duplicates rows"),Entries->GetChildrenCount(),Count);
+                TestEqual(TEXT("Reward preview never grants gold"),State->ExportState().Gold,Gold);
+            }
+            Detail->ReleaseSlateResources(true);
+        }
+        Player->ReleaseForLoad();GI->Shutdown();GEngine->DestroyWorldContext(World);World->DestroyWorld(false);return !HasAnyErrors();
+    }
     TGuardValue<int32> TalkGoal(TalkRow->ObjectiveGroups[0].Objectives[0].RequiredCount,3);
     TGuardValue<int32> CollectGoal(CollectRow->ObjectiveGroups[0].Objectives[0].RequiredCount,3);
     FICWorldState Data;Data.bPlayerCreated=true;Data.PlayerName=TEXT("퀘스트검증");Data.FirstSkill=TEXT("SKL_START_SWORD_001");

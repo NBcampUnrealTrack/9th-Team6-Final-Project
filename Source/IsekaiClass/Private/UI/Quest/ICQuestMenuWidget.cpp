@@ -1,4 +1,5 @@
 #include "UI/Quest/ICQuestMenuWidget.h"
+#include "UI/Framework/ICWidgetTemplates.h"
 #include "Settings/ICGameUserSettings.h"
 #include "UI/Quest/ICQuestDisplay.h"
 #include "UI/Framework/ICFrontendLayout.h"
@@ -67,7 +68,7 @@ void SetMessage(UICQuestDetailWidget* W,FText Text)
 UClass* QuestMenuWidgetClass(const TCHAR* Asset,UClass* Fallback)
 {
     const auto Path=FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Asset,Asset);
-    auto* C=LoadClass<UUserWidget>(nullptr,*Path);return C?C:Fallback;
+    auto* C=LoadClass<UUserWidget>(nullptr,*Path);return C;
 }
 void PresentRewards(UICQuestDetailWidget* Widget,const FICQuestRow& Quest,UICDefinitionSubsystem* Definitions)
 {
@@ -78,27 +79,12 @@ void PresentRewards(UICQuestDetailWidget* Widget,const FICQuestRow& Quest,UICDef
     {
         Summary.Add(Label);
         if(!Entries)return;
-        auto* Tree=Widget->WidgetTree.Get();
-        auto* Card=Tree->ConstructWidget<UBorder>();Card->SetPadding(FMargin(12,8));
-        Card->SetBrushColor(FLinearColor(.065f,.09f,.14f));
-        // The row receives hover events; decorative children do not intercept them.
-        Card->SetVisibility(ESlateVisibility::Visible);
+        auto* Card=ICWidgetTemplates::Create(Widget,TEXT("WBP_IC_QuestReward"));if(!Card)return;
         Card->SetToolTipText(Tooltip.IsEmpty()?Label:Tooltip);
-        auto* Row=Tree->ConstructWidget<UHorizontalBox>();Card->SetContent(Row);
-        auto* IconBox=Tree->ConstructWidget<USizeBox>();IconBox->SetWidthOverride(36);IconBox->SetHeightOverride(36);
-        auto* IconSlot=Row->AddChildToHorizontalBox(IconBox);IconSlot->SetPadding(FMargin(0,0,12,0));IconSlot->SetVerticalAlignment(VAlign_Center);
-        if(auto* Texture=Icon.LoadSynchronous())
-        {
-            auto* Image=Tree->ConstructWidget<UImage>();Image->SetBrushFromTexture(Texture);
-            Image->SetVisibility(ESlateVisibility::HitTestInvisible);IconBox->AddChild(Image);
-        }
-        else
-        {
-            auto* Text=QuestMenuLabel(Tree,NAME_None,Badge,16);Text->SetColorAndOpacity(Color);Text->SetJustification(ETextJustify::Center);
-            auto* Slot=CastChecked<USizeBoxSlot>(IconBox->AddChild(Text));Slot->SetVerticalAlignment(VAlign_Center);
-        }
-        auto* Text=QuestMenuLabel(Tree,NAME_None,Label,17,true);Text->SetColorAndOpacity(Color);
-        auto* Slot=Row->AddChildToHorizontalBox(Text);Slot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));Slot->SetVerticalAlignment(VAlign_Center);
+        auto* Image=CastChecked<UImage>(Card->GetWidgetFromName(TEXT("IMG_Icon")));auto* Texture=Icon.LoadSynchronous();
+        Image->SetBrushFromTexture(Texture);Image->SetVisibility(Texture?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
+        auto* BadgeText=CastChecked<UTextBlock>(Card->GetWidgetFromName(TEXT("TXT_Badge")));BadgeText->SetText(Badge);BadgeText->SetColorAndOpacity(Color);BadgeText->SetVisibility(Texture?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);
+        auto* LabelText=CastChecked<UTextBlock>(Card->GetWidgetFromName(TEXT("TXT_Label")));LabelText->SetText(Label);LabelText->SetColorAndOpacity(Color);
         QuestMenuRow(Entries,Card,6);
     };
     const FLinearColor Normal(.92f,.94f,.98f);
@@ -152,7 +138,7 @@ bool UICQuestMenuEntryWidget::BuildLayout(UWidgetTree* T)
 }
 void UICQuestMenuEntryWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Quest")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Pick);
 }
 void UICQuestMenuEntryWidget::Present(FName ID,FText Title,FText Summary,bool Selected)
@@ -194,29 +180,7 @@ bool UICQuestDetailWidget::BuildLayout(UWidgetTree* T)
 }
 void UICQuestDetailWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
-    // Upgrade existing detail Blueprints in place, keeping their authored layout.
-    if(!GetWidgetFromName(TEXT("RewardEntries")))
-        if(auto* Summary=GetWidgetFromName(TEXT("TXT_Rewards")))
-            if(auto* Column=Cast<UVerticalBox>(Summary->GetParent()))
-            {
-                auto* Entries=WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("RewardEntries"));
-                auto* RewardSlot=Cast<UVerticalBoxSlot>(Column->InsertChildAt(Column->GetChildIndex(Summary),Entries));
-                if(RewardSlot)RewardSlot->SetPadding(FMargin(0,0,0,12));
-                Summary->SetVisibility(ESlateVisibility::Collapsed);
-            }
-    // Existing Widget Blueprints also gain the new action without rebuilding their layout.
-    if (!GetWidgetFromName(TEXT("BTN_ToggleGuide")))
-    {
-        auto* BackButton = GetWidgetFromName(TEXT("BTN_Back"));
-        auto* Column = BackButton ? Cast<UVerticalBox>(BackButton->GetParent()) : nullptr;
-        if (Column)
-        {
-            auto* Button = QuestMenuButton(WidgetTree,TEXT("BTN_ToggleGuide"),FText::GetEmpty());
-            auto* ButtonSlot = Cast<UVerticalBoxSlot>(Column->InsertChildAt(Column->GetChildIndex(BackButton),Button));
-            if (ButtonSlot) ButtonSlot->SetPadding(FMargin(0,0,0,10));
-        }
-    }
+    Super::NativeOnInitialized();
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_ToggleGuide"))))
         Button->OnClicked.AddUniqueDynamic(this,&ThisClass::ToggleGuide);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Start")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Start);
@@ -290,7 +254,7 @@ bool UICQuestMenuWidget::BuildLayout(UWidgetTree* T)
 }
 void UICQuestMenuWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);SetIsFocusable(true);
+    Super::NativeOnInitialized();SetIsFocusable(true);
     auto* Detail=CastChecked<UICQuestDetailWidget>(GetWidgetFromName(TEXT("QuestDetail")));
     Detail->OnStart.AddUniqueDynamic(this,&ThisClass::StartAction);Detail->OnAbandon.AddUniqueDynamic(this,&ThisClass::AbandonAction);Detail->OnBack.AddUniqueDynamic(this,&ThisClass::BackToList);
     RefreshQuests();

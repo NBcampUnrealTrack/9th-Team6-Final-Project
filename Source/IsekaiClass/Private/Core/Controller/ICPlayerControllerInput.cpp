@@ -74,7 +74,7 @@ void AICPlayerController::SetupInputComponent()
 }
 
 bool AICPlayerController::CanHandleGameplayInput() const
-{ IC_TRACE_FUNCTION();const auto* C=Cast<AICPlayerCharacter>(GetPawn());return IsLocalController()&&bCreated&&!bDead&&(Menu.IsEmpty()||(IsLiveNPCDialogue()&&GetDialoguePresentation().bAllowPlayerMovement))&&!IsPaused()&&GetPawn()&&(!C||!C->LifeActions||!C->LifeActions->IsSleeping()); }
+{ IC_TRACE_FUNCTION();const auto* C=Cast<AICPlayerCharacter>(GetPawn());return IsLocalController()&&bCreated&&!bDead&&Menu.IsEmpty()&&!IsPaused()&&GetPawn()&&(!C||!C->LifeActions||!C->LifeActions->IsSleeping()); }
 
 void AICPlayerController::FlushPressedKeys()
 {

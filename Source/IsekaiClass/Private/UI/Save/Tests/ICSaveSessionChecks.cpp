@@ -154,8 +154,10 @@ bool FICSaveSessionAssetsCheck::RunTest(const FString& Parameters)
     TestNull(TEXT("Save list screenshot removed"),WidgetBP->WidgetTree->FindWidget(TEXT("IC_SaveLoad_Thumbnail")));
     TestNull(TEXT("Slot screenshot removed"),SlotBP->WidgetTree->FindWidget(TEXT("IC_SaveSlot_Thumbnail")));
     TestNull(TEXT("Confirmation screenshot removed"),ModalBP->WidgetTree->FindWidget(TEXT("IC_LoadConfirm_Thumbnail")));
-    for(int32 I=0;I<4;++I)
-        TestNotNull(TEXT("Four portrait placeholders exist"),SlotBP->WidgetTree->FindWidget(FName(*FString::Printf(TEXT("IC_SaveSlot_Party%d_Empty"),I))));
+    for(int32 I=0;I<4;++I)TestNotNull(TEXT("Single-row save list keeps player and companion portraits"),SlotBP->WidgetTree->FindWidget(FName(*FString::Printf(TEXT("IC_SaveSlot_Party%d"),I))));
+    TestNull(TEXT("Single-column save list omits the right-hand details pane"),WidgetBP->WidgetTree->FindWidget(TEXT("IC_SaveLoad_Detail")));
+    if(auto* Label=Cast<UTextBlock>(SlotBP->WidgetTree->FindWidget(TEXT("IC_SaveSlot_Label"))))
+        TestFalse(TEXT("Save row text never wraps"),Label->GetAutoWrapText());
     TestNull(TEXT("No fourth companion slot"),SlotBP->WidgetTree->FindWidget(TEXT("IC_SaveSlot_Party4")));
     for(const auto& Pair:TArray<TPair<FName,UClass*>>{{TEXT("ConfirmWidgetClass"),ModalBP->GeneratedClass.Get()},{TEXT("SlotWidgetClass"),SlotBP->GeneratedClass.Get()}})
         TestTrue(TEXT("Save UI child widget class binding"),FindFProperty<FClassProperty>(UICSaveLoadWidget::StaticClass(),Pair.Key)->GetPropertyValue_InContainer(WidgetBP->GeneratedClass->GetDefaultObject()).Get()==Pair.Value);

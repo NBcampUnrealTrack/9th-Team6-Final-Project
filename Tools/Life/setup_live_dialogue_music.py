@@ -23,7 +23,7 @@ def blueprint(path,parent):
         bp=assets.create_asset(name,folder,u.Blueprint,factory)
     assert bp;return bp
 dialogue=table(game+'/Data/DataTable/NPC/DT_IC_DialoguePresentation','ICDialoguePresentationRow',[
-    dict(Name='Default',bUseCloseUpCamera=True,bAllowPlayerMovement=True,CloseDistanceCm=500,HeadBone='J_Bip_C_Head',CameraDistanceCm=220,CameraHeightCm=10,CameraSideOffsetCm=0,FocusOffset='(X=0,Y=0,Z=-12)',FieldOfView=40,FollowSpeed=12,CameraCollisionRadiusCm=8,bHidePlayerInCamera=True)
+    dict(Name='Default',bUseCloseUpCamera=True,bAllowPlayerMovement=False,CloseDistanceCm=500,HeadBone='J_Bip_C_Head',CameraDistanceCm=220,CameraHeightCm=10,CameraSideOffsetCm=0,FocusOffset='(X=0,Y=0,Z=-12)',FieldOfView=40,FollowSpeed=12,CameraCollisionRadiusCm=8,bHidePlayerInCamera=True)
 ],'NPC/DT_IC_DialoguePresentation.csv')
 tracks=[('BGM_Village','마을','Merchant'),('BGM_Outside','마을 밖','Flying_Through_Mountains'),('BGM_Area_01','다른 구역 1','Ocean_Waves'),('BGM_Area_02','다른 구역 2','Inner_Dreams'),('BGM_Combat','전투 중','Enemy_Scrolls')]
 music=table(game+'/Data/DataTable/Audio/DT_IC_BGM','ICBGMRow',[

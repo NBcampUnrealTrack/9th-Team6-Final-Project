@@ -35,6 +35,8 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "InputMappingContext.h"
+#include "InputAction.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICDialogueAffinityCheck, "IC.UI.DialogueAffinity",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -221,13 +223,18 @@ bool FICDialogueAffinityCheck::RunTest(const FString& Parameters)
         const auto BeforeRepeat=CastChecked<UTextBlock>(Dialogue->GetWidgetFromName(TEXT("DialogueText")))->GetText();
         Key(EKeys::Enter,true);
         TestEqual(TEXT("Held Enter cannot repeat an interaction"),CastChecked<UTextBlock>(Dialogue->GetWidgetFromName(TEXT("DialogueText")))->GetText().ToString(),BeforeRepeat.ToString());
-        Key(EKeys::S);TestTrue(TEXT("S selects the next NPC choice"),EntryAt(1)->bSelected&&!EntryAt(0)->bSelected);
+        const auto OriginalContext=PC->DefaultMappingContext;const auto OriginalMove=PC->MoveAction;const auto OriginalRules=PC->DialoguePresentationTable;
+        auto* NavigationContext=NewObject<UInputMappingContext>(PC);auto* Move=NewObject<UInputAction>(PC);
+        NavigationContext->MapKey(Move,EKeys::W);NavigationContext->MapKey(Move,EKeys::S);PC->MoveAction=Move;PC->DefaultMappingContext=NavigationContext;
+        auto* LegacyRules=NewObject<UDataTable>(PC);LegacyRules->RowStruct=FICDialoguePresentationRow::StaticStruct();FICDialoguePresentationRow Legacy;Legacy.bAllowPlayerMovement=true;LegacyRules->AddRow(TEXT("Default"),Legacy);PC->DialoguePresentationTable=LegacyRules;
+        Key(EKeys::S);TestTrue(TEXT("S selects the next NPC choice even with W/S gameplay mappings"),EntryAt(1)->bSelected&&!EntryAt(0)->bSelected);
         Key(EKeys::W);TestTrue(TEXT("W selects the previous NPC choice"),EntryAt(0)->bSelected);
         Key(EKeys::W);TestTrue(TEXT("W wraps to the last available NPC choice"),EntryAt(3)->bSelected);
         Key(EKeys::S);TestTrue(TEXT("S wraps to the first available NPC choice"),EntryAt(0)->bSelected);
         CastChecked<UButton>(EntryAt(2)->GetWidgetFromName(TEXT("EntryButton")))->SetIsEnabled(false);
         Key(EKeys::S);Key(EKeys::S);TestTrue(TEXT("Keyboard navigation skips disabled NPC choices"),EntryAt(3)->bSelected);
         Key(EKeys::W);TestTrue(TEXT("Reverse navigation also skips disabled choices"),EntryAt(1)->bSelected);
+        PC->DefaultMappingContext=OriginalContext;PC->MoveAction=OriginalMove;PC->DialoguePresentationTable=OriginalRules;
         Key(EKeys::Enter);
         TestFalse(TEXT("Enter opens the selected quest screen"),CastChecked<UTextBlock>(Dialogue->GetWidgetFromName(TEXT("DialogueText")))->GetText().IsEmpty());
         TestTrue(TEXT("The next NPC screen also has an automatic keyboard selection"),EntryAt(0)->bSelected);

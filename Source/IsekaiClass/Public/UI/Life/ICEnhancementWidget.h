@@ -2,11 +2,12 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
+#include "UI/Framework/ICActionButtonWidget.h"
 #include "Inventory/Enhancement/ICEnhancementTypes.h"
 #include "ICEnhancementWidget.generated.h"
 class UICEnhancementWidget;
 UCLASS()
-class ISEKAICLASS_API UICEnhancementChoiceButton : public UButton
+class ISEKAICLASS_API UICEnhancementChoiceButton : public UICActionButtonWidget
 {
     GENERATED_BODY()
 public:

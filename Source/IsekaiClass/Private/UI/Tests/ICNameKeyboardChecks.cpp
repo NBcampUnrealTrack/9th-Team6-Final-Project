@@ -22,9 +22,15 @@ bool FICNameKeyboardChecks::RunTest(const FString& Parameters)
     TestEqual(TEXT("Limit preserves existing name"),Name.Text,FString(TEXT("abcdefghijkl")));
     TestEqual(TEXT("G is menu confirm"),UICGameUserSettings::MenuKey(EKeys::G),EKeys::Enter);
     TestEqual(TEXT("F is menu confirm"),UICGameUserSettings::MenuKey(EKeys::F),EKeys::Enter);
-    TestEqual(TEXT("All prologue lines retained"),UICPrologueWidget::Lines().Num(),55);
-    TestEqual(TEXT("Opening sentence retained"),UICPrologueWidget::Lines()[0],FString(TEXT("나는 어느 날 갑자기 이세계에 떨어졌다.")));
-    TestEqual(TEXT("Last sentence retained"),UICPrologueWidget::Lines().Last(),FString(TEXT("우선 친구들부터 만나러 가자.")));
+    auto* Script=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/UI/DT_IC_Prologue.DT_IC_Prologue"));
+    if(TestNotNull(TEXT("Prologue text is authored in a DT"),Script))
+    {
+        TestEqual(TEXT("All prologue lines retained"),Script->GetRowNames().Num(),55);
+        const auto* First=Script->FindRow<FICPrologueRow>(TEXT("Line_001"),TEXT("Test"));
+        const auto* Last=Script->FindRow<FICPrologueRow>(TEXT("Line_055"),TEXT("Test"));
+        if(TestNotNull(TEXT("First line"),First))TestEqual(TEXT("Opening sentence retained"),First->Text.ToString(),FString(TEXT("나는 어느 날 갑자기 이세계에 떨어졌다.")));
+        if(TestNotNull(TEXT("Last line"),Last))TestEqual(TEXT("Last sentence retained"),Last->Text.ToString(),FString(TEXT("우선 친구들부터 만나러 가자.")));
+    }
     return !HasAnyErrors();
 }
 #endif

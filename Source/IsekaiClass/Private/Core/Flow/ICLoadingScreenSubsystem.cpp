@@ -1,4 +1,5 @@
 #include "Core/Flow/ICLoadingScreenSubsystem.h"
+#include "Blueprint/UserWidget.h"
 #include "UI/Framework/ICText.h"
 #include "Core/Flow/ICGameFlowSubsystem.h"
 #include "Engine/Engine.h"
@@ -48,36 +49,14 @@ void UICLoadingScreenSubsystem::BeforeMap(const FString& MapName)
         (GetWorld() && GetWorld()->WorldType == EWorldType::PIE))
         return;
     FLoadingScreenAttributes Screen;
-    // Slate's loading thread outlives the old world's GC; keep its UObject font alive.
-    LoadingFont=LoadObject<UFont>(nullptr,TEXT("/Game/IsekaiClass/UI/Fonts/FONT_IC_UI.FONT_IC_UI"));
-    Screen.bAutoCompleteWhenLoadingCompletes = true;
-    Screen.bMoviesAreSkippable = false;
-    Screen.MinimumLoadingScreenDisplayTime = 0.4f;
-    Screen.WidgetLoadingScreen =
-        SNew(SBorder).Padding(0).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
-        .BorderBackgroundColor(FLinearColor::Black)
-        [SNew(SScaleBox).Stretch(EStretch::ScaleToFit).HAlign(HAlign_Center).VAlign(VAlign_Center)
-        [SNew(SBox).WidthOverride(ICDisplayPolicy::DesignWidth).HeightOverride(ICDisplayPolicy::DesignHeight)
-        [
-        SNew(SBorder)
-            .BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
-            .BorderBackgroundColor(FLinearColor(0.025f, 0.035f, 0.06f))
-            .HAlign(HAlign_Center)
-            .VAlign(VAlign_Center)
-                [SNew(SVerticalBox) +
-                 SVerticalBox::Slot()
-                     .AutoHeight()
-                     .HAlign(HAlign_Center)
-                     .Padding(0, 0, 0, 28)[SNew(STextBlock)
-                                               .Text(ICText::Get(TEXT("Title")))
-                                               .Font(ICFrontendLayout::Font(36, true))] +
-                 SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 18)[SNew(SThrobber)] +
-                 SVerticalBox::Slot().AutoHeight().HAlign(
-                     HAlign_Center)[SNew(STextBlock)
-                                        .Text(ICText::Get(TEXT("Loading")))
-                                        .Font(ICFrontendLayout::Font(20))]]]]];
+    auto* Type=LoadClass<UUserWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_LoadingMovie.WBP_IC_LoadingMovie_C"));
+    if(!ensureMsgf(Type,TEXT("WBP_IC_LoadingMovie is required")))return;
+    // The GameInstance owns the saved WBP throughout map travel.
+    MovieWidget=CreateWidget<UUserWidget>(GetGameInstance(),Type);if(!MovieWidget)return;
     if(GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->bPendingNewGame)
-        Screen.WidgetLoadingScreen=SNew(SBorder).Padding(0).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor::Black);
+        if(auto* Body=MovieWidget->GetWidgetFromName(TEXT("MovieBody")))Body->SetVisibility(ESlateVisibility::Collapsed);
+    Screen.bAutoCompleteWhenLoadingCompletes=true;Screen.bMoviesAreSkippable=false;Screen.MinimumLoadingScreenDisplayTime=.4f;
+    Screen.WidgetLoadingScreen=MovieWidget->TakeWidget();
     GetMoviePlayer()->SetupLoadingScreen(Screen);
 }
 

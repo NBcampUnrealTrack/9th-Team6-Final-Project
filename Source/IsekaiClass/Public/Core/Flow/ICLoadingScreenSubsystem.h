@@ -13,7 +13,7 @@ public:
     void Arm();
 
 private:
-    UPROPERTY(Transient) TObjectPtr<class UFont> LoadingFont;
+    UPROPERTY(Transient) TObjectPtr<class UUserWidget> MovieWidget;
     bool bArmed = false;
     void BeforeMap(const FString& MapName);
     void AfterMap(UWorld* World);

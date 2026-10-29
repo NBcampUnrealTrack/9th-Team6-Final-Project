@@ -21,7 +21,7 @@ const TArray<FName>& UICGameMenuWidget::Tabs()
 void UICGameMenuWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-    if (!WidgetTree->RootWidget) ICFrontendLayout::Build(WidgetTree, TEXT("GameMenu"));
+
     SetIsFocusable(true);
     for (int32 Index = 0; Index < Tabs().Num(); ++Index)
         if (auto* Button = Cast<UButton>(GetWidgetFromName(FName(*(TEXT("TAB_") + Tabs()[Index].ToString())))))

@@ -1,5 +1,6 @@
 #include "UI/Save/ICSaveLoadWidget.h"
 #include "UI/Framework/ICText.h"
+#include "Settings/ICGameUserSettings.h"
 #include "UI/Management/ICUIManagerSubsystem.h"
 #include "UI/Save/ICSaveSlotWidget.h"
 #include "UI/Save/ICLoadConfirmWidget.h"
@@ -13,6 +14,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Components/ScrollBox.h"
+#include "HAL/PlatformTime.h"
 
 UICSaveSubsystem* UICSaveLoadWidget::GetSaves() const
 {
@@ -73,10 +75,45 @@ void UICSaveLoadWidget::NativeDestruct()
 FReply UICSaveLoadWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& KeyEvent)
 {
     IC_TRACE_FUNCTION();
-    if((KeyEvent.GetKey()==EKeys::G||KeyEvent.GetKey()==EKeys::F||KeyEvent.GetKey()==EKeys::Enter)&&HasFocusedDescendants())return Super::NativeOnPreviewKeyDown(Geometry,KeyEvent);
-    if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))
-        if(PC->HandleSessionKey(KeyEvent.GetKey(),KeyEvent.IsRepeat()))return FReply::Handled();
-    return Super::NativeOnPreviewKeyDown(Geometry,KeyEvent);
+    auto* PC=Cast<AICPlayerController>(GetOwningPlayer());if(!PC)return Super::NativeOnPreviewKeyDown(Geometry,KeyEvent);
+    const FKey Key=UICGameUserSettings::MenuKey(KeyEvent.GetKey());
+    if(Key==EKeys::Escape){if(!KeyEvent.IsRepeat())HandleCloseClicked();return FReply::Handled();}
+    if(!GetIsEnabled()||PC->Menu==TEXT("Confirm")||(GetSaves()&&GetSaves()->bSaving))return FReply::Handled();
+    if(Key==EKeys::W||Key==EKeys::Up||Key==EKeys::S||Key==EKeys::Down)
+    {
+        TArray<int32> Slots;
+        const bool SaveMode=PC->GetSessionMenu()==TEXT("Save");
+        for(const auto& Info:DisplaySlots)if(!SaveMode||Info.Slot!=0)Slots.Add(Info.Slot);
+        if(!Slots.IsEmpty())
+        {
+            const int32 Current=Slots.IndexOfByKey(PC->GetSelectedSessionSlot());
+            const int32 Next=Current==INDEX_NONE?0:FMath::Clamp(Current+(Key==EKeys::S||Key==EKeys::Down?1:-1),0,Slots.Num()-1);
+            PC->SelectSessionSlot(Slots[Next]);
+            // The list screen owns navigation, including after a save refreshes its rows.
+            SetUserFocus(PC);
+        }
+    }
+    else if(Key==EKeys::Enter||Key==EKeys::SpaceBar)
+    {
+        if(!KeyEvent.IsRepeat())
+        {if(PC->GetSessionMenu()==TEXT("Save"))HandleSaveClicked();else HandleLoadClicked();}
+    }
+    else if(Key==EKeys::Delete&&!KeyEvent.IsRepeat())HandleDeleteClicked();
+    return FReply::Handled();
+}
+FReply UICSaveLoadWidget::NativeOnAnalogValueChanged(const FGeometry& Geometry,const FAnalogInputEvent& Event)
+{
+    if(Event.GetKey()==EKeys::Gamepad_LeftX)return FReply::Handled();
+    if(Event.GetKey()!=EKeys::Gamepad_LeftY)return Super::NativeOnAnalogValueChanged(Geometry,Event);
+    const float Value=Event.GetAnalogValue();
+    if(FMath::Abs(Value)<.25f){NextStickMove=0;return FReply::Handled();}
+    const double Now=FPlatformTime::Seconds();
+    if(FMath::Abs(Value)>.55f&&Now>=NextStickMove)
+    {
+        NextStickMove=Now+.18;
+        NativeOnPreviewKeyDown(Geometry,FKeyEvent(Value>0?EKeys::Up:EKeys::Down,FModifierKeysState(),Event.GetUserIndex(),false,0,0));
+    }
+    return FReply::Handled();
 }
 void UICSaveLoadWidget::SetNotice(const FText& Text)
 {
@@ -93,12 +130,20 @@ void UICSaveLoadWidget::RefreshSlots()
 {
     IC_TRACE_FUNCTION();auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
     if(!PC||!IC_SaveLoad_SlotList)return;
+    if(!SlotRows.IsEmpty()&&DisplaySlots.Num()==PC->SaveSlots.Num())
+    {
+        bool Same=true;
+        for(int32 I=0;I<DisplaySlots.Num();++I)
+            if(!FICSaveSlotInfo::StaticStruct()->CompareScriptStruct(&DisplaySlots[I],&PC->SaveSlots[I],0)){Same=false;break;}
+        if(Same){UpdateSelection();return;}
+    }
+    const bool RestoreFocus=HasAnyUserFocus()||HasFocusedDescendants();
     DisplaySlots=PC->SaveSlots;
     for(const auto& Row:SlotRows)if(Row)Row->OnSlotPicked.RemoveDynamic(this,&ThisClass::HandleSlotPicked);
     IC_SaveLoad_SlotList->ClearChildren();SlotRows.Reset();
     for(int32 Index=0;Index<DisplaySlots.Num();++Index)
     {
-        auto* Row=CreateWidget<UICSaveSlotWidget>(GetOwningPlayer(),SlotWidgetClass?SlotWidgetClass.Get():UICSaveSlotWidget::StaticClass());
+        auto* Row=CreateWidget<UICSaveSlotWidget>(GetOwningPlayer(),SlotWidgetClass);
         if(!Row)continue;
         Row->ConfigureData(DisplaySlots[Index],PortraitTextures);
         Row->OnSlotPicked.AddUniqueDynamic(this,&ThisClass::HandleSlotPicked);
@@ -106,6 +151,7 @@ void UICSaveLoadWidget::RefreshSlots()
         SlotRows.Add(Row);
     }
     UpdateSelection();
+    if(RestoreFocus&&GetIsEnabled())SetUserFocus(GetOwningPlayer());
 }
 void UICSaveLoadWidget::HandleSlotPicked(int32 SlotIndex)
 {

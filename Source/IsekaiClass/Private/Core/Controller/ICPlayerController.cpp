@@ -282,7 +282,7 @@ void AICPlayerController::UpdateScreens()
         if(!LoadingScreen)
         {
             auto* Class=LoadClass<UICLoadingWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_Loading.WBP_Loading_C"));
-            LoadingScreen=CreateWidget<UICLoadingWidget>(this,Class?Class:UICLoadingWidget::StaticClass());
+            LoadingScreen=CreateWidget<UICLoadingWidget>(this,Class);
             if(LoadingScreen&&FrontendUI)FrontendUI->OpenScreen(LoadingScreen,true,10000);
         }
     }
@@ -292,7 +292,7 @@ void AICPlayerController::UpdateScreens()
         if(!MapScreen)
         {
             auto* Class=LoadClass<UICMapWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Map.WBP_IC_Map_C"));
-            MapScreen=CreateWidget<UICMapWidget>(this,Class?Class:UICMapWidget::StaticClass());
+            MapScreen=CreateWidget<UICMapWidget>(this,Class);
             if(MapScreen&&FrontendUI)FrontendUI->OpenScreen(MapScreen,true,200);
         }
     }
@@ -302,7 +302,7 @@ void AICPlayerController::UpdateScreens()
         if(!SettingsScreen)
         {
             auto* Class=LoadClass<UICSettingsWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Settings.WBP_IC_Settings_C"));
-            SettingsScreen=CreateWidget<UICSettingsWidget>(this,Class?Class:UICSettingsWidget::StaticClass());
+            SettingsScreen=CreateWidget<UICSettingsWidget>(this,Class);
             if(SettingsScreen&&FrontendUI)FrontendUI->OpenScreen(SettingsScreen,false,1000);
         }
     }
@@ -344,7 +344,7 @@ void AICPlayerController::UpdateScreens()
         if(!DeathScreen)
         {
             auto* Class=LoadClass<UICDeathWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Death.WBP_IC_Death_C"));
-            DeathScreen=CreateWidget<UICDeathWidget>(this,Class?Class:UICDeathWidget::StaticClass());
+            DeathScreen=CreateWidget<UICDeathWidget>(this,Class);
             if(DeathScreen&&FrontendUI)FrontendUI->OpenScreen(DeathScreen,true,200);
         }
     }
@@ -486,6 +486,7 @@ void AICPlayerController::SetMenu(const FString& RequestedMenu)
         bInDialogue = false;
     }
     ResetHeldInput();CancelTarget();
+    if(NewMenu==TEXT("Dialogue"))if(auto* DialoguePlayer=Cast<AICPlayerCharacter>(GetPawn()))if(auto* ASC=DialoguePlayer->GetICAbilitySystem())ASC->CancelAction();
     if(Menu!=NewMenu)UE_LOG(LogICUI, Log, TEXT("[UI.Menu] From=%s To=%s Created=%d Dead=%d"),*Menu,*NewMenu,bCreated,bDead);
     if (NewMenu == TEXT("Settings") && Menu != NewMenu) SettingsReturnMenu = Menu;
     Menu=NewMenu;

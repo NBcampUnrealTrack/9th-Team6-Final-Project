@@ -9,7 +9,8 @@ struct ISEKAICLASS_API FICDialoguePresentationRow : public FTableRowBase
 {
     GENERATED_BODY()
     UPROPERTY(EditAnywhere,BlueprintReadWrite) bool bUseCloseUpCamera=true;
-    UPROPERTY(EditAnywhere,BlueprintReadWrite) bool bAllowPlayerMovement=true;
+    /** Retained for old DT imports. Dialogue always suspends player actions. */
+    UPROPERTY(meta=(DeprecatedProperty)) bool bAllowPlayerMovement=false;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(ClampMin="250")) float CloseDistanceCm=500.f;
     UPROPERTY(EditAnywhere,BlueprintReadWrite) FName HeadBone=TEXT("J_Bip_C_Head");
     UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(ClampMin="50")) float CameraDistanceCm=220.f;

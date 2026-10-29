@@ -1,4 +1,5 @@
 #include "UI/Life/ICCraftingStationWidget.h"
+#include "UI/Framework/ICWidgetTemplates.h"
 #include "Settings/ICGameUserSettings.h"
 #include "UI/Life/ICEnhancementWidget.h"
 #include "Components/HorizontalBox.h"
@@ -96,7 +97,7 @@ void UICCraftingStationWidget::BuildLayout(UWidgetTree* T)
 }
 void UICCraftingStationWidget::NativeConstruct()
 {
-    Super::NativeConstruct();if(!GetWidgetFromName(TEXT("StationPages")))BuildLayout(WidgetTree);
+    Super::NativeConstruct();
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Make"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::MakeRecipe);
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_Back"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::ShowRecipeList);
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_CloseStation"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::CloseStation);
@@ -132,9 +133,8 @@ void UICCraftingStationWidget::RefreshList()
     auto* Scroll=Cast<UScrollBox>(GetWidgetFromName(TEXT("RecipeScroll")));if(!Scroll)return;Scroll->ClearChildren();
     for(FName ID:Recipes)
     {
-        auto* B=WidgetTree->ConstructWidget<UICRecipeChoiceButton>();B->RecipeID=ID;B->StationUI=this;B->OnClicked.AddDynamic(B,&UICRecipeChoiceButton::Choose);
-        auto* Name=Caption(WidgetTree,NAME_None,PC->GetCrafting()->Find(ID)->DisplayName);Name->SetAutoWrapText(false);
-        auto* ChoiceSlot=Cast<UButtonSlot>(B->SetContent(Name));ChoiceSlot->SetPadding(FMargin(14,9));Scroll->AddChild(B);
+        auto* B=ICWidgetTemplates::Create<UICRecipeChoiceButton>(this,TEXT("WBP_IC_RecipeChoice"));B->RecipeID=ID;B->StationUI=this;B->OnClicked.AddDynamic(B,&UICRecipeChoiceButton::Choose);
+        B->SetCaption(PC->GetCrafting()->Find(ID)->DisplayName);Scroll->AddChild(B);
     }
     Text(this,TEXT("TXT_Empty"),Recipes.IsEmpty()?NSLOCTEXT("ICCraft","NoRecipes","아직 사용할 수 있는 레시피가 없습니다."):FText::GetEmpty());
     Highlight(FMath::Max(0,Recipes.IndexOfByKey(SelectedRecipe)));
@@ -144,7 +144,7 @@ void UICCraftingStationWidget::Highlight(int32 Index)
     if(!Recipes.IsValidIndex(Index))return;SelectedRecipe=Recipes[Index];
     if(auto* Scroll=Cast<UScrollBox>(GetWidgetFromName(TEXT("RecipeScroll"))))
     {
-        for(int32 I=0;I<Scroll->GetChildrenCount();++I)if(auto* B=Cast<UButton>(Scroll->GetChildAt(I)))B->SetBackgroundColor(I==Index?FLinearColor(.18f,.48f,.48f):FLinearColor(.08f,.13f,.18f));
+        for(int32 I=0;I<Scroll->GetChildrenCount();++I)if(auto* B=Cast<UICActionButtonWidget>(Scroll->GetChildAt(I)))B->SetSelected(I==Index);
         Scroll->ScrollWidgetIntoView(Scroll->GetChildAt(Index),true,EDescendantScrollDestination::IntoView);
     }
 }

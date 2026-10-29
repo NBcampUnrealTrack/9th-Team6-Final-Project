@@ -27,11 +27,12 @@ protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
     virtual void NativeTick(const FGeometry& Geometry,float Delta) override;
-    virtual int32 NativePaint(const FPaintArgs&,const FGeometry&,const FSlateRect&,FSlateWindowElementList&,int32,const FWidgetStyle&,bool) const override;
     virtual FReply NativeOnMouseButtonDown(const FGeometry&,const FPointerEvent&) override;
     virtual FReply NativeOnPreviewKeyDown(const FGeometry&,const FKeyEvent&) override;
 private:
     UPROPERTY(Transient) TObjectPtr<UTexture2D> MapTexture;
+    UPROPERTY(Transient) TMap<FName,TObjectPtr<UUserWidget>> PortalMarkers;
+    UPROPERTY(Transient) TObjectPtr<UUserWidget> PlayerMarker;
     FICMapLayerDefinition Layer;
     FICMapPresentationRow Rules;
     TArray<TWeakObjectPtr<AICWarpStone>> Portals;
@@ -41,6 +42,7 @@ private:
     FName PendingWarp;
     FText Status;
     void RefreshMap();
+    void RefreshVisuals(const FGeometry& Geometry);
     FSlateRect ImageRect(const FGeometry&) const;
     FVector2D MarkerPosition(const FSlateRect&,FVector) const;
     void RefreshLabels();

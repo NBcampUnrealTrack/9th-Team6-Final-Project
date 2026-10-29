@@ -10,8 +10,7 @@
 void UICLoadingWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-    if (!WidgetTree->RootWidget)
-        ICFrontendLayout::Build(WidgetTree, TEXT("Loading"));
+
     SetIsFocusable(true);
     GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->OnChanged.AddUniqueDynamic(this, &ThisClass::Refresh);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Retry"))))

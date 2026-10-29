@@ -12,7 +12,7 @@ with strings_file.open(encoding='utf-8-sig', newline='') as stream:
 strings = {row['Key']: row['SourceString'] for row in rows}
 strings.update({
     'Save_EmptySlot': '비어 있는 슬롯',
-    'Save_Help': '자동 저장은 자동으로 갱신됩니다. 수동 저장은 슬롯 1~4를 사용합니다. Enter 확인 · Esc 뒤로 가기',
+    'Save_Help': 'W/S · ↑/↓ 선택 · F/G 확인 · Delete 삭제 · ESC 뒤로',
     'Save_Delete': '삭제', 'Save_Confirm': '확인', 'Save_Cancel': '취소',
 })
 output = io.StringIO(newline='')

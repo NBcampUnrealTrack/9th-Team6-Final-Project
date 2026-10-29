@@ -29,7 +29,7 @@ FText ItemName(const FICItemRow* Row,FName ID)
 void UICNPCGiftWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();SetIsFocusable(true);
-    if(WidgetTree&&!WidgetTree->RootWidget)ICGameplayLayout::Build(WidgetTree,TEXT("NPCGiftPicker"));
+
     CellClass=LoadClass<UICInventorySlotWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_InventorySlot.WBP_IC_InventorySlot_C"));
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_GiftBack")))->OnClicked.AddUniqueDynamic(this,&ThisClass::ClosePicker);
     CastChecked<UICItemConfirmWidget>(GetWidgetFromName(TEXT("GiftConfirm")))->OnResolved.AddUniqueDynamic(this,&ThisClass::ResolveGift);

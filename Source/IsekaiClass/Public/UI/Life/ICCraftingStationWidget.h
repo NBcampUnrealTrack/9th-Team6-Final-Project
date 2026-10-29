@@ -2,13 +2,14 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
+#include "UI/Framework/ICActionButtonWidget.h"
 #include "ICCraftingStationWidget.generated.h"
 class AICCraftingStation;
 class UWidgetTree;
 class UICCraftingStationWidget;
 
 UCLASS()
-class ISEKAICLASS_API UICRecipeChoiceButton : public UButton
+class ISEKAICLASS_API UICRecipeChoiceButton : public UICActionButtonWidget
 {
     GENERATED_BODY()
 public:
@@ -17,7 +18,7 @@ public:
     UFUNCTION() void Choose();
 };
 
-/** Named widgets are authored into WBP by BuildLayout; C++ is also a fallback. */
+/** BuildLayout is an editor authoring utility. Runtime layout comes exclusively from the saved WBP. */
 UCLASS(Blueprintable)
 class ISEKAICLASS_API UICCraftingStationWidget : public UUserWidget
 {

@@ -12,8 +12,7 @@
 void UICCharacterCreateWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-    if (!WidgetTree->RootWidget)
-        ICFrontendLayout::Build(WidgetTree, TEXT("Questions"));
+
     SetIsFocusable(true);
     NameInput = Cast<UEditableTextBox>(GetWidgetFromName(TEXT("EDIT_Name")));
     if (NameInput)

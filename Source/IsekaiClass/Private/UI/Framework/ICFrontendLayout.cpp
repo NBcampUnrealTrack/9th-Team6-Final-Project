@@ -1,4 +1,6 @@
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Save/ICSaveSlotWidget.h"
+#include "UI/Gameplay/ICMovementCooldownWidget.h"
 #include "UI/Gameplay/ICGameplayLayout.h"
 #include "UI/Framework/ICDisplayPolicy.h"
 #include "UI/Settings/ICSettingsLayout.h"
@@ -30,6 +32,7 @@
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
+#include "Components/InputKeySelector.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
@@ -69,9 +72,9 @@ static void Row(UVerticalBox* Box, UWidget* Widget, float Bottom = 14.f)
     Slot->SetPadding(FMargin(0, 0, 0, Bottom));
     Slot->SetHorizontalAlignment(HAlign_Fill);
 }
-static UButton* Button(UWidgetTree* Tree, FName Name, const TCHAR* Key,bool WithCaption=true)
+static UButton* Button(UWidgetTree* Tree, FName Name, const TCHAR* Key,bool WithCaption=true,TSubclassOf<UButton> ButtonClass=UButton::StaticClass())
 {
-    auto* Widget = Tree->ConstructWidget<UButton>(UButton::StaticClass(), Name);
+    auto* Widget = Tree->ConstructWidget<UButton>(ButtonClass, Name);
     FButtonStyle Style = Widget->GetStyle();
     auto Brush = [](FLinearColor Color) {
         FSlateBrush Result;
@@ -122,7 +125,7 @@ static void Fill(UOverlay* Parent, UWidget* Child)
     Slot->SetHorizontalAlignment(HAlign_Fill);
     Slot->SetVerticalAlignment(VAlign_Fill);
 }
-static void Portraits(UWidgetTree* Tree,UVerticalBox* Box,const TCHAR* Prefix,float Width,float Height)
+static void Portraits(UWidgetTree* Tree,UVerticalBox* Box,const TCHAR* Prefix,float Width,float Height,float Gap=14)
 {
     auto* Line=Tree->ConstructWidget<UHorizontalBox>();
     for(int32 I=0;I<4;++I)
@@ -137,7 +140,7 @@ static void Portraits(UWidgetTree* Tree,UVerticalBox* Box,const TCHAR* Prefix,fl
         auto* ImageSlot=Overlay->AddChildToOverlay(Image);ImageSlot->SetHorizontalAlignment(HAlign_Fill);ImageSlot->SetVerticalAlignment(VAlign_Fill);
         Line->AddChildToHorizontalBox(Size)->SetPadding(FMargin(0,0,10,0));
     }
-    Row(Box,Line,14);
+    Row(Box,Line,Gap);
 }
 static UVerticalBox* SavePanel(UWidgetTree* Tree,float Width,float Height,bool Modal)
 {
@@ -164,14 +167,15 @@ static void BuildSave(UWidgetTree* Tree,FName Kind)
 {
     if(Kind==TEXT("SaveSlot"))
     {
-        auto* Size=Tree->ConstructWidget<USizeBox>(USizeBox::StaticClass(),TEXT("SlotSize"));Size->SetMinDesiredHeight(180);Tree->RootWidget=Size;
-        auto* Pick=Button(Tree,TEXT("IC_SaveSlot_Button"),TEXT("Save_EmptySlot"),false);Size->SetContent(Pick);
-        auto* Columns=Tree->ConstructWidget<UHorizontalBox>();
-        auto* Content=Cast<UButtonSlot>(Pick->SetContent(Columns));Content->SetHorizontalAlignment(HAlign_Fill);Content->SetPadding(FMargin(14,12));
-        auto* Media=Tree->ConstructWidget<UVerticalBox>();Columns->AddChildToHorizontalBox(Media)->SetPadding(FMargin(0,0,20,0));
-        Portraits(Tree,Media,TEXT("IC_SaveSlot_Party"),32,42);
-        auto* Summary=Label(Tree,TEXT("IC_SaveSlot_Label"),Text(TEXT("Save_EmptySlot")),18);Summary->SetWrapTextAt(470);
-        auto* TextSlot=Columns->AddChildToHorizontalBox(Summary);TextSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));TextSlot->SetVerticalAlignment(VAlign_Center);
+        auto* Size=Tree->ConstructWidget<USizeBox>(USizeBox::StaticClass(),TEXT("SlotSize"));Size->SetHeightOverride(90);Tree->RootWidget=Size;
+        auto* Pick=Button(Tree,TEXT("IC_SaveSlot_Button"),TEXT("Save_EmptySlot"),false,UICSaveRowButton::StaticClass());Size->SetContent(Pick);
+        auto* Line=Tree->ConstructWidget<UHorizontalBox>();
+        auto* Content=Cast<UButtonSlot>(Pick->SetContent(Line));Content->SetHorizontalAlignment(HAlign_Fill);Content->SetVerticalAlignment(VAlign_Center);Content->SetPadding(FMargin(20,8));
+        auto* Summary=Label(Tree,TEXT("IC_SaveSlot_Label"),Text(TEXT("Save_EmptySlot")),18);
+        Summary->SetAutoWrapText(false);Summary->SetWrapTextAt(0);Summary->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
+        auto* TextSlot=Line->AddChildToHorizontalBox(Summary);TextSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));TextSlot->SetVerticalAlignment(VAlign_Center);TextSlot->SetPadding(FMargin(0,0,16,0));
+        auto* Faces=Tree->ConstructWidget<UVerticalBox>();Line->AddChildToHorizontalBox(Faces)->SetVerticalAlignment(VAlign_Center);
+        Portraits(Tree,Faces,TEXT("IC_SaveSlot_Party"),50,64,0);
         return;
     }
     if(Kind==TEXT("SaveConfirm"))
@@ -184,25 +188,104 @@ static void BuildSave(UWidgetTree* Tree,FName Kind)
         SaveActions(Tree,Box,{{TEXT("IC_LoadConfirm_Confirm"),TEXT("Save_Confirm")},{TEXT("IC_LoadConfirm_Cancel"),TEXT("Save_Cancel")}});
         return;
     }
-    auto* Box=SavePanel(Tree,1680,920,false);
-    Row(Box,Label(Tree,TEXT("IC_SaveLoad_Title"),Text(TEXT("Save")),38),10);
-    Row(Box,Label(Tree,TEXT("SaveHelp"),Text(TEXT("Save_Help")),18),22);
-    auto* Columns=Tree->ConstructWidget<UHorizontalBox>();
-    auto* MainSlot=Box->AddChildToVerticalBox(Columns);MainSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));MainSlot->SetPadding(FMargin(0,0,20,0));
-    auto* ListSize=Tree->ConstructWidget<USizeBox>();ListSize->SetWidthOverride(850);
-    Columns->AddChildToHorizontalBox(ListSize)->SetPadding(FMargin(0,0,32,0));
-    auto* Scroll=Tree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("IC_SaveLoad_Scroll"));ListSize->SetContent(Scroll);
+    auto* Box=SavePanel(Tree,1560,760,false);
+    Row(Box,Label(Tree,TEXT("IC_SaveLoad_Title"),Text(TEXT("Save")),36),14);
+    auto* Caption=Label(Tree,TEXT("SaveListCaption"),NSLOCTEXT("ICSaveUI","Columns","저장 위치 · 플레이어 · 지역 · 플레이 시간 · 저장 시각"),16);
+    Caption->SetColorAndOpacity(FLinearColor(.48f,.69f,.77f));Row(Box,Caption,20);
+    auto* Scroll=Tree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),TEXT("IC_SaveLoad_Scroll"));
+    Scroll->SetScrollbarThickness(FVector2D(3,3));
+    auto* MainSlot=Box->AddChildToVerticalBox(Scroll);MainSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));MainSlot->SetPadding(FMargin(0,0,0,14));
     Scroll->AddChild(Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("IC_SaveLoad_SlotList")));
-    auto* Details=Tree->ConstructWidget<UVerticalBox>();Columns->AddChildToHorizontalBox(Details)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    Portraits(Tree,Details,TEXT("IC_SaveLoad_Party"),56,72);
-    auto* DetailScroll=Tree->ConstructWidget<UScrollBox>();
-    auto* Detail=Label(Tree,TEXT("IC_SaveLoad_Detail"),FText::GetEmpty(),22);Detail->SetWrapTextAt(690);DetailScroll->AddChild(Detail);
-    Details->AddChildToVerticalBox(DetailScroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    auto* Notice=Label(Tree,TEXT("IC_SaveLoad_Notice"),FText::GetEmpty(),18);Notice->SetWrapTextAt(1500);Row(Box,Notice,16);
-    SaveActions(Tree,Box,{{TEXT("IC_SaveLoad_Save"),TEXT("Save")},{TEXT("IC_SaveLoad_Load"),TEXT("Load")},{TEXT("IC_SaveLoad_Delete"),TEXT("Save_Delete")},{TEXT("IC_SaveLoad_Close"),TEXT("Back")}});
+    auto* Notice=Label(Tree,TEXT("IC_SaveLoad_Notice"),FText::GetEmpty(),16);Notice->SetWrapTextAt(1450);Row(Box,Notice,12);
+    auto* Help=Label(Tree,TEXT("SaveHelp"),NSLOCTEXT("ICSaveUI","VerticalControls","W/S · ↑/↓  선택     F/G  확인     Delete  삭제     ESC  뒤로"),16);
+    Help->SetColorAndOpacity(FLinearColor(.48f,.76f,.84f));Row(Box,Help,0);
+    // Keep existing Blueprint bindings and commands; the list itself is the only navigation surface.
+    auto* Compatibility=Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("SaveCompatibilityActions"));
+    Compatibility->SetVisibility(ESlateVisibility::Collapsed);Row(Box,Compatibility,0);
+    for(const auto* Key:{TEXT("Save"),TEXT("Load"),TEXT("Delete"),TEXT("Close")})
+        Compatibility->AddChildToVerticalBox(Button(Tree,FName(*FString::Printf(TEXT("IC_SaveLoad_%s"),Key)),Key));
+
 }
 void Build(UWidgetTree* Tree, FName Kind)
 {
+    if(Kind==TEXT("Crosshair"))
+    {
+        auto* Canvas=Tree->ConstructWidget<UCanvasPanel>();Tree->RootWidget=Canvas;
+        for(const FVector2D Axis:{FVector2D(1,0),FVector2D(-1,0),FVector2D(0,1),FVector2D(0,-1)})
+        for(int32 Layer=0;Layer<2;++Layer)
+        {
+            auto* Bar=Tree->ConstructWidget<UBorder>();Bar->SetBrushColor(Layer?FLinearColor(1,1,1,.9f):FLinearColor(0,0,0,.85f));
+            auto* S=Canvas->AddChildToCanvas(Bar);S->SetAnchors(FAnchors(.5,.5));S->SetAlignment({.5,.5});S->SetPosition(Axis*6);
+            S->SetSize(Axis.X?FVector2D(6,Layer?1:3):FVector2D(Layer?1:3,6));
+        }
+        return;
+    }
+    if(Kind==TEXT("MapPlayerMarker"))
+    {
+        auto* Size=Tree->ConstructWidget<USizeBox>();Size->SetWidthOverride(32);Size->SetHeightOverride(32);Tree->RootWidget=Size;
+        auto* Text=Label(Tree,TEXT("PlayerArrow"),FText::FromString(TEXT("▲")),26);Text->SetColorAndOpacity(FLinearColor(.4f,1,.4f));Text->SetJustification(ETextJustify::Center);Text->SetAutoWrapText(false);Size->SetContent(Text);return;
+    }
+    if(Kind==TEXT("MapPortalMarker"))
+    {
+        auto* Size=Tree->ConstructWidget<USizeBox>();Size->SetWidthOverride(220);Size->SetHeightOverride(30);Tree->RootWidget=Size;
+        auto* Canvas=Tree->ConstructWidget<UCanvasPanel>();Size->SetContent(Canvas);
+        const TCHAR* Names[]={TEXT("PortalUnlocked"),TEXT("PortalLocked"),TEXT("PortalSelected")};
+        const FLinearColor Colors[]={FLinearColor(.25f,.85f,1),FLinearColor(.4f,.4f,.45f),FLinearColor(1,.8f,.25f)};
+        for(int32 I=0;I<3;++I){auto* Marker=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),Names[I]);Marker->SetBrushColor(Colors[I]);auto* S=Canvas->AddChildToCanvas(Marker);S->SetAlignment({.5,.5});S->SetSize({22,22});}
+        auto* Text=Label(Tree,TEXT("TXT_Label"),FText::GetEmpty(),20);auto* S=Canvas->AddChildToCanvas(Text);S->SetPosition({17,-14});S->SetSize({200,30});return;
+    }
+    if(Kind==TEXT("LoadingMovie"))
+    {
+        auto* Black=Tree->ConstructWidget<UBorder>();Black->SetBrushColor(FLinearColor::Black);Tree->RootWidget=Black;
+        auto* Body=Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("MovieBody"));Black->SetContent(Body);Black->SetHorizontalAlignment(HAlign_Center);Black->SetVerticalAlignment(VAlign_Center);
+        Row(Body,Label(Tree,TEXT("TXT_Title"),Text(TEXT("Title")),36),28);
+        Row(Body,Tree->ConstructWidget<UThrobber>(),18);Row(Body,Label(Tree,TEXT("TXT_Loading"),Text(TEXT("Loading")),20),0);return;
+    }
+    if(Kind==TEXT("ActionRow"))
+    {
+        auto* Pick=Button(Tree,TEXT("BTN_Select"),TEXT("Save_Confirm"),false);Tree->RootWidget=Pick;
+        auto* Text=Label(Tree,TEXT("TXT_Label"),FText::GetEmpty(),18);Text->SetWrapTextAt(0);
+        auto* S=Cast<UButtonSlot>(Pick->SetContent(Text));S->SetPadding(FMargin(14,9));S->SetHorizontalAlignment(HAlign_Fill);return;
+    }
+    if(Kind==TEXT("TextLine")){Tree->RootWidget=Label(Tree,TEXT("TXT_Label"),FText::GetEmpty(),18);return;}
+    if(Kind==TEXT("KeyBindingRow"))
+    {
+        auto* Frame=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("Frame"));Frame->SetPadding(FMargin(22,16));Tree->RootWidget=Frame;
+        auto* Line=Tree->ConstructWidget<UHorizontalBox>();Frame->SetContent(Line);
+        Line->AddChildToHorizontalBox(Label(Tree,TEXT("TXT_Label"),FText::GetEmpty(),18))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+        auto* Width=Tree->ConstructWidget<USizeBox>();Width->SetWidthOverride(280);Width->SetHeightOverride(38);Line->AddChildToHorizontalBox(Width);
+        auto* Selector=Tree->ConstructWidget<UInputKeySelector>(UInputKeySelector::StaticClass(),TEXT("SEL_Key"));Selector->SetAllowModifierKeys(false);Selector->SetAllowGamepadKeys(false);Selector->SetEscapeKeys({EKeys::Escape});
+        auto Style=Selector->GetTextStyle();Style.SetFont(Font(17));Selector->SetTextStyle(Style);Selector->SetKeySelectionText(NSLOCTEXT("ICSettings","PressKey","새 키를 누르세요…"));Width->SetContent(Selector);return;
+    }
+    if(Kind==TEXT("StatusEffect"))
+    {
+        auto* Frame=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("Frame"));Frame->SetPadding(FMargin(2));Tree->RootWidget=Frame;
+        auto* Layer=Tree->ConstructWidget<UOverlay>();Frame->SetContent(Layer);
+        auto* Size=Tree->ConstructWidget<USizeBox>();Size->SetWidthOverride(24);Size->SetHeightOverride(24);Layer->AddChildToOverlay(Size);
+        auto* Icon=Tree->ConstructWidget<UImage>(UImage::StaticClass(),TEXT("IMG_Icon"));Size->SetContent(Icon);
+        auto* Count=Label(Tree,TEXT("TXT_Count"),FText::GetEmpty(),10);Count->SetShadowColorAndOpacity(FLinearColor::Black);Count->SetShadowOffset({1,1});auto* S=Layer->AddChildToOverlay(Count);S->SetHorizontalAlignment(HAlign_Right);S->SetVerticalAlignment(VAlign_Bottom);return;
+    }
+    if(Kind==TEXT("QuestReward"))
+    {
+        auto* Frame=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("Frame"));Frame->SetPadding(FMargin(12,8));Tree->RootWidget=Frame;
+        auto* Line=Tree->ConstructWidget<UHorizontalBox>();Frame->SetContent(Line);
+        auto* Size=Tree->ConstructWidget<USizeBox>();Size->SetWidthOverride(36);Size->SetHeightOverride(36);auto* S=Line->AddChildToHorizontalBox(Size);S->SetPadding(FMargin(0,0,12,0));S->SetVerticalAlignment(VAlign_Center);
+        auto* Layer=Tree->ConstructWidget<UOverlay>();Size->SetContent(Layer);Fill(Layer,Tree->ConstructWidget<UImage>(UImage::StaticClass(),TEXT("IMG_Icon")));
+        auto* Badge=Label(Tree,TEXT("TXT_Badge"),FText::GetEmpty(),16);auto* BS=Layer->AddChildToOverlay(Badge);BS->SetHorizontalAlignment(HAlign_Center);BS->SetVerticalAlignment(VAlign_Center);
+        auto* Text=Label(Tree,TEXT("TXT_Label"),FText::GetEmpty(),17);auto* TS=Line->AddChildToHorizontalBox(Text);TS->SetSize(FSlateChildSize(ESlateSizeRule::Fill));TS->SetVerticalAlignment(VAlign_Center);return;
+    }
+    if(Kind==TEXT("Prologue"))
+    {
+        auto* Black=Tree->ConstructWidget<UBorder>();Black->SetBrushColor(FLinearColor::Black);Black->SetPadding(FMargin(0));Tree->RootWidget=Black;
+        auto* Canvas=Tree->ConstructWidget<UCanvasPanel>();Black->SetContent(Canvas);
+        auto Place=[&](UWidget* W,FVector2D Anchor,FVector2D Size)
+        {auto* S=Canvas->AddChildToCanvas(W);S->SetAnchors(FAnchors(Anchor.X,Anchor.Y));S->SetAlignment(FVector2D(.5,.5));if(Size.IsZero())S->SetAutoSize(true);else S->SetSize(Size);};
+        auto* Text=Label(Tree,TEXT("LineText"),FText::GetEmpty(),27);Text->SetJustification(ETextJustify::Center);Text->SetAutoWrapText(false);Place(Text,{.5,.5},{});
+        auto* Prompt=Label(Tree,TEXT("Prompt"),FText::GetEmpty(),16);Prompt->SetAutoWrapText(false);Prompt->SetWrapTextAt(0);Place(Prompt,{.5,.72},{});
+        auto* Skip=Label(Tree,TEXT("SkipPrompt"),FText::GetEmpty(),16);Skip->SetAutoWrapText(false);Skip->SetWrapTextAt(0);Place(Skip,{.5,.91},{});
+        auto* Arc=Tree->ConstructWidget<UICRadialCooldownBar>(UICRadialCooldownBar::StaticClass(),TEXT("SkipGauge"));Arc->StartAngleDegrees=-90;Arc->SweepAngleDegrees=180;Arc->Thickness=5;Arc->FillColor=FLinearColor(.44,.83,.9);Arc->Progress=0;Place(Arc,{.5,.86},{76,76});
+        return;
+    }
     if(Kind==TEXT("CraftingStation")){UICCraftingStationWidget::BuildLayout(Tree);return;}
     if(Kind==TEXT("Enhancement")){UICEnhancementWidget::BuildLayout(Tree);return;}
     if(Kind==TEXT("Shop")){UICShopWidget::BuildLayout(Tree);return;}

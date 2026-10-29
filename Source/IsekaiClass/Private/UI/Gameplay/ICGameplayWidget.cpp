@@ -33,9 +33,8 @@ AICPlayerController* UICGameplayWidget::GetICPlayerController() const
 void UICGameplayWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
-    if (!WidgetTree->RootWidget)
-        ICFrontendLayout::Build(WidgetTree, TEXT("HUD"));
-    ICGameplayLayout::EnsureGameClock(WidgetTree);
+
+
     RefreshSkillCooldown();
     SetIsFocusable(true);
     if (auto* Menu = Cast<UICGameMenuWidget>(GetWidgetFromName(TEXT("GameMenu"))))
@@ -60,30 +59,20 @@ void UICGameplayWidget::NativeOnInitialized()
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::GameSettings);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Quit"))))
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::Quit);
-    if (auto* Scroll=Cast<UScrollBox>(GetWidgetFromName(TEXT("MenuScroll")));Scroll&&!GetWidgetFromName(TEXT("WeaponSlots")))
-    {
-        auto* Body=GetWidgetFromName(TEXT("TXT_MenuBody"));
-        Scroll->ClearChildren();
-        auto* Slots=WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("WeaponSlots"));
-        Scroll->AddChild(Slots);
-        for (int32 Index=0;Index<4;++Index)
-        {
-            auto* Border=WidgetTree->ConstructWidget<UBorder>();
-            Border->SetPadding(FMargin(10));Border->SetBrushColor(FLinearColor(.07f,.10f,.15f,1));
-            auto* Label=WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),FName(*FString::Printf(TEXT("TXT_WeaponSlot%d"),Index)));
-            Label->SetFont(ICFrontendLayout::Font(16,false));Label->SetAutoWrapText(true);
-            Border->SetContent(Label);
-            auto* CellSlot=Slots->AddChildToHorizontalBox(Border);
-            CellSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));CellSlot->SetPadding(FMargin(3,8));
-        }
-        Slots->SetVisibility(ESlateVisibility::Collapsed);
-        if (Body) Scroll->AddChild(Body);
-    }
+
 }
 
 void UICGameplayWidget::NativeTick(const FGeometry& Geometry, float DeltaSeconds)
 {
     Super::NativeTick(Geometry, DeltaSeconds);
+    if(auto* Aim=GetWidgetFromName(TEXT("HUD_AimReticle")))
+    {
+        const auto* PC=GetICPlayerController();const auto* Inventory=PC?PC->GetInventory():nullptr;
+        const auto Family=Inventory?Inventory->GetEquippedWeaponFamily():EICWeaponFamily::Bow;
+        const bool Visible=PC&&PC->bCreated&&!PC->IsDead()&&PC->Menu.IsEmpty()&&!PC->IsPaused()&&PC->GetPawn()&&Inventory
+            &&(Family==EICWeaponFamily::Bow||Family==EICWeaponFamily::Staff||Family==EICWeaponFamily::Wand);
+        Aim->SetVisibility(Visible?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
+    }
     if(auto* Clock=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_GameClock"))))
     {
         const auto* PC=GetICPlayerController();
@@ -98,24 +87,6 @@ FText UICGameplayWidget::FormatGameClock(double GameMinute)
     const int64 Total=FMath::FloorToInt64(FMath::Max(0.,FMath::IsFinite(GameMinute)?GameMinute:0.));
     return FText::Format(NSLOCTEXT("ICTime","HUDDayClock","{0}일차  {1}:{2}"),FText::AsNumber(Total/1440+1),
         FText::FromString(FString::Printf(TEXT("%02lld"),(Total%1440)/60)),FText::FromString(FString::Printf(TEXT("%02lld"),Total%60)));
-}
-
-int32 UICGameplayWidget::NativePaint(const FPaintArgs& Args,const FGeometry& Geometry,const FSlateRect& Culling,
-    FSlateWindowElementList& Elements,int32 Layer,const FWidgetStyle& Style,bool ParentEnabled) const
-{
-    const int32 Top=Super::NativePaint(Args,Geometry,Culling,Elements,Layer,Style,ParentEnabled);
-    const auto* PC=GetICPlayerController();const auto* Inventory=PC?PC->GetInventory():nullptr;
-    if(!PC||!PC->bCreated||PC->IsDead()||!PC->Menu.IsEmpty()||PC->IsPaused()||!PC->GetPawn()||!Inventory)return Top;
-    const auto Family=Inventory->GetEquippedWeaponFamily();
-    if(Family!=EICWeaponFamily::Bow&&Family!=EICWeaponFamily::Staff&&Family!=EICWeaponFamily::Wand)return Top;
-    const FVector2D Centre=Geometry.GetLocalSize()*.5;
-    for(FVector2D Axis:{FVector2D(1,0),FVector2D(-1,0),FVector2D(0,1),FVector2D(0,-1)})
-    {
-        const TArray<FVector2D> Points{Centre+Axis*3,Centre+Axis*9};
-        FSlateDrawElement::MakeLines(Elements,Top+1,Geometry.ToPaintGeometry(),Points,ESlateDrawEffect::None,FLinearColor(0,0,0,.85f),true,3);
-        FSlateDrawElement::MakeLines(Elements,Top+2,Geometry.ToPaintGeometry(),Points,ESlateDrawEffect::None,FLinearColor(1,1,1,.9f),true,1);
-    }
-    return Top+2;
 }
 
 void UICGameplayWidget::RefreshSkillCooldown()

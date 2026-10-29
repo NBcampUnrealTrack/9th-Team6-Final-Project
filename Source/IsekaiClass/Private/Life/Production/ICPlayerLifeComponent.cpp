@@ -132,7 +132,7 @@ bool UICPlayerLifeComponent::BeginSleep(AActor* Bed)
         Camera->PostProcessSettings.bOverride_MotionBlurAmount=true;Camera->PostProcessSettings.MotionBlurAmount=0;
     }
     auto* Type=LoadClass<UICSleepFadeWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_SleepFade.WBP_IC_SleepFade_C"));
-    Fade=CreateWidget<UUserWidget>(PC,Type?Type:UICSleepFadeWidget::StaticClass());
+    Fade=CreateWidget<UUserWidget>(PC,Type);
     if(Fade){Fade->SetVisibility(ESlateVisibility::HitTestInvisible);Fade->SetRenderOpacity(0);Fade->AddToViewport(1000);}
     return true;
 }

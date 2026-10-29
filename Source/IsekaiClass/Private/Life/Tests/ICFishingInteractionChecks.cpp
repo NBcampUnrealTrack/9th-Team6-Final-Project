@@ -22,6 +22,9 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/BoxComponent.h"
 #include "InputMappingContext.h"
+#include "Inventory/Actors/ICChestPresentationComponent.h"
+#include "NPC/LifeObject/ICLifeObjectActor.h"
+#include "Components/StaticMeshComponent.h"
 #include "UI/Dialogue/ICNPCDialogueWidget.h"
 
 namespace ICFishingChecks
@@ -47,7 +50,7 @@ struct FSession
         Clock=GI->GetSubsystem<UICTimeSubsystem>();Clock->SetRunning(true);Clock->SetMenuPaused(false);Gather=GI->GetSubsystem<UICGatheringSubsystem>();
         Pawn->Camera->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
     }
-    ~FSession(){Gather->CancelGather();Pawn->ReleaseForLoad();GI->Shutdown();World->DestroyWorld(false);}
+    ~FSession(){Gather->CancelGather();Pawn->ReleaseForLoad();GI->Shutdown();GEngine->DestroyWorldContext(World);World->DestroyWorld(false);}
     int32 FishCount() const{int32 N=0;for(int32 I=1;I<=10;++I)N+=Pawn->Inventory->CountItem(FName(*FString::Printf(TEXT("ITM_R01_FISH_%02d"),I)));return N;}
     void Step(double Seconds){Clock->AdvanceClock(Seconds,false);Gather->Tick(Seconds);}
 };
@@ -108,10 +111,44 @@ bool FICNPCInteractionCameraCheck::RunTest(const FString&)
     F.PC->SetMenu(TEXT(""));F.PC->BeginNPCDialogueCamera(NPC);
     F.PC->DialogueScreen=CreateWidget<UICNPCDialogueWidget>(F.PC,LoadClass<UICNPCDialogueWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_NPCDialogue.WBP_IC_NPCDialogue_C")));
     F.PC->Menu=TEXT("Dialogue");F.PC->bInDialogue=true;
+    TestFalse(TEXT("Dialogue blocks player gameplay actions without pausing the world"),F.PC->CanHandleGameplayInput());
+    TestFalse(TEXT("Dialogue never forwards W to character movement"),F.PC->ForwardDialogueMovementKey(EKeys::W,true));
+    TestFalse(TEXT("Dialogue keeps the world running"),F.World->IsPaused());
     const FVector InitialCamera=F.PC->NPCDialogueCamera->GetActorLocation();NPC->SetActorLocation(NPC->GetActorLocation()+FVector(30,0,0));F.PC->UpdateNPCDialogue(.2f);
     TestFalse(TEXT("Live dialogue camera follows NPC instead of freezing a frame"),F.PC->NPCDialogueCamera->GetActorLocation().Equals(InitialCamera,.1));
     F.Pawn->SetActorLocation(NPC->GetActorLocation()+FVector(1000,0,0));F.PC->UpdateNPCDialogue(.2f);
     TestTrue(TEXT("Walking beyond DT distance closes dialogue"),F.PC->Menu.IsEmpty());TestEqual(TEXT("Distance close restores gameplay camera"),F.PC->GetViewTarget(),static_cast<AActor*>(F.Pawn));
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICFurnitureCollisionCheck,"IC.Life.Furniture.PlayerCollision",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICFurnitureCollisionCheck::RunTest(const FString&)
+{
+    ICFishingChecks::FSession F;
+    auto* BedClass=LoadClass<AICLifeObjectActor>(nullptr,TEXT("/Game/IsekaiClass/NPC/Blueprints/Interaction/BP_IC_NPCBed.BP_IC_NPCBed_C"));
+    auto* Bed=BedClass?F.World->SpawnActor<AICLifeObjectActor>(BedClass,FVector(5000,0,200),FRotator::ZeroRotator):nullptr;
+    if(TestNotNull(TEXT("NPC bed WBP-independent interaction actor loads"),Bed))
+    {
+        TestEqual(TEXT("NPC bed blocks the player's capsule channel"),Bed->Shape->GetCollisionResponseToChannel(ECC_Pawn),ECR_Block);
+        FHitResult Hit;const FVector Centre=Bed->Shape->Bounds.Origin;
+        TestTrue(TEXT("Capsule sweep cannot pass through the NPC bed"),F.World->SweepSingleByChannel(Hit,Centre+FVector(400,0,0),Centre,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(34,88))&&Hit.GetActor()==Bed);
+    }
+    for(const auto* Path:{TEXT("/Game/IsekaiClass/Life/Home/Blueprints/BP_IC_PlayerStorage.BP_IC_PlayerStorage_C"),TEXT("/Game/IsekaiClass/NPC/Blueprints/Containers/BP_IC_NPCChest.BP_IC_NPCChest_C")})
+    {
+        auto* Type=LoadClass<AActor>(nullptr,Path);auto* Chest=Type?F.World->SpawnActor<AActor>(Type,FVector(8000,0,200),FRotator::ZeroRotator):nullptr;
+        if(!TestNotNull(TEXT("Storage chest loads"),Chest))continue;
+        auto* Hinge=Chest->FindComponentByClass<UICChestPresentationComponent>();if(!TestNotNull(TEXT("Chest owns animated lid"),Hinge))continue;
+        auto* Lid=Hinge->Lid.Get();TestTrue(TEXT("Lid collision is enabled"),Lid->GetCollisionEnabled()!=ECollisionEnabled::NoCollision);
+        FCollisionQueryParams Query;TInlineComponentArray<UPrimitiveComponent*> Parts;Chest->GetComponents(Parts);
+        for(auto* Part:Parts)if(Part!=Lid)Query.AddIgnoredComponent(Part);
+        for(int32 Open=0;Open<2;++Open)
+        {
+            Hinge->SetRelativeRotation(Open?Hinge->OpenRotation:FRotator::ZeroRotator);
+            const FVector Centre=Lid->Bounds.Origin;FHitResult Hit;
+            TestTrue(Open?TEXT("Open lid blocks player sweeps"):TEXT("Closed lid blocks player sweeps"),F.World->SweepSingleByChannel(Hit,Centre+FVector(0,0,200),Centre,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeSphere(8),Query)&&Hit.GetComponent()==Lid);
+        }
+        Chest->Destroy();
+    }
     return !HasAnyErrors();
 }
 #endif

@@ -14,6 +14,7 @@
 #include "Life/Production/ICPlayerLifeComponent.h"
 #include "NPC/Character/ICNPCBase.h"
 #include "EngineUtils.h"
+#include "Components/CapsuleComponent.h"
 
 AICLifeObjectActor::AICLifeObjectActor()
 {
@@ -43,6 +44,8 @@ AICLifeObjectActor::AICLifeObjectActor()
 void AICLifeObjectActor::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
+    if(ObjectType==EICLifeObjectType::Bed&&Shape)
+    {Shape->SetCollisionProfileName(TEXT("BlockAllDynamic"));Shape->SetCanEverAffectNavigation(false);}
     // 에디터 뷰포트에서 ID와 종류를 바로 확인할 수 있게 표시한다(게임에서는 디버그 CVar가 켜질 때만 보인다).
     SetDebugText(FString::Printf(TEXT("%s\n[%s]"), *GetDebugID().ToString(), ICLife::LexType(ObjectType)), false);
 }
@@ -50,6 +53,12 @@ void AICLifeObjectActor::OnConstruction(const FTransform& Transform)
 void AICLifeObjectActor::BeginPlay()
 {
     Super::BeginPlay();
+    if(ObjectType==EICLifeObjectType::Bed&&Shape)
+    {
+        Shape->SetCollisionProfileName(TEXT("BlockAllDynamic"));Shape->SetCanEverAffectNavigation(false);
+        // NPC schedules still reach their bed slots; the player's capsule remains blocked.
+        for(TActorIterator<AICNPCBase> It(GetWorld());It;++It)It->GetCapsuleComponent()->IgnoreActorWhenMoving(this,true);
+    }
     if (ObjectID.IsNone())
         UE_LOG(LogICLifeObject, Warning, TEXT("[LifeObject.MissingID] Actor=%s 고유 ID(ObjectID)를 입력하세요."), *GetName());
     if (!SmartObject || !SmartObject->GetDefinition())

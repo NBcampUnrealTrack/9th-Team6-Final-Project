@@ -82,14 +82,7 @@ UICCombatFeedbackWidget::UICCombatFeedbackWidget(const FObjectInitializer& Initi
 void UICCombatFeedbackWidget::NativeConstruct()
 {
     Super::NativeConstruct();
-    if(auto* Canvas=Cast<UCanvasPanel>(GetWidgetFromName(TEXT("FeedbackCanvas")));Canvas&&!LockMarker)
-    {
-        LockMarker=WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),TEXT("TXT_LockOn"));
-        LockMarker->SetText(NSLOCTEXT("ICCombat","LockOnMarker","◎"));LockMarker->SetFont(ICFrontendLayout::Font(34,true));
-        LockMarker->SetColorAndOpacity(FLinearColor(1,.76f,.18f));LockMarker->SetJustification(ETextJustify::Center);
-        auto* MarkerSlot=Canvas->AddChildToCanvas(LockMarker);MarkerSlot->SetSize({64,64});MarkerSlot->SetAlignment({.5f,.5f});
-        LockMarker->SetVisibility(ESlateVisibility::Collapsed);
-    }
+    LockMarker=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_LockOn")));
     BoundState=GetGameInstance()?GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>():nullptr;
     if(BoundState)
     {

@@ -1,4 +1,5 @@
 #include "UI/Settings/ICSettingsWidget.h"
+#include "UI/Framework/ICWidgetTemplates.h"
 #include "UI/Settings/ICSettingsLayout.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "UI/Framework/ICUITheme.h"
@@ -47,7 +48,7 @@ UICSettingBinding* UICSettingsWidget::Bind(UWidget* Control,FName ID)
 void UICSettingsWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();SetIsFocusable(true);
-    if(!WidgetTree->RootWidget)ICSettingsLayout::Build(WidgetTree);
+
     for(const auto& Spec:ICSettingsLayout::Specs())
     {
         auto* Control=GetWidgetFromName(FName(*(TEXT("OPTION_")+Spec.ID.ToString())));if(!Control)continue;
@@ -222,14 +223,10 @@ void UICSettingsWidget::BuildKeyBindings()
         if(!Mapping.Action||Mapping.Key.IsGamepadKey()||Mapping.Key.IsAxis1D()||Mapping.Key.IsAxis2D()||Mapping.Key.IsAxis3D()||Mapping.Action==PC->LookAction)continue;
         bool Roll=false;for(const auto& Binding:PC->CommandActions)if(Binding.Action==Mapping.Action&&Binding.Command==EICInputCommand::Roll)Roll=true;
         if(Roll)continue;
-        auto* Frame=WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(),FName(*FString::Printf(TEXT("KeyRow_%d"),KeyBindings.Num())));
-        Frame->SetBrush(ICUITheme::PanelBrush());Frame->SetPadding(FMargin(22,16));List->AddChildToVerticalBox(Frame)->SetPadding(FMargin(0,0,22,10));
-        auto* Row=WidgetTree->ConstructWidget<UHorizontalBox>();Frame->SetContent(Row);
-        auto* Label=WidgetTree->ConstructWidget<UTextBlock>();Label->SetFont(ICFrontendLayout::Font(18));Label->SetText(BindingName(PC,Mapping.Action,Mapping.Key));Row->AddChildToHorizontalBox(Label)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-        auto* Width=WidgetTree->ConstructWidget<USizeBox>();Width->SetWidthOverride(280);Width->SetHeightOverride(38);Row->AddChildToHorizontalBox(Width);
-        auto* Selector=WidgetTree->ConstructWidget<UInputKeySelector>();Selector->SetAllowModifierKeys(false);Selector->SetAllowGamepadKeys(false);Selector->SetEscapeKeys({EKeys::Escape});
-        auto Style=Selector->GetTextStyle();Style.SetFont(ICFrontendLayout::Font(17));Selector->SetTextStyle(Style);
-        Selector->SetKeySelectionText(LOCTEXT("PressKey","새 키를 누르세요…"));Width->SetContent(Selector);
+        auto* Frame=ICWidgetTemplates::Create(this,TEXT("WBP_IC_KeyBindingRow"));if(!Frame)continue;
+        List->AddChildToVerticalBox(Frame)->SetPadding(FMargin(0,0,22,10));
+        auto* Label=CastChecked<UTextBlock>(Frame->GetWidgetFromName(TEXT("TXT_Label")));Label->SetText(BindingName(PC,Mapping.Action,Mapping.Key));
+        auto* Selector=CastChecked<UInputKeySelector>(Frame->GetWidgetFromName(TEXT("SEL_Key")));
         auto* Binding=Bind(Selector,TEXT("Key"));Binding->KeyID=Mapping.Action->GetName()+TEXT(":")+Mapping.Key.GetFName().ToString();Binding->DefaultKey=Mapping.Key;
         Binding->Label=Label->GetText();
         Selector->SetIsEnabled(Mapping.Key!=EKeys::Escape);Selector->OnKeySelected.AddDynamic(Binding,&UICSettingBinding::KeyChanged);KeyBindings.Add(Binding);

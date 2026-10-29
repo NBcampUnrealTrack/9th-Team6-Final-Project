@@ -44,7 +44,7 @@ void UICBGMSubsystem::Tick(float DeltaSeconds)
     if(FPlatformTime::Seconds()<SilentUntil)return;
     RefreshIn-=DeltaSeconds;if(RefreshIn>0)return;RefreshIn=.2f;
     const auto* Flow=GetWorld()->GetGameInstance()?GetWorld()->GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>():nullptr;
-    if(Flow&&(Flow->Phase==EICGameFlowPhase::Prologue||Flow->bPendingNewGame)){ChangeMusic(TEXT("BGM_Prologue"));return;}
+    if(Flow&&(Flow->Phase==EICGameFlowPhase::Prologue||Flow->bPendingNewGame)){ChangeMusic(PrologueRow);return;}
     if(PC&&(PC->Menu==TEXT("Create")||(Flow&&Flow->Phase==EICGameFlowPhase::Questions))){ChangeMusic(TEXT("BGM_CharacterCreate"));return;}
     if(PC&&PC->IsMainMenuLevel()){ChangeMusic(TEXT("BGM_MainMenu"));return;}
     if(!PC||!PC->bCreated||!PC->GetPawn()){ChangeMusic(NAME_None);return;}

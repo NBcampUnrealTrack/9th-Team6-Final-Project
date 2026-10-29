@@ -52,7 +52,7 @@ UVerticalBox* Panel(UWidgetTree* Tree,UOverlay* Root,float Width,float Height)
 }
 UICUIManagerSubsystem* Manager(UUserWidget* Widget){auto* Local=Widget->GetOwningLocalPlayer();return Local?Local->GetSubsystem<UICUIManagerSubsystem>():nullptr;}
 UClass* WidgetClass(const TCHAR* Name,UClass* Fallback)
-{auto* Type=LoadClass<UUserWidget>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Name,Name));return Type?Type:Fallback;}
+{auto* Type=LoadClass<UUserWidget>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/UI/Widget/%s.%s_C"),Name,Name));return Type;}
 }
 
 bool UICStorageTransferPopup::BuildLayout(UWidgetTree* Tree)
@@ -73,7 +73,7 @@ bool UICStorageTransferPopup::BuildLayout(UWidgetTree* Tree)
 }
 void UICStorageTransferPopup::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Less")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Decrease);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_More")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Increase);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Transfer")))->OnClicked.AddUniqueDynamic(this,&ThisClass::Move);
@@ -124,7 +124,7 @@ bool UICStorageWidget::BuildLayout(UWidgetTree* Tree)
 }
 void UICStorageWidget::NativeOnInitialized()
 {
-    Super::NativeOnInitialized();SetIsFocusable(true);if(!WidgetTree->RootWidget)BuildLayout(WidgetTree);
+    Super::NativeOnInitialized();SetIsFocusable(true);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_StorageClose")))->OnClicked.AddUniqueDynamic(this,&ThisClass::CloseStorage);
     auto* Popup=CastChecked<UICStorageTransferPopup>(GetWidgetFromName(TEXT("TransferPopup")));Popup->OnQuantity.AddUniqueDynamic(this,&ThisClass::AdjustQuantity);Popup->OnMove.AddUniqueDynamic(this,&ThisClass::MovePressed);Popup->OnBack.AddUniqueDynamic(this,&ThisClass::CloseItem);
 }
