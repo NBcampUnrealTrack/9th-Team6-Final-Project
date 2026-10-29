@@ -117,6 +117,10 @@ for index,number in enumerate(numbers+('Boss',)):
     capsule.set_capsule_size(radius,half_height)
     save(bp)
     monster_id='MON_R01_BOSS_001' if boss else 'MON_R01_%03d'%(index+1)
+    cdo.set_editor_property('monster_id',monster_id)
+    cdo.set_editor_property('initialize_when_placed',True)
+    cdo.set_editor_property('placed_leash_radius_cm',1600. if boss else 1000.)
+    save(bp)
     name='R01 보스' if boss else 'DragonSD_'+number
     row=metadata(monster_id,name)
     row.update({'Kind':'RegionalBoss' if boss else 'Normal','RegionID':'R01',

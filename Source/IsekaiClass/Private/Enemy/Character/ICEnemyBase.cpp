@@ -10,6 +10,7 @@
 #include "World/State/ICWorldStateSubsystem.h"
 #include "World/Spawn/ICSpawnSubsystem.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -40,15 +41,56 @@ AICEnemyBase::AICEnemyBase()
     HealthBar->SetDrawSize({180,16});HealthBar->SetRelativeLocation({0,0,140});
     HealthBar->SetCollisionEnabled(ECollisionEnabled::NoCollision);HealthBar->SetCanEverAffectNavigation(false);
 }
-bool AICEnemyBase::InitializeEnemy(FName SpawnerID,const FICSpawnSlotDefinition& Slot,const FTransform& Origin)
+void AICEnemyBase::PostActorCreated()
+{
+    Super::PostActorCreated();
+#if WITH_EDITOR
+    if(!IsTemplate()&&GetWorld()&&GetWorld()->WorldType==EWorldType::Editor)PlacementGuid=FGuid::NewGuid();
+#endif
+}
+void AICEnemyBase::PostLoad()
+{
+    Super::PostLoad();
+#if WITH_EDITOR
+    if(!IsTemplate()&&!PlacementGuid.IsValid()&&GetActorGuid().IsValid())PlacementGuid=GetActorGuid();
+#endif
+}
+#if WITH_EDITOR
+void AICEnemyBase::PostEditImport()
+{
+    Super::PostEditImport();
+    if(!IsTemplate())PlacementGuid=FGuid::NewGuid();
+}
+#endif
+void AICEnemyBase::BeginPlay()
+{
+    Super::BeginPlay();
+    // DT spawns carry no placement GUID and continue to initialize explicitly.
+    if(bInitializeWhenPlaced&&(PlacementGuid.IsValid()||IsNetStartupActor()))
+    {
+        if(!PlacementGuid.IsValid())PlacementGuid=FGuid::NewDeterministicGuid(UWorld::RemovePIEPrefix(GetPathName()));
+        if(auto* Spawns=GetWorld()->GetSubsystem<UICSpawnSubsystem>())Spawns->RegisterPlacedMonster(this);
+    }
+}
+bool AICEnemyBase::InitializeEnemy(FName SpawnerID,const FICSpawnSlotDefinition& Slot,const FTransform& Origin,bool bRestoreSavedSlot)
 {
     IC_TRACE_FUNCTION();auto* D=GetGameInstance()?GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>():nullptr;FICDefinitionResult R;
     const auto* Row=D?D->Find<FICMonsterRow>(Slot.MonsterID,R):nullptr;if(!Row||!WorldState())return false;
-    SpawnerDefinitionID=SpawnerID;SlotDefinition=Slot;Definition=*Row;OriginTransform=Origin;
+    if(bEnemyInitialized)return SpawnKey==FName(*(SpawnerID.ToString()+TEXT(":")+FString::FromInt(Slot.SpawnSlotIndex)));
+    SpawnerDefinitionID=SpawnerID;SlotDefinition=Slot;Definition=*Row;OriginTransform=Origin;bPreserveSavedSlot=bRestoreSavedSlot;
     SpawnKey=FName(*(SpawnerID.ToString()+TEXT(":")+FString::FromInt(Slot.SpawnSlotIndex)));CharacterID=SpawnKey;
     EnableCombat(false,false);const auto& S=Definition.CombatStats;
     AbilitySystem->SetCombatBase(S.MaxHP,S.MaxMP,S.PhysicalAttack,S.MagicAttack,S.Defense,S.MoveSpeedCmPerSecond,S.AttackSpeedMultiplier,S.CriticalChance,S.CriticalMultiplier);
     FICCharacterState State;State.CharacterId=SpawnKey;State.Kind=EICCharacterKind::Background;State.MaxHP=State.HP=S.MaxHP;State.MaxMP=State.MP=S.MaxMP;State.SP=0;State.MaxSP=1;State.Position=Origin.GetLocation();State.Rotation=Origin.Rotator();
+    const auto Previous=WorldState()->ExportState();const auto* Saved=Previous.SpawnSlots.Find(SpawnKey);
+    const bool bRestore=bRestoreSavedSlot&&Saved&&!Saved->bDefeated&&Saved->MonsterID==Definition.ID;
+    if(bRestore)
+    {
+        State.HP=FMath::Clamp(Saved->HP,0.f,State.MaxHP);State.MP=FMath::Clamp(Saved->MP,0.f,State.MaxMP);
+        State.Combat=Saved->Combat;State.LastSimPlaySecond=Saved->LastSimPlaySecond;
+        // Resume at the authored origin; stale chase positions can be obstructed
+        // after streaming or terrain edits. HP, effects and identity are retained.
+    }
     if(!AbilitySystem->Restore(State))return false;AbilitySystem->SetOrdinaryStaggerImmunity(Definition.bImmuneToOrdinaryHitStagger);
     GetCharacterMovement()->MaxWalkSpeed=AbilitySystem->Stat(EICStat::MoveSpeed);
     GetCharacterMovement()->bOrientRotationToMovement=false;
@@ -66,9 +108,10 @@ bool AICEnemyBase::InitializeEnemy(FName SpawnerID,const FICSpawnSlotDefinition&
         const auto Bounds=GetMesh()->CalcBounds(GetMesh()->GetComponentTransform());
         HealthBar->SetWorldLocation(FVector(GetActorLocation().X,GetActorLocation().Y,Bounds.Origin.Z+Bounds.BoxExtent.Z+30));
     }
-    auto Next=WorldState()->ExportState();auto& InitialSlot=Next.SpawnSlots.FindOrAdd(SpawnKey);InitialSlot.SpawnerID=SpawnerID;InitialSlot.SlotIndex=Slot.SpawnSlotIndex;InitialSlot.MonsterID=Definition.ID;InitialSlot.MaxHP=InitialSlot.HP=S.MaxHP;InitialSlot.MaxMP=InitialSlot.MP=S.MaxMP;InitialSlot.bDefeated=false;InitialSlot.bRewardPending=false;InitialSlot.IncarnationID=FGuid::NewGuid();InitialSlot.RespawnReadyAtPlaySecond=0;if(!WorldState()->ApplyWorldProgress(Next))return false;
+    auto Next=WorldState()->ExportState();auto& InitialSlot=Next.SpawnSlots.FindOrAdd(SpawnKey);InitialSlot.SpawnerID=SpawnerID;InitialSlot.SlotIndex=Slot.SpawnSlotIndex;InitialSlot.MonsterID=Definition.ID;InitialSlot.MaxHP=State.MaxHP;InitialSlot.HP=State.HP;InitialSlot.MaxMP=State.MaxMP;InitialSlot.MP=State.MP;InitialSlot.bDefeated=false;InitialSlot.bRewardPending=false;InitialSlot.IncarnationID=bRestore&&Saved->IncarnationID.IsValid()?Saved->IncarnationID:FGuid::NewGuid();InitialSlot.RespawnReadyAtPlaySecond=0;InitialSlot.RespawnReadyAtGameMinute=0;if(!WorldState()->ApplyWorldProgress(Next))return false;
     if(!FlushToWorldState_Implementation(WorldState()))return false;
     if(!GetController())SpawnDefaultController();if(auto* AI=Cast<AICAIController>(GetController()))AI->StartExecution(nullptr,Definition.BehaviorTree.LoadSynchronous());
+    SetActorHiddenInGame(false);SetActorEnableCollision(true);
     return true;
 }
 bool AICEnemyBase::FlushToWorldState_Implementation(UICWorldStateSubsystem* State)
@@ -117,7 +160,7 @@ void AICEnemyBase::HandleZeroHP()
 void AICEnemyBase::EndPlay(const EEndPlayReason::Type Reason)
 {
     IC_TRACE_FUNCTION();if(!bSuppressPersistence&&!bDefeatCommitted&&WorldState()&&!SpawnKey.IsNone())
-    {FlushToWorldState_Implementation(WorldState());auto State=WorldState()->ExportState();auto& S=State.SpawnSlots.FindChecked(SpawnKey);S.Position=OriginTransform.GetLocation();S.Rotation=OriginTransform.Rotator();S.HP=S.MaxHP;S.MP=S.MaxMP;S.Combat=FICCombatState();WorldState()->ApplyWorldProgress(State);}
+    {FlushToWorldState_Implementation(WorldState());if(!bPreserveSavedSlot){auto State=WorldState()->ExportState();auto& S=State.SpawnSlots.FindChecked(SpawnKey);S.Position=OriginTransform.GetLocation();S.Rotation=OriginTransform.Rotator();S.HP=S.MaxHP;S.MP=S.MaxMP;S.Combat=FICCombatState();WorldState()->ApplyWorldProgress(State);}}
     Super::EndPlay(Reason);
 }
 void AICEnemyBase::PresentAnimation(UAnimSequence* Animation,bool Loop,float Rate)

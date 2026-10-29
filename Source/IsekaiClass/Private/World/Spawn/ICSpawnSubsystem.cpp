@@ -2,6 +2,7 @@
 #include "UI/Framework/ICText.h"
 #include "Inventory/Rewards/ICRewardService.h"
 #include "World/Anchors/ICWorldAnchor.h"
+#include "World/Spawn/ICPlacedMonsterSpawnPoint.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "NPC/Character/ICNPCBase.h"
 #include "Enemy/Character/ICEnemyBase.h"
@@ -9,6 +10,7 @@
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Time/ICTimeSubsystem.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Level.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
@@ -33,6 +35,34 @@ bool UICSpawnSubsystem::RegisterAnchor(AICWorldAnchor* Anchor)
     Anchors.Add(Anchor->AnchorID,Anchor);NextRefreshAt=-1;return true;
 }
 void UICSpawnSubsystem::UnregisterAnchor(AICWorldAnchor* Anchor) { IC_TRACE_FUNCTION();if(Anchor){auto* A=Anchors.Find(Anchor->AnchorID);if(A&&A->Get()==Anchor)Anchors.Remove(Anchor->AnchorID);}if(!bTearingDown)RefreshSpawns(); }
+bool UICSpawnSubsystem::IsPlacedSpawnerID(FName ID)
+{
+    const FString Text=ID.ToString();FGuid Guid;
+    return Text.StartsWith(TEXT("PLACED_MONSTER_"))&&FGuid::ParseExact(Text.Mid(15),EGuidFormats::Digits,Guid)&&Guid.IsValid();
+}
+bool UICSpawnSubsystem::RegisterPlacedMonster(AICEnemyBase* Monster)
+{
+    if(!IsValid(Monster)||bTearingDown||!Monster->PlacementGuid.IsValid())return false;
+    auto* GI=GetWorld()->GetGameInstance();auto* D=GI?GI->GetSubsystem<UICDefinitionSubsystem>():nullptr;FICDefinitionResult R;
+    if(!D||!D->Find<FICMonsterRow>(Monster->MonsterID,R))
+    {UE_LOG(LogICData,Warning,TEXT("[Spawn.PlacedMonsterMissingDefinition] Actor=%s MonsterID=%s"),*Monster->GetPathName(),*Monster->MonsterID.ToString());return false;}
+    const FString Level=UWorld::RemovePIEPrefix(Monster->GetLevel()->GetOutermost()->GetName());
+    const FName ID(*(TEXT("PLACED_MONSTER_")+FGuid::NewDeterministicGuid(Level+TEXT(":")+Monster->PlacementGuid.ToString(EGuidFormats::Digits)).ToString(EGuidFormats::Digits)));
+    if(const auto* Existing=PlacedMonsterPoints.Find(ID);Existing&&Existing->IsValid())
+    {UE_LOG(LogICData,Warning,TEXT("[Spawn.PlacedMonsterDuplicateID] Actor=%s ID=%s"),*Monster->GetPathName(),*ID.ToString());return false;}
+    FActorSpawnParameters Params;Params.OverrideLevel=Monster->GetLevel();Params.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    auto* Point=GetWorld()->SpawnActor<AICPlacedMonsterSpawnPoint>(AICPlacedMonsterSpawnPoint::StaticClass(),Monster->GetActorTransform(),Params);
+    if(!Point)return false;
+    Point->SpawnerID=ID;Point->PlacementGuid=Monster->PlacementGuid;Point->MonsterClass=Monster->GetClass();Point->Slot.MonsterID=Monster->MonsterID;Point->Slot.LeashRadiusCm=FMath::Max(50.,Monster->PlacedLeashRadiusCm);
+    PlacedMonsterPoints.Add(ID,Point);Enemies.Add(FName(*(ID.ToString()+TEXT(":0"))),Monster);
+    Monster->SetActorHiddenInGame(true);Monster->SetActorEnableCollision(false);NextRefreshAt=-1;
+    return true;
+}
+void UICSpawnSubsystem::UnregisterPlacedMonster(AICPlacedMonsterSpawnPoint* Point)
+{
+    if(Point)if(const auto* Existing=PlacedMonsterPoints.Find(Point->SpawnerID);Existing&&Existing->Get()==Point)
+    {PlacedMonsterPoints.Remove(Point->SpawnerID);NextRefreshAt=-1;}
+}
 bool UICSpawnSubsystem::ResolveLoadedAnchor(FName ID,FTransform& Transform) const { IC_TRACE_FUNCTION();const auto* A=Anchors.Find(ID);if(!A||!A->IsValid())return false;Transform=A->Get()->GetActorTransform();return true; }
 AICCharacterBase* UICSpawnSubsystem::FindCharacter(FName ID) const
 { IC_TRACE_FUNCTION();for(TActorIterator<AICCharacterBase> It(GetWorld());It;++It)if(It->GetCharacterID()==ID&&!It->IsActorBeingDestroyed())return *It;return nullptr; }
@@ -116,33 +146,59 @@ void UICSpawnSubsystem::RefreshSpawns()
         FTransform Origin;if(!ResolveLoadedAnchor(Slot.OriginAnchorID,Origin))continue;const auto* Monster=D->Find<FICMonsterRow>(Slot.MonsterID,R);if(!Monster)continue;
         if(auto* Player=Cast<AICCharacterBase>(UGameplayStatics::GetPlayerPawn(GetWorld(),0)))if(Player->GetICAbilitySystem()&&!Player->GetICAbilitySystem()->Conditions(Slot.Availability))continue;
         const FName Key=FName(*(ID.ToString()+TEXT(":")+FString::FromInt(Slot.SpawnSlotIndex)));WantedKeys.Add(Key);
-        auto World=S->ExportState();auto* Saved=World.SpawnSlots.Find(Key);
-        if(Saved&&Saved->bDefeated)
-        {
-            if(Saved->RespawnReadyAtGameMinute<0)
-            {
-                Saved->RespawnReadyAtGameMinute=T->GetClock().GameMinute+FMath::Max(0.,Monster->RespawnGameMinutes);
-                S->ApplyWorldProgress(World);
-            }
-            if(Saved->bRewardPending||T->GetClock().GameMinute<Saved->RespawnReadyAtGameMinute)continue;
-        }
-        if(auto* Existing=Enemies.Find(Key);Existing&&Existing->IsValid())
-        {
-            if(!Saved||!Saved->bDefeated)continue;
-            // Calendar jumps can expire the cooldown before the death animation ends.
-            Existing->Get()->Destroy();Enemies.Remove(Key);
-        }
         UClass* Type=Monster->PawnClass.IsNull()?AICEnemyBase::StaticClass():Monster->PawnClass.LoadSynchronous();if(!Type||!Type->IsChildOf(AICEnemyBase::StaticClass())){UE_LOG(LogICData,Warning,TEXT("[Spawn.EnemyClassInvalid] %s"),*Slot.MonsterID.ToString());continue;}
-
-        auto* Actor=GetWorld()->SpawnActor<AICEnemyBase>(Type,Origin);if(Actor){if(!Actor->InitializeEnemy(ID,Slot,Origin))Actor->Destroy();else {Enemies.Add(Key,Actor);auto Next=S->ExportState();auto& New=Next.SpawnSlots.FindChecked(Key);New.bDefeated=false;New.RespawnReadyAtPlaySecond=0;New.RespawnReadyAtGameMinute=0;S->ApplyWorldProgress(Next);}}
+        RefreshEnemySlot(ID,Slot,Origin,Type,false);
+    }
+    for(auto It=PlacedMonsterPoints.CreateIterator();It;++It)
+    {
+        auto* Point=It.Value().Get();if(!Point){It.RemoveCurrent();continue;}
+        WantedKeys.Add(FName(*(Point->SpawnerID.ToString()+TEXT(":0"))));
+        RefreshEnemySlot(Point->SpawnerID,Point->Slot,Point->GetActorTransform(),Point->MonsterClass,true);
     }
     for(auto It=Enemies.CreateIterator();It;++It)if(!WantedKeys.Contains(It.Key())){if(It.Value().IsValid())It.Value()->Destroy();It.RemoveCurrent();}
+}
+void UICSpawnSubsystem::RefreshEnemySlot(FName ID,const FICSpawnSlotDefinition& Slot,const FTransform& Origin,UClass* Class,bool bPlaced)
+{
+    auto* GI=GetWorld()->GetGameInstance();auto* S=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* T=GI->GetSubsystem<UICTimeSubsystem>();FICDefinitionResult R;
+    const auto* Monster=D->Find<FICMonsterRow>(Slot.MonsterID,R);if(!Monster||!Class||!Class->IsChildOf(AICEnemyBase::StaticClass()))return;
+    const FName Key(*(ID.ToString()+TEXT(":")+FString::FromInt(Slot.SpawnSlotIndex)));
+    auto World=S->ExportState();auto* Saved=World.SpawnSlots.Find(Key);
+    AICEnemyBase* Existing=Enemies.FindRef(Key).Get();
+    if(Saved&&Saved->bDefeated)
+    {
+        if(Saved->RespawnReadyAtGameMinute<0)
+        {Saved->RespawnReadyAtGameMinute=T->GetClock().GameMinute+FMath::Max(0.,Monster->RespawnGameMinutes);S->ApplyWorldProgress(World);}
+        // A placed copy loaded during its cooldown must not resurrect the enemy.
+        if(Existing&&!Existing->HasInitializedEnemy()){Existing->ReleaseForLoad();Existing->Destroy();Enemies.Remove(Key);Existing=nullptr;}
+        if(Saved->bRewardPending||T->GetClock().GameMinute<Saved->RespawnReadyAtGameMinute)return;
+        if(Existing){Existing->Destroy();Enemies.Remove(Key);Existing=nullptr;}
+    }
+    if(Existing&&Existing->HasInitializedEnemy())return;
+    FActorSpawnParameters Params;Params.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+    if(bPlaced)if(auto* Point=PlacedMonsterPoints.FindRef(ID).Get())Params.OverrideLevel=Point->GetLevel();
+    auto* Actor=Existing?Existing:GetWorld()->SpawnActor<AICEnemyBase>(Class,Origin,Params);
+    if(!Actor)return;
+    if(bPlaced)if(auto* Point=PlacedMonsterPoints.FindRef(ID).Get())Actor->PlacementGuid=Point->PlacementGuid;
+    if(!Actor->InitializeEnemy(ID,Slot,Origin,bPlaced)){Actor->ReleaseForLoad();Actor->Destroy();Enemies.Remove(Key);return;}
+    Enemies.Add(Key,Actor);
 }
 bool UICSpawnSubsystem::FlushActors() { IC_TRACE_FUNCTION();auto* GI=GetWorld()->GetGameInstance();auto* S=GI?GI->GetSubsystem<UICWorldStateSubsystem>():nullptr;if(!S)return true;for(const auto& E:Enemies)if(E.Value.IsValid()&&!E.Value->FlushToWorldState_Implementation(S))return false;return true; }
 bool UICSpawnSubsystem::CanRestoreActors(const FICWorldState& State) const
 {
     IC_TRACE_FUNCTION();auto* D=GetWorld()->GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;
-    for(const auto& Pair:State.SpawnSlots){const auto* Row=D?D->Find<FICSpawnerRow>(Pair.Value.SpawnerID,R):nullptr;if(!Row||!D->Find<FICMonsterRow>(Pair.Value.MonsterID,R)||!Row->Slots.ContainsByPredicate([&Pair](const auto& Slot){return Slot.SpawnSlotIndex==Pair.Value.SlotIndex&&Slot.MonsterID==Pair.Value.MonsterID;}))return false;}
+    if(!D)return false;
+    for(const auto& Pair:State.SpawnSlots)
+    {
+        if(!D->Find<FICMonsterRow>(Pair.Value.MonsterID,R))return false;
+        if(IsPlacedSpawnerID(Pair.Value.SpawnerID))
+        {
+            if(Pair.Value.SlotIndex!=0||Pair.Key!=FName(*(Pair.Value.SpawnerID.ToString()+TEXT(":0"))))return false;
+            if(auto* Point=PlacedMonsterPoints.FindRef(Pair.Value.SpawnerID).Get();Point&&Point->Slot.MonsterID!=Pair.Value.MonsterID)return false;
+            continue; // Other streamed levels/maps may not have loaded their points yet.
+        }
+        const auto* Row=D->Find<FICSpawnerRow>(Pair.Value.SpawnerID,R);
+        if(!Row||!Row->Slots.ContainsByPredicate([&Pair](const auto& Slot){return Slot.SpawnSlotIndex==Pair.Value.SlotIndex&&Slot.MonsterID==Pair.Value.MonsterID;}))return false;
+    }
     return true;
 }
 void UICSpawnSubsystem::RestoreActors()
@@ -174,5 +230,5 @@ AICNPCBase* UICSpawnSubsystem::ReserveReviveTarget(FName ID,UICAbilitySystemComp
 }
 void UICSpawnSubsystem::Deinitialize()
 {
-    IC_TRACE_FUNCTION();bTearingDown=true;if(auto* GI=GetWorld()->GetGameInstance())if(auto* S=GI->GetSubsystem<UICWorldStateSubsystem>())S->OnWorldRestored.RemoveDynamic(this,&ThisClass::WorldRestored);Anchors.Reset();NPCs.Reset();Enemies.Reset();NPCsWaitingForAnchor.Reset();Super::Deinitialize();
+    IC_TRACE_FUNCTION();bTearingDown=true;if(auto* GI=GetWorld()->GetGameInstance())if(auto* S=GI->GetSubsystem<UICWorldStateSubsystem>())S->OnWorldRestored.RemoveDynamic(this,&ThisClass::WorldRestored);Anchors.Reset();NPCs.Reset();Enemies.Reset();PlacedMonsterPoints.Reset();NPCsWaitingForAnchor.Reset();Super::Deinitialize();
 }
