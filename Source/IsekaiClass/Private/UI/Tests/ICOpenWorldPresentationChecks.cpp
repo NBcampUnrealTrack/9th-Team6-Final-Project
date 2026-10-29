@@ -29,9 +29,37 @@
 #include "Components/CanvasPanel.h"
 #include "Components/WidgetComponent.h"
 #include "UI/Gameplay/ICCombatFeedbackWidget.h"
+#include "Data/Rows/World/ICAnchorRow.h"
+#include "Editor.h"
+#include "EngineUtils.h"
+#include "Slate/WidgetRenderer.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "ImageUtils.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
+#include "Widgets/Layout/SBorder.h"
+#include "Styling/CoreStyle.h"
+#include "RenderingThread.h"
+#include "RHI.h"
 
 namespace
 {
+bool CaptureAdventureHUD(UICGameplayWidget* HUD,const TCHAR* Filename)
+{
+    if(GUsingNullRHI)return true;
+    FWidgetRenderer Renderer(true);
+    auto Surface=SNew(SBorder).Padding(0).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+        .BorderBackgroundColor(FLinearColor(.035f,.055f,.075f))[HUD->TakeWidget()];
+    auto* Target=Renderer.DrawWidget(Surface,FVector2D(1920,1080));if(!Target)return false;
+    Renderer.DrawWidget(Target,Surface,FVector2D(1920,1080),.1f);FlushRenderingCommands();
+    TArray<FColor> Pixels;FReadSurfaceDataFlags Flags(RCM_UNorm);Flags.SetLinearToGamma(false);
+    if(!Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels,Flags))return false;
+    TArray64<uint8> PNG;FImageUtils::PNGCompressImageArray(1920,1080,Pixels,PNG);
+    const FString Directory=FPaths::ProjectSavedDir()/TEXT("RequestedHUDWarps/Preview");IFileManager::Get().MakeDirectory(*Directory,true);
+    return FFileHelper::SaveArrayToFile(PNG,*(Directory/Filename));
+}
+
 struct FOpenWorldUIFixture
 {
     UGameInstance* GI=NewObject<UGameInstance>(GEngine);
@@ -73,6 +101,7 @@ bool FICOpenWorldGuideCheck::RunTest(const FString&)
     HUD->RefreshControlGuide();TestFalse(TEXT("Existing saves do not start a new-game guide"),HUD->IsControlGuideVisible());
     auto Next=F.State->ExportState();Next.Flags.Add(TEXT("TUT_CONTROLS_PENDING"),true);F.State->ApplyWorldProgress(Next);HUD->RefreshControlGuide();
     TestTrue(TEXT("Pending new-game guide appears on gameplay HUD"),HUD->IsControlGuideVisible());
+    TestTrue(TEXT("Guide HUD renders for visual review"),CaptureAdventureHUD(HUD,TEXT("ControlGuide.png")));
     auto* Title=Cast<UTextBlock>(HUD->GetWidgetFromName(TEXT("TXT_GuideTitle")));if(!TestNotNull(TEXT("Guide title exists"),Title))return false;
     const FText Before=Title->GetText();
     F.PC->InputKey(FInputKeyEventArgs(nullptr,FInputDeviceId::CreateFromInternalId(0),EKeys::F,IE_Pressed,0));
@@ -135,6 +164,7 @@ bool FICOpenWorldBossCheck::RunTest(const FString&)
         TestEqual(TEXT("Boss panel appears while fighting"),HUD->GetWidgetFromName(TEXT("HUD_BossBar"))->GetVisibility(),ESlateVisibility::HitTestInvisible);
         Boss->GetICAbilitySystem()->ChangeResource(TEXT("HP"),-10);HUD->RefreshTargetInfo();
         TestTrue(TEXT("Boss bar follows actual HP loss"),CastChecked<UProgressBar>(HUD->GetWidgetFromName(TEXT("BAR_BossHP")))->GetPercent()<1.f);
+        TestTrue(TEXT("Boss HP HUD renders for visual review"),CaptureAdventureHUD(HUD,TEXT("BossHP.png")));
         Boss->BeginReturn();HUD->RefreshTargetInfo();TestEqual(TEXT("Returning boss hides the fight bar"),HUD->GetWidgetFromName(TEXT("HUD_BossBar"))->GetVisibility(),ESlateVisibility::Collapsed);
     }
     TArray<FName> Classes;F.Definitions->GetDefinitionIDs(EICDefinitionType::Class,Classes);int32 AudioStages=0;
@@ -171,24 +201,82 @@ bool FICMonsterEngagementBarCheck::RunTest(const FString&)
     TestTrue(TEXT("Normal and boss rules are both covered"),Normal&&Boss);Settings->bEnemyHealthBars=Before;return !HasAnyErrors();
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICWarpConfirmationCheck,"IC.OpenWorld.WarpListConfirmation",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
-bool FICWarpConfirmationCheck::RunTest(const FString&)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICWarpRequestCheck,"IC.OpenWorld.WarpRequestGating",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICWarpRequestCheck::RunTest(const FString&)
 {
-    FOpenWorldUIFixture F;const FName Home=TEXT("WRP_OW_01_HOME");
+    FOpenWorldUIFixture F;const FName Home=TEXT("WRP_OW_01_HOME"),Inn=TEXT("WRP_OW_02_INN");
     auto* Anchor=F.World->SpawnActor<AICWorldAnchor>();Anchor->AnchorID=TEXT("ANC_WRP_OW_ARRIVAL_01_HOME");Anchor->SetActorLocation(FVector(500,100,200));F.World->GetSubsystem<UICSpawnSubsystem>()->RegisterAnchor(Anchor);
     auto* Stone=F.World->SpawnActor<AICWarpStone>();Stone->WarpID=Home;Stone->InteractionText=FText::FromString(TEXT("집"));
-    auto* Class=LoadClass<UICMapWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Map.WBP_IC_Map_C"));auto* Map=CreateWidget<UICMapWidget>(F.PC,Class);
+    auto* LockedStone=F.World->SpawnActor<AICWarpStone>();LockedStone->WarpID=Inn;
+    auto* Class=LoadClass<UICMapWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_Map.WBP_IC_Map_C"));
+    if(!TestNotNull(TEXT("Warp list BP loads"),Class))return false;
+    auto* Map=CreateWidget<UICMapWidget>(F.PC,Class);
     auto* Host=NewObject<UCanvasPanel>(F.PC);Host->AddChild(Map);F.PC->Menu=TEXT("Map");
-    TestNull(TEXT("Warp list contains no map image"),Map->GetWidgetFromName(TEXT("IMG_Map")));
+    TestNull(TEXT("Warp selection contains no map image"),Map->GetWidgetFromName(TEXT("IMG_Map")));
     TestNotNull(TEXT("Vertical destination list exists"),Map->GetWidgetFromName(TEXT("WarpDestinations")));
-    const auto Position=F.Player->GetActorLocation();TestTrue(TEXT("Selecting a destination opens confirmation"),Map->RequestTravel(Home));
+    auto* Loading=Map->GetWidgetFromName(TEXT("MapLoading"));TestNotNull(TEXT("Travel loading cover exists"),Loading);
+    const auto Position=F.Player->GetActorLocation();
+    TestFalse(TEXT("Unknown destinations are rejected"),Map->RequestTravel(TEXT("WRP_UNKNOWN")));
+    TestFalse(TEXT("A placed but locked stone cannot start travel"),Map->RequestTravel(Inn));
+    F.PC->Menu.Empty();TestFalse(TEXT("Closed map rejects travel"),Map->RequestTravel(Home));F.PC->Menu=TEXT("Map");
+    F.PC->bInCombat=true;TestFalse(TEXT("Combat rejects travel"),Map->RequestTravel(Home));F.PC->bInCombat=false;
+    Map->bMinimap=true;TestFalse(TEXT("The minimap cannot directly start travel"),Map->RequestTravel(Home));Map->bMinimap=false;
+    TestTrue(TEXT("An unlocked destination opens the confirmation popup"),Map->RequestTravel(Home));
     TestTrue(TEXT("Confirmation is open"),Map->IsConfirmingTravel());TestFalse(TEXT("Selecting does not begin travel"),Map->IsTraveling());
-    TestEqual(TEXT("No fee before confirmation"),F.State->ExportState().Gold,2000);TestEqual(TEXT("No movement before confirmation"),F.Player->GetActorLocation(),Position);
-    CastChecked<UButton>(Map->GetWidgetFromName(TEXT("BTN_WarpCancel")))->OnClicked.Broadcast();
-    TestFalse(TEXT("Cancel closes confirmation"),Map->IsConfirmingTravel());TestFalse(TEXT("Cancel never begins travel"),Map->IsTraveling());TestEqual(TEXT("Cancel does not charge"),F.State->ExportState().Gold,2000);
-    TestTrue(TEXT("Destination can be selected again"),Map->RequestTravel(Home));CastChecked<UButton>(Map->GetWidgetFromName(TEXT("BTN_WarpConfirm")))->OnClicked.Broadcast();
-    TestTrue(TEXT("Confirm starts travel"),Map->IsTraveling());TestFalse(TEXT("Confirm closes the modal"),Map->IsConfirmingTravel());
+    auto* Question=Cast<UTextBlock>(Map->GetWidgetFromName(TEXT("TXT_WarpQuestion")));
+    TestTrue(TEXT("Question names the selected destination"),Question&&Question->GetText().ToString().Contains(TEXT("집으로 이동하겠습니까?")));
+    TestEqual(TEXT("Opening the popup does not charge"),F.State->ExportState().Gold,2000);TestEqual(TEXT("Opening the popup does not move the player"),F.Player->GetActorLocation(),Position);
+    auto* Confirm=Cast<UButton>(Map->GetWidgetFromName(TEXT("BTN_WarpConfirm")));auto* Cancel=Cast<UButton>(Map->GetWidgetFromName(TEXT("BTN_WarpCancel")));
+    if(!TestNotNull(TEXT("Confirm button exists"),Confirm)||!TestNotNull(TEXT("Cancel button exists"),Cancel))return false;
+    Cancel->OnClicked.Broadcast();TestFalse(TEXT("Cancel closes the popup"),Map->IsConfirmingTravel());TestFalse(TEXT("Cancel does not travel"),Map->IsTraveling());
+    TestEqual(TEXT("Cancel does not charge"),F.State->ExportState().Gold,2000);TestEqual(TEXT("Cancel leaves the player in place"),F.Player->GetActorLocation(),Position);
+    Map->RequestTravel(Home);Map->NativeOnPreviewKeyDown(FGeometry(),FKeyEvent(EKeys::Escape,FModifierKeysState(),0,false,0,0));
+    TestFalse(TEXT("Escape cancels the popup"),Map->IsConfirmingTravel());TestEqual(TEXT("Escape keeps the destination list open"),F.PC->Menu,FString(TEXT("Map")));
+    Map->RequestTravel(Home);Map->NativeOnPreviewKeyDown(FGeometry(),FKeyEvent(EKeys::Right,FModifierKeysState(),0,false,0,0));Map->NativeOnPreviewKeyDown(FGeometry(),FKeyEvent(EKeys::Enter,FModifierKeysState(),0,false,0,0));
+    TestFalse(TEXT("Keyboard can choose Cancel"),Map->IsConfirmingTravel());TestFalse(TEXT("Keyboard cancel does not travel"),Map->IsTraveling());
+    TestTrue(TEXT("Test player balance changes through the economy API"),F.State->SetPlayerGold(100));
+    TestTrue(TEXT("Even a player with too little gold can open the question"),Map->RequestTravel(Home));Confirm->OnClicked.Broadcast();
+    TestFalse(TEXT("Insufficient gold cannot start travel"),Map->IsTraveling());TestTrue(TEXT("Failed confirmation keeps the popup open"),Map->IsConfirmingTravel());
+    auto* Error=Cast<UTextBlock>(Map->GetWidgetFromName(TEXT("TXT_WarpConfirmError")));TestTrue(TEXT("The popup explains the failed request"),Error&&!Error->GetText().IsEmpty());
+    TestEqual(TEXT("Failed confirmation does not charge"),F.State->ExportState().Gold,100);Cancel->OnClicked.Broadcast();
+    TestTrue(TEXT("Test player can afford the confirmed trip"),F.State->SetPlayerGold(2000));
+    Map->RequestTravel(Home);Confirm->OnClicked.Broadcast();
+    TestTrue(TEXT("Confirm starts travel"),Map->IsTraveling());TestFalse(TEXT("Confirm closes the popup"),Map->IsConfirmingTravel());TestTrue(TEXT("Travel blocks gameplay through the event state"),F.PC->bInEvent);
+    if(Loading)TestEqual(TEXT("Loading cover appears before movement"),Loading->GetVisibility(),ESlateVisibility::Visible);
+    TestEqual(TEXT("Request does not charge before arrival"),F.State->ExportState().Gold,2000);TestEqual(TEXT("Request does not teleport before the loading delay"),F.Player->GetActorLocation(),Position);
+    TestFalse(TEXT("Repeated requests cannot start a second trip"),Map->RequestTravel(Home));
+    Confirm->OnClicked.Broadcast();TestEqual(TEXT("A duplicate confirmation does not charge again"),F.State->ExportState().Gold,2000);
     Map->RemoveFromParent();Map->ReleaseSlateResources(true);F.PC->bInEvent=false;F.PC->Menu.Empty();return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICPlacedOpenWorldWarpCheck,"IC.OpenWorld.PlacedWarpDestinations",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICPlacedOpenWorldWarpCheck::RunTest(const FString&)
+{
+    auto* World=GEditor?GEditor->GetEditorWorldContext().World():nullptr;
+    if(!World||World->GetName()!=TEXT("L_OpenWorld")){AddInfo(TEXT("Open L_OpenWorld to validate the placed warp destinations."));return true;}
+    FOpenWorldUIFixture F;
+    struct FDestination{const TCHAR* Code;FVector2D XY;};
+    const FDestination Destinations[]={{TEXT("01_HOME"),{-53740,629630}},{TEXT("02_INN"),{-55695,608350}},
+        {TEXT("03_BRIDGE"),{-60715,561595}},{TEXT("04_RUINS"),{-52830,505280}}};
+    for(const auto& Destination:Destinations)
+    {
+        const FName ID(*(FString(TEXT("WRP_OW_"))+Destination.Code));AICWarpStone* Stone=nullptr;int32 Count=0;
+        for(TActorIterator<AICWarpStone> It(World);It;++It)if(It->WarpID==ID){Stone=*It;++Count;}
+        TestEqual(FString::Printf(TEXT("%s has exactly one placed stone"),*ID.ToString()),Count,1);
+        if(!Stone)continue;
+        TestTrue(TEXT("Stone uses the newly requested negative-X coordinates"),FVector2D(Stone->GetActorLocation()).Equals(Destination.XY,.1f));
+        FICDefinitionResult Result;const auto* Warp=F.Definitions->Find<FICWarpRow>(ID,Result);
+        if(!TestNotNull(TEXT("Placed stone has a runtime warp definition"),Warp))continue;
+        TestEqual(TEXT("Only the house is unlocked by default"),Warp->bUnlockedByDefault,FString(Destination.Code)==TEXT("01_HOME"));
+        AICWorldAnchor* Arrival=nullptr;for(TActorIterator<AICWorldAnchor> It(World);It;++It)if(It->AnchorID==Warp->ArrivalAnchorID)Arrival=*It;
+        if(!TestNotNull(TEXT("Destination arrival anchor is loaded in the actual map"),Arrival))continue;
+        const auto* Row=F.Definitions->Find<FICAnchorRow>(Warp->ArrivalAnchorID,Result);
+        if(TestNotNull(TEXT("Arrival has a matching anchor DT row"),Row))
+            TestTrue(TEXT("Saved anchor position matches its DT"),Arrival->GetActorLocation().Equals(Row->WorldTransform.GetLocation(),.1f));
+        FCollisionQueryParams Query;Query.AddIgnoredActor(Stone);
+        TestFalse(TEXT("Actual arrival has player capsule clearance"),World->OverlapBlockingTestByChannel(Arrival->GetActorLocation(),FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(42,96),Query));
+    }
+    return !HasAnyErrors();
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICOpenWorldDefinitionsCheck,"IC.OpenWorld.RuntimeDefinitions",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)

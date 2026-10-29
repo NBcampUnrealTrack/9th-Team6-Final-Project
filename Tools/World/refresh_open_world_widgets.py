@@ -7,5 +7,5 @@ for name,kind in [('WBP_IC_InventoryMenu','InventoryMenu'),('WBP_IC_Map','Map'),
     u.BlueprintEditorLibrary.compile_blueprint(bp)
     assert u.EditorAssetLibrary.save_loaded_asset(bp,False)
     names={str(n) for n in u.ICBlueprintMaintenanceLibrary.get_frontend_widget_names(bp)}
-    if kind=='Map':assert {'WarpConfirm','BTN_WarpConfirm','BTN_WarpCancel','BTN_Warp0','BTN_Warp3'}<=names and 'IMG_Map' not in names
+    if kind=='Map':assert {'WarpDestinations','WarpConfirm','BTN_WarpConfirm','BTN_WarpCancel','MapLoading'}<=names and 'IMG_Map' not in names
 u.log('IC_OPENWORLD_WIDGETS_REFRESHED')

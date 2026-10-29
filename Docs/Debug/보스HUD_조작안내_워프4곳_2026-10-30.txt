@@ -1,0 +1,61 @@
+2026-10-30 — dev 통합 후 보스 HUD / 시작 조작 안내 / 워프 4곳 추가
+
+사용자 최신 요구
+- 기존 Codex 미니맵 수정은 무시하고 dev 지도·미니맵 유지.
+- 보스 전용 HP UI와 새 게임 시작 후 조작 안내 추가.
+- 설정 창의 설명/조작법 탭은 추후 작업.
+- 집과 마을여관 X는 이번 요청에 따라 음수로 변경. 과거 양수 X 요청보다 이 요청이 우선.
+
+반영
+- 기존 WBP_GameHUD의 위젯/배치를 유지한 채 보스 HP와 조작 가이드 영역만 추가.
+- EnsureAdventureHUD를 에디터 추가 도구와 런타임 초기화에서 공유. 중복 패널 방지.
+- 보스 HP: 화면 상단 중앙의 긴 HP바, 이름, 현재/최대 HP. 실제 보스 상태와 연동.
+- 조작 가이드: 새 게임 생성 시 예약된 안내를 HUD에 8페이지로 표시, F로 진행.
+  완료 상태 저장. 다른 메뉴/전투 중에는 숨김.
+- 안내에서 미구현 구르기/퀘스트 자동 추적 설명을 제거하고 현재 입력 동작에 맞춤.
+- 기존 워프 ID 4개 유지. 집 기본 해금, 나머지 현장 상호작용 후 해금. 비용 500G.
+- 워프돌 F 상호작용으로 활성화 및 dev 전체 지도 열기. M 지도에서도 이동.
+- 포탈 4개와 방문/도착 앵커 8개를 현재 L_OpenWorld의 PersistentLevel에 저장.
+- 도착점은 돌 옆 실제 지면 위에 배치하고 플레이어 캡슐(반경42/반높이96) 여유 공간 확인.
+- Anchor DT와 대응 CSV 좌표 동기화. 현재 사용자의 기존 맵 액터 모두 보존.
+
+워프돌 좌표 — 실제 지면에 맞춘 최종 값
+집:          -53740, 629630, -5189.589903
+마을여관:    -55695, 608350, -6357.331514
+추억의 다리: -60715, 561595, -6537
+폐허 마을:   -52830, 505280, -6467.008631
+여관 요청 Z=6125 위치의 실제 지면은 약 -6360이라 높이를 보정함.
+
+실제 도착 앵커 좌표
+집:          -53990, 629630, -5098.451662
+마을여관:    -55445, 608350, -6260.331514
+추억의 다리: -60465, 561595, -6440
+폐허 마을:   -52580, 505280, -6370.008631
+
+주요 코드
+- ICGameplayLayout::EnsureAdventureHUD
+- UICBlueprintMaintenanceLibrary::AddAdventureHUD
+- ICGameplayWidget.cpp / ICControlGuide.cpp
+- ICOpenWorldPresentationChecks.cpp: 실제 저장된 워프 4곳과 도착 캡슐 검증 추가.
+- Tools/World/apply_requested_hud_warps.py: dev 화면을 재생성하지 않는 제한된 적용 도구.
+- Tools/World/audit_requested_warps.py: 현재 맵/지면 읽기 전용 검사.
+
+검증
+- IsekaiClassEditor Win64 Development 빌드 성공.
+- 저장 파일을 다시 로드한 RHI 자동 테스트 10개 모두 Success, failed=0.
+- IC.OpenWorld 전체 8개 + IC.UI.Firefight.MinimapWorldMarkers + IC.UI.HUDPrototype.
+- 보스 HP 실제 갱신/귀환 시 숨김, 가이드 F키 진행/완료 저장, 방문 해금/비용 확인.
+- PlacedWarpDestinations는 실제 L_OpenWorld를 로드하여 실행했으며 건너뛰지 않음.
+- dev WBP_IC_Minimap/WBP_IC_Map 및 서브레벨 두 파일은 적용 전후 SHA256 동일.
+- 기존 HUD 위젯 이름과 기존 레벨 액터 경로가 모두 보존됨을 적용 도구에서 확인.
+- HUD 안내/보스 HP 렌더링 이미지에서 글자 및 배치 확인.
+
+로컬 검증 자료 (Saved는 Git 제외)
+- Saved/RequestedHUDWarps/Before.json
+- Saved/RequestedHUDWarps/Applied.json
+- Saved/RequestedHUDWarps/BeforeFiles/ (작업 전 파일 백업)
+- Saved/RequestedHUDWarps/Tests/index.json
+- Saved/RequestedHUDWarps/Preview/ControlGuide.png
+- Saved/RequestedHUDWarps/Preview/BossHP.png
+
+커밋/푸시하지 않음. 기존 MergeFix 작업 변경도 그대로 유지.

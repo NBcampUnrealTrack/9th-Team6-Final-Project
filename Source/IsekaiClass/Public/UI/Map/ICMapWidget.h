@@ -23,6 +23,7 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map") TSoftObjectPtr<UDataTable> PresentationTable;
     UFUNCTION(BlueprintCallable,Category="Map") bool RequestTravel(FName WarpID);
     UFUNCTION(BlueprintPure,Category="Map") bool IsTraveling() const{return bTraveling;}
+    UFUNCTION(BlueprintPure,Category="Map") bool IsConfirmingTravel() const{return bConfirming;}
     UFUNCTION(BlueprintPure,Category="Map") FVector2D WorldToMapUV(FVector Position) const;
     UFUNCTION(BlueprintPure,Category="Map|Minimap") int32 GetTrackedBuildingCount() const;
     UFUNCTION(BlueprintPure,Category="Map|Minimap") int32 GetTrackedNPCCount() const;
@@ -51,7 +52,7 @@ private:
     TArray<TWeakObjectPtr<AActor>> Buildings;
     TArray<TWeakObjectPtr<AActor>> NPCs;
     TArray<TWeakObjectPtr<AActor>> Monsters;
-    bool bTraveling=false,bMoved=false,bRegistered=false;
+    bool bTraveling=false,bMoved=false,bRegistered=false,bConfirming=false,bConfirmSelected=true;
     float TravelElapsed=0,RefreshElapsed=1;
     int32 SelectedPortal=0;
     FName PendingWarp;
@@ -62,9 +63,19 @@ private:
     FSlateRect ImageRect(const FGeometry&) const;
     FVector2D MarkerPosition(const FSlateRect&,FVector) const;
     void RefreshLabels();
+    FText DestinationName(FName WarpID) const;
     static bool IsAutomaticBuildingMeshPath(const FString& AssetPath);
     UFUNCTION() void CloseMap();
+    UFUNCTION() void ConfirmTravel();
+    UFUNCTION() void CancelTravelConfirmation();
+    bool BeginTravel(FName WarpID);
+    void ChoosePortal(int32 Index);
+    UFUNCTION() void Portal0();
+    UFUNCTION() void Portal1();
+    UFUNCTION() void Portal2();
+    UFUNCTION() void Portal3();
 #if WITH_DEV_AUTOMATION_TESTS
     friend class FICMinimapWorldMarkerCheck;
+    friend class FICWarpRequestCheck;
 #endif
 };

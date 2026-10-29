@@ -210,7 +210,7 @@ bool UICBlueprintMaintenanceLibrary::RenderFrontendPreview(UBlueprint* Blueprint
         const TCHAR* Names[]={TEXT("집"),TEXT("마을여관"),TEXT("추억의 다리"),TEXT("폐허 마을")};
         for(int32 I=0;I<4;++I)SetText(*FString::Printf(TEXT("TXT_Warp%d"),I),FText::FromString(FString(Names[I])+(I<2?TEXT("\n이동 가능"):TEXT("\n잠김 · 워프돌에서 활성화"))));
         if(auto* W=Preview->WidgetTree->FindWidget(TEXT("WarpConfirm")))W->SetVisibility(Question==1?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
-        SetText(TEXT("TXT_WarpQuestion"),FText::FromString(TEXT("집\n여기로 이동하겠습니까?\n\n이동 비용: 500G")));
+        SetText(TEXT("TXT_WarpQuestion"),FText::FromString(TEXT("집으로 이동하겠습니까?\n\n이동 비용: 500G · 보유 2,000G")));
     }
     FWidgetRenderer Renderer(BP->GetFName()!=TEXT("WBP_IC_Map"));
     FAssetCompilingManager::Get().FinishAllCompilation();
@@ -318,6 +318,22 @@ bool UICBlueprintMaintenanceLibrary::AddGameClockHUD(UBlueprint* Blueprint)
     return false;
 #endif
 }
+bool UICBlueprintMaintenanceLibrary::AddAdventureHUD(UBlueprint* Blueprint)
+{
+#if WITH_EDITOR
+    auto* BP=Cast<UWidgetBlueprint>(Blueprint);if(!BP||!BP->WidgetTree)return false;
+    BP->Modify();BP->WidgetTree->Modify();
+    if(!ICGameplayLayout::EnsureAdventureHUD(BP->WidgetTree))return false;
+    for(const auto* Name:{TEXT("HUD_BossBar"),TEXT("BAR_BossHP"),TEXT("TXT_BossName"),TEXT("TXT_BossHP"),
+        TEXT("HUD_ControlGuide"),TEXT("TXT_GuideTitle"),TEXT("TXT_GuideBody"),TEXT("TXT_GuideNext"),TEXT("GuideFocus")})
+        if(auto* Widget=BP->WidgetTree->FindWidget(Name))
+        {Widget->bIsVariable=true;BP->WidgetVariableNameToGuidMap.FindOrAdd(Widget->GetFName(),FGuid::NewGuid());}
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);return true;
+#else
+    return false;
+#endif
+}
+
 bool UICBlueprintMaintenanceLibrary::AddDialogueAffinityHearts(UBlueprint* Blueprint)
 {
 #if WITH_EDITOR

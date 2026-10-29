@@ -24,8 +24,8 @@ ACTORS = u.get_editor_subsystem(u.EditorActorSubsystem)
 TABLES = {}
 REPORT = {'destinations': [], 'checks': {}, 'capture': {}, 'complete': False}
 POINTS = [
-    ('01_HOME', '집', 53740., 629630., -5155., True),
-    ('02_INN', '마을여관', 55695., 608350., 6125., False),
+    ('01_HOME', '집', -53740., 629630., -5155., True),
+    ('02_INN', '마을여관', -55695., 608350., 6125., False),
     ('03_BRIDGE', '추억의 다리', -60715., 561595., -6495., False),
     ('04_RUINS', '폐허 마을', -52830., 505280., -6430., False),
 ]

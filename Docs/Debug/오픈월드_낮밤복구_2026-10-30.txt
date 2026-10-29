@@ -1,0 +1,41 @@
+L_OpenWorld 낮밤 전환 복구
+작성일: 2026-10-30
+
+원인
+- 현재 저장된 L_OpenWorld에는 AICDayNightController 인스턴스가 0개였음.
+- BP_ICDayNightController와 공통 게임 시계 코드는 남아 있었으나, 레벨 조명과 시간을 연결하는 컨트롤러가 빠져 있었음.
+- 누가 언제 제거했는지는 이번 조사만으로 단정하지 않음.
+
+수정
+- 현재 맵에 BP_ICDayNightController 인스턴스 1개 복구.
+- 아웃라이너 이름: IC_OpenWorld_DayNight.
+- 현재 맵의 태양광 3개, 하늘 조명 1개, BP_Sky_Sphere 2개를 모두 연결.
+- 일출 06:00, 일몰 18:00. 밤의 하늘 조명은 낮의 8%.
+- 동적 조명 및 하늘 갱신 설정 적용. 컨트롤러는 에디터 전용이 아니며 공간 스트리밍 제외.
+- 기존 BP의 태양 궤도 기본값은 유지하고 인스턴스 연결을 복구함.
+- L_OpenWorld 저장 완료. 기존 액터 경로 전체 보존 및 HUD/미니맵/워프 화면 에셋 해시 동일 확인.
+- 이번 수정에서 C++ 소스 변경이나 게임 시간 속도 변경은 없음.
+
+검증
+- IC.Time.DayNight.ClockBindings / IC.Time.DayNight.Orbit: 2개 모두 성공.
+- 저장된 맵을 별도 PIE에서 다시 열어 낮 12시 → 밤 22시 → 다음 날 아침 8시 확인 완료.
+- 12시 태양광 세기: 6 / 4.3 / 3.4, 하늘 조명 1.
+- 22시 태양광 세기: 0 / 0 / 0, 하늘 조명 0.08. 실제 화면 어두워짐 확인.
+- 다음 날 8시 태양광 및 하늘 조명 복원, 실제 화면 밝아짐 확인.
+- 검증 전후 저장된 맵 파일 해시 동일.
+- 실제 사용자 세이브 대신 IC_Visual_ 접두사의 별도 검증 저장 영역 사용.
+- 검증용 ExecutePythonScript 실행은 초기화 단계에서 멈춰 전용 프로세스만 종료했음.
+- 이후 ExecCmds 방식으로 재실행하여 화면 검증 완료 및 프로세스 정상 종료(코드 0).
+
+기록과 백업
+- Saved/DayNightRepair/Before.json: 복구 전 조사.
+- Saved/DayNightRepair/L_OpenWorld.before_day_night.umap: 이번 수정 직전 맵 백업.
+- Saved/DayNightRepair/Setup.json: 복구 및 기존 액터/UI 보존 결과.
+- Saved/DayNightRepair/Tests/index.json: 자동 테스트 결과.
+- Saved/DayNightRepair/Runtime.json: 실제 저장 맵의 PIE 조명 검증 결과.
+- Saved/DayNightRepair/Noon_1200.png / Night_2200.png / Morning_0800.png: 실제 화면.
+- Tools/World/review_day_night_repair.py: 전용 프로세스에서 실행하는 화면 검증 도구.
+  실행 옵션: -ICDayNightRepairReview -ExecCmds="py <스크립트 절대 경로>" -TestExit=IC_DAY_NIGHT_REPAIR_FINISHED
+
+이전 낮밤 백업을 맵 전체에 덮어쓰지 말 것. 현재 맵에는 사용자가 추가한 폴리지와 생활 액터 배치, 최신 워프가 함께 들어 있음.
+아직 커밋/푸시는 수행하지 않음.
