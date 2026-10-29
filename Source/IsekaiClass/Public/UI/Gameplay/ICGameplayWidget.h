@@ -14,6 +14,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshCurrentScreen();
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshSkillCooldown();
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void RefreshTargetInfo();
+    UFUNCTION(BlueprintPure,Category="IC|Guide") bool IsControlGuideVisible() const;
+    UFUNCTION(BlueprintCallable,Category="IC|Guide") bool AdvanceControlGuide();
+    UFUNCTION(BlueprintCallable,Category="IC|Guide") void RefreshControlGuide();
     UFUNCTION(BlueprintPure,Category="IC|Time") static FText FormatGameClock(double GameMinute);
     UFUNCTION(BlueprintImplementableEvent, Category = "IC|UI") void OnRefreshGameplayUI();
 
@@ -25,6 +28,8 @@ protected:
     virtual FReply NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& Event) override;
 
 private:
+    int32 ControlGuidePage=INDEX_NONE;
+    bool bControlGuideFinished=false;
     UFUNCTION() void Back();
     UFUNCTION() void Resume();
     UFUNCTION() void Save();

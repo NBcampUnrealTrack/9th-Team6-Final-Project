@@ -169,7 +169,7 @@ bool FICMonsterBehaviorAssetsCheck::RunTest(const FString&)
     }
     auto* Table=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Combat/DT_IC_Monster.DT_IC_Monster"));
     auto* Spawners=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/World/DT_IC_Spawner.DT_IC_Spawner"));
-    const auto* Spawner=Spawners?Spawners->FindRow<FICSpawnerRow>(TEXT("SPN_R01_TEST_001"),TEXT("Monster bindings")):nullptr;
+    const auto* Spawner=Spawners?Spawners->FindRow<FICSpawnerRow>(TEXT("SPN_R01_001"),TEXT("Monster bindings")):nullptr;
     if(!TestNotNull(TEXT("Monster DT exists"),Table)||!TestNotNull(TEXT("Test-map spawner exists"),Spawner))return false;
     TestEqual(TEXT("Test-map spawner has eleven slots"),Spawner->Slots.Num(),11);TSet<FName> IDs;
     for(const auto& Slot:Spawner->Slots)

@@ -3,6 +3,7 @@
 #include "Life/World/ICLifeActor.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 
 AICFishingLine::AICFishingLine()
 {
@@ -28,9 +29,12 @@ bool AICFishingLine::HasValidLanding() const
 {
     if(!SourceRod.IsValid()||!FishingZone.IsValid()||!FishingZone->ContainsFishingLanding(LandingPoint))return false;
     FCollisionQueryParams Query(SCENE_QUERY_STAT(FishingTether),false);
-    Query.AddIgnoredActor(this);Query.AddIgnoredActor(SourceRod.Get());Query.AddIgnoredActor(GetOwner());Query.AddIgnoredActor(FishingZone.Get());
+    Query.AddIgnoredActor(this);Query.AddIgnoredActor(SourceRod.Get());Query.AddIgnoredActor(GetOwner());
+    for(TActorIterator<AICLifeActor> It(GetWorld());It;++It)if(It->LifeType==EICDefinitionType::FishingPoint)Query.AddIgnoredActor(*It);
     FHitResult Hit;
-    return !GetWorld()->LineTraceSingleByChannel(Hit,GetRodTip(),LandingPoint+FVector(0,0,3),ECC_Visibility,Query);
+    if(!GetWorld()->LineTraceSingleByChannel(Hit,GetRodTip(),LandingPoint+FVector(0,0,3),ECC_Visibility,Query))return true;
+    return Hit.ImpactNormal.Z>=.5f&&FishingZone->ContainsFishingLanding(Hit.ImpactPoint)
+        &&FVector::DistSquared(Hit.ImpactPoint,LandingPoint)<=FMath::Square(15.f);
 }
 void AICFishingLine::Tick(float DeltaSeconds)
 {

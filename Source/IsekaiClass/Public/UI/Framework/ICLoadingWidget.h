@@ -8,10 +8,14 @@ class ISEKAICLASS_API UICLoadingWidget : public UICScreenWidget
     GENERATED_BODY()
 protected:
     virtual void NativeOnInitialized() override;
+    virtual void NativeConstruct() override;
+    virtual void NativeTick(const FGeometry& Geometry,float DeltaSeconds) override;
     virtual void NativeDestruct() override;
     virtual UWidget* NativeGetDesiredFocusTarget() const override;
 
 private:
+    uint64 FirstPoseFrame=MAX_uint64;
+    TWeakObjectPtr<class UAnimInstance> PreparedAnimation;
     UFUNCTION() void Refresh();
     UFUNCTION() void Retry();
     UFUNCTION() void Title();

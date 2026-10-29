@@ -11,6 +11,7 @@
 #include "Combat/Actors/ICWeaponActor.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Inventory/Components/ICInventoryComponent.h"
+#include "Character/Animation/ICHandGrip.h"
 #include "Animation/AnimMontage.h"
 #include "Combat/Party/ICPartyStatus.h"
 void AICCharacterBase::UpdatePresentationTransform(float GroundOffsetCm, const FTransform* BedAnchor)
@@ -72,7 +73,10 @@ void AICCharacterBase::RefreshWeaponAppearance()
         FActorSpawnParameters Params; Params.Owner = this; Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
         EquippedWeaponActor = GetWorld()->SpawnActor<AICWeaponActor>(Type, GetActorTransform(), Params);
         if (!EquippedWeaponActor) return;
-        EquippedWeaponActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Gear->AttachSocket);
+        FName Socket=Gear->AttachSocket;
+        if(State.Kind==EICCharacterKind::Player&&(Socket==TEXT("weapon_r")||Socket==TEXT("weapon_l")))
+        {const FName Reviewed=ICHandGrip::Socket(Gear->WeaponFamily);if(!Reviewed.IsNone()&&GetMesh()->DoesSocketExist(Reviewed))Socket=Reviewed;}
+        EquippedWeaponActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Socket);
         EquippedWeaponActor->SetActorRelativeTransform(Gear->AttachmentTransform);
         EquippedWeaponActor->Configure(*Gear);
         EquippedWeaponActor->SetActorHiddenInGame(bSleepPresentation||bWeaponSheathed||HideForLife);

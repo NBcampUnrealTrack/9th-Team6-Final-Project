@@ -89,9 +89,11 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
 #include "UI/MainMenu/ICMainMenuWidget.h"
 #include "UI/CharacterCreate/ICCharacterCreateWidget.h"
 #include "UI/Framework/ICPrologueWidget.h"
+#include "UI/Framework/ICLoadingWidget.h"
 #include "Audio/ICBGMSubsystem.h"
 #include "Settings/ICGameUserSettings.h"
 #include "Player/Character/ICPlayerCharacter.h"
+#include "Player/Character/ICPlayerAppearance.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
 #include "UI/Gameplay/ICGameMenuWidget.h"
@@ -131,6 +133,7 @@ struct FICPrologueTestAccess
     static void Tick(UICPrologueWidget* Widget,float Delta){Widget->NativeTick(Widget->GetCachedGeometry(),Delta);}
     static bool Reading(UICPrologueWidget* W){return W->State==UICPrologueWidget::EState::Reading;}
     static bool Finishing(UICPrologueWidget* W){return W->State==UICPrologueWidget::EState::FadeOut;}
+    static bool Revealing(UICPrologueWidget* W){return W->State==UICPrologueWidget::EState::Revealing;}
     static float Held(UICPrologueWidget* W){return W->SkipElapsed;}
 };
 struct FICKeyboardTestAccess
@@ -162,12 +165,42 @@ public:
         auto* Flow = PC->GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
         auto* Client = PC->GetLocalPlayer() ? PC->GetLocalPlayer()->ViewportClient.Get() : nullptr;
         if (!Client || !Client->GetWindow()) return false;
+        if(Flow->Phase==EICGameFlowPhase::Initializing&&PC->bCreated&&PC->Menu==TEXT("Loading"))
+        {
+            if(!bSawCharacterPreparation)
+                {bSawCharacterPreparation=true;Capture(Client,bSkipRun?TEXT("Loading_Preparing_Pose_H"):TEXT("Loading_Preparing_Pose_G"));}
+        }
+        if(Flow->Phase==EICGameFlowPhase::Loading&&PC->IsMainMenuLevel()&&PC->Menu==TEXT("Loading"))
+        {
+            TArray<UUserWidget*> Loaders;
+            UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World,Loaders,UICLoadingWidget::StaticClass(),false);
+            for(auto* Loader:Loaders)if(Loader->IsVisible()&&Loader->GetCachedGeometry().GetLocalSize().X>1)
+            {
+                auto* Card=Loader->GetWidgetFromName(TEXT("Card"));auto* Status=Cast<UTextBlock>(Loader->GetWidgetFromName(TEXT("TXT_Status")));
+                Test->TestTrue(TEXT("Post-story loading card is visible"),Card&&Card->IsVisible());
+                Test->TestTrue(TEXT("Post-story loading has a visible status"),Status&&Status->IsVisible()&&!Status->GetText().IsEmpty());
+                if(!bSawStoryLoading)
+                {
+                    bSawStoryLoading=true;StoryLoadingFirst=FPlatformTime::Seconds();
+                    Capture(Client,bSkipRun?TEXT("Loading_After_H"):TEXT("Loading_After_G"));
+                }
+                StoryLoadingLast=FPlatformTime::Seconds();
+                break;
+            }
+            return false;
+        }
         if(Flow->Phase==EICGameFlowPhase::Prologue)
         {
             TArray<UUserWidget*> Prologues;
             UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World,Prologues,UICPrologueWidget::StaticClass(),false);
             for(auto* Entry:Prologues)if(auto* Prologue=Cast<UICPrologueWidget>(Entry);Prologue&&Prologue->IsActivated())
             {
+                if(FICPrologueTestAccess::Revealing(Prologue))
+                {
+                    auto* Player=Cast<AICPlayerCharacter>(PC->GetPawn());
+                    Test->TestTrue(TEXT("World reveal starts with an evaluated arm pose rather than a reference T-pose"),Player&&ICPlayerAppearance::IsFirstPoseReady(Player->GetMesh()));
+                    bSawPreparedReveal=true;return false;
+                }
                 Test->TestFalse(TEXT("Cursor stays hidden during prologue"),PC->bShowMouseCursor);
                 auto* Music=World->GetSubsystem<UICBGMSubsystem>();Music->Tick(1.f);
                 if(FICPrologueTestAccess::Reading(Prologue))Test->TestEqual(TEXT("Prologue reading uses its editable music row"),Music->GetCurrentMusicRow(),FName(TEXT("BGM_Prologue")));
@@ -417,6 +450,11 @@ public:
             }
             if (Flow->Phase != EICGameFlowPhase::Playing || !PC->bCreated)
                 return false;
+            Test->TestTrue(TEXT("Finishing the story presents a painted loading screen before travel"),bSawStoryLoading);
+            Test->TestTrue(TEXT("Post-story loading remains visible long enough to read"),StoryLoadingLast-StoryLoadingFirst>=.8);
+            Test->TestTrue(TEXT("Loading cover remains after save while the character is prepared"),bSawCharacterPreparation);
+            Test->TestTrue(TEXT("Animation is evaluated before the first world reveal"),bSawPreparedReveal);
+            Capture(Client,bSkipRun?TEXT("Startup_Pose_After_H"):TEXT("Startup_Pose_After_G"));
             Test->TestFalse(TEXT("Title replaced by gameplay map"), PC->IsMainMenuLevel());
             Test->TestEqual(TEXT("Gameplay uses the configured play map"), UWorld::RemovePIEPrefix(World->GetOutermost()->GetName()), GetDefault<UICGameFlowSettings>()->PlayMap.GetLongPackageName());
             Test->TestTrue(TEXT("Playable pawn possessed"), PC->GetPawn() != nullptr);
@@ -473,12 +511,14 @@ public:
             Capture(Client,TEXT("Morpheus_Settings"));
             PressKey(EKeys::Escape);
             Test->TestTrue(TEXT("ESC closes options and releases gameplay"),PC->Menu.IsEmpty()&&!World->IsPaused());
-            StartPosition=PC->GetPawn()->GetActorLocation();NextStage(3);return false;
+            StartPosition=PC->GetPawn()->GetActorLocation();MovementStartedAt=World->GetTimeSeconds();NextStage(3);return false;
         }
         if (Stage == 3)
         {
             PC->GetPawn()->AddMovementInput(FVector::ForwardVector, 1.f);
-            if (FPlatformTime::Seconds() - StageAt < .35)
+            // Loading and shader work can consume wall time without advancing
+            // the resumed world. Allow actual gameplay ticks before checking movement.
+            if (World->GetTimeSeconds() - MovementStartedAt < .35)
                 return false;
             Test->TestTrue(TEXT("Gameplay movement accepts input after reveal"),PC->Menu.IsEmpty()&&!World->IsPaused()&&PC->bCreated&&!PC->IsMoveInputIgnored());
             if(auto* Player=Cast<AICPlayerCharacter>(PC->GetPawn()))
@@ -589,6 +629,10 @@ private:
     int32 Stage = 0;
     bool bSeededSaves = false;
     bool bSkipRun=false,bPartialSkip=false;
+    bool bSawStoryLoading=false;
+    bool bSawCharacterPreparation=false,bSawPreparedReveal=false;
+    double StoryLoadingFirst=0,StoryLoadingLast=0;
+    double MovementStartedAt=0;
     TArray<uint8> ManualBytes;
     double Started = 0, StageAt = 0, PausedAt = 0;
     FVector StartPosition = FVector::ZeroVector;

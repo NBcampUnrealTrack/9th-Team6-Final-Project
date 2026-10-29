@@ -31,6 +31,8 @@
 #include "Settings/ICGameUserSettings.h"
 #include "AI/ICAIController.h"
 #include "Life/World/ICRanchAnimal.h"
+#include "Life/Crafting/ICCraftingStation.h"
+#include "Components/StaticMeshComponent.h"
 
 void AICPlayerController::SetupInputComponent()
 {
@@ -394,15 +396,32 @@ AICInteractionActor* AICPlayerController::FindInteractionTarget() const
     const FVector Origin=PlayerPawn->GetActorLocation();
     const FVector Forward=FRotator(0,GetControlRotation().Yaw,0).Vector();
     FCollisionQueryParams Params(SCENE_QUERY_STAT(PlayerInteraction),false);Params.AddIgnoredActor(PlayerPawn);
+    auto InteractionPoint=[&](const AICInteractionActor* Object)
+    {
+        FVector Point=Object->GetActorLocation();
+        if(!Object->IsA<AICCraftingStation>())return Point;
+        // Assembled furniture can extend several metres away from its corner pivot.
+        // Use the nearest visible part for reach, facing, and line-of-sight checks.
+        double Nearest=MAX_dbl;TInlineComponentArray<UStaticMeshComponent*> Meshes;Object->GetComponents(Meshes);
+        for(const auto* Mesh:Meshes)
+        {
+            if(!Mesh->GetStaticMesh()||!Mesh->IsVisible())continue;
+            const FVector Candidate=Mesh->CalcBounds(Mesh->GetComponentTransform()).GetBox().GetClosestPointTo(Origin);
+            const double Distance=FVector::DistSquared(Origin,Candidate);
+            if(Distance<Nearest){Nearest=Distance;Point=Candidate;}
+        }
+        return Point;
+    };
     auto Eligible=[&](AICInteractionActor* Object)
     {
         IC_TRACE_FUNCTION();
         if(!IsValid(Object)||Object->IsHidden()||!Object->GetActorEnableCollision())return false;
         if(const auto* Life=Cast<AICLifeActor>(Object);Life&&Life->LifeType==EICDefinitionType::FishingPoint)return false;
-        const FVector Offset=Object->GetActorLocation()-Origin;
-        if(Offset.Size()>250.f||FVector::DotProduct(Forward,Offset.GetSafeNormal2D())<0.35f)return false;
+        const FVector Point=InteractionPoint(Object),Offset=Point-Origin;
+        const bool AtStation=Object->IsA<AICCraftingStation>()&&Offset.SizeSquared2D()<FMath::Square(25.f);
+        if(Offset.Size()>250.f||(!AtStation&&FVector::DotProduct(Forward,Offset.GetSafeNormal2D())<0.35f))return false;
         FHitResult Occlusion;
-        GetWorld()->LineTraceSingleByChannel(Occlusion,PlayerPawn->GetPawnViewLocation(),Object->GetActorLocation(),ECC_Visibility,Params);
+        GetWorld()->LineTraceSingleByChannel(Occlusion,PlayerPawn->GetPawnViewLocation(),Point,ECC_Visibility,Params);
         return !Occlusion.bBlockingHit||Occlusion.GetActor()==Object;
     };
     FHitResult Hit;
@@ -413,7 +432,7 @@ AICInteractionActor* AICPlayerController::FindInteractionTarget() const
     for(TActorIterator<AICInteractionActor> It(GetWorld());It;++It)
     {
         auto* Object=*It;if(!Eligible(Object))continue;
-        const FVector Offset=Object->GetActorLocation()-Origin;
+        const FVector Offset=InteractionPoint(Object)-Origin;
         const float Score=Offset.Size()-100.f*FVector::DotProduct(Forward,Offset.GetSafeNormal2D());
         if(Score<BestScore){Best=Object;BestScore=Score;}
     }

@@ -1,0 +1,2 @@
+﻿---,RegionID,Slots,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+SPN_COMBAT_TEST_001,"None","((SpawnSlotIndex=0,MonsterID=""MON_COMBAT_TEST_001"",OriginAnchorID=""ANC_COMBAT_TEST_001"",Availability=(Policy=All,Conditions=),LeashShape=Radius,LeashRadiusCm=1200.000000,OriginRelativeLeashBoundsCm=(Min=(X=0.000000,Y=0.000000,Z=0.000000),Max=(X=0.000000,Y=0.000000,Z=0.000000),IsValid=False),bOverrideRespawnTime=False,RespawnPlaySeconds=90.000000))","SPN_COMBAT_TEST_001","","","(GameplayTags=)","1","False","False"

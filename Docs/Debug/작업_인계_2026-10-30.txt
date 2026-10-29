@@ -1,0 +1,130 @@
+IsekaiClass 작업 인계 — SourceTree 커밋 및 dev 통합 확인 기준
+작성일: 2026-10-30 (Asia/Seoul)
+프로젝트: C:\Users\20ori\Desktop\IsekaiClass
+엔진: Unreal Engine 5.8
+
+1. 사용자 요청과 Git 기준
+
+- 사용자가 SourceTree에서 현재 작업을 먼저 커밋하고 이후 겹치는 변경을 확인할 예정.
+- 이번 요청은 작업을 기억하고 커밋 메시지를 텍스트로 제공하는 것. 실제 커밋/병합/푸시는 수행하지 않음.
+- 기록 시점 브랜치: Leader
+- 기록 시점 HEAD: 1c265e3168ccb60ad29ea496e96e2b021eadf21c
+  Merge pull request #45 from NBcampUnrealTrack/Quest
+- 기록 전 스테이지에 올라간 변경 없음. git ls-files -u 결과 없음.
+- 이는 현재 진행 중인 병합 충돌이 없다는 뜻이며, 최신 dev와 변경이 겹치지 않는다는 검증 결과는 아님.
+- 기존 사용자/팀원 변경과 레벨 편집을 보존할 것. 이 문서의 변경만 있다고 가정하여 다른 파일을 되돌리지 말 것.
+
+2. 이번 커밋 범위의 주요 작업
+
+시작 흐름과 UI
+- 프롤로그 종료/건너뛰기 후 로딩 화면을 먼저 표시한 뒤 맵 이동.
+- 캐릭터 준비 중 최초 T 자세가 드러나는 현상을 가리기 위한 로딩 처리.
+- HUD에서 F키로 넘기는 조작 가이드, 조작 설명 항목 추가.
+- 인벤토리 검색 기능 제거.
+
+전투와 무기
+- 플레이어 HUD의 보스 HP 표시.
+- 일반/보스 머리 위 HP는 피격 또는 유효한 추적/전투 대상이 있을 때 표시.
+  피격 표시 유지 시간은 8초이며 귀환/사망 조건에서 숨김.
+- 일반 공격의 휘두르기/발사음과 타격음 연결.
+- 남녀 플레이어 무기 소켓/부착 위치 및 손가락 그립 보정.
+
+워프와 오픈월드
+- 집/마을여관/추억의 다리/폐허 마을 4곳 워프.
+- 집 외 워프는 플레이어가 현장 상호작용한 뒤 해금.
+- 지도 이미지 기반 화면을 세로 목적지 목록 및 확인/취소 팝업으로 변경.
+- 이동 비용/취소/게임패드 조작 유지.
+- L_OpenWorld 및 폴리지 에셋에는 사용자 직접 배치/지형 편집도 포함되어 있음.
+
+데이터 정리
+- 테스트용 NPC 표기를 NPC 1~11에 맞춰 정리.
+- 런타임 DT/ID/문자열 정리, 개발 전용 데이터 분리 및 패키징 제외 설정.
+- CSV와 대응하는 언리얼 DataTable/StringTable 에셋을 함께 보존할 것.
+
+생활 액터
+- BP_IC_Kitchen에 원본 Cooking 제작대 외형 30개 파트 복사.
+- BP_IC_CraftingTable에 원본 Carpentry 제작대 외형 32개 파트 복사.
+- 기능/레시피 유형/생산 Anchor/Station 위젯 연결 유지.
+- 가구 원점이 실제 외형에서 멀어도, 가까운 외형을 기준으로 F 상호작용 대상을 선택.
+- 보관함 PlayerHome/PlayerChest2/PlayerChest3의 이름은 잠금 단계를 자동 지정하지 않음.
+  RequiredExtraStorage를 각각 0/1/2로 설정하는 안내였으며, 이름 기반 자동 잠금 코드를 추가한 것은 아님.
+
+낚시 — 최신 사용자 요구
+- 호수 위 낚시 가능 구역을 배치하고, 호숫가에서 화면 중앙으로 물을 조준한 뒤 H.
+- 플레이어에서 찌까지 최대 1200cm, 20초 후 10종 중 물고기 1마리.
+- 현재 DT는 별도 낚싯대/미끼 아이템을 요구하지 않음.
+- 이동/H/Esc 취소, 즉시 재시도 가능. F 상호작용으로 낚시하지 않음.
+- 숨겨진 액터/비충돌 메시/추가 StaticMesh 구역도 낚시 영역으로 처리.
+- 얕은 조준에서 실제 수면 높이가 구역 평면보다 조금 높은 경우 착수점 보정.
+- 낚싯줄 판정은 낚시 구역 액터들을 무시하되 실제 중간 장애물은 차단.
+- BP_R01_RandomFishingZone의 Show Life Label 및 Label/LifeLabel 표시를 끔.
+- VisualMesh의 Absolute Scale을 해제하고 기존 월드 위치와 크기를 보존.
+  이제 액터 전체를 선택하여 R 또는 액터 Scale X/Y로 낚시 구역을 늘릴 수 있음.
+- 이 두 설정은 BP 기본값에 저장하고 열려 있는 L_OpenWorld 인스턴스에도 적용.
+  적용 시점에 사용자 미저장 맵 편집이 있어 맵 전체를 자동 저장하지 않았음.
+  커밋 전 사용자 에디터의 실제 맵 저장 상태를 확인할 것.
+- 물속을 헤엄치는 물고기 무리 연출을 추가한 것은 아님.
+
+채집/광석 Actor Foliage
+- /Game/IsekaiClass/Life/Collection/Foliage: FT_R01_Collection_01~10, 10개.
+- /Game/IsekaiClass/Life/Mining/Foliage: FT_R01_Ore_01~06, 6개.
+- 실제 해당 채집/광석 BP가 배치되도록 ActorClass 지정, Static Mesh Only=false.
+- 기본 Density=7.5, Radius=200, Random Yaw=true, PointID=None.
+- 배치는 사용자가 Shift+3 Foliage Paint로 진행. 생성 작업에서 대신 칠하지 않았음.
+
+3. 이후 병합에서 특히 확인할 파일
+
+- Source/IsekaiClass/Private/Core/Controller/ICPlayerControllerInput.cpp
+  F 상호작용 외형 기준 탐색 / H 낚시 / 입력 차단 조건.
+- Source/IsekaiClass/Private/Core/Controller/ICPlayerControllerHUD.cpp
+- Source/IsekaiClass/Private/Core/Controller/ICPlayerControllerGamepad.cpp
+- Source/IsekaiClass/Private/Core/Flow/ICGameFlowSubsystem.cpp
+- Source/IsekaiClass/Private/Core/Flow/ICLoadingScreenSubsystem.cpp
+- Source/IsekaiClass/Private/Enemy/Character/ICEnemyBase.cpp 및 Public 대응 헤더
+- Source/IsekaiClass/Private/Combat/GAS/ICAbilitySystemActions.cpp
+- Source/IsekaiClass/Private/Character/Animation/ICCharacterAnimInstance.cpp
+- Source/IsekaiClass/Private/Character/Animation/ICHandGrip.h (신규)
+- Source/IsekaiClass/Private/Player/Character/ICPlayerAppearance.cpp 및 Public 대응 헤더
+- Source/IsekaiClass/Private/Life/World/ICLifeActor.cpp 및 Public 대응 헤더
+- Source/IsekaiClass/Private/Life/World/ICFishingLine.cpp
+- Source/IsekaiClass/Private/Life/Production/ICPlayerLifeComponent.cpp
+- Source/IsekaiClass/Private/UI/Map/ICMapWidget.cpp 및 Public 대응 헤더
+- Source/IsekaiClass/Private/UI/Gameplay/ICControlGuide.cpp 및 Public 대응 헤더 (신규)
+- Source/IsekaiClass/Private/Debug/ICFurnitureAssetSetup.cpp (신규)
+- Source/IsekaiClass/Private/World/Warp/ICPartyWarpComponent.cpp
+- Source/IsekaiClass/Private/World/Spawn/ICSpawnSubsystem.cpp
+- Config/DefaultGame.ini / Data 하위 CSV / 대응 Content DataTable 및 StringTable
+- Content/IsekaiClass/World/Maps/L_OpenWorld.umap
+- BP_IC_Kitchen / BP_IC_CraftingTable / BP_R01_RandomFishingZone
+- WBP_IC_Map / WBP_GameHUD / WBP_Loading / WBP_IC_InventoryMenu
+- 남녀 SK_Player_M / SK_Player_F, 채집/광석 Actor Foliage 16개.
+
+4. 검증 기록과 한계
+
+- C++ IsekaiClassEditor Development 빌드 성공.
+- Saved/StationInteractionFix/Final/index.json: 관련 5개 자동 테스트 모두 Success, failed=0.
+  IC.Life.CraftingStationActualFInteraction
+  IC.Life.CraftingStationFlow
+  IC.Life.Fishing.AimedLineAndTwentySecondCatch
+  IC.Life.Fishing.HiddenAndMultipleRegions
+  IC.Life.Fishing.PlacedOpenWorldRegions
+- 당시 저장된 오픈월드는 낚시 액터 1개/영역 1개. 구역 수를 고정하지 않고 현재 배치 전체를 검증.
+- 네이티브 테스트 캐릭터의 입력/빈 메시 경고가 있었으며 오류는 없음.
+- 이 5개 테스트는 NullRHI 자동 검증이며 최신 사용자 배치 전체에 대한 실제 플레이 화면 검증을 뜻하지 않음.
+- 이전 일괄 기능 검증: Saved/LifeWorldUpgrade/TestsRendered/index.json, 13개 Success.
+- 가구 외형/16개 폴리지 저장 검증: Saved/LifeWorldUpgrade/Authored.json.
+- 워프 UI 화면: Saved/LifeWorldUpgrade/Preview/WarpList.png 및 WarpConfirm.png.
+- 텍스트 숨김 적용: Saved/FishingLabels/Applied.json.
+- 절대 스케일 해제/기존 크기 보존 확인: Saved/FishingScaling/Applied.json.
+- Saved는 Git 제외 경로이며 검증 파일은 로컬 참고용.
+
+5. 다음 작업 시 순서
+
+- 실제 현재 브랜치/HEAD/작업 트리/스테이지부터 다시 확인하여 사용자 커밋을 식별.
+- 사용자가 최신 dev 통합을 요청하면 원격 상태를 확인한 뒤 해당 커밋과 비교.
+- 충돌 마커뿐 아니라 위 공통 파일의 입력/상태/DT 변경이 의미상 덮어써지지 않았는지 확인.
+- .uasset/.umap 충돌은 텍스트 병합하지 말고 보존할 에셋/사용자 배치를 먼저 확인.
+- 머지 후 빌드, 관련 자동 테스트, 키친 F/호숫가 H/워프 목록/시작 로딩 등 영향받은 흐름만 검증.
+- C++ 빌드 전 실행 중인 사용자 에디터를 강제로 닫지 말 것. 저장 상태를 보호할 것.
+- Git LFS 필터를 끈 명령은 읽기 전용 상태 확인에만 사용했음.
+  실제 stage/commit/push에는 정상 Git LFS 필터를 사용하고 raw .uasset를 일반 Git blob으로 넣지 말 것.

@@ -1,5 +1,6 @@
 #include "UI/Gameplay/ICGameplayLayout.h"
 #include "UI/Gameplay/ICFirefightHUDLayout.h"
+#include "UI/Gameplay/ICControlGuide.h"
 #include "UI/Gameplay/ICCharacterStatusWidget.h"
 #include "UI/Gameplay/ICGameMenuWidget.h"
 #include "UI/Gameplay/ICMovementCooldownWidget.h"
@@ -353,6 +354,17 @@ void HUD(UWidgetTree* Tree)
     Add(TEXT("WBP_IC_QuestTracker"), TEXT("HUD_QuestTracker"), {1, 0}, {1, 0}, {-32, 32}, {350, 240});
     Add(TEXT("WBP_IC_QuickSlots"), TEXT("HUD_QuickSlots"), {.5f, 1}, {.5f, 1}, {0, -28}, {580, 140});
     ICFirefightHUDLayout::Target(Tree, Canvas);
+    auto* Boss=Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("HUD_BossBar"));
+    auto* BossSlot=Place(Canvas,Boss,{.5f,0},{.5f,0},{0,26},{720,78});BossSlot->SetZOrder(6);
+    auto* BossFrame=Tree->ConstructWidget<UBorder>();BossFrame->SetBrushColor(FLinearColor(.2f,.12f,.08f,.95f));
+    Place(Boss,BossFrame,{0,0},{0,0},{0,29},{720,29});
+    auto* BossHP=Tree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(),TEXT("BAR_BossHP"));
+    BossHP->SetFillColorAndOpacity(FLinearColor(.82f,.09f,.12f));BossHP->SetPercent(1.f);
+    Place(Boss,BossHP,{0,0},{0,0},{3,32},{714,23});
+    auto* BossName=Label(Tree,TEXT("TXT_BossName"),FText::GetEmpty(),23);BossName->SetColorAndOpacity(FLinearColor(1,.8f,.47f));
+    Place(Boss,BossName,{0,0},{0,0},{0,0},{520,30});
+    auto* BossHealth=Label(Tree,TEXT("TXT_BossHP"),FText::GetEmpty(),16);BossHealth->SetJustification(ETextJustify::Right);
+    Place(Boss,BossHealth,{0,0},{0,0},{500,4},{220,25});Boss->SetVisibility(ESlateVisibility::Collapsed);
     Add(TEXT("WBP_IC_MovementCooldown"), TEXT("HUD_MovementCooldown"), {0, 0}, {.5f, .5f}, {0, 0},
         FVector2D(UICRadialCooldownBar::Diameter));
     if(auto* Feedback=Child(Tree,TEXT("WBP_IC_CombatFeedback"),TEXT("HUD_CombatFeedback")))
@@ -370,6 +382,7 @@ void HUD(UWidgetTree* Tree)
         Slot->SetZOrder(10);
         Menu->SetVisibility(ESlateVisibility::Collapsed);
     }
+    ICControlGuide::Build(Tree,Canvas);
 }
 }
 

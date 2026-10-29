@@ -191,4 +191,6 @@ struct ISEKAICLASS_API FICNormalAttackStage
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Attack", meta=(ClampMin="0")) double GuardDodgeCancelStartPlaySeconds = 0.0;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Attack", meta=(ClampMin="0")) double GuardDodgeCancelEndPlaySeconds = 0.0;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Attack",meta=(RowType="/Script/IsekaiClass.ICCombatVFXRow")) FDataTableRowHandle Visuals;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Attack|Audio") TSoftObjectPtr<USoundBase> AttackSound;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Attack|Audio") TSoftObjectPtr<USoundBase> ImpactSound;
 };

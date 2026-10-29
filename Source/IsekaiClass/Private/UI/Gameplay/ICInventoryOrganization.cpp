@@ -1,6 +1,5 @@
 #include "UI/Gameplay/ICInventoryMenuWidget.h"
 #include "Inventory/Components/ICInventoryComponent.h"
-#include "Components/EditableTextBox.h"
 #include "Components/SpinBox.h"
 #include "Components/TextBlock.h"
 
@@ -12,10 +11,6 @@ void UICInventoryMenuWidget::CycleFilter()
     const FText Names[]={NSLOCTEXT("ICInventory","FilterAll","분류: 전체"),NSLOCTEXT("ICInventory","FilterEquipment","분류: 무기"),NSLOCTEXT("ICInventory","FilterConsumable","분류: 소비품"),NSLOCTEXT("ICInventory","FilterFood","분류: 음식"),NSLOCTEXT("ICInventory","FilterBook","분류: 성장서"),NSLOCTEXT("ICInventory","FilterMaterial","분류: 재료"),NSLOCTEXT("ICInventory","FilterLocked","분류: 잠금")};
     if(auto* T=Cast<UTextBlock>(GetWidgetFromName(TEXT("BTN_FilterItems_Text"))))T->SetText(Names[FilterKind]);RefreshItems();
 }
-bool UICInventoryMenuWidget::IsSearchFocused() const
-{auto* Search=GetWidgetFromName(TEXT("InventorySearch"));return Search&&(Search->HasKeyboardFocus()||Search->HasFocusedDescendants());}
-void UICInventoryMenuWidget::SearchChanged(const FText& Value)
-{if(IsBusy())return;SearchText=Value.ToString().TrimStartAndEnd();SelectedItem=0;RefreshItems();}
 void UICInventoryMenuWidget::LockSelected()
 {
     auto* Inv=Inventory();const auto Item=CurrentItem();if(!Inv||!bDetailOpen||Item.InstanceID!=DetailInstance||!VisibleBagIndices.IsValidIndex(SelectedItem)||VisibleBagIndices[SelectedItem]<0)return;

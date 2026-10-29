@@ -21,7 +21,10 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "Engine/SkeletalMesh.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Inventory/Components/ICInventoryComponent.h"
+#include "Character/Animation/ICHandGrip.h"
 
 namespace
 {
@@ -39,6 +42,9 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
     FAlphaBlend LandingWeight;
     bool bLandingActive=false;
     FAnimNode_Slot Slot;
+    TArray<ICHandGrip::FFinger> GripFingers;
+    TWeakObjectPtr<USkeletalMesh> GripMesh;
+    float RightGrip=0,LeftGrip=0,GripClosure=1;
 
     explicit FICCharacterAnimProxy(UAnimInstance* Instance) : FAnimInstanceProxy(Instance)
     {
@@ -60,10 +66,31 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
     virtual FAnimNode_Base* GetCustomRootNode() override { return &Slot; }
     virtual void GetCustomNodes(TArray<FAnimNode_Base*>& Out) override
     { Out = {&Ground, &CombatGround, &CombatBlend, &Air, &Bed, &Sprint, &Launch, &Fall, &Landing, &LaunchBlend, &FallBlend, &LandingBlend, &SprintBlend, &AirBlend, &SleepBlend, &Slot}; }
+    virtual bool Evaluate(FPoseContext& Output) override
+    {
+        Slot.Evaluate_AnyThread(Output);
+        const auto& Bones=Output.Pose.GetBoneContainer();
+        for(const auto& Finger:GripFingers)
+        {
+            const float Weight=Finger.Left?LeftGrip:RightGrip;if(Weight<UE_SMALL_NUMBER)continue;
+            const auto Index=Bones.MakeCompactPoseIndex(FMeshPoseBoneIndex(Finger.MeshIndex));if(Index==INDEX_NONE)continue;
+            const FQuat Target=FQuat::Slerp(Finger.Reference,Finger.Closed,GripClosure);
+            auto& Transform=Output.Pose[Index];Transform.SetRotation(FQuat::Slerp(Transform.GetRotation(),Target,Weight).GetNormalized());
+        }
+        return true;
+    }
     virtual void PreUpdate(UAnimInstance* Instance, float DeltaSeconds) override
     {
         FAnimInstanceProxy::PreUpdate(Instance, DeltaSeconds);
         const auto* IC = CastChecked<UICCharacterAnimInstance>(Instance);
+        const auto* Player=Cast<AICPlayerCharacter>(IC->TryGetPawnOwner());
+        auto* Mesh=Player?Player->GetMesh()->GetSkeletalMeshAsset():nullptr;
+        if(GripMesh.Get()!=Mesh){GripMesh=Mesh;GripFingers=Mesh?ICHandGrip::Fingers(Mesh->GetRefSkeleton()):TArray<ICHandGrip::FFinger>();}
+        const bool Working=Player&&Player->LifeActions&&(Player->LifeActions->IsWorking()||Player->LifeActions->IsSleeping());
+        const auto Family=Player&&Player->Inventory&&!Working?Player->Inventory->GetEquippedWeaponFamily():EICWeaponFamily::None;
+        RightGrip=FMath::FInterpTo(RightGrip,Family!=EICWeaponFamily::None&&Family!=EICWeaponFamily::Bow?1.f:0.f,DeltaSeconds,14.f);
+        LeftGrip=FMath::FInterpTo(LeftGrip,Family==EICWeaponFamily::Bow?1.f:0.f,DeltaSeconds,14.f);
+        GripClosure=Family==EICWeaponFamily::Sword?1.f:.9f;
         Ground.SetBlendSpace(IC->Locomotion); Ground.SetPosition(FVector(IC->Speed,0,0));
         CombatGround.SetBlendSpace(IC->CombatLocomotion?IC->CombatLocomotion:IC->Locomotion);
         CombatGround.SetPosition(IC->LocalMoveVelocity);

@@ -89,7 +89,11 @@ bool UICSpawnSubsystem::FindSafePartyPlacement(FName ID,FTransform& Transform) c
             if (!Nav->ProjectPointToNavigation(Position, Point, FVector(80,80,200))) continue;
             Position = Point.Location;
         }
-        FHitResult Floor;if(!GetWorld()->LineTraceSingleByChannel(Floor,Position+FVector(0,0,150),Position-FVector(0,0,400),ECC_Visibility,Q)||Floor.ImpactNormal.Z<.65)continue;Position=Floor.ImpactPoint+FVector(0,0,HalfHeight+2);
+        FHitResult Floor;if(!GetWorld()->LineTraceSingleByChannel(Floor,Position+FVector(0,0,150),Position-FVector(0,0,400),ECC_Visibility,Q)||Floor.ImpactNormal.Z<.65)continue;
+        // A capsule resting on a slope needs more vertical clearance than on a
+        // flat floor. Otherwise every candidate can overlap walkable terrain.
+        const float SlopeClearance=Radius*(1.f/Floor.ImpactNormal.Z-1.f)+2.f;
+        Position=Floor.ImpactPoint+FVector(0,0,HalfHeight+SlopeClearance);
         if(GetWorld()->OverlapBlockingTestByChannel(Position,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(Radius,HalfHeight),Clearance))continue;
         Transform=FTransform(Player->GetActorRotation(),Position);return true;
     }

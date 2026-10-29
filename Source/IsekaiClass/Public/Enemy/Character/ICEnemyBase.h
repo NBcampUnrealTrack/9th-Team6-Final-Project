@@ -35,6 +35,7 @@ public:
     bool IsReturning() const { return bReturning; }
     FVector GetOrigin() const { return OriginTransform.GetLocation(); }
     void PlayHitReaction();
+    UFUNCTION(BlueprintPure,Category="IC|UI") bool ShouldShowHealthBar() const;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="IC|UI") TObjectPtr<class UWidgetComponent> HealthBar;
 private:
     FICMonsterRow Definition;
@@ -46,6 +47,7 @@ private:
     bool bPreserveSavedSlot=false;
     FGuid PresentedAction;
     double HitAnimationUntil=0;
+    double HealthBarHitUntil=-1;
     UPROPERTY(Transient) TObjectPtr<class UAnimSequence> PresentedAnimation;
     void PresentAnimation(class UAnimSequence* Animation, bool Loop, float Rate=1);
 };

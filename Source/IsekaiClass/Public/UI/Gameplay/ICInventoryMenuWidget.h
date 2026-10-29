@@ -114,7 +114,6 @@ public:
     UFUNCTION(BlueprintCallable) void CycleFilter();
     UFUNCTION(BlueprintCallable) void LockSelected();
     UFUNCTION(BlueprintCallable) void SplitSelected();
-    bool IsSearchFocused() const;
     UFUNCTION(BlueprintCallable) void ResolveConfirmation(bool bAccept);
     bool HandleMenuKey(FKey Key,bool bRepeat=false);
     bool IsBusy() const {return bDetailOpen||bPickingQuickSlot||bConfirming||bPickingUseTarget;}
@@ -131,9 +130,7 @@ private:
     TArray<int32> EquipmentCells;
     bool bRefreshing=false;
     bool bTrashPending=false;
-    FString SearchText;
     int32 FilterKind=0;
-    UFUNCTION() void SearchChanged(const FText& Text);
     int32 PendingBagIndex=INDEX_NONE;
     FPlayerItemInstance PendingItem;
     FName PendingPreviousQuick;

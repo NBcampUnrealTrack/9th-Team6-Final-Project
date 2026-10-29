@@ -14,6 +14,7 @@ class ISEKAICLASS_API UICBlueprintMaintenanceLibrary : public UBlueprintFunction
 {
     GENERATED_BODY()
 public:
+    UFUNCTION(BlueprintCallable,Category="IC|Editor") static int32 CopyFurnitureAppearance(UBlueprint* Destination,UBlueprint* Source);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool PrepareManagedWidget(UBlueprint* Blueprint,FName Kind);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static int32 ClearBlueprintDocumentation(UBlueprint* Blueprint);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool BuildFrontendWidget(UBlueprint* Blueprint,FName Kind);

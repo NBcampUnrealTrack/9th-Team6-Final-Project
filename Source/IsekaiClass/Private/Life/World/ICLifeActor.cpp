@@ -188,23 +188,57 @@ bool AICLifeActor::TryInteract_Implementation(AICPlayerController* Controller)
     if(LifeType==EICDefinitionType::Crop&&bPlantingPlot&&!GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>()->ExportState().Crops.Contains(PointKey()))return UICSeedPickerWidget::Open(Controller,this);
     return GetGameInstance()->GetSubsystem<UICGatheringSubsystem>()->StartGather(this,Controller);
 }
-void AICLifeActor::GetFishingSurface(FVector& Center,FVector& Normal) const
+namespace
 {
-    const auto* Surface=VisualMesh&&VisualMesh->GetStaticMesh()?VisualMesh.Get():Shape.Get();
+void FishingSurface(const UStaticMeshComponent* Surface,FVector& Center,FVector& Normal)
+{
     const FBox Bounds=Surface->GetStaticMesh()->GetBoundingBox();
     const FVector Local=FVector(Bounds.GetCenter().X,Bounds.GetCenter().Y,Bounds.Max.Z);
     Center=Surface->GetComponentTransform().TransformPosition(Local);Normal=Surface->GetUpVector();
 }
-bool AICLifeActor::ContainsFishingLanding(FVector Point) const
+bool InsideFishingSurface(const UStaticMeshComponent* Surface,const FVector& Point)
 {
-    if(LifeType!=EICDefinitionType::FishingPoint||IsHidden()||!GetActorEnableCollision())return false;
-    const auto* Surface=VisualMesh&&VisualMesh->GetStaticMesh()?VisualMesh.Get():Shape.Get();
-    if(!Surface||!Surface->GetStaticMesh())return false;
     const FBox Bounds=Surface->GetStaticMesh()->GetBoundingBox();
     const FVector Local=Surface->GetComponentTransform().InverseTransformPosition(Point);
-    FVector Center,Normal;GetFishingSurface(Center,Normal);
+    FVector Center,Normal;FishingSurface(Surface,Center,Normal);
     return Local.X>=Bounds.Min.X&&Local.X<=Bounds.Max.X&&Local.Y>=Bounds.Min.Y&&Local.Y<=Bounds.Max.Y
         &&FMath::Abs(FVector::DotProduct(Point-Center,Normal))<=12.f;
+}
+}
+void AICLifeActor::GetFishingRegions(TArray<UStaticMeshComponent*>& Regions) const
+{
+    TInlineComponentArray<UStaticMeshComponent*> Meshes;GetComponents(Meshes);
+    for(auto* Mesh:Meshes)if(Mesh!=Shape&&Mesh->GetStaticMesh())Regions.Add(Mesh);
+    if(Regions.IsEmpty()&&Shape&&Shape->GetStaticMesh())Regions.Add(Shape);
+}
+void AICLifeActor::GetFishingSurface(FVector& Center,FVector& Normal) const
+{
+    TArray<UStaticMeshComponent*> Regions;GetFishingRegions(Regions);
+    if(Regions.IsEmpty()){Center=GetActorLocation();Normal=GetActorUpVector();return;}
+    FishingSurface(Regions[0],Center,Normal);
+}
+bool AICLifeActor::ResolveFishingLanding(const FVector& Origin,const FVector& Direction,FVector& Landing) const
+{
+    if(LifeType!=EICDefinitionType::FishingPoint)return false;
+    TArray<UStaticMeshComponent*> Regions;GetFishingRegions(Regions);double Best=MAX_dbl;bool Found=false;
+    for(const auto* Surface:Regions)
+    {
+        FVector Center,Normal;FishingSurface(Surface,Center,Normal);
+        const double Denominator=FVector::DotProduct(Direction,Normal);if(Denominator>=-.01)continue;
+        const double Distance=FVector::DotProduct(Center-Origin,Normal)/Denominator;
+        if(Distance<=0||Distance>=Best)continue;
+        const FVector Point=Origin+Direction*Distance;
+        if(InsideFishingSurface(Surface,Point)){Best=Distance;Landing=Point;Found=true;}
+    }
+    return Found;
+}
+bool AICLifeActor::ContainsFishingLanding(FVector Point) const
+{
+    if(LifeType!=EICDefinitionType::FishingPoint)return false;
+    // These meshes describe mathematical fishing areas, even when hidden or non-colliding.
+    TArray<UStaticMeshComponent*> Regions;GetFishingRegions(Regions);
+    for(const auto* Surface:Regions)if(InsideFishingSurface(Surface,Point))return true;
+    return false;
 }
 bool AICLifeActor::CompletePlayerAction(AICPlayerController* Controller,FName CropToPlant,FText& Failure)
 {

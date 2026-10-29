@@ -112,7 +112,7 @@ updates = {
     'Q3_4_Result': '유채나물 레시피를 받습니다. 재료: 유채 2개.',
 }
 for index, npc in enumerate((2, 4, 1, 3), 1):
-    updates[f'Q4_{index}_Result'] = f'R01_{npc:02}의 호감도 +300, 고유 기술과 해당 계열의 초보 무기를 받습니다.'
+    updates[f'Q4_{index}_Result'] = f'NPC {npc}의 호감도 +300, 고유 기술과 해당 계열의 초보 무기를 받습니다.'
 for key, value in updates.items():
     upsert(ui, {'Key': key, 'SourceString': value}, 'Key')
 write('StringTables/ST_IC_UI.csv', fields, ui)

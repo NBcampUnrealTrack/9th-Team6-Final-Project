@@ -1,0 +1,4 @@
+﻿---,RegionID,ServiceID,VisitAnchorID,ArrivalAnchorID,bUnlockedByDefault,VisitRadiusCm,Availability,ID,NameKey,DescriptionKey,Tags,DataVersion,bDeprecated,bTestOnly
+WRP_TEST_01,"R01","None","ANC_WRP_TEST_VISIT_01","ANC_WRP_TEST_ARRIVAL_01","False","350.000000","(Policy=All,Conditions=)","WRP_TEST_01","WRP_TEST_01.NAME","","(GameplayTags=)","1","False","False"
+WRP_TEST_02,"R01","None","ANC_WRP_TEST_VISIT_02","ANC_WRP_TEST_ARRIVAL_02","False","350.000000","(Policy=All,Conditions=)","WRP_TEST_02","WRP_TEST_02.NAME","","(GameplayTags=)","1","False","False"
+WRP_TEST_03,"R01","None","ANC_WRP_TEST_VISIT_03","ANC_WRP_TEST_ARRIVAL_03","False","350.000000","(Policy=All,Conditions=)","WRP_TEST_03","WRP_TEST_03.NAME","","(GameplayTags=)","1","False","False"

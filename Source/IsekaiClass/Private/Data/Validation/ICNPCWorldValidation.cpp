@@ -360,7 +360,7 @@ namespace ICDefinitionValidation
         {
             IC_TRACE_FUNCTION();
             const FRowChecks Check{Table, Name, bComplete, Issues};
-            Check.Require(!Row.ServiceID.IsNone(), TEXT("ServiceID"), TEXT("Warp endpoint requires its provider service."));
+            // A world Warp Stone can provide this endpoint without an NPC service.
             Check.Require(!Row.VisitAnchorID.IsNone(), TEXT("VisitAnchorID"), TEXT("Warp visit unlock requires a stable anchor."));
             Check.Require(!Row.ArrivalAnchorID.IsNone(), TEXT("ArrivalAnchorID"), TEXT("Warp endpoint requires a safe arrival anchor."));
             if (!FMath::IsFinite(Row.VisitRadiusCm) || Row.VisitRadiusCm <= 0.0) Check.Add(TEXT("VisitRadiusCm"), TEXT("Warp visit radius must be positive and finite centimeters."));

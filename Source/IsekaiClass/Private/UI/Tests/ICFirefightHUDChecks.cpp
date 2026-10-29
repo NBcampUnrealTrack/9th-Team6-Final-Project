@@ -108,7 +108,7 @@ bool FICFirefightTargetCheck::RunTest(const FString&)
     auto* HUDClass=LoadClass<UICGameplayWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_GameHUD.WBP_GameHUD_C"));
     auto* HUD=CreateWidget<UICGameplayWidget>(PC,HUDClass);auto* Panel=HUD->GetWidgetFromName(TEXT("HUD_TargetInfo"));HUD->RefreshTargetInfo();
     TestEqual(TEXT("No target hides monster panel"),Panel->GetVisibility(),ESlateVisibility::Collapsed);
-    FICDefinitionResult Lookup;const auto* Spawner=D->Find<FICSpawnerRow>(TEXT("SPN_R01_TEST_001"),Lookup);
+    FICDefinitionResult Lookup;const auto* Spawner=D->Find<FICSpawnerRow>(TEXT("SPN_R01_001"),Lookup);
     TArray<AICEnemyBase*> Enemies;
     if(TestNotNull(TEXT("Real monster spawner available"),Spawner))
     {

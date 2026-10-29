@@ -53,9 +53,7 @@ void UICLoadingScreenSubsystem::BeforeMap(const FString& MapName)
     if(!ensureMsgf(Type,TEXT("WBP_IC_LoadingMovie is required")))return;
     // The GameInstance owns the saved WBP throughout map travel.
     MovieWidget=CreateWidget<UUserWidget>(GetGameInstance(),Type);if(!MovieWidget)return;
-    if(GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->bPendingNewGame)
-        if(auto* Body=MovieWidget->GetWidgetFromName(TEXT("MovieBody")))Body->SetVisibility(ESlateVisibility::Collapsed);
-    Screen.bAutoCompleteWhenLoadingCompletes=true;Screen.bMoviesAreSkippable=false;Screen.MinimumLoadingScreenDisplayTime=.4f;
+    Screen.bAutoCompleteWhenLoadingCompletes=true;Screen.bMoviesAreSkippable=false;Screen.MinimumLoadingScreenDisplayTime=.8f;
     Screen.WidgetLoadingScreen=MovieWidget->TakeWidget();
     GetMoviePlayer()->SetupLoadingScreen(Screen);
 }

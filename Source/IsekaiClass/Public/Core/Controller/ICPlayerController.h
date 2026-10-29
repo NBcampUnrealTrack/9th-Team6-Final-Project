@@ -199,6 +199,7 @@ public:
     UFUNCTION(BlueprintCallable,Category="IC|Input") void HandleInputCommand(EICInputCommand Command,int32 Slot=0);
     UFUNCTION(BlueprintPure,Category="IC|Combat") class AICCharacterBase* GetLockedCombatTarget() const;
     UFUNCTION(BlueprintPure,Category="IC|Combat") class AICCharacterBase* GetHUDCombatTarget() const;
+    UFUNCTION(BlueprintPure,Category="IC|Combat") class AICEnemyBase* GetHUDBossTarget() const;
     void NotifyPlayerHitEnemy(class AICCharacterBase* Target);
     UFUNCTION(BlueprintCallable,Category="IC|Input") void ReleaseInputCommand(EICInputCommand Command,int32 Slot=0);
     UFUNCTION(BlueprintCallable,Category="IC|UI") void ExecuteUI(const FString& Command,int32 Index=0);

@@ -40,12 +40,17 @@ AICLifeActor* UICPlayerLifeComponent::ResolveFishingCast(FVector& Landing) const
     for(TActorIterator<AICLifeActor> It(GetWorld());It;++It)
     {
         if(It->LifeType!=EICDefinitionType::FishingPoint)continue;
-        FVector Center,Normal;It->GetFishingSurface(Center,Normal);
-        const double Denominator=FVector::DotProduct(Direction,Normal);if(Denominator>=-.01)continue;
-        const double Distance=FVector::DotProduct(Center-Origin,Normal)/Denominator;if(Distance<=0||Distance>=BestDistance)continue;
-        const FVector Point=Origin+Direction*Distance;
-        if(!It->ContainsFishingLanding(Point)||FVector::DistSquared(Player->GetActorLocation(),Point)>FMath::Square(FishingCastRangeCm))continue;
-        FHitResult Hit;if(GetWorld()->LineTraceSingleByChannel(Hit,Origin,Point+Normal*2,ECC_Visibility,Query))continue;
+        FVector Point;if(!It->ResolveFishingLanding(Origin,Direction,Point))continue;
+        FHitResult Hit;
+        if(GetWorld()->LineTraceSingleByChannel(Hit,Origin,Point,ECC_Visibility,Query))
+        {
+            // A shallow cast can hit the real water well before the authored plane.
+            // Accept only an upward-facing surface within the zone's water-height tolerance.
+            if(Hit.ImpactNormal.Z<.5f||!It->ContainsFishingLanding(Hit.ImpactPoint))continue;
+            Point=Hit.ImpactPoint;
+        }
+        const double Distance=FVector::Distance(Origin,Point);if(Distance>=BestDistance)continue;
+        if(FVector::DistSquared(Player->GetActorLocation(),Point)>FMath::Square(FishingCastRangeCm))continue;
         Best=*It;BestDistance=Distance;Landing=Point;
     }
     return Best;

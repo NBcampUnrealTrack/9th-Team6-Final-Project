@@ -21,6 +21,7 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map") TSoftObjectPtr<UDataTable> PresentationTable;
     UFUNCTION(BlueprintCallable,Category="Map") bool RequestTravel(FName WarpID);
     UFUNCTION(BlueprintPure,Category="Map") bool IsTraveling() const{return bTraveling;}
+    UFUNCTION(BlueprintPure,Category="Map") bool IsConfirmingTravel() const{return bConfirming;}
     UFUNCTION(BlueprintPure,Category="Map") FVector2D WorldToMapUV(FVector Position) const;
     static void BuildLayout(UWidgetTree* Tree,bool Mini);
     static float MinimapOpacity(FVector2D UV);
@@ -31,6 +32,7 @@ protected:
     virtual void NativeDestruct() override;
     virtual void NativeTick(const FGeometry& Geometry,float Delta) override;
     virtual FReply NativeOnMouseButtonDown(const FGeometry&,const FPointerEvent&) override;
+    virtual FReply NativeOnMouseWheel(const FGeometry&,const FPointerEvent&) override;
     virtual FReply NativeOnPreviewKeyDown(const FGeometry&,const FKeyEvent&) override;
 private:
     UPROPERTY(Transient) TObjectPtr<UTexture2D> MapTexture;
@@ -39,9 +41,12 @@ private:
     FICMapLayerDefinition Layer;
     FICMapPresentationRow Rules;
     FVector2D MinimapCenterUV=FVector2D(.5,.5);
+    FVector2D OverviewCenterUV=FVector2D(.5,.5);
+    float OverviewZoom=1.f;
+    bool bOverviewInitialized=false;
     double MapMinimumZoom=1.,MapMaximumZoom=4.;
     TArray<TWeakObjectPtr<AICWarpStone>> Portals;
-    bool bTraveling=false,bMoved=false,bRegistered=false;
+    bool bTraveling=false,bMoved=false,bRegistered=false,bConfirming=false,bConfirmSelected=true;
     float TravelElapsed=0,RefreshElapsed=1;
     int32 SelectedPortal=0;
     FName PendingWarp;
@@ -53,4 +58,14 @@ private:
     FVector2D MarkerPosition(const FSlateRect&,FVector) const;
     void RefreshLabels();
     UFUNCTION() void CloseMap();
+    UFUNCTION() void ConfirmTravel();
+    UFUNCTION() void CancelTravelConfirmation();
+    bool BeginTravel(FName WarpID);
+    void ChoosePortal(int32 Index);
+    UFUNCTION() void Portal0();
+    UFUNCTION() void Portal1();
+    UFUNCTION() void Portal2();
+    UFUNCTION() void Portal3();
+    UFUNCTION() void ToggleOverview();
+    void FocusWarpArea();
 };
