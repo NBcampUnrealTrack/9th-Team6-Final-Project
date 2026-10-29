@@ -17,7 +17,7 @@ public:
         TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/IsekaiClass/World/Maps/L_Title.L_Title")));
     UPROPERTY(Config, EditAnywhere, Category = "Maps")
     TSoftObjectPtr<UWorld> PlayMap =
-        TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/IsekaiClass/World/L_TestMap.L_TestMap")));
+        TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/IsekaiClass/World/Maps/L_OpenWorld.L_OpenWorld")));
     UPROPERTY(Config, EditAnywhere, Category = "Creation")
     TSoftObjectPtr<UDataTable> CreationOptions = TSoftObjectPtr<UDataTable>(
         FSoftObjectPath(TEXT("/Game/IsekaiClass/Data/DataTable/Settings/DT_IC_CreationOptions.DT_IC_CreationOptions")));

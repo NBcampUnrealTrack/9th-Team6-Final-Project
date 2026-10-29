@@ -33,6 +33,7 @@ bool FICMonsterPrototypeCheck::RunTest(const FString& Parameters)
     auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* World=GI->GetWorld();
     auto& Context=*GEngine->GetWorldContextFromWorld(World);auto* Viewport=NewObject<UGameViewportClient>(GEngine);
     Context.GameViewport=Viewport;Viewport->Init(Context,GI,false);World->InitializeActorsForPlay(FURL(),false);
+    World->CreateAISystem(); // Authored DT blackboards require the same AI context as PIE.
     auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* Time=GI->GetSubsystem<UICTimeSubsystem>();
     auto* PC=World->SpawnActor<AICPlayerController>();FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));
     auto* Player=World->SpawnActor<AICPlayerCharacter>();Player->EnableCombat(true,true);PC->SetPawn(Player);
@@ -111,6 +112,9 @@ bool FICMonsterPrototypeCheck::RunTest(const FString& Parameters)
         const auto Slate=Feedback->TakeWidget();
         auto* Canvas=CastChecked<UCanvasPanel>(Feedback->GetWidgetFromName(TEXT("FeedbackCanvas")));
         auto* Enemy=Enemies[0];auto* EnemyASC=Enemy->GetICAbilitySystem();auto* PlayerASC=Player->GetICAbilitySystem();auto* AI=CastChecked<AICAIController>(Enemy->GetController());
+        // This legacy unit test explicitly exercises the no-tree fallback. The authored
+        // tree and all eleven production bindings are covered by IC.AI.Monsters tests.
+        AI->StartExecution(nullptr,nullptr);
         const auto Step=[&](double Seconds){Time->AdvanceClock(Seconds,false);EnemyASC->TickComponent(Seconds,LEVELTICK_All,nullptr);PlayerASC->TickComponent(Seconds,LEVELTICK_All,nullptr);};
         const float HPBefore=PlayerASC->Capture().HP;
         AI->Tick(.3f);Enemy->Tick(.01f);

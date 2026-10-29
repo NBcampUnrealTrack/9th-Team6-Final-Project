@@ -142,9 +142,12 @@ L_TestMap에서 생성·이동을 확인하기 위한 임시 구성이다.
 
 ## L_TestMap의 한 줄 테스트 배치
 
-정식 맵 파일명은 /Game/IsekaiClass/World/Maps/L_OpenWorld다. 정식 월드 완성 전에는
-/Game/IsekaiClass/World/L_TestMap을 계속 사용한다. 플레이 맵 설정과 R01 Region의
-참조를 L_OpenWorld로 앞당겨 바꾸지 않는다.
+2026-10-29부터 게임 시작과 이어하기의 플레이 맵은
+`/Game/IsekaiClass/World/Maps/L_OpenWorld`를 사용한다. 타이틀·캐릭터 생성·프롤로그를
+마치면 오픈월드로 이동한다. 아래 NPC 한 줄 배치는 `L_TestMap`의 검증용 구성으로 유지한다.
+오픈월드를 패키징 맵 목록에 추가했다. 에디터 빌드와 `IC.Frontend.TitleToPlay` 검사에서
+55줄 프롤로그 후 오픈월드 진입, 이어하기, 저장 목록 불러오기를 확인했다.
+검증 결과는 `Saved/OpenWorldStartTests/index.json`에 있다.
 
 맵에는 BP_R01TestLayout 기준 액터 하나를 둔다. NPC BP를 맵에 직접 놓지 않는다.
 기준 액터는 실행 시 NPC 정의와 시간표에서 집·활동·침대 ID를 읽어 위치 앵커
@@ -327,7 +330,7 @@ Source 파일 삭제·정리는 사용자 요청대로 계속 보류한다.
 에디터 네트워크 검사 시간 초과 등이다. 경고 로그를 숨기거나 검사를 비활성화하지 않았다.
 화면 이미지는 `Saved/SaveUIReview`의 7개 PNG이며, 16:10 저장 화면과 21:9 저장·확인
 화면을 직접 확인했다. 게임패드 전체 탐색과 패키징은 이번 검사 범위에 포함하지 않는다.
-현재 플레이 맵은 `L_TestMap`, 정식 맵은 추후 `L_OpenWorld`로 유지한다.
+이 기록 당시 플레이 맵은 `L_TestMap`이었으며, 2026-10-29부터 시작 맵을 `L_OpenWorld`로 변경했다.
 
 리타겟팅 생성 성공과 시각 검증 완료는 별개다. ResourceReference의 대표 장면·
 쿠킹 검증 플래그는 실제 확인을 마친 뒤에만 올린다.
