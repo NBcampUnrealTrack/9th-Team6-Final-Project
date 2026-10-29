@@ -13,19 +13,23 @@ public:
     void Construct(const FArguments&){}
     FSlateBrush Brush;
     bool bFade=false;
+    FVector2D UVMin=FVector2D::ZeroVector;
+    FVector2D UVMax=FVector2D(1.0,1.0);
     virtual FVector2D ComputeDesiredSize(float) const override{return {256,128};}
     virtual int32 OnPaint(const FPaintArgs&,const FGeometry& G,const FSlateRect&,FSlateWindowElementList& E,int32 L,const FWidgetStyle& Style,bool) const override
     {
         if(!Brush.GetResourceObject())return L;
-        if(!bFade){FSlateDrawElement::MakeBox(E,L,G.ToPaintGeometry(),&Brush,ESlateDrawEffect::None,Style.GetColorAndOpacityTint());return L;}
-        constexpr int32 Columns=32,Rows=16;
+        const int32 Columns=bFade?32:1,Rows=bFade?16:1;
         TArray<FSlateVertex> Vertices;TArray<SlateIndex> Indices;
         const auto Transform=G.GetAccumulatedRenderTransform();const FVector2D Size=G.GetLocalSize();
         for(int32 Y=0;Y<=Rows;++Y)for(int32 X=0;X<=Columns;++X)
         {
-            const FVector2D UV(double(X)/Columns,double(Y)/Rows);
-            auto Color=Style.GetColorAndOpacityTint();Color.A*=UICMapWidget::MinimapOpacity(UV);
-            Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(Transform,FVector2f(UV*Size),FVector2f(UV),Color.ToFColor(true)));
+            const FVector2D LocalUV(double(X)/Columns,double(Y)/Rows);
+            const FVector2D TextureUV(
+                FMath::Lerp(UVMin.X,UVMax.X,LocalUV.X),
+                FMath::Lerp(UVMin.Y,UVMax.Y,LocalUV.Y));
+            auto Color=Style.GetColorAndOpacityTint();if(bFade)Color.A*=UICMapWidget::MinimapOpacity(LocalUV);
+            Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(Transform,FVector2f(LocalUV*Size),FVector2f(TextureUV),Color.ToFColor(true)));
         }
         for(int32 Y=0;Y<Rows;++Y)for(int32 X=0;X<Columns;++X)
         {const SlateIndex I=Y*(Columns+1)+X;Indices.Append({I,SlateIndex(I+1),SlateIndex(I+Columns+1),SlateIndex(I+1),SlateIndex(I+Columns+2),SlateIndex(I+Columns+1)});}
@@ -34,6 +38,12 @@ public:
 };
 TSharedRef<SWidget> UICMapTextureImage::RebuildWidget(){Image=SNew(SICMapTextureImage);SynchronizeProperties();return Image.ToSharedRef();}
 void UICMapTextureImage::SynchronizeProperties()
-{Super::SynchronizeProperties();if(Image){Image->Brush.SetResourceObject(Texture);Image->Brush.DrawAs=ESlateBrushDrawType::Image;Image->bFade=bFadeEdges;Image->Invalidate(EInvalidateWidgetReason::Paint);}}
+{Super::SynchronizeProperties();if(Image){Image->Brush.SetResourceObject(Texture);Image->Brush.DrawAs=ESlateBrushDrawType::Image;Image->bFade=bFadeEdges;Image->UVMin=UVMin;Image->UVMax=UVMax;Image->Invalidate(EInvalidateWidgetReason::Paint);}}
 void UICMapTextureImage::SetTexture(UTexture2D* Value){if(Texture!=Value){Texture=Value;SynchronizeProperties();}}
+void UICMapTextureImage::SetUVRegion(FVector2D Min,FVector2D Max)
+{
+    Min.X=FMath::Clamp(Min.X,0.,1.);Min.Y=FMath::Clamp(Min.Y,0.,1.);
+    Max.X=FMath::Clamp(Max.X,Min.X,1.);Max.Y=FMath::Clamp(Max.Y,Min.Y,1.);
+    if(!UVMin.Equals(Min)||!UVMax.Equals(Max)){UVMin=Min;UVMax=Max;SynchronizeProperties();}
+}
 void UICMapTextureImage::ReleaseSlateResources(bool Children){Super::ReleaseSlateResources(Children);Image.Reset();}
