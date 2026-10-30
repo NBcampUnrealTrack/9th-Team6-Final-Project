@@ -157,16 +157,18 @@ bool UICQuestGuideComponent::ResolveTarget(const FICQuestRow& Definition, const 
                 && Quests->GetObjectiveProgress(Objective, Quest, World, Progress)
                 && Progress >= Objective.RequiredCount) continue;
             TargetKey = Objective.ObjectiveID;
-            if (!Objective.GuidanceAnchorID.IsNone())
-            {
-                if (ResolveAnchor(Objective.GuidanceAnchorID)) return true;
-            }
+            // NPCs can leave their authored anchor as their schedule changes.
+            // Follow the live actor first; the anchor is a fallback while it is unloaded.
             if ((Objective.Type == EICQuestObjectiveType::Talk || Objective.Type == EICQuestObjectiveType::Affinity)
                 && Objective.Target.Type == EICDefinitionType::NPC)
             {
                 if (ResolveNPC(Objective.Target.ID)) return true;
             }
-            else if (Objective.Type == EICQuestObjectiveType::Visit && Objective.Target.Type == EICDefinitionType::Anchor)
+            if (!Objective.GuidanceAnchorID.IsNone())
+            {
+                if (ResolveAnchor(Objective.GuidanceAnchorID)) return true;
+            }
+            if (Objective.Type == EICQuestObjectiveType::Visit && Objective.Target.Type == EICDefinitionType::Anchor)
             {
                 if (ResolveAnchor(Objective.Target.ID)) return true;
             }
