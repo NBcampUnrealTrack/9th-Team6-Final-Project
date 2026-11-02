@@ -88,7 +88,14 @@ struct ISEKAICLASS_API FICCombatSettingsRow : public FICDefinitionRow
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="360")) double GuardArcDegrees = 120;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double GuardDamageMultiplier = 0.30;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0", ClampMax="1")) double GuardMoveSpeedMultiplier = 0.50;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeInvulnerabilityPlaySeconds = 0.25;
+    // Minimum protection. Authored dodge travel extends it through the evasive push.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeInvulnerabilityPlaySeconds = 0.50;
+    // Fallback timing/distance for characters without an authored root-motion dodge.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.01")) double DodgeDurationPlaySeconds = 0.95;
+    // Fallback travel time for clips without authored horizontal root translation.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.01")) double DodgeTravelPlaySeconds = 0.75;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.01")) double DodgeAnimationPlayRate = 2.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.1")) double PlayerDodgeDistanceScale = 1.15;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeDistanceCm = 300;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) double DodgeCooldownPlaySeconds = 3;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.01")) double DashDurationPlaySeconds = 0.25;

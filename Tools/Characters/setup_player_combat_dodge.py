@@ -6,6 +6,7 @@ import unreal as u
 root = Path(u.Paths.convert_relative_path_to_full(u.Paths.project_dir()))
 sys.path.insert(0, str(root / "Tools/Characters"))
 import setup_assets as setup
+from dodge_timing import configure_dodge_blends
 
 sources = {
     "Sword_Animations": "Sword_Animations/Animations/Sequence2/06_Dodge/01_Dodge/Dodge_F_Seq",
@@ -25,10 +26,7 @@ for gender, suffix in [("Male", "M"), ("Female", "F")]:
         clip.set_editor_property("root_motion_root_lock", u.RootMotionRootLock.REF_POSE)
         setup.save(clip)
         montage = u.ICCharacterSetupLibrary.create_action_montage(f"{folder}/AM_{pack}_combat_dodge", clip, False)
-        for prop in ["blend_in", "blend_out"]:
-            blend = montage.get_editor_property(prop)
-            blend.set_editor_property("blend_time", .04)
-            montage.set_editor_property(prop, blend)
+        configure_dodge_blends(montage)
         setup.save(montage)
         montages[pack] = montage
     sets = dict(profile.get_editor_property("weapon_sets"))

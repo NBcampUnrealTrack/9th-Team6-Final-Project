@@ -14,7 +14,7 @@ enum class EPlayerEquipSlot : uint8 { Weapon=0, None=4 };
 UENUM(BlueprintType)
 enum class EPlayerItemTab : uint8 { Normal , Quest  };
 UENUM(BlueprintType)
-enum class EPlayerItemCategory : uint8 { Consumable , Food , Book , Material , Gathering , Fish , Crafted , Quest , Ticket , Equipment , Revival  };
+enum class EPlayerItemCategory : uint8 { Consumable , Food , Elixir , Material , Gathering , Fish , Crafted , Quest , Ticket , Equipment , Revival  };
 UENUM(BlueprintType)
 enum class EPlayerItemGrade : uint8 { Common , Uncommon , Rare , Epic , Legendary  };
 

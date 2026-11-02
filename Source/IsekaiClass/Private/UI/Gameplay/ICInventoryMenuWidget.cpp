@@ -367,7 +367,7 @@ void UICInventoryMenuWidget::RefreshItems()
     for(int32 I=0;I<Data.Bag.Slots.Num();++I)
     {const auto& S=Data.Bag.Slots[I];const auto* D=Inv?Inv->Find(S.ItemID):nullptr;
      const bool Tab=ItemTab==EPlayerItemTab::Normal?(!D||D->Tab==EPlayerItemTab::Normal):(D&&D->Tab==EPlayerItemTab::Quest);
-     const bool Filter=FilterKind==0||(D&&(FilterKind==1?D->Kind==EPlayerItemKind::Equipment:FilterKind==2?D->Kind==EPlayerItemKind::Consumable:FilterKind==3?D->Category==EPlayerItemCategory::Food:FilterKind==4?D->Category==EPlayerItemCategory::Book:FilterKind==5?D->Kind==EPlayerItemKind::Material:S.bLocked));
+     const bool Filter=FilterKind==0||(D&&(FilterKind==1?D->Kind==EPlayerItemKind::Equipment:FilterKind==2?D->Kind==EPlayerItemKind::Consumable:FilterKind==3?D->Category==EPlayerItemCategory::Food:FilterKind==4?D->Category==EPlayerItemCategory::Elixir:FilterKind==5?D->Kind==EPlayerItemKind::Material:S.bLocked));
      if(Tab&&Filter)VisibleBagIndices.Add(I);}
     if(ItemTab==EPlayerItemTab::Quest&&FilterKind==0)for(int32 I=0;I<Data.QuestItems.Num();++I)
         VisibleBagIndices.Add(-I-1);

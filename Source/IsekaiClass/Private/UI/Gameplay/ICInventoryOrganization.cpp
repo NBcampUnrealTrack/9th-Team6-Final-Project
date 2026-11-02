@@ -8,7 +8,7 @@ void UICInventoryMenuWidget::SortItems()
 void UICInventoryMenuWidget::CycleFilter()
 {
     if(IsBusy())return;FilterKind=(FilterKind+1)%7;SelectedItem=0;
-    const FText Names[]={NSLOCTEXT("ICInventory","FilterAll","분류: 전체"),NSLOCTEXT("ICInventory","FilterEquipment","분류: 무기"),NSLOCTEXT("ICInventory","FilterConsumable","분류: 소비품"),NSLOCTEXT("ICInventory","FilterFood","분류: 음식"),NSLOCTEXT("ICInventory","FilterBook","분류: 성장서"),NSLOCTEXT("ICInventory","FilterMaterial","분류: 재료"),NSLOCTEXT("ICInventory","FilterLocked","분류: 잠금")};
+    const FText Names[]={NSLOCTEXT("ICInventory","FilterAll","분류: 전체"),NSLOCTEXT("ICInventory","FilterEquipment","분류: 무기"),NSLOCTEXT("ICInventory","FilterConsumable","분류: 소비품"),NSLOCTEXT("ICInventory","FilterFood","분류: 음식"),NSLOCTEXT("ICInventory","FilterElixir","분류: 엘릭서"),NSLOCTEXT("ICInventory","FilterMaterial","분류: 재료"),NSLOCTEXT("ICInventory","FilterLocked","분류: 잠금")};
     if(auto* T=Cast<UTextBlock>(GetWidgetFromName(TEXT("BTN_FilterItems_Text"))))T->SetText(Names[FilterKind]);RefreshItems();
 }
 void UICInventoryMenuWidget::LockSelected()

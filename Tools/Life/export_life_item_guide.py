@@ -25,7 +25,7 @@ sections = [
     ('낚시 용품', lambda id: id in ('ITM_R01_FISH_ROD', 'ITM_R01_FISH_BAIT')),
     ('R01 요리', lambda id: id.startswith('ITM_R01_FOOD_')),
     ('기존 회복·음식', lambda id: id.startswith(('ITM_CONS_', 'ITM_FOOD_'))),
-    ('성장서', lambda id: id.startswith('ITM_BOOK_')),
+    ('엘릭서', lambda id: id.startswith('ITM_ELIXIR_')),
     ('무기', lambda id: id.startswith('EQP_WPN_')),
     ('확장권·퀘스트 아이템', lambda id: id in ('ITM_TKT_001', 'ITM_QST_001')),
 ]
@@ -45,7 +45,7 @@ for number, (title, accept) in enumerate(sections, 1):
             extra.append('판매가 %s' % r['SellPrice'])
         if r['UseEffect'] == 'Recovery':
             extra.append('회복 HP %g / MP %g / SP %g' % tuple(float(r[k]) for k in ('RestoreHP', 'RestoreMP', 'RestoreSP')))
-        if r['UseEffect'] == 'GrowthBook':
+        if r['UseEffect'] == 'GrowthElixir':
             extra.append('해당 능력치 +%s' % r['GrowthAmount'])
         if id == 'ITM_QST_001':
             extra.append('퀘스트 탭, 버리기·판매·선물 불가')

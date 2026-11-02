@@ -19,6 +19,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimSequence.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/GameInstance.h"
 #include "Debug/ICLog.h"
@@ -33,6 +34,7 @@
 
 namespace
 {
+constexpr double DodgeLocomotionBlendSeconds=.16;
 // Resolve a fresh camera ray at release time, so moving the mouse during a
 // combo still aims at the current screen centre rather than the selected enemy.
 void ICPlayerAttackView(const AICPlayerCharacter* Player,FVector& Location,FRotator& Rotation)
@@ -284,12 +286,15 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
     if(RequestedAction==TEXT("Dodge")||RequestedAction==TEXT("Dash"))
     {
         const bool bDodge=RequestedAction==TEXT("Dodge");
+        const double DistanceScale=bDodge&&Cast<AICPlayerCharacter>(Character)?FMath::Max(.1,Moves->PlayerDodgeDistanceScale):1.;
         MovementCooldownDuration=FMath::Max(0.,Moves->DodgeCooldownPlaySeconds);
         DodgeReadyAt=StartedAt+MovementCooldownDuration;
-        MovementDuration=FMath::Max(.01,bDodge?Moves->DodgeInvulnerabilityPlaySeconds:Moves->DashDurationPlaySeconds);
-        MovementDistance=FMath::Max(0.,bDodge?Moves->DodgeDistanceCm:Moves->DashDistanceCm);
+        MovementDuration=FMath::Max(.01,bDodge?Moves->DodgeTravelPlaySeconds:Moves->DashDurationPlaySeconds);
+        MovementDistance=FMath::Max(0.,bDodge?Moves->DodgeDistanceCm*DistanceScale:Moves->DashDistanceCm);
         MovementAlpha=0;
-        ActionEndsAt=StartedAt+MovementDuration;
+        DodgeMovementCurve.Reset();
+        ActionEndsAt=StartedAt+(bDodge?FMath::Max3(MovementDuration,Moves->DodgeDurationPlaySeconds,Moves->DodgeInvulnerabilityPlaySeconds):MovementDuration);
+        DodgeInvulnerableUntil=bDodge?StartedAt+FMath::Max(0.,Moves->DodgeInvulnerabilityPlaySeconds):0;
         DodgeDirection=Character->GetLastMovementInputVector().GetSafeNormal2D();
         bool bDirectionalDodge=false;
         if(auto* Player=Cast<AICPlayerCharacter>(Character);Player&&bDodge)
@@ -305,19 +310,58 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
         }
         if(DodgeDirection.IsNearlyZero())DodgeDirection=Character->GetActorForwardVector();
         Character->GetCharacterMovement()->StopMovementImmediately();
+        Character->ConsumeMovementInputVector();
         SetLooseGameplayTagCount(ICTags::Dodging,1);
-        SetLooseGameplayTagCount(ICTags::Invulnerable,bDodge?1:0);
+        SetLooseGameplayTagCount(ICTags::Invulnerable,bDodge&&DodgeInvulnerableUntil>StartedAt?1:0);
         if(auto* Montage=Skill.Montage.LoadSynchronous())
+        {
+            // Keep the capsule on the authored push/landing timing. Sampling raw
+            // root translation does not enable engine root motion or bypass sweeps.
+            if(bDodge&&!Montage->SlotAnimTracks.IsEmpty()&&Montage->SlotAnimTracks[0].AnimTrack.AnimSegments.Num()==1)
+            {
+                const auto& Segment=Montage->SlotAnimTracks[0].AnimTrack.AnimSegments[0];
+                if(const auto* Sequence=Cast<UAnimSequence>(Segment.GetAnimReference()))
+                {
+                    const FVector End=Sequence->ExtractRootMotionFromRange(Segment.AnimStartTime,Segment.AnimEndTime,FAnimExtractContext()).GetTranslation().GetSafeNormal2D();
+                    const double Distance=FVector::DotProduct(Sequence->ExtractRootMotionFromRange(Segment.AnimStartTime,Segment.AnimEndTime,FAnimExtractContext()).GetTranslation(),End);
+                    if(Distance>1.)
+                    {
+                        // Keep the authored push/recovery timing; apply the
+                        // player's adjustable travel scale to distance only.
+                        MovementDistance=Distance*DistanceScale;
+                        MovementDuration=Montage->GetPlayLength()/(FMath::Max(FMath::Abs(Montage->RateScale),UE_SMALL_NUMBER)*FMath::Max(.01,Moves->DodgeAnimationPlayRate));
+                        ActionEndsAt=StartedAt+MovementDuration;
+                        constexpr int32 Samples=64;
+                        for(int32 Index=0;Index<=Samples;++Index)
+                        {
+                            const double At=FMath::Lerp(double(Segment.AnimStartTime),double(Segment.AnimEndTime),double(Index)/Samples);
+                            const FVector Root=Sequence->ExtractRootMotionFromRange(Segment.AnimStartTime,At,FAnimExtractContext()).GetTranslation();
+                            const double Value=FMath::Clamp(FVector::DotProduct(Root,End)/Distance,0.,1.);
+                            DodgeMovementCurve.Add(FMath::Max(Value,DodgeMovementCurve.IsEmpty()?0.:DodgeMovementCurve.Last()));
+                        }
+                        DodgeMovementCurve.Last()=1.;
+                        // Keep the evasive movement protected, then expose the
+                        // planted recovery rather than cutting immunity mid-leap.
+                        for(int32 Index=0;Index<DodgeMovementCurve.Num();++Index)
+                            if(DodgeMovementCurve[Index]>=.9)
+                            {
+                                DodgeInvulnerableUntil=StartedAt+FMath::Min(MovementDuration,FMath::Max(Moves->DodgeInvulnerabilityPlaySeconds,MovementDuration*Index/Samples));
+                                break;
+                            }
+                    }
+                }
+            }
             if(auto* Anim=Character->GetMesh()->GetAnimInstance())
             {
-                // Directional dodges preserve facing. Gameplay time owns the dodge
-                // duration and invulnerability; montage blending must not end them early.
+                // Preserve the full dodge and recovery instead of squeezing the
+                // clip into its much shorter invulnerability window.
                 if(!bDirectionalDodge)Character->SetActorRotation(DodgeDirection.Rotation());
                 const float Duration=FMath::Max(.01f,float(ActionEndsAt-StartedAt));
-                Anim->Montage_Play(Montage,Montage->GetPlayLength()/Duration);
+                Anim->Montage_Play(Montage,Montage->GetPlayLength()/(Duration*FMath::Max(FMath::Abs(Montage->RateScale),UE_SMALL_NUMBER)));
                 if(auto* Instance=Anim->GetActiveInstanceForMontage(Montage))
                     ActiveMontageInstanceID=Instance->GetInstanceID();
             }
+        }
     }
     else
     {
@@ -379,7 +423,9 @@ void UICAbilitySystemComponent::EndCurrentAction(bool Cancelled)
     if(Cancelled&&RequestedAction==TEXT("Skill")&&!bCommitted)
         ApplySkillCooldown(Skill,FMath::Max(GetSkillCooldownRemaining(Skill.ID),Skill.BeforeFirstEffectRetryPlaySeconds));
     if(RequestedAction==TEXT("Attack")){FICDefinitionResult R;const auto* Settings=Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;ComboIndex=Cancelled?0:(ComboIndex+1)%3;ComboReadyUntil=PlaySecond()+(Settings?Settings->ComboWindowPlaySeconds:.8);}
-    if(Cancelled||RequestedAction==TEXT("Dodge"))if(auto* C=Cast<AICCharacterBase>(GetAvatarActor()))if(auto* Anim=C->GetMesh()->GetAnimInstance())if(auto* Montage=Skill.Montage.Get())Anim->Montage_Stop(.05f,Montage);
+    // Successful dodges finish with their authored blend-out; stopping them here
+    // would replace that recovery with a sudden .05-second blend.
+    if(Cancelled)if(auto* C=Cast<AICCharacterBase>(GetAvatarActor()))if(auto* Anim=C->GetMesh()->GetAnimInstance())if(auto* Montage=Skill.Montage.Get())Anim->Montage_Stop(RequestedAction==TEXT("Dodge")?.12f:.05f,Montage);
     ClearActionTags();OpenTraceHits.Reset();ActiveMontageInstanceID=INDEX_NONE;CurrentID.Invalidate();RunningAbility=nullptr;OnStateChanged.Broadcast();
 }
 void UICAbilitySystemComponent::AdvanceAction(double Now)
@@ -409,11 +455,30 @@ void UICAbilitySystemComponent::AdvanceAction(double Now)
     if(!CurrentID.IsValid())return;auto* C=Cast<AICCharacterBase>(GetAvatarActor());if(!C){CancelAction();return;}
     if(RequestedAction==TEXT("Dodge")||RequestedAction==TEXT("Dash"))
     {
-        const double Alpha=FMath::Clamp((Now-StartedAt)/MovementDuration,0.,1.);
+        if(RequestedAction==TEXT("Dodge")&&Now>=DodgeInvulnerableUntil)SetLooseGameplayTagCount(ICTags::Invulnerable,0);
+        const double Progress=FMath::Clamp((Now-StartedAt)/MovementDuration,0.,1.);
+        // Ease into the push and settle before recovery; retain the dash's linear travel.
+        double Alpha=RequestedAction==TEXT("Dodge")?Progress*Progress*(3.-2.*Progress):Progress;
+        if(RequestedAction==TEXT("Dodge")&&DodgeMovementCurve.Num()>1)
+        {
+            const double Frame=FMath::Clamp((Now-StartedAt)/(ActionEndsAt-StartedAt),0.,1.)*(DodgeMovementCurve.Num()-1);
+            const int32 Before=FMath::FloorToInt(Frame),After=FMath::Min(Before+1,DodgeMovementCurve.Num()-1);
+            Alpha=FMath::Lerp(DodgeMovementCurve[Before],DodgeMovementCurve[After],Frame-Before);
+        }
         // Apply only this frame's movement: collision and gravity must not be undone
         // by repeatedly steering toward an absolute position captured at input time.
         C->AddActorWorldOffset(DodgeDirection*MovementDistance*(Alpha-MovementAlpha),true);
         MovementAlpha=Alpha;
+        if(RequestedAction==TEXT("Dodge")&&Cast<AICPlayerCharacter>(C)&&DodgeMovementCurve.Num()>1
+            &&HasMatchingGameplayTag(ICTags::Dodging)&&Alpha>=.995&&Now>=DodgeInvulnerableUntil
+            &&Now>=ActionEndsAt-DodgeLocomotionBlendSeconds)
+        {
+            // The authored push is over. Blend the planted tail into locomotion
+            // while its remaining root samples and action/cooldown finish normally.
+            SetLooseGameplayTagCount(ICTags::Dodging,0);
+            if(auto* Anim=C->GetMesh()->GetAnimInstance())if(auto* Montage=Skill.Montage.Get())
+                Anim->Montage_Stop(float(FMath::Max(.025,ActionEndsAt-Now)),Montage);
+        }
     }
     else
     {

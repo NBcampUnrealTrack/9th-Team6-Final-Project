@@ -21,7 +21,7 @@ bool FICLifeCalendarCheck::RunTest(const FString&)
 {
     auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* World=GI->GetWorld();World->InitializeActorsForPlay(FURL(),false);
     auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* Time=GI->GetSubsystem<UICTimeSubsystem>();
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("생활 달력 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("생활 달력 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);State->RestoreState(Initial);
     auto* PC=World->SpawnActor<AICPlayerController>();FICDefinitionResult R;const auto* Row=D->Find<FICResourceRow>(TEXT("RES_R01_GATHER_01"),R);
     auto* Plant=World->SpawnActor<AICLifeActor>(Row->ResourceActorClass.LoadSynchronous());Plant->PointID=TEXT("TEST_CALENDAR_RESOURCE");FText Failure;
@@ -44,7 +44,7 @@ bool FICRanchHuntingCheck::RunTest(const FString&)
 {
     auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* World=GI->GetWorld();World->InitializeActorsForPlay(FURL(),false);
     auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("닭 사냥 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("닭 사냥 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);State->RestoreState(Initial);
     FICDefinitionResult R;const auto* Row=D->Find<FICRanchingRow>(TEXT("RAN_R01_01"),R);
     auto* Type=Row?Row->AnimalActorClass.LoadSynchronous():nullptr;
@@ -89,7 +89,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICLifeEconomyCheck,"IC.Life.ItemEconomyRecover
 bool FICLifeEconomyCheck::RunTest(const FString&)
 {
     auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("아이템 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("아이템 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Player.HP=Player.SP=1;Initial.Characters.Add(Player.CharacterId,Player);State->RestoreState(Initial);
     FICDefinitionResult R;auto* Bag=NewObject<UICInventoryComponent>();Bag->BeginStaging(D,0);
     for(int32 I=1;I<=30;++I)

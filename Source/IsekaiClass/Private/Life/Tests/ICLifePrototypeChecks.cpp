@@ -21,7 +21,7 @@ bool FICLifePrototypeCheck::RunTest(const FString&)
     auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* World=GI->GetWorld();World->InitializeActorsForPlay(FURL(),false);
     auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* Time=GI->GetSubsystem<UICTimeSubsystem>();
     auto* PC=World->SpawnActor<AICPlayerController>();
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("생활검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("생활검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(D,0);
     for(int32 Index=1;Index<=5;++Index)TestTrue(TEXT("Authored seed item exists"),Staging->AddItem(FName(*FString::Printf(TEXT("ITM_R01_SEED_%02d"),Index)),1,false));
@@ -101,7 +101,7 @@ bool FICLifePrototypeCheck::RunTest(const FString&)
         TestEqual(TEXT("Fishing pool contains fish 1..10"),Fishing->FishSelections.Num(),10);
         for(const auto& Selection:Fishing->FishSelections)TestEqual(TEXT("Each fish has the same future random weight"),Selection.Weight,1.);
         auto* Type=Fishing->PointActorClass.LoadSynchronous();auto* Box=Type?Cast<AICLifeActor>(Type->GetDefaultObject()):nullptr;
-        TestTrue(TEXT("Fishing BP displays its name label"),Box&&Box->bShowLifeLabel);
+        TestTrue(TEXT("Fishing BP keeps its area name label hidden"),Box&&!Box->bShowLifeLabel);
         TestTrue(TEXT("Fishing BP is a fishing point rather than a resource"),Box&&Box->LifeType==EICDefinitionType::FishingPoint);
     }
     PC->Destroy();GI->Shutdown();World->DestroyWorld(false);return true;
@@ -112,7 +112,7 @@ bool FICNPCQuestMarkerCheck::RunTest(const FString&)
 {
     auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* World=GI->GetWorld();
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* Q=GI->GetSubsystem<UICQuestSubsystem>();
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("퀘스트표시");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("퀘스트표시");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);
     TestTrue(TEXT("Marker world initialized"),State->RestoreState(Initial));
     TestEqual(TEXT("Quest giver has green exclamation marker"),Q->GetNPCQuestMarker(TEXT("NPC_R01_001")),1);
     TestEqual(TEXT("NPC without offered quest has no marker"),Q->GetNPCQuestMarker(TEXT("NPC_R01_012")),0);

@@ -23,8 +23,17 @@ bool FICGachaCheck::RunTest(const FString&)
     if(!TestNotNull(TEXT("Actual gacha DT is registered"),Rule)){GI->Shutdown();World->DestroyWorld(false);return false;}
     TestEqual(TEXT("Draw costs 1000G by default"),Rule->CostGold,1000);TestEqual(TEXT("Two independently weighted groups"),Rule->Pools.Num(),2);
     TestEqual(TEXT("Gathering pool has weight 50"),Rule->Pools[0].Weight,50.);TestEqual(TEXT("Book pool has weight 50"),Rule->Pools[1].Weight,50.);
-    TestEqual(TEXT("Ten gathering items"),Rule->Pools[0].Items.Num(),10);TestEqual(TEXT("Fifteen usable growth books"),Rule->Pools[1].Items.Num(),15);
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("뽑기 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");Initial.Gold=10000;
+    TestEqual(TEXT("Ten gathering items"),Rule->Pools[0].Items.Num(),10);TestEqual(TEXT("Fifteen usable elixirs"),Rule->Pools[1].Items.Num(),15);
+    TestEqual(TEXT("Growth rewards use the elixir pool"),Rule->Pools[1].PoolID,FName(TEXT("GROWTH_ELIXIR")));
+    for(const auto& Prize:Rule->Pools[1].Items)
+    {
+        const auto* Elixir=D->Find<FICItemRow>(Prize.ItemID,R);
+        if(!TestNotNull(TEXT("Every elixir prize resolves"),Elixir))continue;
+        TestTrue(TEXT("Elixir category and use effect match"),Elixir->Category==EPlayerItemCategory::Elixir&&Elixir->UseEffect==EICItemEffect::GrowthElixir);
+        TestTrue(TEXT("Elixirs use potion icons"),Elixir->Icon.ToSoftObjectPath().ToString().Contains(TEXT("Potion")));
+        TestTrue(TEXT("Runtime item labels are elixirs"),Elixir->DisplayName.ToString().Contains(TEXT("엘릭서")));
+    }
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("뽑기 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");Initial.Gold=10000;
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);
     int32 Gathering=0,Books=0;TSet<EPlayerMainStat> Attributes;
     for(int32 Seed=1;Seed<=256;++Seed)
@@ -35,7 +44,7 @@ bool FICGachaCheck::RunTest(const FString&)
         TestEqual(TEXT("Space available result goes to bag"),Result.ReceivedCount,1);
         const FString ID=Result.Prize.ItemID.ToString();
         if(ID.StartsWith(TEXT("ITM_R01_PLANT_")))++Gathering;
-        else if(ID.StartsWith(TEXT("ITM_BOOK_"))){++Books;const auto* Book=D->Find<FICItemRow>(Result.Prize.ItemID,R);if(Book)Attributes.Add(Book->GrowthStat);}
+        else if(ID.StartsWith(TEXT("ITM_ELIXIR_"))){++Books;const auto* Book=D->Find<FICItemRow>(Result.Prize.ItemID,R);if(Book)Attributes.Add(Book->GrowthStat);}
         else AddError(TEXT("Draw returned an item outside authored pools"));
     }
     TestTrue(TEXT("Both pools receive draws around the configured half share"),Gathering>80&&Gathering<176&&Books>80&&Books<176);

@@ -13,6 +13,8 @@
 #include "NPC/Character/ICNPCBase.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "Data/Text/ICTextLibrary.h"
+#include "Internationalization/StringTable.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "UI/Dialogue/ICNPCGiftWidget.h"
 #include "UI/Dialogue/ICDialogueEntryWidget.h"
@@ -33,7 +35,7 @@ bool FICNPCGiftPickerCheck::RunTest(const FString&)
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(D,0);
     for(const auto ID:{TEXT("ITM_R01_FOOD_15"),TEXT("ITM_R01_PLANT_01"),TEXT("ITM_R01_ORE_01"),TEXT("ITM_R01_FISH_ROD"),TEXT("ITM_QST_001")})
         TestTrue(TEXT("Seed actual inventory definitions"),Staging->AddItem(ID,2,false));
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("선물선택 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");Initial.Inventory=Staging->GetSnapshot();
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("선물선택 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");Initial.Inventory=Staging->GetSnapshot();
     for(auto& Item:Initial.Inventory.Bag.Slots)if(Item.ItemID==TEXT("ITM_R01_ORE_01"))Item.bLocked=true;
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);
     TestTrue(TEXT("Inventory state restores"),State->RestoreState(Initial));
@@ -43,6 +45,9 @@ bool FICNPCGiftPickerCheck::RunTest(const FString&)
     auto* NPC=World->SpawnActor<AICNPCBase>();TestTrue(TEXT("Actual NPC initializes"),NPC->InitializeNPC(TEXT("NPC_R01_002")));
     NPC->SetActorLocation(Pawn->GetActorLocation()+FVector(100,0,0));State->SetAffinity(TEXT("NPC_R01_002"),0);
     TestTrue(TEXT("NPC conversation begins"),NPC->TryInteract(PC));
+    PC->SetMenu(TEXT("Dialogue"));
+    TestTrue(TEXT("NPC dialogue keeps the mouse visible"),PC->bShowMouseCursor);
+    TestEqual(TEXT("NPC dialogue does not capture the mouse"),Viewport->GetMouseCaptureMode(),EMouseCaptureMode::NoCapture);
     TArray<TSharedPtr<SWidget>> HeldSlate;
     auto Open=[&](){auto* Picker=CreateWidget<UICNPCGiftWidget>(PC,Class);HeldSlate.Add(Picker->TakeWidget());Picker->OpenForNPC(NPC);return Picker;};
     auto Key=[](UICNPCGiftWidget* Picker,FKey Pressed,bool Repeat=false)
@@ -64,7 +69,8 @@ bool FICNPCGiftPickerCheck::RunTest(const FString&)
     TestEqual(TEXT("Opening confirmation consumes nothing"),Pawn->Inventory->CountItem(TEXT("ITM_R01_PLANT_01")),2);
     auto* Confirm=CastChecked<UICItemConfirmWidget>(Picker->GetWidgetFromName(TEXT("GiftConfirm")));
     const auto Message=CastChecked<UTextBlock>(Confirm->GetWidgetFromName(TEXT("TXT_Message")))->GetText().ToString();
-    TestTrue(TEXT("Confirmation names the selected item and actual NPC"),Message.Contains(TEXT("들꽃 줄기"))&&Message.Contains(TEXT("R01_02"))&&Message.Contains(TEXT("선물하시겠습니까?")));
+    const auto NPCName=UICTextLibrary::ResolveText(LoadObject<UStringTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_Definitions.ST_IC_Definitions")),NPC->GetNPCDefinition().NameKey);
+    TestTrue(TEXT("Confirmation names the selected item and actual NPC"),NPCName.bSuccess&&Message.Contains(TEXT("들꽃 줄기"))&&Message.Contains(NPCName.Text.ToString())&&Message.Contains(TEXT("선물하시겠습니까?")));
     Key(Picker,EKeys::Enter);TestFalse(TEXT("Default Cancel returns to the inventory"),Picker->bConfirming);
     TestEqual(TEXT("Cancel consumes nothing"),Pawn->Inventory->CountItem(TEXT("ITM_R01_PLANT_01")),2);
     Key(Picker,EKeys::Enter);Key(Picker,EKeys::Escape);TestFalse(TEXT("ESC dismisses only confirmation"),Picker->bConfirming);

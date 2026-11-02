@@ -131,7 +131,8 @@ bool UICAbilitySystemComponent::HasRecentCombat() const
 {
     IC_TRACE_FUNCTION(); FICDefinitionResult R; auto* Rule = Definitions()?Definitions()->Find<FICCombatSettingsRow>(TEXT("CFG_COMBAT_001"),R):nullptr;
     const double Grace = Runtime.Kind == EICCharacterKind::Player ? (Rule ? Rule->PlayerCombatGracePlaySeconds : 5) : (Rule ? Rule->RecentCombatPlaySeconds : 8);
-    return IsAlive() && (HasMatchingGameplayTag(ICTags::Dodging) || PlaySecond() - RecentCombatAt < Grace);
+    return IsAlive() && (HasMatchingGameplayTag(ICTags::Dodging)
+        || (CurrentID.IsValid()&&RequestedAction==TEXT("Dodge")) || PlaySecond() - RecentCombatAt < Grace);
 }
 void UICAbilitySystemComponent::MarkCombat() { IC_TRACE_FUNCTION(); RecentCombatAt = PlaySecond(); }
 double UICAbilitySystemComponent::GetMovementCooldownRemaining() const
@@ -160,6 +161,8 @@ void UICAbilitySystemComponent::ResetExecutionForLoad()
 {
     IC_TRACE_FUNCTION();CancelAction();SetGuarding(false);RecentCombatAt=-100;DodgeReadyAt=StaggerReadyAt=StaggerUntil=0;
     MovementCooldownDuration=MovementDuration=MovementDistance=MovementAlpha=0;
+    DodgeInvulnerableUntil=0;
+    DodgeMovementCurve.Reset();
     ComboIndex=0;ComboReadyUntil=BufferedAttackUntil=0;SetLooseGameplayTagCount(ICTags::Staggered,0);
 }
 void UICAbilitySystemComponent::AdvanceNaturalSP(double Seconds)

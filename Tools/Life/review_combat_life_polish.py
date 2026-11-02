@@ -59,7 +59,7 @@ def tick(delta):
             if not chicken.get_editor_property('hidden'):return
             assert S['bag'].count_item('ITM_R01_CHICKEN_MEAT')==S['before_meat']+1
             S['checks']['F_chicken_animation_then_saved_meat_and_optional_eggs']=True;shot('ChickenLoot')
-            for i,item in enumerate(['ITM_CONS_001','ITM_BOOK_001','ITM_TKT_001','ITM_FOOD_001']):
+            for i,item in enumerate(['ITM_CONS_001','ITM_ELIXIR_001','ITM_TKT_001','ITM_FOOD_001']):
                 assert S['bag'].add_item(item,3,False)
                 slots=S['bag'].get_snapshot().bag.slots;slot=next(n for n,v in enumerate(slots) if str(v.item_id)==item and v.count>0);assert S['bag'].bind_quick_slot(i,slot)
             phase('quickslots');return
@@ -68,13 +68,13 @@ def tick(delta):
             for i in range(1,5):
                 card=find_widget(bar,'QuickSlot'+str(i));assert card.get_editor_property('Count')>0 and card.get_editor_property('Icon')
             S['checks']['all_four_HUD_quickslots_have_icons_and_counts']=True;shot('HUD_QuickSlots')
-            S['book_before_use']=S['bag'].count_item('ITM_BOOK_001');key('Gamepad_DPad_Right');phase('gamepad_target');return
+            S['book_before_use']=S['bag'].count_item('ITM_ELIXIR_001');key('Gamepad_DPad_Right');phase('gamepad_target');return
         if S['phase']=='gamepad_target' and elapsed>.3:
             assert pc.is_using_gamepad() and str(pc.get_editor_property('PendingItem'))!='None'
             key('Gamepad_FaceButton_Bottom');phase('gamepad_use');return
         if S['phase']=='gamepad_use' and elapsed>.4:
             assert str(pc.get_editor_property('PendingItem'))=='None';S['checks']['Xbox_DPad_quickslot_and_A_target_confirm']=True
-            assert S['bag'].count_item('ITM_BOOK_001')==S['book_before_use']-1
+            assert S['bag'].count_item('ITM_ELIXIR_001')==S['book_before_use']-1
             S['chest']=next(a for a in actors(u.ICPlayerStorage) if not a.get_editor_property('hidden'));approach(S['chest']);phase('chest_f');return
         if S['phase']=='chest_f' and elapsed>.6:
             key('F');S['hinge']=S['chest'].get_editor_property('ChestPresentation');assert not pc.get_editor_property('StorageScreen');phase('chest_open');return

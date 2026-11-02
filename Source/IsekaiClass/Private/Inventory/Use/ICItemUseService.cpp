@@ -51,7 +51,7 @@ FICItemUseResult UICItemUseService::Prepare(UICInventoryComponent* Inventory,UIC
             const float SP=Player?FMath::Min<double>(C.MaxSP,C.SP+D->RestoreSP+C.MaxSP*D->RestoreSPRatio):0.f;
             Changed=HP!=C.HP||MP!=C.MP||SP!=C.SP;C.HP=HP;C.MP=MP;C.SP=SP;break;
         }
-        case EICItemEffect::GrowthBook:
+        case EICItemEffect::GrowthElixir:
         {
             TArray<FName> Settings;
             if(!Definitions->GetDefinitionIDs(EICDefinitionType::Settings,Settings).bSuccess)return Fail(TEXT("StatSettings"),ICText::Get(TEXT("Native_21f5a25f1253")).ToString());
@@ -89,7 +89,7 @@ FICItemUseResult UICItemUseService::Prepare(UICInventoryComponent* Inventory,UIC
         default:return Fail(TEXT("UseEffect"),ICText::Get(TEXT("Native_74b370552341")).ToString());
     }
     for(FName ID:D->StatusEffectIDs){FString Reason;if(!ICCombatSimulation::PrepareItemStatus(C,ID,Definitions,Reason)){R.Field=TEXT("StatusEffectIDs");R.Reason=Reason;return R;}Changed=true;}
-    const bool ConsumeAtCap=D->UseEffect==EICItemEffect::GrowthBook&&D->bConsumeAtGrowthCap;
+    const bool ConsumeAtCap=D->UseEffect==EICItemEffect::GrowthElixir&&D->bConsumeAtGrowthCap;
     if(!Changed&&D->bRejectWhenNoEffect&&!ConsumeAtCap)return Fail(TEXT("UseEffect"),ICText::Get(TEXT("Native_95e036acbacb")).ToString());
     FICInventoryState Items;
     if(!Inventory->BuildConsumption(ItemID,1,Items))return Fail(TEXT("Inventory"),ICText::Get(TEXT("Native_86d4e1888edc")).ToString());

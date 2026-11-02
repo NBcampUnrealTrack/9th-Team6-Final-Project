@@ -169,6 +169,71 @@ bool FICSaveCompatibilityCheck::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICSharedSkillMigrationCheck,"IC.WorldState.SharedNPCSkillMigration",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICSharedSkillMigrationCheck::RunTest(const FString&)
+{
+    auto* Save=NewObject<UICSaveGame>();Save->WorldState=PlayerWorld();Save->Clock.PlaySecond=10;
+    auto& World=Save->WorldState;World.FirstSkill=TEXT("SKL_START_SWORD_001");
+    auto& Player=World.Characters.FindChecked(UICWorldStateSubsystem::PlayerId());
+    const TArray<TPair<FName,FName>> Aliases={
+        {TEXT("SKL_START_SWORD_001"),TEXT("SKL_NPC_R01_002")},
+        {TEXT("SKL_START_BOW_001"),TEXT("SKL_NPC_R01_004")},
+        {TEXT("SKL_START_STAFF_001"),TEXT("SKL_NPC_R01_001")},
+        {TEXT("SKL_START_WAND_001"),TEXT("SKL_NPC_R01_003")}};
+    int32 Family=1;
+    for(const auto& Alias:Aliases)
+    {
+        Player.UnlockedSkillIDs.Add(Alias.Key);Player.UnlockedSkillIDs.Add(Alias.Value);
+        Player.EquippedWeaponSkills.Add(static_cast<EICWeaponFamily>(Family++),Alias.Key);
+        Player.Combat.SkillReadyAtPlaySecond.Add(Alias.Key,30);
+        Player.Combat.SkillReadyAtPlaySecond.Add(Alias.Value,40);
+    }
+    TArray<uint8> Bytes;
+    if(!TestTrue(TEXT("Old starter skill state encodes"),UICSaveGame::EncodeForFile(Save,Bytes)))return false;
+    auto* Loaded=UICSaveGame::DecodeFile(Bytes);
+    if(!TestNotNull(TEXT("Existing saves load after consolidating skills"),Loaded))return false;
+    TestEqual(TEXT("First skill uses the NPC definition"),Loaded->WorldState.FirstSkill,FName(TEXT("SKL_NPC_R01_002")));
+    const auto& Migrated=Loaded->WorldState.Characters.FindChecked(Player.CharacterId);
+    TestEqual(TEXT("Acquired skills merge without duplicates"),Migrated.UnlockedSkillIDs.Num(),4);
+    Family=1;
+    for(const auto& Alias:Aliases)
+    {
+        TestFalse(TEXT("Retired skill ID is removed"),Migrated.UnlockedSkillIDs.Contains(Alias.Key));
+        TestTrue(TEXT("Acquired NPC skill is preserved"),Migrated.UnlockedSkillIDs.Contains(Alias.Value));
+        TestEqual(TEXT("Weapon assignment follows the shared skill"),Migrated.EquippedWeaponSkills.FindRef(static_cast<EICWeaponFamily>(Family++)),Alias.Value);
+        TestEqual(TEXT("Cooldown merge keeps the later deadline"),Migrated.Combat.SkillReadyAtPlaySecond.FindRef(Alias.Value),40.);
+        TestFalse(TEXT("Retired cooldown is removed"),Migrated.Combat.SkillReadyAtPlaySecond.Contains(Alias.Key));
+    }
+    TArray<uint8> Rewritten;
+    TestTrue(TEXT("Migrated save can be written again"),UICSaveGame::EncodeForFile(Loaded,Rewritten));
+    auto* Reopened=UICSaveGame::DecodeFile(Rewritten);
+    TestTrue(TEXT("Repeated migration retains all four acquired skills"),Reopened&&Reopened->WorldState.Characters.FindChecked(Player.CharacterId).UnlockedSkillIDs.Num()==4);
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICElixirSaveMigrationCheck,"IC.WorldState.ElixirItemMigration",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICElixirSaveMigrationCheck::RunTest(const FString&)
+{
+    auto* Save=NewObject<UICSaveGame>();Save->WorldState=PlayerWorld();auto& State=Save->WorldState;
+    State.Inventory.Bag.Slots.SetNum(20);auto& Item=State.Inventory.Bag.Slots[0];
+    Item.ItemID=TEXT("ITM_BOOK_010");Item.InstanceID=FGuid::NewGuid();Item.Count=3;Item.bLocked=true;
+    State.Inventory.QuickSlots.SetNum(4);State.Inventory.QuickSlots[0]=Item.ItemID;State.Codex.AcquiredItemIDs.Add(Item.ItemID);
+    auto& Slots=State.Inventory.Storage.FindOrAdd(TEXT("CNT_ELIXIR_TEST")).Slots;Slots.SetNum(40);
+    Slots[0]=Item;Slots[0].ItemID=TEXT("ITM_BOOK_018");Slots[0].InstanceID=FGuid::NewGuid();
+    TArray<uint8> Bytes;
+    if(!TestTrue(TEXT("Old growth-item save encodes"),UICSaveGame::EncodeForFile(Save,Bytes)))return false;
+    auto* Loaded=UICSaveGame::DecodeFile(Bytes);
+    if(!TestNotNull(TEXT("Old growth items load as elixirs"),Loaded))return false;
+    const auto& Migrated=Loaded->WorldState.Inventory.Bag.Slots[0];
+    TestEqual(TEXT("Constitution item ID migrates"),Migrated.ItemID,FName(TEXT("ITM_ELIXIR_010")));
+    TestEqual(TEXT("Stack amount is preserved"),Migrated.Count,3);TestEqual(TEXT("Item identity is preserved"),Migrated.InstanceID,Item.InstanceID);
+    TestTrue(TEXT("Locked flag is preserved"),Migrated.bLocked);
+    TestEqual(TEXT("Quick-slot references migrate"),Loaded->WorldState.Inventory.QuickSlots[0],Migrated.ItemID);
+    TestTrue(TEXT("Discovered codex items migrate"),Loaded->WorldState.Codex.AcquiredItemIDs.Contains(Migrated.ItemID));
+    TestEqual(TEXT("Storage items migrate"),Loaded->WorldState.Inventory.Storage.FindChecked(TEXT("CNT_ELIXIR_TEST")).Slots[0].ItemID,FName(TEXT("ITM_ELIXIR_018")));
+    return !HasAnyErrors();
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICSchemaInvariantCheck,"IC.WorldState.SchemaInvariants",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FICSchemaInvariantCheck::RunTest(const FString& Parameters)
 {

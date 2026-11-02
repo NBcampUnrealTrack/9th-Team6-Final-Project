@@ -10,6 +10,7 @@ class UBlendSpace;
 class USkeletalMesh;
 class UWorld;
 class UICCharacterAnimationProfile;
+class AICEnemyBase;
 
 UCLASS()
 class ISEKAICLASS_API UICCharacterSetupLibrary : public UBlueprintFunctionLibrary
@@ -40,6 +41,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool CalibrateImportedNPC(USkeletalMesh* Mesh, UICCharacterAnimationProfile* Profile);
     /** Start a PIE-only visual review with an isolated save namespace. */
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool PrepareLiveCharacterReview(UWorld* World);
+    /** Spawn a normal monster at an isolated PIE review origin without saving map assets. */
+    UFUNCTION(BlueprintCallable, Category="IC|Editor",meta=(DevelopmentOnly)) static AICEnemyBase* SpawnLiveReviewEnemy(UWorld* World,FVector Origin);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool BeginMonsterTestReview();
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool CaptureMonsterTestHUD(UWorld* World,const FString& File);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool PressUIReviewKey(UWorld* World,FKey Key);

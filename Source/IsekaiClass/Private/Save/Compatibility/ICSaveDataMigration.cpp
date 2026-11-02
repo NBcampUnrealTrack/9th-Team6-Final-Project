@@ -1,16 +1,53 @@
 #include "Save/Compatibility/ICSaveDataMigration.h"
 #include "Debug/ICLog.h"
 
+namespace
+{
+void NormalizeSharedSkills(FICWorldState& State)
+{
+    // The four retired player-only starters now use the same definitions as NPCs.
+    static const TMap<FName,FName> Aliases={
+        {TEXT("SKL_START_SWORD_001"),TEXT("SKL_NPC_R01_002")},
+        {TEXT("SKL_START_BOW_001"),TEXT("SKL_NPC_R01_004")},
+        {TEXT("SKL_START_STAFF_001"),TEXT("SKL_NPC_R01_001")},
+        {TEXT("SKL_START_WAND_001"),TEXT("SKL_NPC_R01_003")}};
+    const auto Canonical=[](FName ID){const auto* Mapped=Aliases.Find(ID);return Mapped?*Mapped:ID;};
+    State.FirstSkill=Canonical(State.FirstSkill);
+    for(auto& Pair:State.Characters)
+    {
+        auto& Character=Pair.Value;
+        TSet<FName> Skills;for(FName ID:Character.UnlockedSkillIDs)Skills.Add(Canonical(ID));
+        Character.UnlockedSkillIDs=MoveTemp(Skills);
+        for(auto& Equipped:Character.EquippedWeaponSkills)Equipped.Value=Canonical(Equipped.Value);
+        TMap<FName,double> Cooldowns;
+        for(const auto& Cooldown:Character.Combat.SkillReadyAtPlaySecond)
+        {
+            // Merging an acquired NPC skill with its old starter must not shorten a cooldown.
+            const FName ID=Canonical(Cooldown.Key);
+            if(auto* Existing=Cooldowns.Find(ID))*Existing=FMath::Max(*Existing,Cooldown.Value);
+            else Cooldowns.Add(ID,Cooldown.Value);
+        }
+        Character.Combat.SkillReadyAtPlaySecond=MoveTemp(Cooldowns);
+    }
+}
+}
+
 void ICSaveDataMigration::NormalizeInventoryIDs(FICWorldState& State)
 {
     IC_TRACE_FUNCTION();
+    NormalizeSharedSkills(State);
     static const TMap<FName,FName> ItemIDs={
-        {TEXT("PotionHP"),TEXT("ITM_CONS_001")},{TEXT("Food"),TEXT("ITM_FOOD_001")},{TEXT("BookSTR"),TEXT("ITM_BOOK_001")},
+        {TEXT("PotionHP"),TEXT("ITM_CONS_001")},{TEXT("Food"),TEXT("ITM_FOOD_001")},{TEXT("BookSTR"),TEXT("ITM_ELIXIR_001")},
+        {TEXT("ITM_BOOK_001"),TEXT("ITM_ELIXIR_001")},{TEXT("ITM_BOOK_002"),TEXT("ITM_ELIXIR_002")},{TEXT("ITM_BOOK_003"),TEXT("ITM_ELIXIR_003")},
+        {TEXT("ITM_BOOK_004"),TEXT("ITM_ELIXIR_004")},{TEXT("ITM_BOOK_005"),TEXT("ITM_ELIXIR_005")},{TEXT("ITM_BOOK_006"),TEXT("ITM_ELIXIR_006")},
+        {TEXT("ITM_BOOK_007"),TEXT("ITM_ELIXIR_007")},{TEXT("ITM_BOOK_008"),TEXT("ITM_ELIXIR_008")},{TEXT("ITM_BOOK_009"),TEXT("ITM_ELIXIR_009")},
+        {TEXT("ITM_BOOK_010"),TEXT("ITM_ELIXIR_010")},{TEXT("ITM_BOOK_011"),TEXT("ITM_ELIXIR_011")},{TEXT("ITM_BOOK_012"),TEXT("ITM_ELIXIR_012")},
+        {TEXT("ITM_BOOK_016"),TEXT("ITM_ELIXIR_016")},{TEXT("ITM_BOOK_017"),TEXT("ITM_ELIXIR_017")},{TEXT("ITM_BOOK_018"),TEXT("ITM_ELIXIR_018")},
         {TEXT("Wood"),TEXT("ITM_R01_PLANT_03")},{TEXT("Ticket"),TEXT("ITM_TKT_001")},{TEXT("QuestRing"),TEXT("ITM_QST_001")},
         {TEXT("ITM_MAT_001"),TEXT("ITM_R01_PLANT_03")},{TEXT("ITM_MAT_002"),TEXT("ITM_R01_CROP_01")},{TEXT("ITM_MAT_003"),TEXT("ITM_R01_ORE_01")},
         {TEXT("ITEM_P0_01"),TEXT("ITM_R01_FOOD_15")},{TEXT("ITM_MAT_PORK"),TEXT("ITM_R01_RANCH_03")},
         {TEXT("ITM_MAT_GREEN_HERB"),TEXT("ITM_R01_PLANT_05")},{TEXT("ITEM_HERO_GIFT"),TEXT("ITM_R01_FOOD_19")},
-        {TEXT("ITM_BOOK_013"),TEXT("ITM_BOOK_001")},{TEXT("ITM_BOOK_014"),TEXT("ITM_BOOK_002")},{TEXT("ITM_BOOK_015"),TEXT("ITM_BOOK_003")},
+        {TEXT("ITM_BOOK_013"),TEXT("ITM_ELIXIR_001")},{TEXT("ITM_BOOK_014"),TEXT("ITM_ELIXIR_002")},{TEXT("ITM_BOOK_015"),TEXT("ITM_ELIXIR_003")},
         {TEXT("ITEM_R01_01"),TEXT("ITM_R01_PLANT_01")},{TEXT("ITEM_R01_02"),TEXT("ITM_R01_PLANT_02")},
         {TEXT("ITEM_R01_03"),TEXT("ITM_R01_PLANT_03")},{TEXT("ITEM_R01_04"),TEXT("ITM_R01_PLANT_04")},
         {TEXT("ITEM_R01_05"),TEXT("ITM_R01_PLANT_05")},{TEXT("ITEM_R01_06"),TEXT("ITM_R01_PLANT_06")},

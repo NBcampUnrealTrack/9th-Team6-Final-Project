@@ -19,7 +19,7 @@ bool FICExpandedGameplayCheck::RunTest(const FString&)
 {
     auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* World=GI->GetWorld();World->InitializeActorsForPlay(FURL(),false);
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* Time=GI->GetSubsystem<UICTimeSubsystem>();
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("확장 기능 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("확장 기능 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);
     TestTrue(TEXT("Test state restores"),State->RestoreState(Initial));
     auto* PC=World->SpawnActor<AICPlayerController>();auto* Pawn=World->SpawnActor<AICPlayerCharacter>();PC->Possess(Pawn);PC->bCreated=true;
@@ -41,9 +41,9 @@ bool FICExpandedGameplayCheck::RunTest(const FString&)
     TestTrue(TEXT("Requirement boundary allows village sword"),Inventory->Equip(FindBag(TEXT("EQP_WPN_SWORD_002"))));
     TestEqual(TEXT("The new weapon occupies the sword slot"),Inventory->GetWeaponLoadout()[0].ItemID,FName(TEXT("EQP_WPN_SWORD_002")));
 
-    Inventory->AddItem(TEXT("ITM_BOOK_001"),1,false);const FName Companion=TEXT("NPC_R01_002");const int32 BeforeSTR=State->GetSnapshot(Companion).MainStats.STR;FText Reason;
-    TestTrue(TEXT("Growth book can be used on the chosen party member"),PC->UseInventoryItem(TEXT("ITM_BOOK_001"),Companion,Reason));
-    TestEqual(TEXT("Only the chosen member grows"),State->GetSnapshot(Companion).MainStats.STR,BeforeSTR+1);TestEqual(TEXT("Book consumes once"),Inventory->CountItem(TEXT("ITM_BOOK_001")),0);
+    Inventory->AddItem(TEXT("ITM_ELIXIR_001"),1,false);const FName Companion=TEXT("NPC_R01_002");const int32 BeforeSTR=State->GetSnapshot(Companion).MainStats.STR;FText Reason;
+    TestTrue(TEXT("Elixir can be used on the chosen party member"),PC->UseInventoryItem(TEXT("ITM_ELIXIR_001"),Companion,Reason));
+    TestEqual(TEXT("Only the chosen member grows"),State->GetSnapshot(Companion).MainStats.STR,BeforeSTR+1);TestEqual(TEXT("Book consumes once"),Inventory->CountItem(TEXT("ITM_ELIXIR_001")),0);
     Inventory->AddItem(TEXT("ITM_CONS_001"),2,false);
     TestFalse(TEXT("Full HP target rejects ineffective food/potion"),PC->UseInventoryItem(TEXT("ITM_CONS_001"),Companion,Reason));
     TestEqual(TEXT("Failed use does not consume"),Inventory->CountItem(TEXT("ITM_CONS_001")),2);

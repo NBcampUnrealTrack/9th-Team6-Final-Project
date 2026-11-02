@@ -13,6 +13,7 @@
 #include "Animation/AnimInstanceProxy.h"
 #include "AlphaBlend.h"
 #include "Animation/AnimSequence.h"
+#include "Animation/AnimMontage.h"
 #include "Animation/BlendSpace.h"
 #include "Animation/AnimNode_SequencePlayer.h"
 #include "AnimNodes/AnimNode_BlendSpacePlayer.h"
@@ -43,6 +44,9 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
     bool bLandingActive=false;
     FAnimNode_Slot Slot;
     TArray<ICHandGrip::FFinger> GripFingers;
+    TArray<int32> LocomotionLowerBody;
+    TWeakObjectPtr<UAnimMontage> LastWeaponMontage;
+    bool bUpperBodyWeapon=false;
     TWeakObjectPtr<USkeletalMesh> GripMesh;
     float RightGrip=0,LeftGrip=0,GripClosure=1;
 
@@ -56,6 +60,7 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
         LandingBlend.A.SetLinkNode(&AirBlend); LandingBlend.B.SetLinkNode(&Landing);
         SleepBlend.A.SetLinkNode(&LandingBlend); SleepBlend.B.SetLinkNode(&Bed);
         Slot.Source.SetLinkNode(&SleepBlend); Slot.SlotName = TEXT("DefaultSlot");
+        Slot.bAlwaysUpdateSourcePose=true;
         Air.SetLoopAnimation(true); Bed.SetLoopAnimation(true);
         Sprint.SetLoopAnimation(true);
         Launch.SetLoopAnimation(false);Fall.SetLoopAnimation(true);Landing.SetLoopAnimation(false);
@@ -70,6 +75,16 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
     {
         Slot.Evaluate_AnyThread(Output);
         const auto& Bones=Output.Pose.GetBoneContainer();
+        if(bUpperBodyWeapon&&!LocomotionLowerBody.IsEmpty())
+        {
+            FPoseContext LocomotionPose(Output);
+            Slot.Source.Evaluate(LocomotionPose);
+            for(int32 Bone:LocomotionLowerBody)
+            {
+                const auto Index=Bones.MakeCompactPoseIndex(FMeshPoseBoneIndex(Bone));
+                if(Index!=INDEX_NONE)Output.Pose[Index]=LocomotionPose.Pose[Index];
+            }
+        }
         for(const auto& Finger:GripFingers)
         {
             const float Weight=Finger.Left?LeftGrip:RightGrip;if(Weight<UE_SMALL_NUMBER)continue;
@@ -83,9 +98,36 @@ struct FICCharacterAnimProxy : FAnimInstanceProxy
     {
         FAnimInstanceProxy::PreUpdate(Instance, DeltaSeconds);
         const auto* IC = CastChecked<UICCharacterAnimInstance>(Instance);
-        const auto* Player=Cast<AICPlayerCharacter>(IC->TryGetPawnOwner());
+        auto* Player=Cast<AICPlayerCharacter>(IC->TryGetPawnOwner());
         auto* Mesh=Player?Player->GetMesh()->GetSkeletalMeshAsset():nullptr;
-        if(GripMesh.Get()!=Mesh){GripMesh=Mesh;GripFingers=Mesh?ICHandGrip::Fingers(Mesh->GetRefSkeleton()):TArray<ICHandGrip::FFinger>();}
+        if(GripMesh.Get()!=Mesh)
+        {
+            GripMesh=Mesh;GripFingers=Mesh?ICHandGrip::Fingers(Mesh->GetRefSkeleton()):TArray<ICHandGrip::FFinger>();
+            LocomotionLowerBody.Reset();LastWeaponMontage.Reset();
+            if(Mesh)
+            {
+                const auto& Ref=Mesh->GetRefSkeleton();
+                int32 Spine=Ref.FindBoneIndex(TEXT("J_Bip_C_Spine"));
+                if(Spine==INDEX_NONE)Spine=Ref.FindBoneIndex(TEXT("spine_01"));
+                if(Spine!=INDEX_NONE)for(int32 Bone=0;Bone<Ref.GetNum();++Bone)
+                {
+                    int32 Parent=Bone;while(Parent!=INDEX_NONE&&Parent!=Spine)Parent=Ref.GetParentIndex(Parent);
+                    if(Parent!=Spine)LocomotionLowerBody.Add(Bone);
+                }
+            }
+        }
+        bUpperBodyWeapon=false;
+        if(Player)
+        {
+            auto* Montage=Instance->GetCurrentActiveMontage();
+            bool WeaponMontage=false;
+            if(const auto* Profile=Player->GetAnimationProfile();Profile&&Montage)
+                for(const auto& Set:Profile->WeaponSets)
+                    WeaponMontage|=Set.Value.Draw==Montage||Set.Value.Sheathe==Montage;
+            if(WeaponMontage)LastWeaponMontage=Montage;
+            bUpperBodyWeapon=WeaponMontage||Player->IsSwitchingWeapon()
+                ||(!Montage&&LastWeaponMontage.IsValid()&&Instance->Montage_IsActive(LastWeaponMontage.Get()));
+        }
         const bool Working=Player&&Player->LifeActions&&(Player->LifeActions->IsWorking()||Player->LifeActions->IsSleeping());
         const auto Family=Player&&Player->Inventory&&!Working?Player->Inventory->GetEquippedWeaponFamily():EICWeaponFamily::None;
         RightGrip=FMath::FInterpTo(RightGrip,Family!=EICWeaponFamily::None&&Family!=EICWeaponFamily::Bow?1.f:0.f,DeltaSeconds,14.f);

@@ -26,7 +26,7 @@ bool FICInventoryMenuCheck::RunTest(const FString&)
     auto* PC=World->SpawnActor<AICPlayerController>();FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));
     auto* Player=World->SpawnActor<AICPlayerCharacter>();Player->EnableCombat(true,true);PC->Possess(Player);
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* Definitions=GI->GetSubsystem<UICDefinitionSubsystem>();
-    FICWorldState Data;Data.bPlayerCreated=true;Data.PlayerName=TEXT("인벤토리");Data.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Data;Data.bPlayerCreated=true;Data.PlayerName=TEXT("인벤토리");Data.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;Data.Characters.Add(P.CharacterId,P);
     TestTrue(TEXT("Initialize actual world inventory"),State->RestoreState(Data));Player->InitializeState(P.CharacterId);Player->Inventory->BindWorldState(State);
     PC->bCreated=true;PC->Menu=TEXT("Pause");auto* Inv=Player->Inventory.Get();

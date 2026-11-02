@@ -5,6 +5,7 @@ import unreal as u
 root=Path(u.Paths.convert_relative_path_to_full(u.Paths.project_dir()))
 sys.path.insert(0,str(root/'Tools/Characters'))
 import setup_assets as setup
+from dodge_timing import configure_dodge_blends
 
 directions=['F_0','F_R_45','F_R_90','B_R_45','B_180','B_L_45','F_L_90','F_L_45']
 sword_dodges=['F','F_R_45','R','B_R_45','B','B_L_45','L','F_L_45']
@@ -44,10 +45,7 @@ for gender,suffix in [('Male','M'),('Female','F')]:
         montages=[]
         for i in range(8):
             montage=u.ICCharacterSetupLibrary.create_action_montage(folder+f'/AM_Dodge8_{pack}_{i}',output[f'dodge{i}'],False)
-            for prop in ['blend_in','blend_out']:
-                settings=montage.get_editor_property(prop)
-                settings.set_editor_property('blend_time',.04)
-                montage.set_editor_property(prop,settings)
+            configure_dodge_blends(montage)
             setup.save(montage);montages.append(montage)
         authored[pack]=(blend,montages)
         u.log(f'IC_DIRECTIONAL_PACK_SAVED {gender} {pack}')

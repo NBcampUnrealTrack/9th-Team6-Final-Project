@@ -48,7 +48,7 @@ FString UICCharacterSetupLibrary::CaptureUIAspectSamples()
     auto* PreviewViewport=NewObject<UGameViewportClient>(GEngine);Context.GameViewport=PreviewViewport;PreviewViewport->Init(Context,GI,false);
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();
     auto* Inventory=NewObject<UICInventoryComponent>();Inventory->BeginStaging(D,0);
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("화면비 확인");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");Initial.Inventory=Inventory->GetSnapshot();
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("화면비 확인");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");Initial.Inventory=Inventory->GetSnapshot();
     FICCharacterState PlayerState;PlayerState.CharacterId=UICWorldStateSubsystem::PlayerId();PlayerState.Kind=EICCharacterKind::Player;
     PlayerState.UnlockedSkillIDs.Add(Initial.FirstSkill);Initial.Characters.Add(PlayerState.CharacterId,PlayerState);State->RestoreState(Initial);
     World->InitializeActorsForPlay(FURL(),false);

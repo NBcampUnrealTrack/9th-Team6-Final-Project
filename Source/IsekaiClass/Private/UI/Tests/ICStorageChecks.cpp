@@ -37,7 +37,7 @@ struct FSession
             PRAGMA_ENABLE_DEPRECATION_WARNINGS
         }
         World->InitializeActorsForPlay(FURL(),false);State=GI->GetSubsystem<UICWorldStateSubsystem>();
-        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("독립 창고 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("독립 창고 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
         FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;Initial.Characters.Add(P.CharacterId,P);State->RestoreState(Initial);
         PC=World->SpawnActor<AICPlayerController>();if(Local){FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));}
         Player=World->SpawnActor<AICPlayerCharacter>();PC->Possess(Player);PC->bCreated=true;PC->Menu.Reset();Player->InitializeState(P.CharacterId);Bag=Player->Inventory;Bag->BindWorldState(State);
@@ -101,12 +101,12 @@ bool FICStorageRecoveryCheck::RunTest(const FString&)
 {
     ICStorageChecks::FSession F;auto Old=F.State->ExportState();auto& Slots=Old.Inventory.Storage[TEXT("PlayerHome")].Slots;Slots.SetNum(160);
     for(int32 I=0;I<40;++I){Slots[I].ItemID=TEXT("ITM_R01_SEED_01");Slots[I].Count=99;Slots[I].InstanceID=FGuid::NewGuid();}
-    Slots[130].ItemID=TEXT("ITM_BOOK_001");Slots[130].Count=1;Slots[130].InstanceID=FGuid::NewGuid();const auto ItemID=Slots[130].InstanceID;
+    Slots[130].ItemID=TEXT("ITM_ELIXIR_001");Slots[130].Count=1;Slots[130].InstanceID=FGuid::NewGuid();const auto ItemID=Slots[130].InstanceID;
     TestTrue(TEXT("Expanded save restores without losing its old overflow"),F.State->RestoreState(Old));auto Saved=F.State->ExportState();TestEqual(TEXT("Loaded storage is forty slots"),Saved.Inventory.Storage[TEXT("PlayerHome")].Slots.Num(),40);
     if(!TestTrue(TEXT("Overflow has a saved recovery drop"),Saved.Drops.Num()==1&&Saved.Drops[0].bStorageRecovery))return false;
     auto* Drop=F.World->SpawnActor<AICDroppedItem>(Saved.Drops[0].Position,FRotator::ZeroRotator);Drop->Initialize(Saved.Drops[0]);auto* Time=F.GI->GetSubsystem<UICTimeSubsystem>();Time->SetRunning(true);Time->SetMenuPaused(false);Time->AdvanceClock(1000,false);Drop->Tick(.25f);
-    TestEqual(TEXT("Storage migration items never expire on the ground"),F.State->ExportState().Drops.Num(),1);Drop->TryPickup(F.PC);TestEqual(TEXT("Recovered item returns to bag"),F.Bag->CountItem(TEXT("ITM_BOOK_001")),1);
-    TestEqual(TEXT("Recovery preserves item identity"),F.Bag->GetSnapshot().Bag.Slots[F.Slot(TEXT("ITM_BOOK_001"))].InstanceID,ItemID);TestEqual(TEXT("Pickup removes the completed recovery drop"),F.State->ExportState().Drops.Num(),0);return !HasAnyErrors();
+    TestEqual(TEXT("Storage migration items never expire on the ground"),F.State->ExportState().Drops.Num(),1);Drop->TryPickup(F.PC);TestEqual(TEXT("Recovered item returns to bag"),F.Bag->CountItem(TEXT("ITM_ELIXIR_001")),1);
+    TestEqual(TEXT("Recovery preserves item identity"),F.Bag->GetSnapshot().Bag.Slots[F.Slot(TEXT("ITM_ELIXIR_001"))].InstanceID,ItemID);TestEqual(TEXT("Pickup removes the completed recovery drop"),F.State->ExportState().Drops.Num(),0);return !HasAnyErrors();
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICChestAndFurnitureCheck,"IC.Polish.ChestAndFurniture",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FICChestAndFurnitureCheck::RunTest(const FString&)

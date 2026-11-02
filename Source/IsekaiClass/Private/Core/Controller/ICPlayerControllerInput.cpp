@@ -202,7 +202,7 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
         }
     }
     const bool CombatFacing=CombatNow&&UICGameUserSettings::Get()->bCombatFacing;
-    C->GetCharacterMovement()->bOrientRotationToMovement=!CombatFacing;
+    C->GetCharacterMovement()->bOrientRotationToMovement=!CombatFacing&&!ASC->HasMatchingGameplayTag(ICTags::Dodging);
     if(CombatFacing&&CanHandleGameplayInput()&&ASC->CanAcceptMovementInput()&&!C->IsSwitchingWeapon())
     {
         const auto Family=ASC->GetEquippedWeaponFamily();

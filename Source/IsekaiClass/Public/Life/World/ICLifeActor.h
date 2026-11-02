@@ -28,6 +28,7 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class USkeletalMeshComponent> AnimalMesh;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<class UGeometryCollectionComponent> OreMesh;
     UFUNCTION(BlueprintCallable, Category="IC|Life") bool Plant(AICPlayerController* Controller);
+    bool CanPlantCrop(AICPlayerController* Controller,FName CropID,FText& Failure) const;
     UFUNCTION(BlueprintCallable, Category="IC|Life") virtual void RefreshLife();
     bool CompletePlayerAction(AICPlayerController* Player,FName CropToPlant,FText& Failure);
     UFUNCTION(BlueprintPure, Category="IC|Life") int32 GetGrowthStage() const;

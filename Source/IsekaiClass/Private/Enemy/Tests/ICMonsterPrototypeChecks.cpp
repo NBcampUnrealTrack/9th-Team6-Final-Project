@@ -41,7 +41,7 @@ bool FICMonsterPrototypeCheck::RunTest(const FString& Parameters)
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(D,0);
     TestTrue(TEXT("Existing starter sword can be granted"),Staging->AddItem(TEXT("EQP_WPN_SWORD_001"),1,false));
     TestTrue(TEXT("Existing starter sword can be equipped"),Staging->Equip(0));
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("전투 테스트");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");Initial.Inventory=Staging->GetSnapshot();
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("전투 테스트");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");Initial.Inventory=Staging->GetSnapshot();
     FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;P.UnlockedSkillIDs.Add(Initial.FirstSkill);Initial.Characters.Add(P.CharacterId,P);
     TestTrue(TEXT("Real world state initializes"),State->RestoreState(Initial));
     TestTrue(TEXT("Player uses actual GAS state"),Player->InitializeState(P.CharacterId));Player->Inventory->BindWorldState(State);

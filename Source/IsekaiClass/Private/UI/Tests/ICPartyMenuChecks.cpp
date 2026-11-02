@@ -37,7 +37,7 @@ bool FICPartyMenuCheck::RunTest(const FString& Parameters)
     auto* Player=World->SpawnActor<AICPlayerCharacter>();Player->EnableCombat(true,true);PC->Possess(Player);
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(D,0);
-    FICWorldState Data;Data.bPlayerCreated=true;Data.PlayerName=TEXT("실제 파티 플레이어");Data.Preset=1;Data.FirstSkill=TEXT("SKL_START_SWORD_001");Data.Inventory=Staging->GetSnapshot();
+    FICWorldState Data;Data.bPlayerCreated=true;Data.PlayerName=TEXT("실제 파티 플레이어");Data.Preset=1;Data.FirstSkill=TEXT("SKL_NPC_R01_002");Data.Inventory=Staging->GetSnapshot();
     FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;P.MainStats.STR=12;Data.Characters.Add(P.CharacterId,P);
     TestTrue(TEXT("Actual player data initializes"),State->RestoreState(Data));TestTrue(TEXT("Live player initializes"),Player->InitializeState(P.CharacterId));Player->Inventory->BindWorldState(State);
     PC->bCreated=true;PC->Menu=TEXT("Pause");

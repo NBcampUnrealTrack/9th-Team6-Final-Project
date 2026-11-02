@@ -34,7 +34,7 @@ class UInputMappingContext;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayerCombatRequest,FName,Action,int32,Slot);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayerInitialized,FName,JobID,FName,FirstSkillID);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPlayerStatBookApplied,FName,TargetID,EPlayerMainStat,Stat,int32,Amount);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPlayerStatElixirApplied,FName,TargetID,EPlayerMainStat,Stat,int32,Amount);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerExhaustionChanged,bool,bExhausted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerSleepRequested,int32,GameMinutes);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerEquipmentStatsChanged,FPlayerEquipmentStats,Stats);
@@ -109,7 +109,7 @@ public:
     virtual void ReceivedPlayer() override;
     UPROPERTY(BlueprintAssignable) FPlayerCombatRequest OnCombatRequest;
     UPROPERTY(BlueprintAssignable) FPlayerInitialized OnPlayerInitialized;
-    UPROPERTY(BlueprintAssignable) FPlayerStatBookApplied OnStatBookApplied;
+    UPROPERTY(BlueprintAssignable) FPlayerStatElixirApplied OnStatElixirApplied;
     UPROPERTY(BlueprintAssignable) FPlayerExhaustionChanged OnExhaustionChanged;
     UPROPERTY(BlueprintAssignable) FPlayerSleepRequested OnSleepRequested;
     UPROPERTY(BlueprintAssignable) FPlayerEquipmentStatsChanged OnEquipmentStatsChanged;

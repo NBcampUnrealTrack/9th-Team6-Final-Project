@@ -9,6 +9,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimSequence.h"
 #include "Save/ICSaveGame.h"
 #include "Kismet/GameplayStatics.h"
 #include "Enemy/Character/ICEnemyBase.h"
@@ -29,6 +30,7 @@
 #include "Camera/CameraComponent.h"
 #include "Settings/ICGameUserSettings.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Components/BoxComponent.h"
 #include "EngineUtils.h"
 #include "AbilitySystemBlueprintLibrary.h"
@@ -124,7 +126,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASSkillEventCheck,"IC.GAS.SkillGameplayEven
 bool FICGASSkillEventCheck::RunTest(const FString& Parameters)
 {
     FGASFixture F;
-    const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"));
+    const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_NPC_R01_002"));
     auto* Row = F.Skills->FindRow<FICSkillRow>(F.SkillID,TEXT("GAS test"));
     if (!TestNotNull(TEXT("Fixture skill"),Row)) return false;
     Row->CooldownTag=Tag;
@@ -149,11 +151,26 @@ bool FICGASSkillAssetCheck::RunTest(const FString& Parameters)
     auto* Table=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Combat/DT_IC_Skill.DT_IC_Skill"));
     if (!TestNotNull(TEXT("Skill data table"),Table)) return false;
     TArray<FICSkillRow*> Rows;Table->GetAllRows(TEXT("GAS asset validation"),Rows);
-    TestEqual(TEXT("Authored skill count"),Rows.Num(),16);
-    for (const auto& Entry : TArray<TPair<FName,double>>{
-        {TEXT("SKL_START_SWORD_001"),20.}, {TEXT("SKL_START_BOW_001"),30.}, {TEXT("SKL_START_STAFF_001"),30.}})
-        if (const auto* Row=Table->FindRow<FICSkillRow>(Entry.Key,TEXT("Starter cooldown")))
-            TestEqual(Entry.Key.ToString()+TEXT(" cooldown seconds"),Row->CooldownPlaySeconds,Entry.Value);
+    TestEqual(TEXT("Players and NPCs share exactly eleven skill definitions"),Rows.Num(),11);
+    auto* Recruits=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Character/DT_IC_RecruitCombat"));
+    if(!TestNotNull(TEXT("NPC skill ownership table"),Recruits))return false;
+    for(int32 Index=1;Index<=11;++Index)
+    {
+        const FName SkillID(*FString::Printf(TEXT("SKL_NPC_R01_%03d"),Index));
+        const FName NPCID(*FString::Printf(TEXT("NPC_R01_%03d"),Index));
+        const auto* Row=Table->FindRow<FICSkillRow>(SkillID,TEXT("Shared NPC skill"));
+        if(!TestNotNull(SkillID.ToString(),Row))continue;
+        TestTrue(TEXT("Shared skills retain NPC ownership"),Row->OwnerType==EICSkillOwner::RecruitUnique&&Row->NPCID==NPCID);
+        bool Linked=false;
+        for(const auto& Pair:Recruits->GetRowMap())
+            if(const auto* Recruit=reinterpret_cast<const FICRecruitCombatRow*>(Pair.Value);Recruit->NPCID==NPCID)Linked=Recruit->UniqueSkillID==SkillID;
+        TestTrue(SkillID.ToString()+TEXT(" is the NPC's actual unique skill"),Linked);
+    }
+    auto* NewGame=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Settings/DT_IC_NewGame"));
+    const auto* Rules=NewGame?NewGame->FindRow<FICNewGameRow>(TEXT("CFG_NEWGAME_001"),TEXT("Shared initial skills")):nullptr;
+    if(TestNotNull(TEXT("New-game skill choices"),Rules))
+        for(FName ID:Rules->StartingSkills)
+            TestTrue(TEXT("New players start with an existing NPC skill"),ID.ToString().StartsWith(TEXT("SKL_NPC_"))&&Table->FindRow<FICSkillRow>(ID,TEXT("Initial skill")));
     for (const auto* Row:Rows)
     {
         const FString Label=Row->ID.ToString();
@@ -191,6 +208,80 @@ bool FICGASResourcesCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Load clears unsaved dodge retry"),F.ASC->RequestAction(TEXT("Dodge"),NAME_None,nullptr).bSuccess);F.ASC->CancelAction();
     return !HasAnyErrors();
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICDodgeRecoveryCheck,"IC.GAS.DodgeAnimationAndRecovery",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICDodgeRecoveryCheck::RunTest(const FString&)
+{
+    FGASFixture F;
+    for(const FString Gender:{FString(TEXT("Male")),FString(TEXT("Female"))})
+    {
+        const FString Suffix=Gender==TEXT("Male")?TEXT("M"):TEXT("F");
+        auto* Mesh=LoadObject<USkeletalMesh>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Player/SamplePlayer/%s/SK_Player_%s"),*Gender,*Suffix));
+        auto* Profile=LoadObject<UICCharacterAnimationProfile>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Animation/Player/Main%s/DA_ANIM_PLAYER_%s"),*Gender,*Suffix));
+        if(!TestNotNull(TEXT("Dodge mesh"),Mesh)||!TestNotNull(TEXT("Dodge animation profile"),Profile))return false;
+        F.Player->AnimationProfile=Profile;F.Player->GetMesh()->SetSkeletalMesh(Mesh);F.Player->GetMesh()->SetAnimInstanceClass(UICCharacterAnimInstance::StaticClass());
+        auto* Anim=F.Player->GetMesh()->GetAnimInstance();
+        if(!TestNotNull(TEXT("Dodge anim instance"),Anim))return false;
+        for(int32 Direction=0;Direction<8;++Direction)
+        {
+            F.ASC->ResetExecutionForLoad();F.Player->SetActorLocation({0,0,100});F.Player->SetActorRotation(FRotator::ZeroRotator);
+            F.Player->MovementIntent=FRotator(0,45.f*Direction,0).Vector();
+            const auto Action=F.ASC->RequestAction(TEXT("Dodge"),NAME_None,nullptr);
+            if(!TestTrue(TEXT("Directional dodge starts"),Action.bSuccess))return false;
+            auto* Montage=Anim->GetCurrentActiveMontage();
+            if(!TestNotNull(TEXT("Directional dodge montage plays"),Montage))return false;
+            auto* MontageInstance=Anim->GetActiveInstanceForMontage(Montage);
+            if(!TestNotNull(TEXT("Directional dodge montage instance"),MontageInstance))return false;
+            const int32 MontageInstanceID=MontageInstance->GetInstanceID();
+            TestEqual(TEXT("Input selects the matching directional clip"),Montage,Profile->Unarmed.DirectionalDodges[Direction].Get());
+            TestEqual(TEXT("Dodge runs the authored clip at double speed"),Anim->Montage_GetPlayRate(Montage),2.f);
+            const double AuthoredDuration=Montage->GetPlayLength()/(Montage->RateScale*2.);
+            const auto& Segment=Montage->SlotAnimTracks[0].AnimTrack.AnimSegments[0];
+            const auto* Sequence=Cast<UAnimSequence>(Segment.GetAnimReference());
+            if(!TestNotNull(TEXT("Authored dodge sequence"),Sequence))return false;
+            const FVector RootEnd=Sequence->ExtractRootMotionFromRange(0,Sequence->GetPlayLength(),FAnimExtractContext()).GetTranslation();
+            const double DistanceScale=FICCombatSettingsRow().PlayerDodgeDistanceScale;
+            const double AuthoredDistance=RootEnd.Size2D()*DistanceScale;
+            const auto Step=[&](double Seconds)
+            {
+                const int32 Frames=FMath::RoundToInt(Seconds/.025);
+                for(int32 Frame=0;Frame<Frames;++Frame)
+                {
+                    F.Step(.025);F.Player->GetMesh()->TickAnimation(.025f,false);F.Player->GetMesh()->RefreshBoneTransforms();
+                }
+            };
+            const FVector Start=F.Player->GetActorLocation();const auto SP=F.ASC->Capture().SP;
+            Step(.125);const double Early=FVector::Dist2D(Start,F.Player->GetActorLocation());
+            const FVector EarlyRoot=Sequence->ExtractRootMotionFromRange(0,.25*Montage->RateScale,FAnimExtractContext()).GetTranslation();
+            TestTrue(TEXT("Dodge anticipation follows the scaled authored root curve at double speed"),FMath::IsNearlyEqual(Early,FVector::DotProduct(EarlyRoot,RootEnd.GetSafeNormal2D())*DistanceScale,DistanceScale));
+            F.Time->SetMenuPaused(true);const FVector Paused=F.Player->GetActorLocation();F.Step(1);
+            TestEqual(TEXT("Menu pause preserves the dodge position"),F.Player->GetActorLocation(),Paused);
+            TestEqual(TEXT("Menu pause preserves the action"),F.ASC->GetActionID(),Action.ActionID);F.Time->SetMenuPaused(false);
+            Step(.15);
+            TestTrue(TEXT("Animation remains active beyond the old .25s cut"),Anim->Montage_IsPlaying(Montage));
+            TestEqual(TEXT("Recovery still belongs to this dodge"),F.ASC->GetActionID(),Action.ActionID);
+            const FVector RootNow=Sequence->ExtractRootMotionFromRange(0,.55*Montage->RateScale,FAnimExtractContext()).GetTranslation();
+            const double Expected=FVector::DotProduct(RootNow,RootEnd.GetSafeNormal2D())*DistanceScale;
+            TestTrue(TEXT("Capsule follows the scaled root distance at the matching animation time"),FMath::IsNearlyEqual(FVector::Dist2D(Start,F.Player->GetActorLocation()),Expected,DistanceScale));
+            Step(AuthoredDuration-.325);
+            TestFalse(TEXT("Planted recovery is vulnerable"),F.ASC->HasMatchingGameplayTag(ICTags::Invulnerable));
+            TestTrue(TEXT("Planted recovery blends back into movement before the clip ends"),F.ASC->CanAcceptMovementInput());
+            TestTrue(TEXT("Recovery keeps the combat movement context until the action ends"),F.ASC->HasRecentCombat());
+            const auto* Blending=Anim->GetMontageInstanceForID(MontageInstanceID);
+            TestTrue(TEXT("Recovery keeps a fading montage pose while movement resumes"),Blending&&Blending->GetWeight()>0.f&&Blending->GetWeight()<1.f);
+            FICAttackCapture Damage;Damage.Magnitude=1;
+            TestTrue(TEXT("Recovery can take damage after invulnerability"),F.ASC->ApplyDamage(Damage,nullptr,false,false,false,false));
+            Step(.10);TestTrue(TEXT("Dodge applies the configured 15 percent travel extension"),FMath::IsNearlyEqual(FVector::Dist2D(Start,F.Player->GetActorLocation()),AuthoredDistance,.1));
+            TestTrue(TEXT("Dodge direction preserves actor facing"),F.Player->GetActorRotation().IsNearlyZero());
+            const FVector Recovery=F.Player->GetActorLocation();Step(.125);
+            TestEqual(TEXT("Recovery does not add sliding"),F.Player->GetActorLocation(),Recovery);
+            TestFalse(TEXT("Dodge finishes after recovery"),F.ASC->GetActionID().IsValid());
+            TestFalse(TEXT("Dodge clears its movement lock"),F.ASC->HasMatchingGameplayTag(ICTags::Dodging));
+            TestEqual(TEXT("Dodge has no SP cost"),F.ASC->Capture().SP,SP);
+        }
+    }
+    return !HasAnyErrors();
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICGASEffectCheck,"IC.GAS.EffectCaptureAndOffline",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FICGASEffectCheck::RunTest(const FString& Parameters)
 {
@@ -304,10 +395,10 @@ void ConfigureInputWeapons(FGASFixture& F)
     FICEquipmentRow BowGear=SwordGear;BowGear.ID=BowItem.EquipmentID;BowGear.ItemID=BowItem.ID;BowGear.WeaponFamily=EICWeaponFamily::Bow;BowGear.RequiredClass=EICCharacterClass::Archer;
     F.Table<FICEquipmentRow>(EICDefinitionType::Equipment,{SwordGear,BowGear});
     auto SwordSkill=*F.Skills->FindRow<FICSkillRow>(F.SkillID,TEXT("Input"));SwordSkill.Purpose=EICSkillPurpose::Heal;SwordSkill.RequiredWeaponFamily=EICWeaponFamily::Sword;SwordSkill.bRequiresEquippedWeapon=true;SwordSkill.TargetRules.Target=EICCombatTarget::PartyMember;SwordSkill.TargetRules.bAllowCaster=true;
-    SwordSkill.CooldownTag=FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"));
+    SwordSkill.CooldownTag=FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_NPC_R01_002"));
     F.Skills->AddRow(SwordSkill.ID,SwordSkill);
     auto BowSkill=SwordSkill;BowSkill.ID=TEXT("SKL_INPUT_997");BowSkill.ClassID=Bow.ID;BowSkill.RequiredWeaponFamily=EICWeaponFamily::Bow;BowSkill.CooldownPlaySeconds=7;
-    BowSkill.CooldownTag=FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_BOW_001"));
+    BowSkill.CooldownTag=FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_NPC_R01_004"));
     F.Skills->AddRow(BowSkill.ID,BowSkill);
     F.Definitions->ConfigureCatalog(F.Catalog);
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(F.Definitions,0);
@@ -327,8 +418,8 @@ bool FICInputWeaponCheck::RunTest(const FString& Parameters)
     const auto Sword=F.ASC->RequestAction(TEXT("Skill"),F.SkillID,F.Player);
     TestTrue(TEXT("Sword skill activates"),Sword.bSuccess);
     TestTrue(TEXT("Sword effect commits its own cooldown"),F.ASC->NotifyCombatEvent(Sword.ActionID,TEXT("AN_HitStart"),0));
-    TestTrue(TEXT("Sword cooldown GE owns sword tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"))));
-    TestFalse(TEXT("Sword cooldown GE does not own bow tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_BOW_001"))));
+    TestTrue(TEXT("Sword cooldown GE owns sword tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_NPC_R01_002"))));
+    TestFalse(TEXT("Sword cooldown GE does not own bow tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_NPC_R01_004"))));
     F.ASC->CancelAction();
     const double SwordCooldown=F.ASC->GetSkillCooldownRemaining(F.SkillID);
     TestTrue(TEXT("Changing weapon ignores the original class restriction"),Inventory->CycleWeapon());
@@ -339,8 +430,8 @@ bool FICInputWeaponCheck::RunTest(const FString& Parameters)
     const auto Bow=F.ASC->RequestAction(TEXT("Skill"),BowID,F.Player);
     TestTrue(TEXT("Sword cooldown does not block bow skill"),Bow.bSuccess);
     TestTrue(TEXT("Bow starts an independent cooldown"),F.ASC->NotifyCombatEvent(Bow.ActionID,TEXT("AN_HitStart"),0));
-    TestTrue(TEXT("Bow cooldown GE owns bow tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_BOW_001"))));
-    TestTrue(TEXT("Bow does not remove sword GE"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_START_SWORD_001"))));
+    TestTrue(TEXT("Bow cooldown GE owns bow tag"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_NPC_R01_004"))));
+    TestTrue(TEXT("Bow does not remove sword GE"),F.ASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(TEXT("IC.Cooldown.SKL_NPC_R01_002"))));
     F.ASC->CancelAction();
     TestTrue(TEXT("Skill can be unequipped during its cooldown"),F.ASC->EquipWeaponSkill(EICWeaponFamily::Bow,NAME_None));
     TestTrue(TEXT("Empty skill slot stays empty"),F.ASC->GetCurrentWeaponSkill().IsNone());
@@ -412,6 +503,56 @@ bool FICWeaponCycleSaveCheck::RunTest(const FString&)
     TestEqual(TEXT("An unequipped sword in the bag is skipped"),Inventory->GetEquippedWeaponFamily(),EICWeaponFamily::Bow);
     TestEqual(TEXT("The unequipped sword instance remains owned"),Inventory->GetSnapshot().Bag.Slots[0].InstanceID,SwordID);
     TestTrue(TEXT("Sword equipment slot is now empty"),Inventory->GetWeaponLoadout()[0].IsEmpty());
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICWeaponMovingLegsCheck,"IC.Input.WeaponSwitchKeepsLocomotion",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICWeaponMovingLegsCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureInputWeapons(F);
+    auto* Player=F.Player;auto* Body=Player->GetMesh();auto* Inventory=Player->Inventory.Get();
+    for(const FString Gender:{FString(TEXT("Male")),FString(TEXT("Female"))})
+    {
+        const FString Suffix=Gender==TEXT("Male")?TEXT("M"):TEXT("F");
+        auto* Mesh=LoadObject<USkeletalMesh>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Player/SamplePlayer/%s/SK_Player_%s"),*Gender,*Suffix));
+        auto* Profile=LoadObject<UICCharacterAnimationProfile>(nullptr,*FString::Printf(TEXT("/Game/IsekaiClass/Animation/Player/Main%s/DA_ANIM_PLAYER_%s"),*Gender,*Suffix));
+        if(!TestNotNull(TEXT("Moving weapon mesh"),Mesh)||!TestNotNull(TEXT("Moving weapon profile"),Profile))return false;
+        Player->AnimationProfile=Profile;
+        for(const float Speed:{250.f,675.f})for(const bool Drawing:{true,false})
+        {
+            Player->CancelWeaponTransition();F.ASC->ResetExecutionForLoad();
+            if(Drawing)Inventory->SetWeaponSheathed(true);
+            else for(int32 Attempt=0;Attempt<6&&Inventory->GetEquippedWeaponFamily()!=EICWeaponFamily::Bow;++Attempt)Inventory->CycleWeapon();
+            Body->SetSkeletalMesh(Mesh);Body->SetAnimInstanceClass(nullptr);Body->SetAnimInstanceClass(UICCharacterAnimInstance::StaticClass());
+            auto* Reference=NewObject<USkeletalMeshComponent>(Player);Reference->RegisterComponent();
+            Reference->SetSkeletalMesh(Mesh);Reference->SetAnimInstanceClass(UICCharacterAnimInstance::StaticClass());
+            Player->GetCharacterMovement()->SetMovementMode(MOVE_Walking);Player->GetCharacterMovement()->Velocity=FVector(Speed,0,0);
+            Player->bSprintHeld=Speed>450.f;
+            const auto TickBoth=[&]()
+            {
+                Body->TickAnimation(.025f,false);Reference->TickAnimation(.025f,false);
+                Body->RefreshBoneTransforms();Reference->RefreshBoneTransforms();
+            };
+            for(int32 Frame=0;Frame<20;++Frame)TickBoth();
+            if(!TestTrue(TEXT("Moving draw/sheathe starts"),Player->RequestCycleWeapon())){Reference->DestroyComponent();return false;}
+            if(Player->bSprintHeld)TestTrue(TEXT("Weapon switching keeps held sprint active"),Player->IsSprinting());
+            bool LegsMoved=false,UpperBodyChanged=false;double LargestLegError=0;FQuat PreviousLeg=FQuat::Identity;
+            const auto& Ref=Mesh->GetRefSkeleton();const int32 Leg=Ref.FindBoneIndex(TEXT("J_Bip_L_UpperLeg"));
+            for(int32 Frame=0;Frame<8;++Frame)
+            {
+                TickBoth();const auto& Pose=Body->GetBoneSpaceTransforms();const auto& Base=Reference->GetBoneSpaceTransforms();
+                for(const FName Name:{FName(TEXT("J_Bip_C_Hips")),FName(TEXT("J_Bip_L_UpperLeg")),FName(TEXT("J_Bip_R_UpperLeg")),FName(TEXT("J_Bip_L_LowerLeg")),FName(TEXT("J_Bip_R_LowerLeg")),FName(TEXT("J_Bip_L_Foot")),FName(TEXT("J_Bip_R_Foot"))})
+                {const int32 Bone=Ref.FindBoneIndex(Name);if(Pose.IsValidIndex(Bone)&&Base.IsValidIndex(Bone))LargestLegError=FMath::Max(LargestLegError,double(Pose[Bone].GetRotation().AngularDistance(Base[Bone].GetRotation())));}
+                if(Pose.IsValidIndex(Leg)){if(Frame>0)LegsMoved|=Pose[Leg].GetRotation().AngularDistance(PreviousLeg)>.005;PreviousLeg=Pose[Leg].GetRotation();}
+                for(const FName Name:{FName(TEXT("J_Bip_L_UpperArm")),FName(TEXT("J_Bip_R_UpperArm"))})
+                {const int32 Bone=Ref.FindBoneIndex(Name);if(Pose.IsValidIndex(Bone)&&Base.IsValidIndex(Bone))UpperBodyChanged|=Pose[Bone].GetRotation().AngularDistance(Base[Bone].GetRotation())>.01;}
+            }
+            TestTrue(TEXT("Legs match the uninterrupted locomotion pose"),LargestLegError<.002);
+            TestTrue(TEXT("Legs keep taking steps during weapon switching"),LegsMoved);
+            TestTrue(TEXT("Upper body still performs the weapon transition"),UpperBodyChanged);
+            Player->CancelWeaponTransition();Reference->DestroyComponent();
+        }
+    }
     return !HasAnyErrors();
 }
 

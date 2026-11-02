@@ -29,7 +29,7 @@ struct FSession
     {
         GI->InitializeStandalone();World=GI->GetWorld();World->InitializeActorsForPlay(FURL(),false);
         State=GI->GetSubsystem<UICWorldStateSubsystem>();Definitions=GI->GetSubsystem<UICDefinitionSubsystem>();Time=GI->GetSubsystem<UICTimeSubsystem>();
-        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("생활 확장 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");Initial.Gold=10000;
+        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("생활 확장 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");Initial.Gold=10000;
         FICCharacterState Character;Character.CharacterId=UICWorldStateSubsystem::PlayerId();Character.Kind=EICCharacterKind::Player;Initial.Characters.Add(Character.CharacterId,Character);
         State->RestoreState(Initial);State->EnsureCharacter(TEXT("NPC_R01_006"),EICCharacterKind::Recruitable);
         PC=World->SpawnActor<AICPlayerController>();Player=World->SpawnActor<AICPlayerCharacter>();PC->Possess(Player);PC->bCreated=true;PC->Menu.Reset();

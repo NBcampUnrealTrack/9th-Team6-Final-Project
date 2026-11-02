@@ -97,6 +97,9 @@ public:
                 Test->TestTrue(TEXT("Black margin does not activate the start button"),PC->Menu!=TEXT("Create"));
             }
             Click(Client->GetWindow(),Center);
+            Test->TestTrue(TEXT("Clicking a menu never hides its cursor"),PC->bShowMouseCursor);
+            Test->TestEqual(TEXT("Menu clicks do not capture the mouse"),Client->GetMouseCaptureMode(),EMouseCaptureMode::NoCapture);
+            Test->TestFalse(TEXT("Menu capture never hides the cursor"),Client->HideCursorDuringCapture());
             Stage=2;StageAt=FPlatformTime::Seconds();return false;
         }
         Test->TestTrue(TEXT("Real mouse coordinates activate the visible button after resize"),PC->Menu==TEXT("Create")&&PC->CharacterCreateScreen!=nullptr);

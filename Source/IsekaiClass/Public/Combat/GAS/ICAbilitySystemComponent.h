@@ -118,6 +118,8 @@ private:
     double StartedAt = 0, RecentCombatAt = -100, DodgeReadyAt = 0, StaggerReadyAt = 0, StaggerUntil = 0;
     double ActionEndsAt = 0;
     double MovementCooldownDuration = 0, MovementDuration = 0, MovementDistance = 0, MovementAlpha = 0;
+    double DodgeInvulnerableUntil = 0;
+    TArray<double> DodgeMovementCurve;
     int32 ComboIndex = 0;
     EICWeaponFamily ComboWeaponFamily = EICWeaponFamily::None;
     double AttackCancelStart = 0, AttackCancelEnd = 0;

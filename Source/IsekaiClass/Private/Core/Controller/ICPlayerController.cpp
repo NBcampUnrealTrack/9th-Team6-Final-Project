@@ -493,7 +493,7 @@ void AICPlayerController::SetMenu(const FString& RequestedMenu)
     Menu=NewMenu;
     if(auto* Saves=GetSaves())Saves->SetAutoSaveSuspended(bDead||NewMenu==TEXT("MainMenu")||NewMenu==TEXT("Loading")||NewMenu==TEXT("Prologue")||NewMenu==TEXT("Create")||NewMenu==TEXT("Save")||NewMenu==TEXT("Quit")||NewMenu==TEXT("Confirm")||bInitialSavePending||bSessionClosing);
     UpdateScreens();
-    InteractionHint.Empty();bShowMouseCursor=false;
+    InteractionHint.Empty();bShowMouseCursor=!NewMenu.IsEmpty();
     if(auto* Time=GetTime()){Time->SetRunning(bCreated&&!bDead);Time->SetMenuPaused(false);}
     UUserWidget* Focus=LoadingScreen?static_cast<UUserWidget*>(LoadingScreen.Get()):MapScreen?static_cast<UUserWidget*>(MapScreen.Get()):SettingsScreen?static_cast<UUserWidget*>(SettingsScreen.Get()):SessionSaveLoadScreen?static_cast<UUserWidget*>(SessionSaveLoadScreen.Get()):DeathScreen?static_cast<UUserWidget*>(DeathScreen.Get()):CharacterCreateScreen&&CharacterCreateScreen->IsActivated()?static_cast<UUserWidget*>(CharacterCreateScreen.Get()):IsMainMenuLevel()?static_cast<UUserWidget*>(MainMenuWidget.Get()):static_cast<UUserWidget*>(Screen.Get());
     if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->SetMenuContext(this,Focus,!NewMenu.IsEmpty()&&NewMenu!=TEXT("Dialogue"));

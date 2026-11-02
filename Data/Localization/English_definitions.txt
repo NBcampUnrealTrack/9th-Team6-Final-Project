@@ -15,7 +15,7 @@
 308|Gacha Machine
 309|Pay gold to receive a random item.
 310|Gathered Materials
-311|Growth Books
+311|Elixirs
 312|Any Kind of Fish
 414|Player Plot 1
 415|Player Plot 2

@@ -76,7 +76,7 @@ struct FOpenWorldUIFixture
         PC=World->SpawnActor<AICPlayerController>();FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));
         Player=World->SpawnActor<AICPlayerCharacter>();Player->EnableCombat(true,true);PC->Possess(Player);
         State=GI->GetSubsystem<UICWorldStateSubsystem>();Definitions=GI->GetSubsystem<UICDefinitionSubsystem>();
-        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("워프검증");Initial.Gold=2000;Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("워프검증");Initial.Gold=2000;Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
         FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;Initial.Characters.Add(P.CharacterId,P);
         State->RestoreState(Initial);Player->InitializeState(P.CharacterId);Player->Inventory->BindWorldState(State);
         PC->bCreated=true;PC->Menu=TEXT("");

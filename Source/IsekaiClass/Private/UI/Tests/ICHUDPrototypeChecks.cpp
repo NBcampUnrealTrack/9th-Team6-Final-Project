@@ -169,7 +169,7 @@ bool FICHUDPrototypeCheck::RunTest(const FString& Parameters)
         FICWorldState Data;
         Data.bPlayerCreated = true;
         Data.PlayerName = TEXT("실제이름");
-        Data.FirstSkill = TEXT("SKL_START_SWORD_001");
+        Data.FirstSkill = TEXT("SKL_NPC_R01_002");
         FICCharacterState Character;
         Character.CharacterId = UICWorldStateSubsystem::PlayerId();
         Character.Kind = EICCharacterKind::Player;

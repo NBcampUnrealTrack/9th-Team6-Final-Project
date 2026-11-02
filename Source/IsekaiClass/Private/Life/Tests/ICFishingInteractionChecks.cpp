@@ -45,7 +45,7 @@ struct FSession
         World->InitializeActorsForPlay(FURL(),false);
         PC=World->SpawnActor<AICPlayerController>();FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));
         Pawn=World->SpawnActor<AICPlayerCharacter>();Pawn->EnableCombat(true,true);PC->Possess(Pawn);PC->bCreated=true;PC->Menu.Empty();
-        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("낚시 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("낚시 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
         FICCharacterState PlayerState;PlayerState.CharacterId=UICWorldStateSubsystem::PlayerId();PlayerState.Kind=EICCharacterKind::Player;
         Initial.Characters.Add(PlayerState.CharacterId,PlayerState);
         auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();State->RestoreState(Initial);Pawn->InitializeState(PlayerState.CharacterId);Pawn->Inventory->BindWorldState(State);

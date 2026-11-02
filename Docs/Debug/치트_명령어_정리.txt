@@ -31,8 +31,8 @@ ICGiveItem <아이템ID> <수량>
       밀 10개 지급.
   예: ICGiveItem ITM_R01_CHICKEN_MEAT 5
       닭고기 5개 지급.
-  예: ICGiveItem ITM_BOOK_001 1
-      초급 근력의 서 1개 지급.
+  예: ICGiveItem ITM_ELIXIR_001 1
+      초급 근력 엘릭서 1개 지급.
   예: ICGiveItem EQP_WPN_SWORD_001 1
       초보자 검 1개 지급.
 

@@ -52,7 +52,7 @@ bool FICGiftTransactionCheck::RunTest(const FString&)
     auto* Definitions=GI->GetSubsystem<UICDefinitionSubsystem>();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(Definitions,0);
     TestTrue(TEXT("Gift item is a valid inventory item"),Staging->AddItem(TEXT("ITM_R01_FOOD_15"),3,false));
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("선물 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");Initial.Inventory=Staging->GetSnapshot();
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("선물 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");Initial.Inventory=Staging->GetSnapshot();
     FICCharacterState PlayerState;PlayerState.CharacterId=UICWorldStateSubsystem::PlayerId();PlayerState.Kind=EICCharacterKind::Player;
     PlayerState.UnlockedSkillIDs.Add(Initial.FirstSkill);Initial.Characters.Add(PlayerState.CharacterId,PlayerState);
     TestTrue(TEXT("Initial world restored"),State->RestoreState(Initial));
