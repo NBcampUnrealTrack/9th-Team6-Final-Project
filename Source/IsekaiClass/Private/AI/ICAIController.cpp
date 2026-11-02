@@ -1,6 +1,7 @@
 #include "AI/ICAIController.h"
 #include "StateTree.h"
 #include "NPC/Character/ICNPCBase.h"
+#include "NPC/Behavior/ICNPCHomeBehaviorComponent.h"
 #include "Enemy/Character/ICEnemyBase.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Combat/GAS/ICGameplayTags.h"
@@ -15,6 +16,7 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "Debug/ICLog.h"
 AICAIController::AICAIController()
 {
@@ -104,6 +106,27 @@ void AICAIController::RestoreScheduleFacing()
         return;
     }
 }
+bool AICAIController::RequestHomeBehaviorMove(const FVector& Goal, float AcceptanceRadiusCm)
+{
+    if (!GetPawn() || bInteractionHold) return false;
+    if (AICCharacterBase* ControlledCharacter = Cast<AICCharacterBase>(GetPawn()))
+        ControlledCharacter->GetCharacterMovement()->bOrientRotationToMovement = true;
+    return MoveToLocation(Goal, FMath::Max(10.f, AcceptanceRadiusCm), true, true, true, false, GetNonCompanionNavigationFilter()) != EPathFollowingRequestResult::Failed;
+}
+void AICAIController::StopHomeBehaviorMove()
+{
+    StopMovement();
+    if (AICCharacterBase* ControlledCharacter = Cast<AICCharacterBase>(GetPawn())) ControlledCharacter->GetCharacterMovement()->StopMovementImmediately();
+}
+void AICAIController::FaceHomeBehavior(const FRotator& Facing)
+{
+    if (AICCharacterBase* ControlledCharacter = Cast<AICCharacterBase>(GetPawn()))
+    {
+        ControlledCharacter->GetCharacterMovement()->bOrientRotationToMovement = false;
+        SetControlRotation(Facing);
+        ControlledCharacter->SetActorRotation(Facing);
+    }
+}
 void AICAIController::OnUnPossess() { IC_TRACE_FUNCTION();StopExecution();Super::OnUnPossess(); }
 bool AICAIController::TryRecoverCompanion(bool bPathFailure)
 {
@@ -158,6 +181,7 @@ void AICAIController::Decide()
         if(bInteractionHold){StopMovement();return;}
         const auto State=S->GetSnapshot(C->GetCharacterID());if(State.IsDowned()){StopExecution();return;}
         if(State.Mode==EICCharacterMode::Companion){DecideCompanionFollow(NPC);return;}
+        if (UICNPCHomeBehaviorComponent* HomeBehavior = NPC->GetHomeBehavior(); HomeBehavior && HomeBehavior->TickBehavior(*this)) return;
         constexpr float ArrivalDistanceCm=150.f;
         FVector Goal;FRotator GoalRotation=FRotator::ZeroRotator;bool HasGoal=false;
         {

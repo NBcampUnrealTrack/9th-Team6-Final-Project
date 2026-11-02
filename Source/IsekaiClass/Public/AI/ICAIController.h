@@ -42,6 +42,10 @@ public:
 
     void RestoreScheduleFacing();
     bool IsInteractionHeld() const { return bInteractionHold; }
+    /** HomeBehaviorComponent가 일반 스케줄 이동을 대신할 때만 쓰는 이동 API. */
+    bool RequestHomeBehaviorMove(const FVector& Goal, float AcceptanceRadiusCm);
+    void StopHomeBehaviorMove();
+    void FaceHomeBehavior(const FRotator& Facing);
     bool TryRecoverCompanion(bool bPathFailure=false);
     /** Used by every non-companion AI path request. Companions intentionally retain the default filter. */
     TSubclassOf<UNavigationQueryFilter> GetNonCompanionNavigationFilter() const;

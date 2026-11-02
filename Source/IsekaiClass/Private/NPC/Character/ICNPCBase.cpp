@@ -25,6 +25,7 @@
 #include "EngineUtils.h"
 #include "UI/Quest/ICNPCQuestMarkerWidget.h"
 #include "NPC/LifeObject/ICLifeObjectUserComponent.h"
+#include "NPC/Behavior/ICNPCHomeBehaviorComponent.h"
 #include "AI/ICNPCAIController.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Kismet/GameplayStatics.h"
@@ -41,6 +42,7 @@ AICNPCBase::AICNPCBase()
     QuestMarker->SetRelativeLocation(FVector(0,0,125));
     QuestMarker->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     LifeObjectUser=CreateDefaultSubobject<UICLifeObjectUserComponent>(TEXT("LifeObjectUser"));
+    HomeBehavior=CreateDefaultSubobject<UICNPCHomeBehaviorComponent>(TEXT("HomeBehavior"));
 
     auto* Movement=GetCharacterMovement();
     Movement->MaxWalkSpeed=ScheduleMoveSpeed;
