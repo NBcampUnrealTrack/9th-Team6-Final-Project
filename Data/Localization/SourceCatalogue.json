@@ -87,65 +87,65 @@
     "ST_IC_Definitions:RCP_CRAFT_WAND_001.NAME",
     "ST_IC_Definitions:EQP_WPN_WAND_001.DESCRIPTION"
   ],
-  "초급 근력의 서": [
-    "ST_IC_Definitions:ITM_BOOK_001.NAME",
-    "ST_IC_Definitions:ITM_BOOK_001.DESCRIPTION"
+  "초급 근력 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_001.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_001.DESCRIPTION"
   ],
-  "중급 근력의 서": [
-    "ST_IC_Definitions:ITM_BOOK_002.NAME",
-    "ST_IC_Definitions:ITM_BOOK_002.DESCRIPTION"
+  "중급 근력 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_002.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_002.DESCRIPTION"
   ],
-  "고급 근력의 서": [
-    "ST_IC_Definitions:ITM_BOOK_003.NAME",
-    "ST_IC_Definitions:ITM_BOOK_003.DESCRIPTION"
+  "고급 근력 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_003.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_003.DESCRIPTION"
   ],
-  "초급 민첩의 서": [
-    "ST_IC_Definitions:ITM_BOOK_004.NAME",
-    "ST_IC_Definitions:ITM_BOOK_004.DESCRIPTION"
+  "초급 민첩 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_004.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_004.DESCRIPTION"
   ],
-  "중급 민첩의 서": [
-    "ST_IC_Definitions:ITM_BOOK_005.NAME",
-    "ST_IC_Definitions:ITM_BOOK_005.DESCRIPTION"
+  "중급 민첩 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_005.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_005.DESCRIPTION"
   ],
-  "고급 민첩의 서": [
-    "ST_IC_Definitions:ITM_BOOK_006.NAME",
-    "ST_IC_Definitions:ITM_BOOK_006.DESCRIPTION"
+  "고급 민첩 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_006.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_006.DESCRIPTION"
   ],
-  "초급 지력의 서": [
-    "ST_IC_Definitions:ITM_BOOK_007.NAME",
-    "ST_IC_Definitions:ITM_BOOK_007.DESCRIPTION"
+  "초급 지력 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_007.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_007.DESCRIPTION"
   ],
-  "중급 지력의 서": [
-    "ST_IC_Definitions:ITM_BOOK_008.NAME",
-    "ST_IC_Definitions:ITM_BOOK_008.DESCRIPTION"
+  "중급 지력 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_008.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_008.DESCRIPTION"
   ],
-  "고급 지력의 서": [
-    "ST_IC_Definitions:ITM_BOOK_009.NAME",
-    "ST_IC_Definitions:ITM_BOOK_009.DESCRIPTION"
+  "고급 지력 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_009.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_009.DESCRIPTION"
   ],
-  "초급 체력의 서": [
-    "ST_IC_Definitions:ITM_BOOK_010.NAME",
-    "ST_IC_Definitions:ITM_BOOK_010.DESCRIPTION"
+  "초급 체력 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_010.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_010.DESCRIPTION"
   ],
-  "중급 체력의 서": [
-    "ST_IC_Definitions:ITM_BOOK_011.NAME",
-    "ST_IC_Definitions:ITM_BOOK_011.DESCRIPTION"
+  "중급 체력 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_011.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_011.DESCRIPTION"
   ],
-  "고급 체력의 서": [
-    "ST_IC_Definitions:ITM_BOOK_012.NAME",
-    "ST_IC_Definitions:ITM_BOOK_012.DESCRIPTION"
+  "고급 체력 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_012.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_012.DESCRIPTION"
   ],
-  "초급 운의 서": [
-    "ST_IC_Definitions:ITM_BOOK_016.NAME",
-    "ST_IC_Definitions:ITM_BOOK_016.DESCRIPTION"
+  "초급 운 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_016.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_016.DESCRIPTION"
   ],
-  "중급 운의 서": [
-    "ST_IC_Definitions:ITM_BOOK_017.NAME",
-    "ST_IC_Definitions:ITM_BOOK_017.DESCRIPTION"
+  "중급 운 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_017.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_017.DESCRIPTION"
   ],
-  "고급 운의 서": [
-    "ST_IC_Definitions:ITM_BOOK_018.NAME",
-    "ST_IC_Definitions:ITM_BOOK_018.DESCRIPTION"
+  "고급 운 엘릭서": [
+    "ST_IC_Definitions:ITM_ELIXIR_018.NAME",
+    "ST_IC_Definitions:ITM_ELIXIR_018.DESCRIPTION"
   ],
   "체력 포션": [
     "ST_IC_Definitions:ITM_CONS_001.NAME",
@@ -1078,8 +1078,8 @@
   "채집물": [
     "ST_IC_Definitions:GAC_R01_BASIC_001.GATHERING"
   ],
-  "성장서": [
-    "ST_IC_Definitions:GAC_R01_BASIC_001.GROWTH_BOOK"
+  "엘릭서": [
+    "ST_IC_Definitions:GAC_R01_BASIC_001.GROWTH_ELIXIR"
   ],
   "물고기 아무 종류": [
     "ST_IC_Definitions:Recipe.AnyFish"
@@ -4178,7 +4178,7 @@
   "분류: 음식": [
     "ICInventoryOrganization.cpp"
   ],
-  "분류: 성장서": [
+  "분류: 엘릭서": [
     "ICInventoryOrganization.cpp"
   ],
   "분류: 재료": [

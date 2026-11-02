@@ -1,6 +1,8 @@
 #include "UI/Management/ICUIManagerSubsystem.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/PlayerController.h"
+#include "Core/Controller/ICPlayerController.h"
+#include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/GameInstance.h"
 #include "Time/ICTimeSubsystem.h"
@@ -182,16 +184,18 @@ void UICUIManagerSubsystem::RefreshContext()
             Focus = S.Widget.Get();
             Z = S.Z;
         }
-    const bool HasMenu=bMenuOpen||!Screens.IsEmpty();
-    PC->bShowMouseCursor=false;
-    PC->bEnableClickEvents=false;PC->bEnableMouseOverEvents=false;
+    const auto* GameController=Cast<AICPlayerController>(PC);
+    const bool HasMenu=bMenuOpen||!Screens.IsEmpty()||(GameController&&!GameController->Menu.IsEmpty());
+    PC->bShowMouseCursor=HasMenu;
+    PC->bEnableClickEvents=HasMenu;PC->bEnableMouseOverEvents=HasMenu;
     // These screens use focused-widget key navigation. A synthetic mouse click bypasses their A-key handlers.
     if(auto* Variable=IConsoleManager::Get().FindConsoleVariable(TEXT("CommonUI.ShouldVirtualAcceptSimulateMouseButton")))
         Variable->Set(0,ECVF_SetByGameOverride);
     if (HasMenu)
     {
         FInputModeGameAndUI Mode;
-        Mode.SetHideCursorDuringCapture(true);
+        Mode.SetHideCursorDuringCapture(false);
+        Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
         if (Focus)
         {
             Mode.SetWidgetToFocus(Focus->TakeWidget());
@@ -204,12 +208,16 @@ void UICUIManagerSubsystem::RefreshContext()
             PendingFocus=Desired?Desired:Focus;
         }
         PC->SetInputMode(Mode);
+        if(auto* Viewport=GetWorld()->GetGameViewport())
+        {Viewport->SetMouseCaptureMode(EMouseCaptureMode::NoCapture);Viewport->SetMouseLockMode(EMouseLockMode::DoNotLock);Viewport->SetHideCursorDuringCapture(false);}
     }
     else
     {
         PendingFocus.Reset();
         FInputModeGameOnly Mode;
         PC->SetInputMode(Mode);
+        if(auto* Viewport=GetWorld()->GetGameViewport())
+        {Viewport->SetMouseCaptureMode(EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown);Viewport->SetMouseLockMode(EMouseLockMode::LockOnCapture);}
     }
 }
 void UICUIManagerSubsystem::CloseAllScreens()

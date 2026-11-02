@@ -9,7 +9,7 @@ class AICWeaponActor;
 UENUM(BlueprintType)
 enum class EICItemTarget : uint8 { None , PlayerOnly , LivingParty , DownedCompanion , NonCompanionRecruit  };
 UENUM(BlueprintType)
-enum class EICItemEffect : uint8 { None , Recovery , GrowthBook , Revival , Dispel , Expansion  };
+enum class EICItemEffect : uint8 { None , Recovery , GrowthElixir , Revival , Dispel , Expansion  };
 UENUM(BlueprintType)
 enum class EICCodexProductCategory : uint8 { Automatic, Gathering, Farming, Fishing, Mining, Ranching };
 

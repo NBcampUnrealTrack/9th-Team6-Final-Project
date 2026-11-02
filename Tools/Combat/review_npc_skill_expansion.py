@@ -108,7 +108,7 @@ def tick(delta):
             assert menu.select_tab('Inventory')
             ui=u.WidgetLibrary.get_all_widgets_of_class(S['world'],u.ICInventoryMenuWidget,False)[0]
             S.update(menu=menu,inventory_ui=ui)
-            for identifier,count in [('ITM_BOOK_001',2),('ITM_R01_FOOD_01',2),('ITM_CONS_001',2)]:assert inventory.add_item(identifier,count,False)
+            for identifier,count in [('ITM_ELIXIR_001',2),('ITM_R01_FOOD_01',2),('ITM_CONS_001',2)]:assert inventory.add_item(identifier,count,False)
             assert len(ui.get_editor_property('members'))==4
             gold=str(ui.get_editor_property('TXT_Gold').get_text())
             assert int(''.join(c for c in gold if c.isdigit()))==state.export_state().gold,gold
@@ -123,19 +123,19 @@ def tick(delta):
             phase('inventory');return
         ui=S['inventory_ui'];inv=S['inventory'];state=S['state']
         if S['phase']=='inventory' and elapsed>.6:
-            capture('InventoryGoldAndParty');open_item('ITM_BOOK_001');phase('book');return
+            capture('InventoryGoldAndParty');open_item('ITM_ELIXIR_001');phase('book');return
         if S['phase']=='book' and elapsed>.35:
-            capture('GrowthBookUse');press('Enter')
+            capture('GrowthElixirUse');press('Enter')
             assert ui.get_editor_property('picking_use_target')
             assert len(ui.get_editor_property('UseTargets').get_editor_property('members'))==4
             S['book_str']=state.get_snapshot('NPC_R01_002').main_stats.str
-            S['book_count']=inv.count_item('ITM_BOOK_001')
+            S['book_count']=inv.count_item('ITM_ELIXIR_001')
             phase('targets');return
         if S['phase']=='targets' and elapsed>.4:
             capture('UsePartyTargets');press('D');press('D');press('Enter')
             assert not ui.get_editor_property('picking_use_target')
             assert state.get_snapshot('NPC_R01_002').main_stats.str==S['book_str']+1
-            assert inv.count_item('ITM_BOOK_001')==S['book_count']-1
+            assert inv.count_item('ITM_ELIXIR_001')==S['book_count']-1
             S['checks']['book_use_keyboard_selects_companion']=True
             open_item('ITM_R01_FOOD_01');press('Enter')
             before=inv.count_item('ITM_R01_FOOD_01')

@@ -45,7 +45,7 @@ struct FSession
         GI->InitializeStandalone();World=GI->GetWorld();auto& Context=*GEngine->GetWorldContextFromWorld(World);
         auto* Viewport=NewObject<UGameViewportClient>(GEngine);Context.GameViewport=Viewport;Viewport->Init(Context,GI,false);
         World->InitializeActorsForPlay(FURL(),false);State=GI->GetSubsystem<UICWorldStateSubsystem>();
-        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("Party follow");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+        FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("Party follow");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
         FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;Initial.Characters.Add(P.CharacterId,P);State->RestoreState(Initial);
         PC=World->SpawnActor<AICPlayerController>();FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));
         Player=World->SpawnActor<AICPlayerCharacter>();Player->EnableCombat(true,true);PC->Possess(Player);PC->bCreated=true;PC->Menu.Empty();

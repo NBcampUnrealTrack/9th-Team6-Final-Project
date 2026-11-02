@@ -167,11 +167,27 @@ void AICLifeActor::RefreshLife()
     }
     if(auto* Widget=LifeLabel->GetUserWidgetObject())if(auto* Text=Cast<UTextBlock>(Widget->GetWidgetFromName(TEXT("LifeLabelText"))))Text->SetText(GetInteractionText());
 }
+bool AICLifeActor::CanPlantCrop(AICPlayerController* Controller,FName CropID,FText& Failure) const
+{
+    Failure=FText::GetEmpty();
+    if(!Controller||!GetGameInstance()||Controller->GetWorld()!=GetWorld()||LifeType!=EICDefinitionType::Crop||!bPlantingPlot)
+    {Failure=NSLOCTEXT("ICFarm","InvalidPlot","씨앗을 심을 수 있는 밭이 아닙니다.");return false;}
+    FICDefinitionResult Result;
+    const auto* Crop=GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>()->Find<FICCropRow>(CropID,Result);
+    if(!Crop){Failure=NSLOCTEXT("ICFarm","InvalidCrop","심을 작물 정보를 찾을 수 없습니다.");return false;}
+    if(!Crop->AllowedPlotAnchorIDs.IsEmpty()&&!Crop->AllowedPlotAnchorIDs.Contains(PointKey()))
+    {Failure=NSLOCTEXT("ICFarm","PlotRestricted","이 밭에는 선택한 씨앗을 심을 수 없습니다.");return false;}
+    if(GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>()->ExportState().Crops.Contains(PointKey()))
+    {Failure=NSLOCTEXT("ICFarm","PlotOccupied","이미 작물이 심어진 밭입니다.");return false;}
+    if(!Controller->GetInventory()||Controller->GetInventory()->CountItem(Crop->SeedItemID)<1)
+    {Failure=NSLOCTEXT("ICFarm","NeedSeed","심을 씨앗이 부족합니다.");return false;}
+    return true;
+}
 bool AICLifeActor::Plant(AICPlayerController* Controller)
 {
-    if(!Controller||!GetGameInstance()||LifeType!=EICDefinitionType::Crop||!bPlantingPlot)return false;
+    FText Failure;if(!CanPlantCrop(Controller,DefinitionID,Failure))return false;
     auto* GI=GetGameInstance();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;
-    const auto* Crop=D->Find<FICCropRow>(DefinitionID,R);if(!Crop||(!Crop->AllowedPlotAnchorIDs.IsEmpty()&&!Crop->AllowedPlotAnchorIDs.Contains(PointKey()))||!State->FlushParticipants())return false;
+    const auto* Crop=D->Find<FICCropRow>(DefinitionID,R);if(!Crop||!State->FlushParticipants())return false;
     auto Next=State->ExportState();if(Next.Crops.Contains(PointKey()))return false;
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(D,Next.Job);
     if(!Staging->ApplySnapshot(Next.Inventory)||!Staging->Consume(Crop->SeedItemID,1))return false;
@@ -245,7 +261,12 @@ bool AICLifeActor::CompletePlayerAction(AICPlayerController* Controller,FName Cr
     if(!Controller||!GetGameInstance())return false;
     if(LifeType==EICDefinitionType::Resource)return CompleteResourceGather(Controller,Failure);
     if(!CropToPlant.IsNone())
-    {if(!bPlantingPlot)return false;DefinitionID=CropToPlant;const bool Done=Plant(Controller);if(!Done)RefreshLife();return Done;}
+    {
+        if(!CanPlantCrop(Controller,CropToPlant,Failure))return false;
+        DefinitionID=CropToPlant;const bool Done=Plant(Controller);
+        if(!Done){RefreshLife();Failure=NSLOCTEXT("ICFarm","PlantFailed","씨앗을 심지 못했습니다. 밭과 씨앗을 확인하고 다시 시도해 주세요.");}
+        return Done;
+    }
     if(LifeType==EICDefinitionType::FishingPoint)
     {
         auto* GI=GetGameInstance();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();FICDefinitionResult R;

@@ -31,7 +31,7 @@ bool FICCraftingStationCheck::RunTest(const FString&)
     auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* Time=GI->GetSubsystem<UICTimeSubsystem>();
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(D,0);
     for(const auto* ID:{TEXT("ITM_R01_ORE_06"),TEXT("ITM_R01_PLANT_10"),TEXT("ITM_R01_CROP_04"),TEXT("ITM_R01_FISH_04"),TEXT("ITM_R01_CROP_01")})Staging->AddItem(ID,10,false);
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("제작 UI 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");Initial.Inventory=Staging->GetSnapshot();
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("제작 UI 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");Initial.Inventory=Staging->GetSnapshot();
     FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;Initial.Characters.Add(P.CharacterId,P);
     TestTrue(TEXT("Crafting test state restores"),State->RestoreState(Initial));Player->InitializeState(P.CharacterId);Player->Inventory->BindWorldState(State);PC->bCreated=true;PC->Menu.Reset();Time->SetRunning(true);Time->SetMenuPaused(false);
     for(const auto* Kind:{TEXT("Crafting"),TEXT("Cooking")})
@@ -65,7 +65,7 @@ bool FICCraftingStationReachCheck::RunTest(const FString&)
     auto* PC=World->SpawnActor<AICPlayerController>();FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));
     auto* Player=World->SpawnActor<AICPlayerCharacter>();PC->Possess(Player);
     Player->EnableCombat(true,true);
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("주방 F키 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("주방 F키 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;Initial.Characters.Add(P.CharacterId,P);
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();State->RestoreState(Initial);Player->InitializeState(P.CharacterId);Player->Inventory->BindWorldState(State);
     PC->bCreated=true;PC->Menu.Reset();auto* Time=GI->GetSubsystem<UICTimeSubsystem>();Time->SetRunning(true);Time->SetMenuPaused(false);

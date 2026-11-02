@@ -151,7 +151,7 @@ bool AICPlayerController::UseInventoryItem(FName ItemID,FName Target,FText& Reas
         Applied=State->CommitGameplayTransaction(Next,FGuid::NewGuid());
     }
     if(!Applied)return Fail(ICText::Get(TEXT("Native_13ad4c07f5b9")));
-    if(Prepared.GrowthAmount>0)OnStatBookApplied.Broadcast(Target,Prepared.GrowthStat,Prepared.GrowthAmount);
+    if(Prepared.GrowthAmount>0)OnStatElixirApplied.Broadcast(Target,Prepared.GrowthStat,Prepared.GrowthAmount);
     UE_LOG(LogICInventory, Log, TEXT("[Item.Used] Item=%s Target=%s HP=%.2f MP=%.2f SP=%.2f Growth=%d"),*Prepared.ItemID.ToString(),*Target.ToString(),Prepared.Character.HP,Prepared.Character.MP,Prepared.Character.SP,Prepared.GrowthAmount);
     CancelTarget();SyncSaveSafety();return true;
 }

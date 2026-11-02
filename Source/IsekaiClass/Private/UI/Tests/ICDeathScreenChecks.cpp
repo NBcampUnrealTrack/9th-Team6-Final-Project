@@ -27,7 +27,7 @@ bool FICDeathScreenCheck::RunTest(const FString& Parameters)
     Context.GameViewport=Viewport;Viewport->Init(Context,GI,false);World->InitializeActorsForPlay(FURL(),false);
     auto* PC=World->SpawnActor<AICPlayerController>();FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* Time=GI->GetSubsystem<UICTimeSubsystem>();auto* Saves=GI->GetSubsystem<UICSaveSubsystem>();
-    FICWorldState Data;Data.bPlayerCreated=true;Data.PlayerName=TEXT("사망 검증");Data.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Data;Data.bPlayerCreated=true;Data.PlayerName=TEXT("사망 검증");Data.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Data.Characters.Add(Player.CharacterId,Player);
     TestTrue(TEXT("Isolated player state is valid"),State->RestoreState(Data));
     Saves->ConfigureServices(State,Time,TEXT("IC_Test_Death_")+FGuid::NewGuid().ToString(EGuidFormats::Digits));

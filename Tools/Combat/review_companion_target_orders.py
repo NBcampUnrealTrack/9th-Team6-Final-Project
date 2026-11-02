@@ -35,7 +35,7 @@ def tick(dt):
             assert u.GameUserSettings.get_game_user_settings().get_editor_property('GamepadLayout')==1;S['checks']['Xbox_is_default_layout']=True
             for a in actors(u.ICNPCBase)+actors(u.ICEnemyBase):stop(a)
             player.set_actor_location_and_rotation(u.Vector(-1000,-2500,96),u.Rotator(),False,True)
-            for i,item in enumerate(['ITM_BOOK_001']):
+            for i,item in enumerate(['ITM_ELIXIR_001']):
                 assert S['bag'].add_item(item,3,False);idx=next(n for n,v in enumerate(S['bag'].get_snapshot().bag.slots) if str(v.item_id)==item);assert S['bag'].bind_quick_slot(1,idx)
             phase('male_jump');return
         if S['phase']=='male_jump' and elapsed>.8:
@@ -62,7 +62,7 @@ def tick(dt):
                 assert S['bag'].cycle_weapon()
             key('Gamepad_DPad_Right');phase('target_stick');return
         if S['phase']=='target_stick' and elapsed>.2:
-            assert str(pc.get_editor_property('PendingItem'))=='ITM_BOOK_001';axis('Gamepad_LeftX',1);phase('target_stick_check');return
+            assert str(pc.get_editor_property('PendingItem'))=='ITM_ELIXIR_001';axis('Gamepad_LeftX',1);phase('target_stick_check');return
         if S['phase']=='target_stick_check' and elapsed>.3:
             axis('Gamepad_LeftX',0);S['selected']=str(pc.get_editor_property('PendingTargetID'));assert S['selected'].startswith('NPC_R01_'),S['selected'];key('Gamepad_FaceButton_Bottom');S['checks']['Xbox_DPad_quickslot_left_stick_party_target_A_use']=True
             enemies=actors(u.ICEnemyBase);old=enemies[0];new=enemies[1];S.update(old=old,new=new)

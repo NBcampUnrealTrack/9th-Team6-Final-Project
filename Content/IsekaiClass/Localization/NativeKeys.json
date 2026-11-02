@@ -916,8 +916,8 @@
   },
   {
     "namespace": "ICInventory",
-    "key": "FilterBook",
-    "source": "분류: 성장서"
+    "key": "FilterElixir",
+    "source": "분류: 엘릭서"
   },
   {
     "namespace": "ICInventory",

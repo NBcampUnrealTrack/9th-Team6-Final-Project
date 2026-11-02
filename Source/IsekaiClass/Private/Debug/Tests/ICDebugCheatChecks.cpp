@@ -20,7 +20,7 @@ bool FICDebugCheatCheck::RunTest(const FString&)
     auto* World = GI->GetWorld(); World->InitializeActorsForPlay(FURL(), false);
     auto* State = GI->GetSubsystem<UICWorldStateSubsystem>(); auto* Time = GI->GetSubsystem<UICTimeSubsystem>();
     auto* D = GI->GetSubsystem<UICDefinitionSubsystem>();
-    FICWorldState Initial; Initial.bPlayerCreated = true; Initial.PlayerName = TEXT("치트 검증"); Initial.FirstSkill = TEXT("SKL_START_SWORD_001");
+    FICWorldState Initial; Initial.bPlayerCreated = true; Initial.PlayerName = TEXT("치트 검증"); Initial.FirstSkill = TEXT("SKL_NPC_R01_002");
     FICCharacterState Player; Player.CharacterId = UICWorldStateSubsystem::PlayerId(); Player.Kind = EICCharacterKind::Player; Initial.Characters.Add(Player.CharacterId, Player);
     TestTrue(TEXT("Cheat test world restores"), State->RestoreState(Initial));
     auto* PC = World->SpawnActor<AICPlayerController>(); auto* Pawn = World->SpawnActor<AICPlayerCharacter>(); PC->Possess(Pawn);

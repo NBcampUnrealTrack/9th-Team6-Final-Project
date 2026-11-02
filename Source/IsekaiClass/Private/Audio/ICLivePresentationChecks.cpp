@@ -59,7 +59,7 @@ bool FICNPCBedAccessCheck::RunTest(const FString&)
     World->InitializeActorsForPlay(FURL(),false);
     auto* PC=World->SpawnActor<AICPlayerController>();FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));
     auto* Pawn=World->SpawnActor<AICPlayerCharacter>();PC->Possess(Pawn);PC->bCreated=true;PC->Menu.Empty();
-    auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("침대 검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+    auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("침대 검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);State->RestoreState(Initial);
     Pawn->InitializeState(Player.CharacterId);Pawn->Inventory->BindWorldState(State);auto* Time=GI->GetSubsystem<UICTimeSubsystem>();Time->SetRunning(true);Time->SetMenuPaused(false);
     auto* Bed=World->SpawnActor<AICLifeObjectActor>();Bed->ObjectType=EICLifeObjectType::Bed;Bed->OwnerNPCID=TEXT("NPC_R01_001");Bed->ObjectID=TEXT("TEST_OWNER_BED");

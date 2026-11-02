@@ -67,10 +67,6 @@ for row in rows:
     row['AbilityClass'] = ability_path + '.GA_' + skill_id + '_C'
     row['CooldownEffectClass'] = effect_path + '.GE_CD_' + skill_id + '_C'
     row['CooldownTag'] = tag
-    if skill_id == 'SKL_START_SWORD_001':
-        row['CooldownPlaySeconds'] = '20'
-    elif skill_id in ('SKL_START_BOW_001', 'SKL_START_STAFF_001'):
-        row['CooldownPlaySeconds'] = '30'
 
 
 cue_dir = '/Game/IsekaiClass/Combat/GAS/Cues'

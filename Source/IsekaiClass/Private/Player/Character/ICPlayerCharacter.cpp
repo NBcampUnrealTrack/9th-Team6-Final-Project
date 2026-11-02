@@ -78,7 +78,7 @@ bool AICPlayerCharacter::IsSprinting() const
 {
     return bSprintHeld && AbilitySystem && AbilitySystem->IsAlive()
         && !AbilitySystem->HasRecentCombat()
-        && !IsSwitchingWeapon() && !AbilitySystem->GetActionID().IsValid()
+        && !AbilitySystem->GetActionID().IsValid()
         && !AbilitySystem->HasMatchingGameplayTag(ICTags::Staggered)
         && !AbilitySystem->HasMatchingGameplayTag(ICTags::Returning)
         && GetCharacterMovement()->IsMovingOnGround();

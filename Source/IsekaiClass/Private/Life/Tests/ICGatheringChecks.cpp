@@ -42,7 +42,7 @@ bool FICGatheringCheck::RunTest(const FString&)
     auto* PCType=LoadClass<AICPlayerController>(nullptr,TEXT("/Game/IsekaiClass/Core/GameFramework/BP_ICPlayerController.BP_ICPlayerController_C"));
     auto* PC=World->SpawnActor<AICPlayerController>(PCType);FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));
     auto* Pawn=World->SpawnActor<AICPlayerCharacter>();Pawn->EnableCombat(true,true);PC->Possess(Pawn);PC->bCreated=true;PC->Menu.Empty();
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("채집검증");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("채집검증");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);
     TestTrue(TEXT("Player state restores"),State->RestoreState(Initial));
     TestTrue(TEXT("Live player state initializes"),Pawn->InitializeState(Player.CharacterId));Pawn->Inventory->BindWorldState(State);

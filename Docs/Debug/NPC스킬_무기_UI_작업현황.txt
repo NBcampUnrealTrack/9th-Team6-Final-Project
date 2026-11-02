@@ -17,7 +17,7 @@
 3. 치트: NPC01/02/03 호감도 300 및 파티 3칸 한 번에 배치.
    초보 무기 4종 지급+각 가족 슬롯에 장착하는 별도 명령.
 4. Tab 몬스터 락온: 대상 지정/전환/해제, 사망·거리·시야 이탈 처리와 전투 조준 연결.
-5. 인벤토리 골드 표시, 퀵슬롯 기능 정리, 소비품/음식/성장서 팝업 [사용]→파티 대상 선택→실제 사용.
+5. 인벤토리 골드 표시, 퀵슬롯 기능 정리, 소비품/음식/엘릭서 팝업 [사용]→파티 대상 선택→실제 사용.
 6. 메뉴 도감 NPC 카테고리와 호감도 표시.
 
 조사 내용
@@ -43,7 +43,7 @@
 [참조 검사 통과] Free_Magic/Free_Spells 옛 경로 23개를 PackageRedirects로 복구. 새 검사 누락 0, 손상 텍스처 0.
 [빌드 통과] 전체 Unity 빌드 Saved/BuildNPCSkillFinalUnity.log. 후속 크기·첫 GPU 명중 보정 및 진단 GPU 읽기 보호도 빌드 통과.
 [자동 검사 통과] Saved/NPCSkillReview/FinalTests/index.json: 35개 성공, 0개 실패(경고 포함).
-[실제 PIE 통과] 파티 치트, 무기 치트, 골드 표시, 키보드 성장서 대상 선택, 무효 음식 미소비, 숫자 퀵슬롯, NPC 호감도 도감, 락온 순환/해제.
+[실제 PIE 통과] 파티 치트, 무기 치트, 골드 표시, 키보드 엘릭서 대상 선택, 무효 음식 미소비, 숫자 퀵슬롯, NPC 호감도 도감, 락온 순환/해제.
   성공 로그: Saved/NPCSkillExpansionLive6.log의 NPC_EXPANSION_LIVE_REVIEW_OK.
 [실제 PIE 통과] 신규 무기 16개 메시·실측 길이 및 NPC 스킬 11개 발동. 모든 공격 스킬 피해와 대상 부착 Hit 확인.
   R01_08과 R01_11은 각각 3회 타격 확인. Saved/NPCSkillReview/Combat/Review.json, NPCSkillCombatLive4.log 참고.

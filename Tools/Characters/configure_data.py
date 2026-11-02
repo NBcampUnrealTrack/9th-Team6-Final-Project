@@ -75,7 +75,7 @@ def main():
     text_fields, texts = load("StringTables/ST_IC_Definitions.csv")
     dlg_fields, dlg_texts = load("StringTables/ST_IC_Dialogue.csv")
     skills = tables["Combat/DT_IC_Skill.csv"][1]
-    source_skills = {family: next(row.copy() for row in skills if row["ID"] == f"SKL_START_{family}_001") for family in WEAPON.values()}
+    source_skills = {family: next(row.copy() for row in skills if row['RequiredWeaponFamily'].upper() == family and row['ID'].startswith('SKL_NPC_')) for family in WEAPON.values()}
     for number, role in enumerate(ROLES, 1):
         npc = f"NPC_R01_{number:03}"
         display = f"NPC {number}"
@@ -90,7 +90,7 @@ def main():
         upsert(npcs, definition(fields, npc, Type="Recruitable", Race="Human", RegionID="R01", HomeID=home, InitialAnchorID=anchors["HOME"], ScheduleID=schedule, DialogueIDs=f'(\"{dialogue}\")', GiftPreferenceID="GIFT_R01_COMMON", ServiceIDs="()", RecruitCombatID=combat, ClassID=CLASS[role], OccupationTag="None", bRecruitable="True", bEndingTarget="False", bClassmate=str(number>=9), InitialAffinity=0, AppearanceResourceID=f"RES_{npc}", Mesh=object_path(mesh), Portrait=object_path(f"{GAME}/NPC/SampleNPC/R01/R01_portrait/R01_{number}"), AnimationClass="/Script/IsekaiClass.ICCharacterAnimInstance", AnimationProfile=object_path(profile), ActorClass=f"{GAME}/NPC/Blueprints/R01/BP_{npc}.BP_{npc}_C", ScheduleStateTree="None", MeshTransform="(Rotation=(X=0,Y=0,Z=-0.707107,W=0.707107),Translation=(X=0,Y=0,Z=-88),Scale3D=(X=1,Y=1,Z=1))"))
         cf, cr = tables["Character/DT_IC_RecruitCombat.csv"]
         upsert(cr, definition(cf, combat, NPCID=npc, ClassID=CLASS[role], WeaponFamily=FAMILY[role], Role={"Healer":"Healer","Warrior":"Frontline","Archer":"RangedDamage","Mage":"MagicDamage"}[role], InitialBaseStats="(STR=1,DEX=1,INT=1,CON=1,CHA=1,LUK=1)", InitialEquipment=f"(WeaponID=EQU_WPN_{WEAPON[role]}_001)", UniqueSkillID=skill, InitialAttackDisposition="Defensive", InitialLowHPDisposition="Wait", InitialTargetPriority="PlayerTargetFirst", bInitiallyAutoSkillEnabled="False"))
-        source = source_skills[WEAPON[role]].copy()
+        source = next((row.copy() for row in skills if row['ID'] == skill), source_skills[WEAPON[role]].copy())
         source.update({"---":skill,"ID":skill,"NameKey":skill+".NAME","DescriptionKey":"","OwnerType":"RecruitUnique","ClassID":"None","NPCID":npc,"bInitiallyUnlocked":"True"})
         upsert(skills, source)
         df, dr = tables["NPC/DT_IC_Dialogue.csv"]

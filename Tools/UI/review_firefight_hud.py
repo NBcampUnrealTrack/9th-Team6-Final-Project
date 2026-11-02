@@ -56,9 +56,9 @@ def tick(delta):
                 assert state.set_affinity(npc, 300)
                 assert state.set_party_slot(npc, slot)
             bag = pc.get_inventory()
-            for item in ('ITM_CONS_001', 'ITM_FOOD_001', 'ITM_BOOK_001'):
+            for item in ('ITM_CONS_001', 'ITM_FOOD_001', 'ITM_ELIXIR_001'):
                 bag.add_item(item, 8, False)
-            for slot, item in enumerate(('ITM_CONS_001', 'ITM_FOOD_001', 'ITM_BOOK_001', 'ITM_CONS_001')):
+            for slot, item in enumerate(('ITM_CONS_001', 'ITM_FOOD_001', 'ITM_ELIXIR_001', 'ITM_CONS_001')):
                 index = next(i for i, v in enumerate(bag.get_snapshot().bag.slots) if str(v.item_id) == item)
                 assert bag.bind_quick_slot(slot, index)
             assert state.set_vitals('CHR_PLAYER', 25, 50, 70)

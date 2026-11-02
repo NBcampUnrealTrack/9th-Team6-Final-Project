@@ -29,7 +29,7 @@ bool FICItemHUDCooldownCheck::RunTest(const FString&)
 {
     auto* GI=NewObject<UGameInstance>(GEngine);GI->InitializeStandalone();auto* World=GI->GetWorld();World->InitializeActorsForPlay(FURL(),false);
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* Time=GI->GetSubsystem<UICTimeSubsystem>();
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("HUD cooldown");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("HUD cooldown");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Player.HP=20;Initial.Characters.Add(Player.CharacterId,Player);
     TestTrue(TEXT("Restore isolated state"),State->RestoreState(Initial));
     auto* PC=World->SpawnActor<AICPlayerController>();auto* Pawn=World->SpawnActor<AICPlayerCharacter>();PC->Possess(Pawn);PC->bCreated=true;
@@ -138,7 +138,7 @@ bool FICFirefightTargetCheck::RunTest(const FString&)
     auto& Context=*GEngine->GetWorldContextFromWorld(World);auto* Viewport=NewObject<UGameViewportClient>(GEngine);Context.GameViewport=Viewport;Viewport->Init(Context,GI,false);
     World->InitializeActorsForPlay(FURL(),false);
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* D=GI->GetSubsystem<UICDefinitionSubsystem>();auto* Time=GI->GetSubsystem<UICTimeSubsystem>();
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("Target HUD");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("Target HUD");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState Player;Player.CharacterId=UICWorldStateSubsystem::PlayerId();Player.Kind=EICCharacterKind::Player;Initial.Characters.Add(Player.CharacterId,Player);State->RestoreState(Initial);
     auto* PC=World->SpawnActor<AICPlayerController>();FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));auto* Pawn=World->SpawnActor<AICPlayerCharacter>();PC->Possess(Pawn);PC->bCreated=true;PC->Menu.Empty();
     Pawn->EnableCombat(true,true);Pawn->InitializeState(Player.CharacterId);Pawn->SetActorLocation({0,0,100});PC->SetControlRotation(FRotator::ZeroRotator);

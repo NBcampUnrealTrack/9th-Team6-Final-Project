@@ -140,7 +140,7 @@ plot_positions=[]
 for index,identifier in enumerate(plot_ids):
     group=index//4;cell=index%4;position=(-1250+(cell%2)*260,-850-group*750+(cell//2)*260,50)
     plot_positions.append(position);anchor(identifier,f'플레이어 밭 {index+1}','FarmPlot',position)
-for crop in crops.values():crop['AllowedPlotAnchorIDs']=list(dict.fromkeys(crop['AllowedPlotAnchorIDs']+plot_ids))
+# Keep crop restrictions authored in the DT; placed farm plots need not use these eight anchor IDs.
 anchor('ANC_PLAYER_BED','플레이어 침대','Bed',(0,-500,96))
 anchor('ANC_PLAYER_CHEST_02','추가 창고 1','StorageInstallation',(450,-500,0));anchor('ANC_PLAYER_CHEST_03','추가 창고 2','StorageInstallation',(650,-500,0))
 homes=table('World/DT_IC_Home')

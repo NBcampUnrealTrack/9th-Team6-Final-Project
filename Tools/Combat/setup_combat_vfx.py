@@ -139,14 +139,7 @@ def class_row(row):
     row['NormalAttackStages'] = '(' + ','.join(visuals(s, f'NORMAL_{family}_{i}') for i, s in enumerate(stages, 1)) + ')'
 
 
-def skill_row(row):
-    family = row['RequiredWeaponFamily'].upper()
-    if row['---'].startswith('SKL_START_') and family in COLORS:
-        row['Presentation'] = visuals(row['Presentation'], 'SKILL_' + family)
-
-
 patch_table('Character/DT_IC_Class', class_row)
-patch_table('Combat/DT_IC_Skill', skill_row)
 (ROOT / 'Saved/CombatVFXSetupReport.json').write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding='utf-8')
 if u.EditorAssetLibrary.does_asset_exist(FOLDER + '/NormalAttack/NS_IC_Test'):
     u.EditorAssetLibrary.delete_asset(FOLDER + '/NormalAttack/NS_IC_Test')

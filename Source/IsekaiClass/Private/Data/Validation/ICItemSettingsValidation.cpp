@@ -311,7 +311,9 @@ void ValidateItemSettings(const TArray<FICDefinitionTable>& Tables,bool bComplet
         IC_TRACE_FUNCTION();
         if(Row.RunSpeedCmPerSecond<Row.WalkSpeedCmPerSecond) ItemIssue(Issues,At,TEXT("RunSpeedCmPerSecond"),TEXT("Running cannot be slower than walking."));
         if(Row.InputBufferPlaySeconds>Row.ComboWindowPlaySeconds) ItemIssue(Issues,At,TEXT("ComboWindowPlaySeconds"),TEXT("Combo connection window must cover its input buffer."));
-        if(Row.DodgeInvulnerabilityPlaySeconds>Row.DodgeCooldownPlaySeconds) ItemIssue(Issues,At,TEXT("DodgeCooldownPlaySeconds"),TEXT("Dodge cooldown must cover its invulnerability span."));
+        if(Row.DodgeDurationPlaySeconds<=0 || Row.DodgeDurationPlaySeconds>Row.DodgeCooldownPlaySeconds) ItemIssue(Issues,At,TEXT("DodgeDurationPlaySeconds"),TEXT("Dodge duration must be positive and fit within its cooldown."));
+        if(Row.DodgeTravelPlaySeconds<=0 || Row.DodgeTravelPlaySeconds>Row.DodgeDurationPlaySeconds) ItemIssue(Issues,At,TEXT("DodgeTravelPlaySeconds"),TEXT("Dodge travel must be positive and fit within its animation/recovery."));
+        if(Row.DodgeInvulnerabilityPlaySeconds>Row.DodgeDurationPlaySeconds) ItemIssue(Issues,At,TEXT("DodgeInvulnerabilityPlaySeconds"),TEXT("Dodge invulnerability must fit within its animation/recovery."));
         if(Row.DashDurationPlaySeconds<=0 || Row.DashDurationPlaySeconds>Row.DodgeCooldownPlaySeconds) ItemIssue(Issues,At,TEXT("DashDurationPlaySeconds"),TEXT("Dash duration must be positive and fit within the shared movement cooldown."));
         if(Row.HitStaggerPlaySeconds>Row.HitStaggerIntervalPlaySeconds) ItemIssue(Issues,At,TEXT("HitStaggerIntervalPlaySeconds"),TEXT("Repeat stagger interval must cover the stagger span."));
     });

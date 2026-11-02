@@ -172,11 +172,11 @@ for family_index, family in enumerate(FAMILIES):
                                   'damage': tier*10, 'required_stat': REQUIRED_STATS[family_index], 'minimum': (tier-1)*10,
                                   'recipe_id': recipe_id})
 
-# Foods and growth books can be selected for the player or a living party member.
+# Foods and elixirs can be selected for the player or a living party member.
 old_flags_path=OUT/'OriginalItemUseFlags.json'
 old_flags=json.loads(old_flags_path.read_text(encoding='utf-8')) if old_flags_path.exists() else {}
 for item in ITEMS.values():
-    if item['Kind'] == 'Consumable' and item['UseEffect'] in ('Recovery', 'GrowthBook'):
+    if item['Kind'] == 'Consumable' and item['UseEffect'] in ('Recovery', 'GrowthElixir'):
         item['UseTarget'] = 'LivingParty'
         item['bAllowNonCompanionRecruitUse'] = old_flags.get(item['ID'],item['bAllowNonCompanionRecruitUse'])
 
@@ -385,6 +385,7 @@ for name in ('WBP_IC_GameMenu','WBP_GameHUD'):
 
 doc=['NPC 스킬·무기·인벤토리 설정 안내', '2026-10-27', '',
      'NPC와 플레이어는 같은 SKL_NPC_R01_001~011 행을 사용한다.',
+     '런타임 스킬은 총 11개이며, 플레이어 전용 SKL_START_* 행은 사용하지 않는다.',
      '원본 SampleVFX는 보존하고 새 Niagara는 /Game/IsekaiClass/VFX/CombatEffect/Skill/NPC에 저장한다.', '',
      '스킬별 기본값 (범위는 cm, 시전·쿨타임은 실제 플레이 초)',
      '피해·회복 계산은 DT_IC_SkillEffect.Magnitude의 SourceStat × Coefficient + FlatAmount이다.',

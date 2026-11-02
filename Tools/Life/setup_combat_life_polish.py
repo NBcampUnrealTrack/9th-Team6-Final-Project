@@ -35,7 +35,7 @@ definitions=ROOT/'Data/StringTables/ST_IC_Definitions.csv'
 strings={r['Key']:r['SourceString'] for r in csv.DictReader(definitions.open(encoding='utf-8-sig',newline=''))}
 registry=table('Registry/DT_IC_IDRegistry');drops=table('Rewards/DT_IC_DropTable')
 for row_name,dropid,label,items in [
-    ('Bookshelf','DRP_FURNITURE_BOOKSHELF','책장 보상',[f'ITM_BOOK_{n:03d}' for n in [1,2,3,4,5,6,7,8,9,10,11,12,16,17,18]]),
+    ('Bookshelf','DRP_FURNITURE_BOOKSHELF','책장 보상',[f'ITM_ELIXIR_{n:03d}' for n in [1,2,3,4,5,6,7,8,9,10,11,12,16,17,18]]),
     ('Wardrobe','DRP_FURNITURE_WARDROBE','옷장 보상',['ITM_CONS_001']+[f'ITM_R01_SEED_{n:02d}' for n in range(1,6)])]:
     table('Life/DT_IC_FurnitureLoot','ICFurnitureLootRow').setdefault(row_name,dict(Name=row_name,DisplayName=label,DropTableID=dropid,RefillGameMinutes=0))
     if dropid not in drops:
@@ -52,7 +52,7 @@ for row_name,dropid,label,items in [
 icons=GAME+'/UI/SampleUI/MorpheusGUI/textures/Icons/64/'
 for row in table('Items/DT_IC_Item').values():
     if row.get('Icon') not in ('None','',None):continue
-    item=row['ID'];icon='t_Scroll_64' if item.startswith('ITM_BOOK') else 't_Backpack_64' if item=='ITM_TKT_001' else 't_PotionHeart_64' if item.startswith('ITM_CONS') else 't_Apple_64' if 'FOOD' in item or 'RANCH' in item or 'CHICKEN_MEAT' in item else None
+    item=row['ID'];icon='t_PotionStrength_64' if item.startswith('ITM_ELIXIR') else 't_Backpack_64' if item=='ITM_TKT_001' else 't_PotionHeart_64' if item.startswith('ITM_CONS') else 't_Apple_64' if 'FOOD' in item or 'RANCH' in item or 'CHICKEN_MEAT' in item else None
     if icon:
         tex=u.load_asset(icons+icon);assert tex;row['Icon']=tex.get_path_name()
 

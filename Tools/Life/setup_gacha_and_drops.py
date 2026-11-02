@@ -61,7 +61,7 @@ row={key:'' for key in fields}
 row.update({fields[0]:id,'ID':id,'CostGold':'1000','NameKey':id+'.NAME','DescriptionKey':id+'.DESCRIPTION',
             'Tags':'(GameplayTags=)','DataVersion':'1','bDeprecated':'False','bTestOnly':'False'})
 plants=['ITM_R01_PLANT_%02d'%i for i in range(1,11)]
-books=['ITM_BOOK_%03d'%i for i in list(range(1,13))+[16,17,18]]
+books=['ITM_ELIXIR_%03d'%i for i in list(range(1,13))+[16,17,18]]
 assert all(any(r['ID']==item for r in items) for item in plants+books)
 
 
@@ -70,7 +70,7 @@ def pool(name,ids):
     return '(PoolID="%s",NameKey="%s.%s",Weight=50,Items=(%s))'%(name,id,name,entries)
 
 
-row['Pools']='('+pool('GATHERING',plants)+','+pool('GROWTH_BOOK',books)+')'
+row['Pools']='('+pool('GATHERING',plants)+','+pool('GROWTH_ELIXIR',books)+')'
 write_table(relative,table,fields,[r for r in rows if r['ID']!=id]+[row])
 catalog=u.load_asset('/Game/IsekaiClass/Data/DataAsset/DA_IC_DefinitionCatalog')
 bindings=list(catalog.get_editor_property('tables'))
@@ -90,7 +90,7 @@ write_table('Registry/DT_IC_IDRegistry',registry,gf,[r for r in gr if r['ID']!=i
 strings_path=ROOT/'Data/StringTables/ST_IC_Definitions.csv'
 strings={r['Key']:r['SourceString'] for r in csv.DictReader(io.StringIO(strings_path.read_text(encoding='utf-8-sig')))}
 strings.update({id+'.NAME':'뽑기 기계',id+'.DESCRIPTION':'골드를 지불하고 무작위 아이템을 받습니다.',
-                id+'.GATHERING':'채집물',id+'.GROWTH_BOOK':'성장서'})
+                id+'.GATHERING':'채집물',id+'.GROWTH_ELIXIR':'엘릭서'})
 output=io.StringIO(newline='');writer=csv.writer(output,lineterminator='\n');writer.writerow(['Key','SourceString']);writer.writerows(strings.items())
 write(strings_path,output.getvalue())
 strings_asset=u.load_asset(BASE+'StringTables/ST_IC_Definitions')
@@ -112,4 +112,4 @@ machine=existing[0] if existing else actors.spawn_actor_from_class(bp.generated_
 machine.set_actor_location_and_rotation(location,u.Rotator(),False,True)
 machine.set_actor_label('IC_GachaMachine_Test');machine.set_folder_path('IC_Life_Test/Gacha')
 assert u.EditorLoadingAndSavingUtils.save_dirty_packages(True,True)
-u.log('GACHA_AND_CUBE_DROPS_SETUP_OK: 1000G, Gathering 50 / GrowthBook 50, 97 cube item appearances')
+u.log('GACHA_AND_CUBE_DROPS_SETUP_OK: 1000G, Gathering 50 / GrowthElixir 50, 97 cube item appearances')

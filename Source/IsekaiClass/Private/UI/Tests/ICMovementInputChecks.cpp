@@ -10,6 +10,7 @@
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Combat/GAS/ICGameplayTags.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "Data/Rows/Settings/ICSettingsRows.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Time/ICTimeSubsystem.h"
@@ -39,7 +40,7 @@ bool FICMovementInputCheck::RunTest(const FString& Parameters)
     PC->bCreated=true;PC->Menu.Empty();Player->SetActorLocation({0,0,100});Player->SetActorRotation(FRotator::ZeroRotator);
     auto* State=GI->GetSubsystem<UICWorldStateSubsystem>();auto* Time=GI->GetSubsystem<UICTimeSubsystem>();
     auto* Staging=NewObject<UICInventoryComponent>();Staging->BeginStaging(GI->GetSubsystem<UICDefinitionSubsystem>(),0);
-    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("이동 테스트");Initial.FirstSkill=TEXT("SKL_START_SWORD_001");Initial.Inventory=Staging->GetSnapshot();
+    FICWorldState Initial;Initial.bPlayerCreated=true;Initial.PlayerName=TEXT("이동 테스트");Initial.FirstSkill=TEXT("SKL_NPC_R01_002");Initial.Inventory=Staging->GetSnapshot();
     FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;P.UnlockedSkillIDs.Add(Initial.FirstSkill);Initial.Characters.Add(P.CharacterId,P);
     TestTrue(TEXT("Actual player state initializes"),State->RestoreState(Initial));
     TestTrue(TEXT("Actual player GAS initializes"),Player->InitializeState(P.CharacterId));Player->Inventory->BindWorldState(State);
@@ -125,9 +126,16 @@ bool FICMovementInputCheck::RunTest(const FString& Parameters)
     TestTrue(TEXT("Rejected retry preserves dodge invulnerability"),ASC->HasMatchingGameplayTag(ICTags::Invulnerable));Key(EKeys::RightShift,false);
     Refresh();if(Ring)TestEqual(TEXT("Dodge reveals the ring again without a label"),Ring->GetVisibility(),ESlateVisibility::HitTestInvisible);
     const FVector DodgeStart=Player->GetActorLocation();Step(.25);
-    TestTrue(TEXT("No-input combat dodge moves 300cm backward"),FMath::IsNearlyEqual(Player->GetActorLocation().X-DodgeStart.X,-300.,.1));
-    TestFalse(TEXT("Dodge immunity ends with the action"),ASC->HasMatchingGameplayTag(ICTags::Invulnerable));
+    const double ScaledDodgeDistance=300.*FICCombatSettingsRow().PlayerDodgeDistanceScale;
+    TestTrue(TEXT("No-input dodge is still travelling backward at .25s"),FMath::IsNearlyEqual(Player->GetActorLocation().X-DodgeStart.X,-ScaledDodgeDistance*(7./27.),.1));
+    TestTrue(TEXT("Dodge immunity covers the push instead of ending at .25s"),ASC->HasMatchingGameplayTag(ICTags::Invulnerable));
+    TestEqual(TEXT("Dodge action continues after immunity"),ASC->GetActionID(),DodgeID);
     TestFalse(TEXT("Dash and dodge share one cooldown"),ASC->RequestAction(TEXT("Dash"),NAME_None,nullptr).bSuccess);
+    Step(.25);TestFalse(TEXT("Dodge immunity ends after .5s"),ASC->HasMatchingGameplayTag(ICTags::Invulnerable));
+    Step(.25);TestTrue(TEXT("No-input fallback dodge applies the player's extended travel"),FMath::IsNearlyEqual(Player->GetActorLocation().X-DodgeStart.X,-ScaledDodgeDistance,.1));
+    TestFalse(TEXT("Recovery prevents movement before the pose settles"),ASC->CanAcceptMovementInput());
+    Step(.21);TestFalse(TEXT("Dodge ends after its full animation"),ASC->GetActionID().IsValid());
+    TestTrue(TEXT("Movement returns after recovery"),ASC->CanAcceptMovementInput());
     ASC->ResetExecutionForLoad();Refresh();if(Widget)TestTrue(TEXT("Loading resets transient movement cooldown UI"),Widget->bReady&&Widget->Progress==1.f);
 
     Player->SetActorLocation({0,0,100});Player->SetActorRotation(FRotator::ZeroRotator);auto* Wall=World->SpawnActor<AActor>();
@@ -158,16 +166,20 @@ bool FICMovementInputCheck::RunTest(const FString& Parameters)
     TestEqual(TEXT("Ready Q skill hides its countdown"),SkillSeconds?SkillSeconds->GetVisibility():ESlateVisibility::Visible,ESlateVisibility::Hidden);
     TestTrue(TEXT("Ready Q skill keeps the portrait fully bright"),Portrait&&Portrait->GetColorAndOpacity().Equals(FLinearColor::White));
     const FName SkillID=ASC->GetCurrentWeaponSkill();
+    FICDefinitionResult SkillLookup;
+    const auto* SkillRow=GI->GetSubsystem<UICDefinitionSubsystem>()->Find<FICSkillRow>(SkillID,SkillLookup);
+    if(!TestNotNull(TEXT("Equipped Q uses a shared NPC skill definition"),SkillRow))return false;
     ASC->CancelAction();
     const auto SkillAction=ASC->RequestAction(TEXT("Skill"),SkillID,nullptr);
     TestTrue(TEXT("Q starts its equipped weapon skill"),SkillAction.bSuccess);
+    Step(SkillRow->FirstEffectOffsetPlaySeconds+.001);
     TestTrue(TEXT("Q effect starts its configured cooldown"),ASC->NotifyCombatEvent(SkillAction.ActionID,TEXT("AN_EffectCommit"),0));
     if(HUD)HUD->RefreshSkillCooldown();
-    TestEqual(TEXT("Active Q cooldown shows whole remaining seconds"),SkillSeconds?SkillSeconds->GetText().ToString():FString(),FString(TEXT("20")));
+    TestEqual(TEXT("Active Q cooldown shows whole remaining seconds"),SkillSeconds?SkillSeconds->GetText().ToString():FString(),FString::FromInt(FMath::CeilToInt(SkillRow->CooldownPlaySeconds)));
     TestTrue(TEXT("Used Q skill darkens only the portrait"),Portrait&&FMath::IsNearlyEqual(Portrait->GetColorAndOpacity().R,.3f));
-    ASC->CancelAction();Step(10);if(HUD)HUD->RefreshSkillCooldown();
+    ASC->CancelAction();Step(SkillRow->CooldownPlaySeconds*.5);if(HUD)HUD->RefreshSkillCooldown();
     TestTrue(TEXT("Half of Q cooldown restores half of the portrait brightness"),Portrait&&FMath::IsNearlyEqual(Portrait->GetColorAndOpacity().R,.65f));
-    TestEqual(TEXT("Q countdown follows play time"),SkillSeconds?SkillSeconds->GetText().ToString():FString(),FString(TEXT("10")));
+    TestEqual(TEXT("Q countdown follows play time"),SkillSeconds?SkillSeconds->GetText().ToString():FString(),FString::FromInt(FMath::CeilToInt(SkillRow->CooldownPlaySeconds*.5)));
     if(Widget)Widget->ReleaseSlateResources(true);Player->ReleaseForLoad();GI->Shutdown();GEngine->DestroyWorldContext(World);World->DestroyWorld(false);
     return !HasAnyErrors();
 }

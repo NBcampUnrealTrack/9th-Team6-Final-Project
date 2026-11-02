@@ -24,21 +24,21 @@ NPC 테스트 지역,NPC Test Region
 초보자 마법스태프,Beginner Magic Staff
 초보자 검,Beginner Sword
 초보자 치유완드,Beginner Healing Wand
-초급 근력의 서,Basic Book of Strength
-중급 근력의 서,Intermediate Book of Strength
-고급 근력의 서,Advanced Book of Strength
-초급 민첩의 서,Basic Book of Dexterity
-중급 민첩의 서,Intermediate Book of Dexterity
-고급 민첩의 서,Advanced Book of Dexterity
-초급 지력의 서,Basic Book of Intelligence
-중급 지력의 서,Intermediate Book of Intelligence
-고급 지력의 서,Advanced Book of Intelligence
-초급 체력의 서,Basic Book of Vitality
-중급 체력의 서,Intermediate Book of Vitality
-고급 체력의 서,Advanced Book of Vitality
-초급 운의 서,Basic Book of Luck
-중급 운의 서,Intermediate Book of Luck
-고급 운의 서,Advanced Book of Luck
+초급 근력 엘릭서,Basic Elixir of Strength
+중급 근력 엘릭서,Intermediate Elixir of Strength
+고급 근력 엘릭서,Advanced Elixir of Strength
+초급 민첩 엘릭서,Basic Elixir of Dexterity
+중급 민첩 엘릭서,Intermediate Elixir of Dexterity
+고급 민첩 엘릭서,Advanced Elixir of Dexterity
+초급 지력 엘릭서,Basic Elixir of Intelligence
+중급 지력 엘릭서,Intermediate Elixir of Intelligence
+고급 지력 엘릭서,Advanced Elixir of Intelligence
+초급 체력 엘릭서,Basic Elixir of Vitality
+중급 체력 엘릭서,Intermediate Elixir of Vitality
+고급 체력 엘릭서,Advanced Elixir of Vitality
+초급 운 엘릭서,Basic Elixir of Luck
+중급 운 엘릭서,Intermediate Elixir of Luck
+고급 운 엘릭서,Advanced Elixir of Luck
 체력 포션,Health Potion
 채소 수프,Vegetable Soup
 빵,Bread
@@ -430,7 +430,7 @@ Result: Fish and Einkorn Wrap 1"
 뽑기 기계,Gacha Machine
 골드를 지불하고 무작위 아이템을 받습니다.,Pay gold to receive a random item.
 채집물,Gathered Materials
-성장서,Growth Books
+엘릭서,Elixirs
 물고기 아무 종류,Any Kind of Fish
 시골 마을 검,Village Sword
 시골 마을 검. 기본 공격력 20. 요구 STR 10.,Village Sword. Base Attack 20. Requires STR 10.
@@ -1530,7 +1530,7 @@ M · 지도,M · Map
 분류: 무기,Filter: Weapons
 분류: 소비품,Filter: Consumables
 분류: 음식,Filter: Food
-분류: 성장서,Filter: Growth books
+분류: 엘릭서,Filter: Elixirs
 분류: 재료,Filter: Materials
 분류: 잠금,Filter: Locked
 현재 상태,Current status

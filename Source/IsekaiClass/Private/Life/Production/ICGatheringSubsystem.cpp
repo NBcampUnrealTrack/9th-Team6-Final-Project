@@ -42,7 +42,12 @@ void UICGatheringSubsystem::Deinitialize()
 bool UICGatheringSubsystem::StartGather(AICLifeActor* Resource, AICPlayerController* Player)
 {return Resource&&Resource->LifeType!=EICDefinitionType::FishingPoint&&StartAction(Resource,Player,NAME_None);}
 bool UICGatheringSubsystem::StartPlant(AICLifeActor* Plot,AICPlayerController* Player,FName CropID)
-{return !CropID.IsNone()&&StartAction(Plot,Player,CropID);}
+{
+    if(!IsValid(Plot)||!IsValid(Player)||CropID.IsNone())return false;
+    FText Failure;
+    if(!Plot->CanPlantCrop(Player,CropID,Failure)){Player->ShowLocalized(Failure);return false;}
+    return StartAction(Plot,Player,CropID);
+}
 bool UICGatheringSubsystem::StartFishing(AICLifeActor* Zone,AICPlayerController* Player,FVector Landing)
 {return Zone&&Zone->LifeType==EICDefinitionType::FishingPoint&&StartAction(Zone,Player,NAME_None,&Landing);}
 bool UICGatheringSubsystem::StartAction(AICLifeActor* Resource,AICPlayerController* Player,FName CropID,const FVector* FishingLanding)

@@ -24,8 +24,10 @@ deleted = {
     'ITM_MAT_003': 'ITM_R01_ORE_01', 'ITEM_P0_01': 'ITM_R01_FOOD_15',
     'ITM_MAT_PORK': 'ITM_R01_RANCH_03', 'ITM_MAT_GREEN_HERB': 'ITM_R01_PLANT_05',
     'ITEM_HERO_GIFT': 'ITM_R01_FOOD_19',
-    # CHA growth is already disabled. Keep only the requested fifteen usable books.
-    'ITM_BOOK_013': 'ITM_BOOK_001', 'ITM_BOOK_014': 'ITM_BOOK_002', 'ITM_BOOK_015': 'ITM_BOOK_003',
+    # Preserve old saves/data while keeping the fifteen usable elixirs.
+    **{'ITM_BOOK_%03d' % i: 'ITM_ELIXIR_%03d' % i for i in list(range(1,13))+[16,17,18]},
+    'ITM_BOOK_013': 'ITM_ELIXIR_001', 'ITM_BOOK_014': 'ITM_ELIXIR_002', 'ITM_BOOK_015': 'ITM_ELIXIR_003',
+    'ITM_ELIXIR_013': 'ITM_ELIXIR_001', 'ITM_ELIXIR_014': 'ITM_ELIXIR_002', 'ITM_ELIXIR_015': 'ITM_ELIXIR_003',
     **{'ITEM_R01_%02d' % i: 'ITM_R01_PLANT_%02d' % i for i in range(1, 11)},
     'ITEM_R01_11': 'ITM_R01_CROP_01',
 }

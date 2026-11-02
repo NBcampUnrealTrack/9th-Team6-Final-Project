@@ -41,7 +41,7 @@ bool FICQuestMenuCheck::RunTest(const FString&)
     {
         // Production scenarios replaced the original sample quests. Exercise the current DT
         // and its WBP reward rows without changing project definitions or leaking this world.
-        FICWorldState Current;Current.bPlayerCreated=true;Current.PlayerName=TEXT("퀘스트 UI 검증");Current.FirstSkill=TEXT("SKL_START_SWORD_001");
+        FICWorldState Current;Current.bPlayerCreated=true;Current.PlayerName=TEXT("퀘스트 UI 검증");Current.FirstSkill=TEXT("SKL_NPC_R01_002");
         FICCharacterState Character;Character.CharacterId=UICWorldStateSubsystem::PlayerId();Character.Kind=EICCharacterKind::Player;Current.Characters.Add(Character.CharacterId,Character);
         TestTrue(TEXT("Initialize current scenario preview"),State->RestoreState(Current));Player->InitializeState(Character.CharacterId);Player->Inventory->BindWorldState(State);PC->bCreated=true;
         TArray<FName> IDs;D->GetDefinitionIDs(EICDefinitionType::Quest,IDs);IDs.Sort(FNameLexicalLess());
@@ -72,7 +72,7 @@ bool FICQuestMenuCheck::RunTest(const FString&)
     }
     TGuardValue<int32> TalkGoal(TalkRow->ObjectiveGroups[0].Objectives[0].RequiredCount,3);
     TGuardValue<int32> CollectGoal(CollectRow->ObjectiveGroups[0].Objectives[0].RequiredCount,3);
-    FICWorldState Data;Data.bPlayerCreated=true;Data.PlayerName=TEXT("퀘스트검증");Data.FirstSkill=TEXT("SKL_START_SWORD_001");
+    FICWorldState Data;Data.bPlayerCreated=true;Data.PlayerName=TEXT("퀘스트검증");Data.FirstSkill=TEXT("SKL_NPC_R01_002");
     FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;Data.Characters.Add(P.CharacterId,P);
     TestTrue(TEXT("Initialize actual world"),State->RestoreState(Data));Player->InitializeState(P.CharacterId);Player->Inventory->BindWorldState(State);PC->bCreated=true;PC->Menu=TEXT("Pause");
     auto* Class=LoadClass<UICGameplayWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_GameHUD.WBP_GameHUD_C"));

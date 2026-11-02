@@ -1,0 +1,35 @@
+씨앗 심기 동작만 재생되고 작물/씨앗 수량이 바뀌지 않는 문제
+작성일: 2026-10-30 (Asia/Seoul)
+
+원인
+- L_OpenWorld에 현재 배치된 BP_IC_FarmPlot 8개는 모두 PointID=None.
+- 이 경우 저장 키는 액터 고유 이름(BP_IC_FarmPlot_C_7 등)을 사용함.
+- DT_IC_Crop의 기본 작물 5종은 ANC_PLAYER_PLOT_01~08만 허용하고 있었음.
+- 시작 시에는 이 제한을 검사하지 않아 심기 동작이 재생되지만,
+  완료 시 Plant가 거절하여 작물 생성과 씨앗 소비가 함께 취소됨.
+
+수정
+- 기본 작물 5종의 AllowedPlotAnchorIDs를 CSV와 실제 DataTable 모두 비움.
+- 특정 밭으로 제한할 필요가 있을 때는 이 목록에 원하는 PointID를 입력.
+- setup_life_expansion.py가 예전 8개 ID 제한을 다시 추가하지 않도록 수정.
+- CanPlantCrop을 시작/완료에서 함께 사용하여 잘못된 밭, 제한된 밭,
+  이미 심어진 밭, 씨앗 부족을 작업 전 확인하고 사유를 표시.
+- 완료 시에도 씨앗을 재확인하며, 기존의 작물 생성/씨앗 소비 단일 거래 유지.
+- 이미 심어진 밭에 대한 잘못된 완료 요청이 DefinitionID를 덮어쓰지 않도록 보호.
+- 맵 및 밭 위치/크기/PointID는 변경하지 않음.
+
+검증 자료
+- Saved/PlantingFix/Audit.json: 수정 전 작물 DT와 실제 밭 8개 배치.
+- Saved/PlantingFix/Applied.json: 실제 DT 수정 결과, 다른 작물 속성 보존 확인.
+- 신규 자동 테스트: IC.Life.Planting.ProgressAndSeedConsumption,
+  IC.Life.Planting.PlacedOpenWorldPlots, IC.Life.Planting.CancelAndRevalidate.
+- 함께 실행한 기존 R01AssetsAndSavedGrowth의 낚시 이름표 검사에는
+  이전 표시 기대값이 남아 있어, 현재 BP의 이름표 숨김 설정에 맞춰 검사만 수정.
+- 최종 IsekaiClassEditor Development 빌드 성공: Saved/PlantingFix/Build.log.
+- 최종 관련 자동 테스트 6개 모두 Success, failed=0:
+  Saved/PlantingFix/Final/index.json.
+- 기본 씨앗 5종의 작업 완료 후 작물/메시 생성 및 씨앗 1개 소비,
+  현재 배치 밭 8개별 독립 저장, 취소 시 씨앗 보존, 중복 심기 거부,
+  작업 중 씨앗 소진 시 실패, 수확 후 재심기, 기존 채집/성장 확인.
+- NullRHI 자동 검증. 네이티브 테스트 캐릭터의 입력 설정/빈 메시 경고가 있으며,
+  실제 플레이 화면의 동작 연출을 캡처한 검증은 아님.

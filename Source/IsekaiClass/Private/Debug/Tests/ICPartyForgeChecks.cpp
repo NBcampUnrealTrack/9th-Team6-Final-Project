@@ -32,7 +32,7 @@ struct FSession
         Viewport->SetViewportOverlayWidget(nullptr,SNew(SOverlay));
         PRAGMA_ENABLE_DEPRECATION_WARNINGS
         World->InitializeActorsForPlay(FURL(),false);State=GI->GetSubsystem<UICWorldStateSubsystem>();D=GI->GetSubsystem<UICDefinitionSubsystem>();
-        FICWorldState W;W.bPlayerCreated=true;W.PlayerName=TEXT("ForgeTest");W.FirstSkill=TEXT("SKL_START_SWORD_001");FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;W.Characters.Add(P.CharacterId,P);State->RestoreState(W);
+        FICWorldState W;W.bPlayerCreated=true;W.PlayerName=TEXT("ForgeTest");W.FirstSkill=TEXT("SKL_NPC_R01_002");FICCharacterState P;P.CharacterId=UICWorldStateSubsystem::PlayerId();P.Kind=EICCharacterKind::Player;W.Characters.Add(P.CharacterId,P);State->RestoreState(W);
         PC=World->SpawnActor<AICPlayerController>();FString Error;PC->SetPlayer(GI->CreateLocalPlayer(0,Error,false));Player=World->SpawnActor<AICPlayerCharacter>();Player->EnableCombat(true,true);PC->Possess(Player);PC->bCreated=true;State->RestoreState(W);Player->InitializeState(P.CharacterId);Bag=Player->Inventory;Bag->BindWorldState(State);State->SetPlayerGold(20000);
     }
     void Recruit(FName ID,int32 Slot){State->EnsureCharacter(ID,EICCharacterKind::Recruitable);State->SetAffinity(ID,300);State->SetPartySlot(ID,Slot);}

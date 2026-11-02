@@ -5,6 +5,7 @@
 #include "Character/Animation/ICHandGrip.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/SkeletalMeshSocket.h"
+#include "Components/SkeletalMeshComponent.h"
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Animation/Skeleton.h"
@@ -22,6 +23,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 #include "Debug/ICMonsterTestLayout.h"
+#include "Enemy/Character/ICEnemyBase.h"
+#include "AI/ICAIController.h"
 #include "UnrealClient.h"
 #include "Editor.h"
 #include "PlayInEditorDataTypes.h"
@@ -97,6 +100,25 @@ bool UICCharacterSetupLibrary::BeginMonsterTestReview()
     GEditor->RequestPlaySession(Session);return true;
 #else
     return false;
+#endif
+}
+
+AICEnemyBase* UICCharacterSetupLibrary::SpawnLiveReviewEnemy(UWorld* World,FVector Origin)
+{
+#if WITH_EDITOR
+    if(!World||World->WorldType!=EWorldType::PIE)return nullptr;
+    const FTransform Transform(FRotator::ZeroRotator,Origin);
+    auto* Enemy=World->SpawnActorDeferred<AICEnemyBase>(AICEnemyBase::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+    if(!Enemy)return nullptr;
+    Enemy->MonsterID=TEXT("MON_R01_001");Enemy->bInitializeWhenPlaced=false;
+    Enemy->FinishSpawning(Transform);
+    FICSpawnSlotDefinition Slot;Slot.MonsterID=Enemy->MonsterID;Slot.LeashRadiusCm=5000.;
+    if(!Enemy->InitializeEnemy(FName(*(TEXT("VISUAL_REVIEW_")+FGuid::NewGuid().ToString(EGuidFormats::Digits))),Slot,Transform))
+    {Enemy->Destroy();return nullptr;}
+    if(auto* AI=Cast<AICAIController>(Enemy->GetController()))AI->StopExecution();
+    return Enemy;
+#else
+    return nullptr;
 #endif
 }
 

@@ -201,7 +201,7 @@ public:
                     Test->TestTrue(TEXT("World reveal starts with an evaluated arm pose rather than a reference T-pose"),Player&&ICPlayerAppearance::IsFirstPoseReady(Player->GetMesh()));
                     bSawPreparedReveal=true;return false;
                 }
-                Test->TestFalse(TEXT("Cursor stays hidden during prologue"),PC->bShowMouseCursor);
+                Test->TestTrue(TEXT("Prologue UI keeps the cursor visible"),PC->bShowMouseCursor);
                 auto* Music=World->GetSubsystem<UICBGMSubsystem>();Music->Tick(1.f);
                 if(FICPrologueTestAccess::Reading(Prologue))Test->TestEqual(TEXT("Prologue reading uses its editable music row"),Music->GetCurrentMusicRow(),FName(TEXT("BGM_Prologue")));
                 const int32 Before=Prologue->GetLineIndex();
@@ -487,7 +487,7 @@ public:
             Test->TestEqual(TEXT("Pause freezes PlayClock"),PC->GetTime()->GetClock().PlaySecond,PausedAt);
             auto* CurrentMenu=Cast<UICGameMenuWidget>(PC->Screen->GetWidgetFromName(TEXT("GameMenu")));
             if(!Test->TestNotNull(TEXT("Current tabbed gameplay menu mounted"),CurrentMenu)){Cleanup();return true;}
-            Test->TestFalse(TEXT("Menu cursor is hidden"),PC->bShowMouseCursor);
+            Test->TestTrue(TEXT("Menu cursor is visible"),PC->bShowMouseCursor);
             Capture(Client,TEXT("Morpheus_Menu"));
             CurrentMenu->SelectTab(TEXT("Settings"));CurrentMenu->NavigationArea=1;CurrentMenu->SettingsActionIndex=0;
             Test->TestTrue(TEXT("G confirms the selected menu action"),CurrentMenu->HandleMenuKey(EKeys::G));
