@@ -8,6 +8,7 @@
 class AICNPCBase;
 class AICPlayerController;
 class UICLifeObjectUserComponent;
+class UICNPCHomeBehaviorComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FICNPCInteractionStarted, AICNPCBase*, NPC, AICPlayerController*, Requester, FName, ServiceID);
 
@@ -85,6 +86,10 @@ public:
     /** 생활 오브젝트(침대·의자·카운터 등) 예약/점유 상태. 연출 전용이며 저장하지 않는다. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="IC|Life") TObjectPtr<UICLifeObjectUserComponent> LifeObjectUser;
     UFUNCTION(BlueprintPure, Category="IC|Life") UICLifeObjectUserComponent* GetLifeObjectUser() const { return LifeObjectUser; }
+
+    /** 집 앵커 주변의 비근무 자율 행동. StateTree/생활 오브젝트 없이도 동작한다. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="IC|NPC|Home") TObjectPtr<UICNPCHomeBehaviorComponent> HomeBehavior;
+    UFUNCTION(BlueprintPure, Category="IC|NPC|Home") UICNPCHomeBehaviorComponent* GetHomeBehavior() const { return HomeBehavior; }
 
 protected:
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|NPC|Movement",meta=(ClampMin="0"))

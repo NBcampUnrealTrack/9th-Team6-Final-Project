@@ -109,24 +109,24 @@ int32 UICLifeObjectSubsystem::GatherCandidates(const UICLifeObjectUserComponent&
     const FGameplayTag Occupation = User.GetOccupationTag();
     const FName Region = User.GetRegionID();
 
-    // 거리 기준점: 목적지 앵커(로드되어 있으면) → 없으면 NPC 현재 위치.
+    // 탐색 기준점: 시간표 목적지 앵커(로드되어 있으면) → 없으면 NPC 현재 위치.
+    // 넓은 오픈 월드에서 다른 집 오브젝트까지 가다가 시간표가 바뀌지 않도록 반경(기본 25m) 안에서만 찾는다.
     FVector Origin = UserActor->GetActorLocation();
     FTransform AnchorTransform;
     if (!Routine.DestinationAnchorID.IsNone() && User.ResolveAnchor(Routine.DestinationAnchorID, AnchorTransform))
         Origin = AnchorTransform.GetLocation();
 
+    // 반경 안에서 본인이 사용할 수 있는 오브젝트(활동 태그 + 소유자/허용 NPC/직업/지역 조건 통과) 중
+    // 하나를 무작위로 고른다. 오브젝트마다 난수를 하나씩 부여해서, 자리가 많은 오브젝트가 더 자주 뽑히지 않게 한다.
     for (const TWeakObjectPtr<AICLifeObjectActor>& Entry : Objects)
     {
         AICLifeObjectActor* Object = Entry.Get();
         if (!Object || !Object->IsSmartObjectReady() || Object->IsPlayerLocked()) continue;
         if (!Object->GetEffectiveActivityTags().HasTag(Routine.ActivityTag)) continue;
         if (!Object->CanBeUsedBy(UserID, Occupation, Region)) continue;
+        if (SearchRadiusCm > 0.f && FVector::DistSquared(Origin, Object->GetActorLocation()) > FMath::Square(static_cast<double>(SearchRadiusCm))) continue;
 
-        const bool bLinked = !Object->LinkedAnchorID.IsNone() && Object->LinkedAnchorID == Routine.DestinationAnchorID;
-        const bool bOwned = !Object->OwnerNPCID.IsNone() && Object->OwnerNPCID == UserID;
-        const double Distance = FVector::Dist(Origin, Object->GetActorLocation());
-        if (!bLinked && !bOwned && SearchRadiusCm > 0.f && Distance > SearchRadiusCm) continue;
-
+        const double ObjectRoll = FMath::FRand();
         TArray<FSmartObjectSlotHandle> Slots;
         SO->GetAllSlots(Object->SmartObject->GetRegisteredHandle(), Slots);
         for (const FSmartObjectSlotHandle& Slot : Slots)
@@ -135,8 +135,8 @@ int32 UICLifeObjectSubsystem::GatherCandidates(const UICLifeObjectUserComponent&
             FICLifeObjectCandidate& Candidate = OutCandidates.AddDefaulted_GetRef();
             Candidate.Object = Object;
             Candidate.SlotIndex = Slot.GetSlotIndex();
-            // 앵커 연결 > 내 소유 > 거리 > 슬롯 번호 순으로 우선한다.
-            Candidate.Score = Distance + Slot.GetSlotIndex() - (bLinked ? 1.0e7 : 0.0) - (bOwned ? 1.0e6 : 0.0);
+            // 같은 오브젝트 안에서는 빈 자리 중 앞 번호부터 쓴다.
+            Candidate.Score = ObjectRoll + Slot.GetSlotIndex() * 1.0e-6;
         }
     }
     OutCandidates.Sort([](const FICLifeObjectCandidate& A, const FICLifeObjectCandidate& B) { return A.Score < B.Score; });
