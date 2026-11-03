@@ -57,19 +57,19 @@ UClass* WidgetClass(const TCHAR* Name,UClass* Fallback)
 
 bool UICStorageTransferPopup::BuildLayout(UWidgetTree* Tree)
 {
-    using namespace ICStorageLayout;auto* Root=Tree->ConstructWidget<UOverlay>();Tree->RootWidget=Root;
-    auto* Shade=Tree->ConstructWidget<UBorder>();Shade->SetBrushColor(FLinearColor(0,0,0,.8f));Fill(Root,Shade);
-    auto* Body=Panel(Tree,Root,620,480);
-    Row(Body,Label(Tree,TEXT("TXT_ItemName"),FText::GetEmpty(),28));
-    auto* Description=Tree->ConstructWidget<UScrollBox>();Description->AddChild(Label(Tree,TEXT("TXT_Description"),FText::GetEmpty()));Body->AddChildToVerticalBox(Description)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    auto* QuantityRow=Tree->ConstructWidget<UHorizontalBox>();Row(Body,QuantityRow);
-    QuantityRow->AddChildToHorizontalBox(Button(Tree,TEXT("BTN_Less"),FText::FromString(TEXT("<"))));
-    auto* QuantityText=Label(Tree,TEXT("TXT_Quantity"),FText::GetEmpty(),24);QuantityText->SetJustification(ETextJustify::Center);
+    auto* Root=Tree->ConstructWidget<UOverlay>();Tree->RootWidget=Root;
+    auto* Shade=Tree->ConstructWidget<UBorder>();Shade->SetBrushColor(FLinearColor(0,0,0,.8f));ICStorageLayout::Fill(Root,Shade);
+    auto* Body=ICStorageLayout::Panel(Tree,Root,620,480);
+    ICStorageLayout::Row(Body,ICStorageLayout::Label(Tree,TEXT("TXT_ItemName"),FText::GetEmpty(),28));
+    auto* Description=Tree->ConstructWidget<UScrollBox>();Description->AddChild(ICStorageLayout::Label(Tree,TEXT("TXT_Description"),FText::GetEmpty()));Body->AddChildToVerticalBox(Description)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    auto* QuantityRow=Tree->ConstructWidget<UHorizontalBox>();ICStorageLayout::Row(Body,QuantityRow);
+    QuantityRow->AddChildToHorizontalBox(ICStorageLayout::Button(Tree,TEXT("BTN_Less"),FText::FromString(TEXT("<"))));
+    auto* QuantityText=ICStorageLayout::Label(Tree,TEXT("TXT_Quantity"),FText::GetEmpty(),24);QuantityText->SetJustification(ETextJustify::Center);
     auto* NumberPlacement=QuantityRow->AddChildToHorizontalBox(QuantityText);NumberPlacement->SetSize(FSlateChildSize(ESlateSizeRule::Fill));NumberPlacement->SetVerticalAlignment(VAlign_Center);
-    QuantityRow->AddChildToHorizontalBox(Button(Tree,TEXT("BTN_More"),FText::FromString(TEXT(">"))));
-    Row(Body,Label(Tree,TEXT("TXT_TransferNotice"),FText::GetEmpty(),17),6);
-    Row(Body,Button(Tree,TEXT("BTN_Transfer"),NSLOCTEXT("ICStorage","Deposit","창고로 이동")),8);
-    Row(Body,Button(Tree,TEXT("BTN_TransferBack"),NSLOCTEXT("ICStorage","Back","뒤로")),0);return true;
+    QuantityRow->AddChildToHorizontalBox(ICStorageLayout::Button(Tree,TEXT("BTN_More"),FText::FromString(TEXT(">"))));
+    ICStorageLayout::Row(Body,ICStorageLayout::Label(Tree,TEXT("TXT_TransferNotice"),FText::GetEmpty(),17),6);
+    ICStorageLayout::Row(Body,ICStorageLayout::Button(Tree,TEXT("BTN_Transfer"),NSLOCTEXT("ICStorage","Deposit","창고로 이동")),8);
+    ICStorageLayout::Row(Body,ICStorageLayout::Button(Tree,TEXT("BTN_TransferBack"),NSLOCTEXT("ICStorage","Back","뒤로")),0);return true;
 }
 void UICStorageTransferPopup::NativeOnInitialized()
 {
@@ -83,9 +83,9 @@ void UICStorageTransferPopup::NativeOnInitialized()
 }
 void UICStorageTransferPopup::Present(FText Name,FText Description,int32 Count,int32 Maximum,bool ToStorage,FText Notice)
 {
-    using namespace ICStorageLayout;Caption(this,TEXT("TXT_ItemName"),Name);Caption(this,TEXT("TXT_Description"),Description);
-    Caption(this,TEXT("TXT_Quantity"),FText::Format(NSLOCTEXT("ICStorage","Amount","{0} / {1}개"),FText::AsNumber(Count),FText::AsNumber(Maximum)));
-    Caption(this,TEXT("TXT_TransferNotice"),Notice);Caption(this,TEXT("BTN_Transfer_Text"),ToStorage?NSLOCTEXT("ICStorage","Deposit","창고로 이동"):NSLOCTEXT("ICStorage","Withdraw","인벤토리로 이동"));
+    ICStorageLayout::Caption(this,TEXT("TXT_ItemName"),Name);ICStorageLayout::Caption(this,TEXT("TXT_Description"),Description);
+    ICStorageLayout::Caption(this,TEXT("TXT_Quantity"),FText::Format(NSLOCTEXT("ICStorage","Amount","{0} / {1}개"),FText::AsNumber(Count),FText::AsNumber(Maximum)));
+    ICStorageLayout::Caption(this,TEXT("TXT_TransferNotice"),Notice);ICStorageLayout::Caption(this,TEXT("BTN_Transfer_Text"),ToStorage?NSLOCTEXT("ICStorage","Deposit","창고로 이동"):NSLOCTEXT("ICStorage","Withdraw","인벤토리로 이동"));
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Less")))->SetIsEnabled(Count>1);CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_More")))->SetIsEnabled(Count<Maximum);
     CastChecked<UButton>(GetWidgetFromName(TEXT("BTN_Transfer")))->SetIsEnabled(Maximum>0);Highlight();
 }
@@ -104,23 +104,23 @@ bool UICStorageTransferPopup::HandleKey(FKey Key,bool Repeat)
 
 bool UICStorageWidget::BuildLayout(UWidgetTree* Tree)
 {
-    using namespace ICStorageLayout;auto* Root=Tree->ConstructWidget<UOverlay>();Tree->RootWidget=Root;auto* Body=Panel(Tree,Root,1360,790);
-    auto* Heading=Tree->ConstructWidget<UHorizontalBox>();Row(Body,Heading);
-    Heading->AddChildToHorizontalBox(Label(Tree,NAME_None,NSLOCTEXT("ICStorage","Title","개인 창고"),30))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-    Heading->AddChildToHorizontalBox(Button(Tree,TEXT("BTN_StorageClose"),NSLOCTEXT("ICStorage","Close","닫기")));
+    auto* Root=Tree->ConstructWidget<UOverlay>();Tree->RootWidget=Root;auto* Body=ICStorageLayout::Panel(Tree,Root,1360,790);
+    auto* Heading=Tree->ConstructWidget<UHorizontalBox>();ICStorageLayout::Row(Body,Heading);
+    Heading->AddChildToHorizontalBox(ICStorageLayout::Label(Tree,NAME_None,NSLOCTEXT("ICStorage","Title","개인 창고"),30))->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+    Heading->AddChildToHorizontalBox(ICStorageLayout::Button(Tree,TEXT("BTN_StorageClose"),NSLOCTEXT("ICStorage","Close","닫기")));
     auto* Columns=Tree->ConstructWidget<UHorizontalBox>();Body->AddChildToVerticalBox(Columns)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
     for(int32 Side=0;Side<2;++Side)
     {
         auto* Frame=Tree->ConstructWidget<UBorder>();Frame->SetBrushColor(FLinearColor(.06f,.09f,.13f));Frame->SetPadding(FMargin(12));
         auto* Placement=Columns->AddChildToHorizontalBox(Frame);Placement->SetSize(FSlateChildSize(ESlateSizeRule::Fill));Placement->SetPadding(Side==0?FMargin(0,0,12,0):FMargin(12,0,0,0));
         auto* Column=Tree->ConstructWidget<UVerticalBox>();Frame->SetContent(Column);
-        Row(Column,Label(Tree,Side==0?TEXT("TXT_ChestTitle"):TEXT("TXT_BagTitle"),FText::GetEmpty(),23));
+        ICStorageLayout::Row(Column,ICStorageLayout::Label(Tree,Side==0?TEXT("TXT_ChestTitle"):TEXT("TXT_BagTitle"),FText::GetEmpty(),23));
         auto* Scroll=Tree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(),Side==0?TEXT("ChestScroll"):TEXT("StorageBagScroll"));Column->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
         auto* Grid=Tree->ConstructWidget<UUniformGridPanel>(UUniformGridPanel::StaticClass(),Side==0?TEXT("ChestGrid"):TEXT("StorageBagGrid"));Grid->SetSlotPadding(FMargin(2));Scroll->AddChild(Grid);
     }
-    Row(Body,Label(Tree,TEXT("TXT_StorageNotice"),FText::GetEmpty(),18),5);
-    Row(Body,Label(Tree,NAME_None,NSLOCTEXT("ICStorage","Keys","클릭 · Enter 정보/이동  |  WASD 이동  |  Tab 양쪽 전환  |  ESC 닫기"),17),0);
-    auto* Popup=Tree->ConstructWidget<UICStorageTransferPopup>(ICStorageLayout::WidgetClass(TEXT("WBP_IC_StorageTransferPopup"),UICStorageTransferPopup::StaticClass()),TEXT("TransferPopup"));Fill(Root,Popup);Popup->SetVisibility(ESlateVisibility::Collapsed);return true;
+    ICStorageLayout::Row(Body,ICStorageLayout::Label(Tree,TEXT("TXT_StorageNotice"),FText::GetEmpty(),18),5);
+    ICStorageLayout::Row(Body,ICStorageLayout::Label(Tree,NAME_None,NSLOCTEXT("ICStorage","Keys","클릭 · Enter 정보/이동  |  WASD 이동  |  Tab 양쪽 전환  |  ESC 닫기"),17),0);
+    auto* Popup=Tree->ConstructWidget<UICStorageTransferPopup>(ICStorageLayout::WidgetClass(TEXT("WBP_IC_StorageTransferPopup"),UICStorageTransferPopup::StaticClass()),TEXT("TransferPopup"));ICStorageLayout::Fill(Root,Popup);Popup->SetVisibility(ESlateVisibility::Collapsed);return true;
 }
 void UICStorageWidget::NativeOnInitialized()
 {
@@ -162,10 +162,10 @@ FPlayerItemInstance UICStorageWidget::CurrentItem() const
 }
 void UICStorageWidget::RefreshStorage()
 {
-    if(!bOpen||!Inventory||bRefreshing||bSubmitting)return;TGuardValue<bool> Guard(bRefreshing,true);using namespace ICStorageLayout;
+    if(!bOpen||!Inventory||bRefreshing||bSubmitting)return;TGuardValue<bool> Guard(bRefreshing,true);
     const auto Snapshot=Inventory->GetSnapshot();const auto* Chest=Snapshot.Storage.Find(ContainerID);if(!Chest){CloseStorage();return;}
-    Caption(this,TEXT("TXT_ChestTitle"),NSLOCTEXT("ICStorage","FortySlots","창고 · 40칸 고정"));
-    Caption(this,TEXT("TXT_BagTitle"),FText::Format(NSLOCTEXT("ICStorage","BagCapacity","인벤토리 · {0}칸"),FText::AsNumber(Snapshot.Bag.Slots.Num())));
+    ICStorageLayout::Caption(this,TEXT("TXT_ChestTitle"),NSLOCTEXT("ICStorage","FortySlots","창고 · 40칸 고정"));
+    ICStorageLayout::Caption(this,TEXT("TXT_BagTitle"),FText::Format(NSLOCTEXT("ICStorage","BagCapacity","인벤토리 · {0}칸"),FText::AsNumber(Snapshot.Bag.Slots.Num())));
     for(int32 Side=0;Side<2;++Side)
     {
         auto* Grid=CastChecked<UUniformGridPanel>(GetWidgetFromName(Side==0?TEXT("ChestGrid"):TEXT("StorageBagGrid")));const auto& Slots=Side==0?Chest->Slots:Snapshot.Bag.Slots;

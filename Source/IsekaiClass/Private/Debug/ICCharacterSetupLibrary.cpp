@@ -36,6 +36,18 @@
 #include "Misc/FileHelper.h"
 #endif
 
+bool UICCharacterSetupLibrary::SetUIReviewWindowSize(UWorld* World,int32 Width,int32 Height)
+{
+#if WITH_EDITOR
+    auto* Viewport=World&&World->WorldType==EWorldType::PIE?World->GetGameViewport():nullptr;
+    auto Window=Viewport?Viewport->GetWindow():nullptr;
+    if(!Window.IsValid()||Width<=0||Height<=0)return false;
+    Window->ReshapeWindow(Window->GetPositionInScreen(),FVector2f(Width,Height));return true;
+#else
+    return false;
+#endif
+}
+
 bool UICCharacterSetupLibrary::CaptureMonsterTestHUD(UWorld* World,const FString& File)
 {
 #if WITH_EDITOR

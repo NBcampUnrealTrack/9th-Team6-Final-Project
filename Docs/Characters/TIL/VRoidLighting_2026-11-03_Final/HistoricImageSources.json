@@ -1,0 +1,632 @@
+[
+  {
+    "image": "initial-04h.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\00_current\\04h.png",
+        "caption": "기준 · 초기 부위 혼합"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\01_unlit_scale\\04h.png",
+        "caption": "1 · Unlit 고정 배율"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\02_tonemap\\04h.png",
+        "caption": "2 · 역톤매핑 해제"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\03_mtoon_lit\\04h.png",
+        "caption": "3 · MToon Lit"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\04_sss_skin\\04h.png",
+        "caption": "4 · 피부 SSS"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\05_character_fill\\04h.png",
+        "caption": "5 · 캐릭터 보조광"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\06_postprocess\\04h.png",
+        "caption": "6 · 화면 명도 보정"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\07_environment\\04h.png",
+        "caption": "7 · 조도 추정형 Unlit"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\08_single_sun\\04h.png",
+        "caption": "8 · 단일 태양광"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "initial-10h.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\00_current\\10h.png",
+        "caption": "기준 · 초기 부위 혼합"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\01_unlit_scale\\10h.png",
+        "caption": "1 · Unlit 고정 배율"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\02_tonemap\\10h.png",
+        "caption": "2 · 역톤매핑 해제"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\03_mtoon_lit\\10h.png",
+        "caption": "3 · MToon Lit"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\04_sss_skin\\10h.png",
+        "caption": "4 · 피부 SSS"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\05_character_fill\\10h.png",
+        "caption": "5 · 캐릭터 보조광"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\06_postprocess\\10h.png",
+        "caption": "6 · 화면 명도 보정"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\07_environment\\10h.png",
+        "caption": "7 · 조도 추정형 Unlit"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\08_single_sun\\10h.png",
+        "caption": "8 · 단일 태양광"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "initial-14h.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\00_current\\14h.png",
+        "caption": "기준 · 초기 부위 혼합"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\01_unlit_scale\\14h.png",
+        "caption": "1 · Unlit 고정 배율"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\02_tonemap\\14h.png",
+        "caption": "2 · 역톤매핑 해제"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\03_mtoon_lit\\14h.png",
+        "caption": "3 · MToon Lit"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\04_sss_skin\\14h.png",
+        "caption": "4 · 피부 SSS"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\05_character_fill\\14h.png",
+        "caption": "5 · 캐릭터 보조광"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\06_postprocess\\14h.png",
+        "caption": "6 · 화면 명도 보정"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\07_environment\\14h.png",
+        "caption": "7 · 조도 추정형 Unlit"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\08_single_sun\\14h.png",
+        "caption": "8 · 단일 태양광"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "initial-20h.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\00_current\\20h.png",
+        "caption": "기준 · 초기 부위 혼합"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\01_unlit_scale\\20h.png",
+        "caption": "1 · Unlit 고정 배율"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\02_tonemap\\20h.png",
+        "caption": "2 · 역톤매핑 해제"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\03_mtoon_lit\\20h.png",
+        "caption": "3 · MToon Lit"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\04_sss_skin\\20h.png",
+        "caption": "4 · 피부 SSS"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\05_character_fill\\20h.png",
+        "caption": "5 · 캐릭터 보조광"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\06_postprocess\\20h.png",
+        "caption": "6 · 화면 명도 보정"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\07_environment\\20h.png",
+        "caption": "7 · 조도 추정형 Unlit"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\MethodComparison\\08_single_sun\\20h.png",
+        "caption": "8 · 단일 태양광"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "hair-eight-Night_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\Research_20261103\\ReportPreview\\Overview_Night_Outside.png"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "hair-eight-Night_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\Research_20261103\\ReportPreview\\Overview_Night_Inside.png"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "hair-eight-Day_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\Research_20261103\\ReportPreview\\Overview_Day_Outside.png"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "hair-eight-Day_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\Research_20261103\\ReportPreview\\Overview_Day_Inside.png"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "edge-extra-Night_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\02_geometry_normal_Night_Inside_Closeup.png",
+        "caption": "2번 기준"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\07_raw_diffuse_Night_Inside_Closeup.png",
+        "caption": "7번 기준"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\09_mask_coverage_Night_Inside_Closeup.png",
+        "caption": "7번 + UV 경계 보정"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\10_alpha_colour_Night_Inside_Closeup.png",
+        "caption": "7번 + 투명 가장자리 색 보정"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\11_alpha_clip_Night_Inside_Closeup.png",
+        "caption": "7번 + 가장자리 잘라내기"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\12_finer_mip_Night_Inside_Closeup.png",
+        "caption": "7번 + 더 선명한 텍스처 샘플"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\13_thin_normal_Night_Inside_Closeup.png",
+        "caption": "7번 + 얇은 면 빛 전달"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\D1_unlit_view_Night_Inside_Closeup.png",
+        "caption": "진단: 조명 없는 재질색 보기"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\D2_short_ao_off_Night_Inside_Closeup.png",
+        "caption": "진단: 근거리 간접광 차폐 끄기"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\D3_screen_trace_off_Night_Inside_Closeup.png",
+        "caption": "진단: 화면 기반 간접광 추적 끄기"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "ao-diagnostics-Night_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\07_raw_diffuse_Night_Inside_Closeup.png",
+        "caption": "7번 기준"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\D4_post_material_off_Night_Inside_Closeup.png",
+        "caption": "D4_post_material_off"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\D5_ssao_off_Night_Inside_Closeup.png",
+        "caption": "D5_ssao_off"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\D6_dfao_off_Night_Inside_Closeup.png",
+        "caption": "D6_dfao_off"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\D7_all_ao_off_Night_Inside_Closeup.png",
+        "caption": "D7_all_ao_off"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\D8_contact_off_Night_Inside_Closeup.png",
+        "caption": "D8_contact_off"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "edge-extra-Day_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\02_geometry_normal_Day_Outside_Closeup.png",
+        "caption": "2번 기준"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\07_raw_diffuse_Day_Outside_Closeup.png",
+        "caption": "7번 기준"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\09_mask_coverage_Day_Outside_Closeup.png",
+        "caption": "7번 + UV 경계 보정"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\10_alpha_colour_Day_Outside_Closeup.png",
+        "caption": "7번 + 투명 가장자리 색 보정"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\11_alpha_clip_Day_Outside_Closeup.png",
+        "caption": "7번 + 가장자리 잘라내기"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\12_finer_mip_Day_Outside_Closeup.png",
+        "caption": "7번 + 더 선명한 텍스처 샘플"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\13_thin_normal_Day_Outside_Closeup.png",
+        "caption": "7번 + 얇은 면 빛 전달"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\D1_unlit_view_Day_Outside_Closeup.png",
+        "caption": "진단: 조명 없는 재질색 보기"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\D2_short_ao_off_Day_Outside_Closeup.png",
+        "caption": "진단: 근거리 간접광 차폐 끄기"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\Captures\\D3_screen_trace_off_Day_Outside_Closeup.png",
+        "caption": "진단: 화면 기반 간접광 추적 끄기"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "ao-diagnostics-Day_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\07_raw_diffuse_Day_Outside_Closeup.png",
+        "caption": "7번 기준"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\D4_post_material_off_Day_Outside_Closeup.png",
+        "caption": "D4_post_material_off"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\D5_ssao_off_Day_Outside_Closeup.png",
+        "caption": "D5_ssao_off"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\D6_dfao_off_Day_Outside_Closeup.png",
+        "caption": "D6_dfao_off"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\D7_all_ao_off_Day_Outside_Closeup.png",
+        "caption": "D7_all_ao_off"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC003HairOnly\\EdgeStudy_20261103\\OutlineCaptures\\D8_contact_off_Day_Outside_Closeup.png",
+        "caption": "D8_contact_off"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "kawaii-Night_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\Player_F_Night_Outside_Full.png",
+        "caption": "플레이어 여성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\Player_F_Night_Outside_Face.png",
+        "caption": "플레이어 여성 · 얼굴"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\NPC_R01_003_Night_Outside_Full.png",
+        "caption": "NPC 003 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\NPC_R01_003_Night_Outside_Face.png",
+        "caption": "NPC 003 · 얼굴"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "kawaii-Night_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\Player_F_Night_Inside_Full.png",
+        "caption": "플레이어 여성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\Player_F_Night_Inside_Face.png",
+        "caption": "플레이어 여성 · 얼굴"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\NPC_R01_003_Night_Inside_Full.png",
+        "caption": "NPC 003 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\NPC_R01_003_Night_Inside_Face.png",
+        "caption": "NPC 003 · 얼굴"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "kawaii-Day_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\Player_F_Day_Outside_Full.png",
+        "caption": "플레이어 여성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\Player_F_Day_Outside_Face.png",
+        "caption": "플레이어 여성 · 얼굴"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\NPC_R01_003_Day_Outside_Full.png",
+        "caption": "NPC 003 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\NPC_R01_003_Day_Outside_Face.png",
+        "caption": "NPC 003 · 얼굴"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "kawaii-Day_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\Player_F_Day_Inside_Full.png",
+        "caption": "플레이어 여성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\Player_F_Day_Inside_Face.png",
+        "caption": "플레이어 여성 · 얼굴"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\NPC_R01_003_Day_Inside_Full.png",
+        "caption": "NPC 003 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\KawaiiToon_20261103\\Captures\\NPC_R01_003_Day_Inside_Face.png",
+        "caption": "NPC 003 · 얼굴"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "outline-before-after-Night_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\15_hair_boundary_filter_Night_Outside_Full.png",
+        "caption": "머리만 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\Character_Whole_Night_Outside_Full.png",
+        "caption": "전신 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\15_hair_boundary_filter_Night_Outside_Closeup.png",
+        "caption": "머리만 · 근접"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\Character_Whole_Night_Outside_Closeup.png",
+        "caption": "전신 · 근접"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "outline-before-after-Night_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\15_hair_boundary_filter_Night_Inside_Full.png",
+        "caption": "머리만 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\Character_Whole_Night_Inside_Full.png",
+        "caption": "전신 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\15_hair_boundary_filter_Night_Inside_Closeup.png",
+        "caption": "머리만 · 근접"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\Character_Whole_Night_Inside_Closeup.png",
+        "caption": "전신 · 근접"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "outline-before-after-Day_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\15_hair_boundary_filter_Day_Outside_Full.png",
+        "caption": "머리만 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\Character_Whole_Day_Outside_Full.png",
+        "caption": "전신 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\15_hair_boundary_filter_Day_Outside_Closeup.png",
+        "caption": "머리만 · 근접"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\Character_Whole_Day_Outside_Closeup.png",
+        "caption": "전신 · 근접"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "outline-before-after-Day_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\15_hair_boundary_filter_Day_Inside_Full.png",
+        "caption": "머리만 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\Character_Whole_Day_Inside_Full.png",
+        "caption": "전신 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\15_hair_boundary_filter_Day_Inside_Closeup.png",
+        "caption": "머리만 · 근접"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\Character_Whole_Day_Inside_Closeup.png",
+        "caption": "전신 · 근접"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "world-control.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\World_Original.png",
+        "caption": "원본 후처리"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPC003CharacterOutline_20261103\\PreviewCaptures\\World_Selected.png",
+        "caption": "캐릭터 전용 예외 추가"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "npc001-revisions-Night_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\Final\\NPC_R01_001_Night_Outside.png",
+        "caption": "기준 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC001SoftHead\\Final\\NPC_R01_001_Night_Outside.png",
+        "caption": "얼굴·눈 산란 실험 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC001HairOnly\\Final\\NPC_R01_001_Night_Outside.png",
+        "caption": "눈 복원·머리카락만 산란 · 전신"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "npc001-revisions-Night_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\Final\\NPC_R01_001_Night_Inside.png",
+        "caption": "기준 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC001SoftHead\\Final\\NPC_R01_001_Night_Inside.png",
+        "caption": "얼굴·눈 산란 실험 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC001HairOnly\\Final\\NPC_R01_001_Night_Inside.png",
+        "caption": "눈 복원·머리카락만 산란 · 전신"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "npc001-revisions-Day_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\Final\\NPC_R01_001_Day_Outside.png",
+        "caption": "기준 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC001SoftHead\\Final\\NPC_R01_001_Day_Outside.png",
+        "caption": "얼굴·눈 산란 실험 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC001HairOnly\\Final\\NPC_R01_001_Day_Outside.png",
+        "caption": "눈 복원·머리카락만 산란 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\Final\\NPC_R01_001_Day_Outside_Closeup.png",
+        "caption": "기준 · 얼굴"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC001SoftHead\\Final\\NPC_R01_001_Day_Outside_Closeup.png",
+        "caption": "얼굴·눈 산란 실험 · 얼굴"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC001HairOnly\\Final\\NPC_R01_001_Day_Outside_Closeup.png",
+        "caption": "눈 복원·머리카락만 산란 · 얼굴"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "npc001-revisions-Day_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\Final\\NPC_R01_001_Day_Inside.png",
+        "caption": "기준 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC001SoftHead\\Final\\NPC_R01_001_Day_Inside.png",
+        "caption": "얼굴·눈 산란 실험 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\NPCWorldReactive\\NPC001HairOnly\\Final\\NPC_R01_001_Day_Inside.png",
+        "caption": "눈 복원·머리카락만 산란 · 전신"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  }
+]
