@@ -118,6 +118,11 @@ FGameplayTagContainer AICLifeObjectActor::GetEffectiveActivityTags() const
     return ActivityTags.IsEmpty() ? ICLife::GetDefaultActivityTags(ObjectType) : ActivityTags;
 }
 
+bool AICLifeObjectActor::IsLinkedToAnchor(FName AnchorID) const
+{
+    return !AnchorID.IsNone() && (LinkedAnchorID == AnchorID || LinkedAnchorIDs.Contains(AnchorID));
+}
+
 int32 AICLifeObjectActor::GetSlotCount() const
 {
     const USmartObjectDefinition* Definition = SmartObject ? SmartObject->GetDefinition() : nullptr;
