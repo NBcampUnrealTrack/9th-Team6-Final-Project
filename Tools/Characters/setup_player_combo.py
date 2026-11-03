@@ -23,6 +23,25 @@ SPECS = {
 }
 
 
+# Contact frames in the retargeted Combo_Attack_01 clips, on a 60 Hz timeline.
+# The second stage reverses its slash; the finisher rises and then strikes down.
+SWORD_CONTACT_FRAMES = ((9,), (9, 27), (11, 44))
+
+
+def build_combo_montage(folder, family, stage, clip, fraction, projectile):
+    times = [frame / 60 for frame in SWORD_CONTACT_FRAMES[stage]] if family == 'Sword' else [round(clip.get_play_length() * fraction, 6)]
+    path = folder + f'/AM_Combo_{family}_{stage + 1}'
+    montage = u.ICCharacterSetupLibrary.create_normal_attack_montage(path, clip, times[0], projectile)
+    if not montage:
+        raise RuntimeError('Attack montage generation failed: ' + path)
+    for index, time in enumerate(times[1:], 1):
+        notify = u.AnimationLibrary.add_animation_notify_event(montage, 'ICNormalAttack', time, u.ICCombatAnimNotify)
+        notify.set_editor_property('event', 'AN_HitStart')
+        notify.set_editor_property('hit_index', index)
+    setup.save(montage)
+    return montage, times[0]
+
+
 def glow_material():
     material = setup.create(setup.GAME + '/Combat/Effects/M_AttackGlow', u.Material, u.MaterialFactoryNew())
     material.set_editor_property('shading_model', u.MaterialShadingModel.MSM_UNLIT)
@@ -44,7 +63,7 @@ def tune_classes(timing):
         fields, rows = reader.fieldnames, list(reader)
     for row in rows:
         family = row['WeaponFamily']
-        if family not in SPECS:
+        if family not in timing:
             continue
         _, _, _, distance, speed = SPECS[family]
         # Split only on stage boundaries; Hit and Vector nested structs remain intact.
@@ -61,6 +80,10 @@ def tune_classes(timing):
                 'GuardDodgeCancelStartPlaySeconds': min(length - .05, hit_time + .1),
                 'GuardDodgeCancelEndPlaySeconds': length,
             }
+            if family == 'Sword':
+                frames = SWORD_CONTACT_FRAMES[index]
+                values.update(RepeatCount=len(frames), RepeatIntervalPlaySeconds=(frames[-1]-frames[0])/60,
+                              GuardDodgeCancelStartPlaySeconds=frames[-1]/60 + .15)
             if distance:
                 values.update(ProjectileSpeedCmPerSecond=speed, ProjectileLifetimePlaySeconds=distance / speed)
                 stage = re.sub(r'Shape=\w+', 'Shape=Projectile', stage)
@@ -69,7 +92,7 @@ def tune_classes(timing):
                 else:
                     values['ProjectileMaxDistanceCm'] = distance
             for key, value in values.items():
-                stage, count = re.subn(r'(?<!\w)' + key + r'=[0-9.]+', f'{key}={value:.6f}', stage, count=1)
+                stage, count = re.subn(r'(?<!\w)' + key + r'=[0-9.]+', (f'{key}={int(value)}' if key == 'RepeatCount' else f'{key}={value:.6f}'), stage, count=1)
                 if count != 1:
                     raise RuntimeError(f'Could not tune {family}/{index}/{key}')
             output.append(stage)
@@ -105,12 +128,7 @@ def main():
                 clip.set_editor_property('root_motion_root_lock', u.RootMotionRootLock.REF_POSE)
                 setup.save(clip)
                 length = clip.get_play_length()
-                hit_time = round(length * fraction, 6)
-                montage = u.ICCharacterSetupLibrary.create_normal_attack_montage(
-                    folder + f'/AM_Combo_{family}_{i + 1}', clip, hit_time, bool(distance))
-                if not montage:
-                    raise RuntimeError('Attack montage generation failed')
-                setup.save(montage)
+                montage, hit_time = build_combo_montage(folder, family, i, clip, fraction, bool(distance))
                 montages.append(montage)
                 times.append((hit_time, length))
                 report.append(dict(gender=gender, family=family, stage=i + 1, clip=clip.get_path_name(),

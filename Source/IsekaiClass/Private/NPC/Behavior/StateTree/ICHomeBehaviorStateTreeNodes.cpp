@@ -47,6 +47,7 @@ EStateTreeRunStatus FICSTTask_HomeBehavior::Tick(FStateTreeExecutionContext& Con
     FInstanceDataType& Data = Context.GetInstanceData(*this);
     UICNPCHomeBehaviorComponent* Behavior = ICHomeBehaviorNodes::GetBehavior(Data.AIController);
     AICAIController* Controller = ICHomeBehaviorNodes::GetICController(Data.AIController);
+    if (Behavior && Behavior->ConsumeHomeObjectRetryRequest()) return EStateTreeRunStatus::Succeeded;
     return Behavior && Controller && Behavior->TickBehavior(*Controller)
         ? EStateTreeRunStatus::Running : EStateTreeRunStatus::Failed;
 }
@@ -56,4 +57,32 @@ void FICSTTask_HomeBehavior::ExitState(FStateTreeExecutionContext& Context, cons
     FInstanceDataType& Data = Context.GetInstanceData(*this);
     if (UICNPCHomeBehaviorComponent* Behavior = ICHomeBehaviorNodes::GetBehavior(Data.AIController))
         Behavior->StopBehavior(ICHomeBehaviorNodes::GetICController(Data.AIController));
+}
+
+FICSTTask_HomeObjectUseTimer::FICSTTask_HomeObjectUseTimer()
+{
+    bShouldStateChangeOnReselect = false;
+}
+
+EStateTreeRunStatus FICSTTask_HomeObjectUseTimer::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
+{
+    FInstanceDataType& Data = Context.GetInstanceData(*this);
+    if (UICNPCHomeBehaviorComponent* Behavior = ICHomeBehaviorNodes::GetBehavior(Data.AIController))
+        Behavior->BeginHomeObjectUse();
+    return EStateTreeRunStatus::Running;
+}
+
+EStateTreeRunStatus FICSTTask_HomeObjectUseTimer::Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const
+{
+    FInstanceDataType& Data = Context.GetInstanceData(*this);
+    if (UICNPCHomeBehaviorComponent* Behavior = ICHomeBehaviorNodes::GetBehavior(Data.AIController))
+        if (Behavior->IsHomeObjectUseActive() && Behavior->IsHomeObjectUseFinished()) return EStateTreeRunStatus::Succeeded;
+    return EStateTreeRunStatus::Running;
+}
+
+void FICSTTask_HomeObjectUseTimer::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
+{
+    FInstanceDataType& Data = Context.GetInstanceData(*this);
+    if (UICNPCHomeBehaviorComponent* Behavior = ICHomeBehaviorNodes::GetBehavior(Data.AIController))
+        Behavior->EndHomeObjectUse();
 }

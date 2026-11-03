@@ -23,8 +23,8 @@
 
 FText ICSettingsLayout::ControllerHelp(int32 Layout)
 {
-    if(Layout==1)return LOCTEXT("ControllerHelpXbox","L스틱 이동 · R스틱 시점 · RT 공격 · LT 달리기/회피 · RB 무기 변경 · LB 대상 지정\nX 상호작용 · Y 낚시 · A 점프/확인 · B 뒤로 · Start 메뉴 · View 인벤토리\nLT + X/Y/B/A: Q/E/R/T 스킬 · 십자키: 퀵슬롯 · 대상 선택 중 L스틱: 파티원 선택");
-    return LOCTEXT("ControllerHelpNintendo","L스틱 이동 · R스틱 시점 · ZR 공격 · ZL 달리기/회피 · R 무기 변경 · L 대상 지정\nX 상호작용 · Y 낚시 · A 점프/확인 · B 뒤로 · + 메뉴 · - 인벤토리\nZL + X/Y/B/A: Q/E/R/T 스킬 · 십자키: 퀵슬롯 · 대상 선택 중 L스틱: 파티원 선택");
+    if(Layout==1)return LOCTEXT("ControllerHelpXbox","L스틱 이동 · R스틱 시점 · RT 공격 · LT 달리기/회피 · RB 무기 변경 · LB 대상 지정\nX 상호작용/낚시 · A 점프/확인 · B 뒤로 · Start 메뉴 · View 인벤토리\nLT + X/Y/B/A: Q/E/R/T 스킬 · 십자키: 퀵슬롯 · 대상 선택 중 L스틱: 파티원 선택");
+    return LOCTEXT("ControllerHelpNintendo","L스틱 이동 · R스틱 시점 · ZR 공격 · ZL 달리기/회피 · R 무기 변경 · L 대상 지정\nX 상호작용/낚시 · A 점프/확인 · B 뒤로 · + 메뉴 · - 인벤토리\nZL + X/Y/B/A: Q/E/R/T 스킬 · 십자키: 퀵슬롯 · 대상 선택 중 L스틱: 파티원 선택");
 }
 
 const TArray<FText>& ICSettingsLayout::Tabs()

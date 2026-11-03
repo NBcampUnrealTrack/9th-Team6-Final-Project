@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "NPC/LifeObject/ICLifeObjectActor.h"
 #include "NPC/LifeObject/ICLifeObjectTypes.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -18,6 +19,14 @@ bool FICLifeObjectActivityTagCheck::RunTest(const FString&)
     TestFalse(TEXT("작업대는 Shop 검색에 걸리지 않는다"), ICLife::GetDefaultActivityTags(EICLifeObjectType::Workbench).HasTag(ICLifeTags::WorkShop));
     TestTrue(TEXT("침대는 Sleep 검색에 걸린다"), ICLife::GetDefaultActivityTags(EICLifeObjectType::Bed).HasTag(ICLifeTags::Sleep));
     TestFalse(TEXT("의자는 Sleep 검색에 걸리지 않는다"), ICLife::GetDefaultActivityTags(EICLifeObjectType::Seat).HasTag(ICLifeTags::Sleep));
+
+    // 기존 단일 앵커와 새 다중 앵커는 함께 후보 연결로 처리한다.
+    AICLifeObjectActor* SharedWorkbench = NewObject<AICLifeObjectActor>();
+    SharedWorkbench->LinkedAnchorID = TEXT("ANC_R01_007_WORK");
+    SharedWorkbench->LinkedAnchorIDs = {TEXT("ANC_R01_009_WORK"), TEXT("ANC_R01_010_WORK"), TEXT("ANC_R01_011_WORK")};
+    TestTrue(TEXT("기존 단일 앵커 연결을 유지한다"), SharedWorkbench->IsLinkedToAnchor(TEXT("ANC_R01_007_WORK")));
+    TestTrue(TEXT("다중 앵커의 NPC도 같은 오브젝트를 쓴다"), SharedWorkbench->IsLinkedToAnchor(TEXT("ANC_R01_009_WORK")));
+    TestFalse(TEXT("등록하지 않은 앵커는 사용할 수 없다"), SharedWorkbench->IsLinkedToAnchor(TEXT("ANC_R01_008_WORK")));
 
     // 같은 구간 판정
     FICLifeRoutine A;

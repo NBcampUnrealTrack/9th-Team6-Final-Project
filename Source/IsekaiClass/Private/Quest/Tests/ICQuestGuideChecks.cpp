@@ -16,6 +16,8 @@
 #include "Misc/App.h"
 #include "NiagaraRibbonRendererProperties.h"
 #include "Quest/ICQuestGuideLight.h"
+#include "Quest/ICQuestGuideComponent.h"
+#include "GameFramework/Pawn.h"
 #include "Quest/ICQuestGuidePath.h"
 #include "Components/BoxComponent.h"
 
@@ -286,6 +288,68 @@ bool FICQuestGuideStepBridgeCheck::RunTest(const FString& Parameters)
             ICQuestGuidePath::BuildStepBridge(*World, Lower, Upper, 50, nullptr, Points));
     }
     GEngine->DestroyWorldContext(World);
+    World->DestroyWorld(false);
+    return !HasAnyErrors();
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestGuideGroundClearanceCheck, "IC.Runtime.QuestGuideGroundClearance",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FICQuestGuideGroundClearanceCheck::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+    AActor* Floor = World->SpawnActor<AActor>();
+    UBoxComponent* Box = NewObject<UBoxComponent>(Floor);
+    Floor->SetRootComponent(Box);
+    Box->SetBoxExtent(FVector(1000, 200, 50));
+    Box->SetCollisionObjectType(ECC_WorldStatic);
+    Box->SetCollisionResponseToAllChannels(ECR_Block);
+    Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    Box->RegisterComponentWithWorld(World);
+    AICQuestGuideLight* Light = World->SpawnActor<AICQuestGuideLight>();
+    Light->PlayPath({FVector::ZeroVector, FVector(500, 0, 0)}, 500, 100, 50, false);
+    TestTrue(TEXT("A route below the floor is lifted above the surface"),
+        Light->IsPlaying() && Light->GetActorLocation().Z >= 100.f - .01f);
+    Light->Tick(1.f);
+    TestTrue(TEXT("The head keeps clearance while travelling"), Light->GetActorLocation().Z >= 100.f - .01f);
+    // A tall wall is outside the floor probe's vertical range and must truncate
+    // the route rather than be mistaken for the floor of another storey.
+    Box->SetBoxExtent(FVector(10, 200, 500));
+    Floor->SetActorLocation(FVector(250, 0, 0));
+    Light->PlayPath({FVector::ZeroVector, FVector(500, 0, 0)}, 500, 100, 50, false);
+    Light->Tick(10.f);
+    TestTrue(TEXT("Blocked sections never draw a path through the wall"), Light->GetActorLocation().X < 240.f);
+    GEngine->DestroyWorldContext(World);
+    World->DestroyWorld(false);
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICQuestGuideSequentialPulsesCheck, "IC.Runtime.QuestGuideSequentialPulses",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FICQuestGuideSequentialPulsesCheck::RunTest(const FString& Parameters)
+{
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    APawn* Pawn = World->SpawnActor<APawn>();
+    UICQuestGuideComponent* Guide = NewObject<UICQuestGuideComponent>(Pawn);
+    Pawn->AddInstanceComponent(Guide);
+    Guide->RegisterComponent();
+    const TArray<FVector> Route = {FVector::ZeroVector, FVector(1500, 0, 0)};
+    Guide->SpawnPulse(*Pawn, Route);
+    if (TestEqual(TEXT("First route starts alone"), Guide->ActiveLights.Num(), 1))
+    {
+        AICQuestGuideLight* First = Guide->ActiveLights[0];
+        Guide->SpawnPulse(*Pawn, Route);
+        TestEqual(TEXT("A moving route blocks another spawn"), Guide->ActiveLights.Num(), 1);
+        First->Tick(.2f);
+        First->FadeOut();
+        Guide->SpawnPulse(*Pawn, Route);
+        TestEqual(TEXT("The fading tail also blocks another spawn"), Guide->ActiveLights.Num(), 1);
+        First->Tick(1.f);
+        TestTrue(TEXT("Completed fade releases the active route"), Guide->ActiveLights.IsEmpty());
+        Guide->SpawnPulse(*Pawn, Route);
+        TestEqual(TEXT("A new route can start after disappearance"), Guide->ActiveLights.Num(), 1);
+    }
     World->DestroyWorld(false);
     return !HasAnyErrors();
 }

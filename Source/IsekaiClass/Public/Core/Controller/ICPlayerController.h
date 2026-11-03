@@ -148,8 +148,8 @@ public:
     UFUNCTION(BlueprintCallable,Category="IC|Session") void ConfirmModal(bool bAccept);
     UFUNCTION(BlueprintCallable,Category="IC|Session") void QuitWithoutSave();
     void FinishSessionSave(int32 Slot,bool bSuccess);
-    AICInteractionActor* FindInteractionTarget() const;
-    AICNPCBase* FindNPCInteractionTarget() const;
+    AICInteractionActor* FindInteractionTarget(TArray<AActor*>* Candidates = nullptr) const;
+    AICNPCBase* FindNPCInteractionTarget(TArray<AActor*>* Candidates = nullptr) const;
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString Menu=TEXT("Create");
     UPROPERTY(BlueprintReadOnly,Category="IC|UI") FString Notice;
     UPROPERTY(Transient,BlueprintReadOnly,Category="IC|UI") FText NoticeDisplayText;
@@ -270,7 +270,10 @@ private:
     void FlushWorldState();
     void CancelTarget();
     void Interact();
-    AICRanchAnimal* FindRanchInteractionTarget() const;
+    TArray<AActor*> GetInteractionChoices() const;
+    TWeakObjectPtr<AActor> SelectedInteraction;
+    bool bInteractionPinned = false;
+    AICRanchAnimal* FindRanchInteractionTarget(TArray<AActor*>* Candidates = nullptr) const;
     void OpenNPCDialogue(AICNPCBase* NPC);
     void BeginNPCDialogueCamera(AICNPCBase* NPC);
     void UpdateNPCDialogue(float DeltaSeconds);

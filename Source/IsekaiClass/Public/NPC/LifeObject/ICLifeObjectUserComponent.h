@@ -45,10 +45,6 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Life", meta=(ClampMin="1"))
     int32 MaxMoveFailures = 3;
 
-    /** 화면에 Print String으로 생활 행동을 표시한다(개발 빌드 전용). */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Life|Debug")
-    bool bPrintToScreen = true;
-
     // ---------- 일과 ----------
 
     /** 현재 GameClock으로 일과를 다시 계산한다. 구간이 바뀌었으면 true. bForce가 아니면 게임 분이 바뀔 때만 계산한다. */
@@ -67,11 +63,18 @@ public:
     // ---------- 탐색·예약 ----------
 
     int32 FindCandidates();
+    /**
+     * 일과 태그를 건드리지 않고, 호출자가 지정한 활동 태그로 후보를 찾는다(집 여가 활동 풀용).
+     * ExcludeObject를 주면 그 오브젝트의 슬롯은 대안이 없어도 후보에서 완전히 뺀다(재사용 쿨다운용).
+     */
+    int32 FindCandidatesForActivity(FGameplayTag ActivityTag, const AICLifeObjectActor* ExcludeObject = nullptr);
     const TArray<FICLifeObjectCandidate>& GetCandidates() const { return Candidates; }
     /** 후보를 점수순으로 돌며 첫 번째로 예약에 성공한 슬롯을 잡는다. */
     bool ClaimBestCandidate();
     UFUNCTION(BlueprintPure, Category="IC|Life") bool HasClaim() const;
     UFUNCTION(BlueprintPure, Category="IC|Life") AICLifeObjectActor* GetClaimedObject() const;
+    /** 직전에 실제 사용을 시작한 오브젝트. 대안이 있으면 다음 후보에서 제외한다. */
+    AICLifeObjectActor* GetLastUsedObject() const { return LastUsedObject.Get(); }
     int32 GetClaimedSlotIndex() const { return ClaimedSlotIndex; }
     const FSmartObjectClaimHandle& GetClaimHandle() const { return Claim; }
     bool GetClaimTransform(FTransform& OutTransform) const;
@@ -125,6 +128,7 @@ private:
     TArray<FICLifeObjectCandidate> Candidates;
     FSmartObjectClaimHandle Claim;
     TWeakObjectPtr<AICLifeObjectActor> ClaimedObject;
+    TWeakObjectPtr<AICLifeObjectActor> LastUsedObject;
     int32 ClaimedSlotIndex = INDEX_NONE;
     TWeakObjectPtr<UAnimMontage> PlayingMontage;
     FName PendingRescheduleReason;

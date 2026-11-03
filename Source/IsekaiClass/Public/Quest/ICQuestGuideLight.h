@@ -27,16 +27,16 @@ public:
 
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide", meta=(ClampMin="1", Units="cm"))
-    float TailLength = 220.f;
+    float TailLength = 900.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide", meta=(ClampMin="0.01", Units="s"))
     float FadeOutDuration = .6f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide", meta=(ClampMin="0"))
-    float TrailBrightness = 2.f;
+    float TrailBrightness = 1.35f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide")
-    FLinearColor GuideColor = FLinearColor(1.f, .73f, .33f, 1.f);
+    FLinearColor GuideColor = FLinearColor(1.f, .52f, .025f, 1.f);
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide", meta=(ClampMin="0", Units="s"))
     float FadeInDuration = .12f;
@@ -56,6 +56,7 @@ private:
     void UpdateFade(float DeltaSeconds);
     void SetVisualOpacity(float Opacity);
     FVector SampleRoute(float Distance) const;
+    void ConformPathToGround(float MaxDistance);
 
     UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> TrailMaterial;
     UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> CoreMaterial;

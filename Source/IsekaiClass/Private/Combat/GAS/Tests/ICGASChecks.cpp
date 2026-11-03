@@ -833,28 +833,34 @@ bool FICSwordComboDamageCheck::RunTest(const FString&)
         Target->SetNumericAttributeBase(UICCombatAttributeSet::GetAutoDodgeChanceAttribute(),0);
         auto Step=[&](){F.Step(.01);F.Player->GetMesh()->TickAnimation(.01f,false);F.Player->GetMesh()->RefreshBoneTransforms();F.Player->GetMesh()->ConditionallyDispatchQueuedAnimEvents();};
         TestTrue(TEXT("Sword combo starts"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,Enemy).bSuccess);
-        float LastDamage=0;
+        const TArray<TArray<double>> ContactTimes = {{.15}, {.15, .45}, {11./60., 44./60.}};
         for(int32 Stage=0;Stage<3;++Stage)
         {
             const float Before=Target->Capture().HP;const auto ID=F.ASC->GetActionID();
             F.ASC->RequestAction(TEXT("Attack"),NAME_None,Enemy);
             const double Began=F.Time->GetClock().PlaySecond;
-            // The finisher's wind-up lets an enemy enter just after its release.
-            // It must still hit during the DT's authored 0.15-second hit window.
-            if(Stage==2)Enemy->SetActorLocation(F.Player->GetActorLocation()+FVector(-100,0,0));
+            int32 Contacts = 0;
+            float PreviousHP = Before;
             for(int32 Frame=0;Frame<600&&F.ASC->GetActionID()==ID;++Frame)
             {
-                if(Stage==2&&F.Time->GetClock().PlaySecond-Began>.83)
-                    Enemy->SetActorLocation(F.Player->GetActorLocation()+FVector(100,0,0));
                 Step();
+                const float HP = Target->Capture().HP;
+                if (HP < PreviousHP)
+                {
+                    const double Elapsed = F.Time->GetClock().PlaySecond - Began;
+                    if (ContactTimes[Stage].IsValidIndex(Contacts))
+                        TestTrue(TEXT("Damage follows the swing frame"), FMath::Abs(Elapsed - ContactTimes[Stage][Contacts]) < .055);
+                    ++Contacts;
+                }
+                PreviousHP = HP;
             }
+            TestEqual(TEXT("Exactly one damage event per sword swing"), Contacts, ContactTimes[Stage].Num());
             const float Damage=Before-Target->Capture().HP;
             AddInfo(FString::Printf(TEXT("%s stage %d damage %.0f reach %.1f distance %.1f"),*Gender,Stage+1,Damage,Weapon->GetMeleeReachCm(),FVector::Distance(F.Player->GetActorLocation(),Enemy->GetActorLocation())));
             TestTrue(FString::Printf(TEXT("%s sword stage %d reduces actual enemy HP"),*Gender,Stage+1),Damage>0);
             const double Coefficients[]={1.,1.1,1.4};
-            TestEqual(TEXT("Each stage applies its damage exactly once"),Damage,float(FMath::RoundToDouble(F.ASC->Stat(EICStat::PhysicalAttack)*Coefficients[Stage])));
-            if(Stage==2)TestTrue(TEXT("Finisher damage exceeds stage two"),Damage>LastDamage);
-            LastDamage=Damage;
+            TestEqual(TEXT("Repeated sampling cannot duplicate a swing"), Damage,
+                ContactTimes[Stage].Num() * float(FMath::RoundToDouble(F.ASC->Stat(EICStat::PhysicalAttack)*Coefficients[Stage])));
         }
         F.ASC->CancelAction();F.Player->EquippedWeaponActor=nullptr;Weapon->Destroy();Enemy->Destroy();F.Step(1.);
     }

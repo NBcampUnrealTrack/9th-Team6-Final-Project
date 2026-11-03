@@ -157,18 +157,34 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
     SyncSaveSafety();
     if (!CanHandleGameplayInput()) ResetHeldInput();
     if (bDirty) { bDirty=false; UpdateScreens(); }
-    const auto* Target=CanHandleGameplayInput()?FindInteractionTarget():nullptr;
-    const auto* NPC=CanHandleGameplayInput()?FindNPCInteractionTarget():nullptr;
-    const auto* Animal=CanHandleGameplayInput()?FindRanchInteractionTarget():nullptr;
-    FString Hint=NPC?(NPC->IsSleepingForInteraction()?NPC->GetInteractionText().ToString():TEXT("[F] ")+NPC->GetInteractionText().ToString()):Target?TEXT("[F] ")+Target->GetInteractionText().ToString():FString();
-    if(!NPC&&Animal)Hint=NSLOCTEXT("ICRanch","ChickenSlaughterHint","[F] 닭 잡기").ToString();
-    if(CanHandleGameplayInput())if(const auto* FishingCharacter=Cast<AICPlayerCharacter>(GetPawn());FishingCharacter&&FishingCharacter->LifeActions)
+    const TArray<AActor*> Choices = CanHandleGameplayInput() ? GetInteractionChoices() : TArray<AActor*>();
+    if (!bInteractionPinned || !Choices.Contains(SelectedInteraction.Get()))
     {
-        FVector Landing;
-        if(FishingCharacter->LifeActions->ResolveFishingCast(Landing))
-            Hint+=(Hint.IsEmpty()?TEXT(""):TEXT("\n"))+NSLOCTEXT("ICFishing","CastHint","[H] 낚시 · 20초  (화면 중앙으로 찌 던지기)").ToString();
+        SelectedInteraction = Choices.IsEmpty() ? nullptr : Choices[0];
+        bInteractionPinned = false;
     }
-    if(IsUsingGamepad()){Hint.ReplaceInline(TEXT("[F]"),TEXT("[X]"));Hint.ReplaceInline(TEXT("[H]"),TEXT("[Y]"));}
+    FString Hint;
+    for (AActor* Choice : Choices)
+    {
+        FString Label;
+        if (auto* Drop = Cast<AICDroppedItem>(Choice))
+            Label = NSLOCTEXT("ICInteraction","PickupChoice","줍기").ToString() + TEXT(" · ") + Drop->Label->Text.ToString();
+        else if (auto* NPC = Cast<AICNPCBase>(Choice))
+            Label = NPC->GetInteractionText().ToString();
+        else if (Cast<AICRanchAnimal>(Choice))
+            Label = NSLOCTEXT("ICInteraction","AnimalChoice","닭 잡기").ToString();
+        else if (auto* Zone = Cast<AICLifeActor>(Choice); Zone && Zone->LifeType == EICDefinitionType::FishingPoint)
+            Label = NSLOCTEXT("ICFishing","InteractionChoice","낚시 · 20초").ToString();
+        else if (auto* Object = Cast<AICInteractionActor>(Choice))
+            Label = Object->GetInteractionText().ToString();
+        if (!Hint.IsEmpty()) Hint += TEXT("\n");
+        if (SelectedInteraction.Get() == Choice)
+            Hint += Choices.Num() > 1 ? TEXT("▶ [F] ") : TEXT("[F] ");
+        Hint += Label;
+    }
+    if (Choices.Num() > 1)
+        Hint += NSLOCTEXT("ICInteraction","WheelChoice","\n휠 ↑↓ 선택").ToString();
+    if (IsUsingGamepad()) Hint.ReplaceInline(TEXT("[F]"), TEXT("[X]"));
     if (Hint!=InteractionHint) { InteractionHint=Hint; bDirty=true; }
     auto* C=Cast<AICPlayerCharacter>(GetPawn());
     auto* ASC=C?C->GetICAbilitySystem():nullptr;
@@ -273,7 +289,7 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     if (!IsLocalController() || Slot<0 || Slot>3) return;
     if (Command==EICInputCommand::CompanionSkill && Slot>=3) return;
     if (Command==EICInputCommand::Skill && Slot!=0) return;
-    if (Command==EICInputCommand::Block) return;
+    if (Command==EICInputCommand::Block || Command==EICInputCommand::Fishing) return;
     if (Command==EICInputCommand::SprintDodge) Command=EICInputCommand::Dodge;
     if (Command==EICInputCommand::TargetToggle) Command=EICInputCommand::NextTarget;
     if(IsMainMenuLevel()||Menu==TEXT("Create")||Menu==TEXT("Loading")||Menu==TEXT("Prologue"))return;
@@ -281,7 +297,7 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
         &&Command!=EICInputCommand::Roll&&Command!=EICInputCommand::QuestFollow)
     {
         Gathering->CancelGather();
-        if(Command==EICInputCommand::Interact||Command==EICInputCommand::Fishing||Command==EICInputCommand::Menu)return;
+        if(Command==EICInputCommand::Interact||Command==EICInputCommand::Menu)return;
     }
     if (Menu==TEXT("Confirm"))
     { if(Command==EICInputCommand::Confirm)ConfirmModal(true); else if(Command==EICInputCommand::Menu)ConfirmModal(false); return; }
@@ -366,12 +382,12 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
                 InputCharacter->Jump();
         return;
     }
-    if(Command==EICInputCommand::Interact||Command==EICInputCommand::Fishing)
+    if(Command==EICInputCommand::Interact)
     {
         auto* InteractionCharacter=Cast<AICPlayerCharacter>(GetPawn());
         auto* InteractionASC=InteractionCharacter?InteractionCharacter->GetICAbilitySystem():nullptr;
         if(!InteractionASC||!InteractionASC->CanAcceptInteractionInput()||InteractionCharacter->IsSwitchingWeapon())return;
-        if(Command==EICInputCommand::Interact)Interact();else RequestFishing();
+        Interact();
         return;
     }
     if(Command==EICInputCommand::SwitchWeapon)
@@ -389,7 +405,7 @@ void AICPlayerController::HandleInputCommand(EICInputCommand Command,int32 Slot)
     if(!Action.IsNone()) { ExecuteCombatInput(Action,Slot); OnCombatRequest.Broadcast(Action,Slot); }
 }
 
-AICInteractionActor* AICPlayerController::FindInteractionTarget() const
+AICInteractionActor* AICPlayerController::FindInteractionTarget(TArray<AActor*>* Candidates) const
 {
     IC_TRACE_FUNCTION();
     const auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn());if(!PlayerPawn||!GetWorld())return nullptr;
@@ -427,18 +443,21 @@ AICInteractionActor* AICPlayerController::FindInteractionTarget() const
     FHitResult Hit;
     const FVector Camera=PlayerPawn->Camera->GetComponentLocation();
     GetWorld()->LineTraceSingleByChannel(Hit,Camera,Camera+PlayerPawn->Camera->GetForwardVector()*1000.f,ECC_Visibility,Params);
-    if(auto* Exact=Cast<AICInteractionActor>(Hit.GetActor());Eligible(Exact))return Exact;
+    auto* Exact = Cast<AICInteractionActor>(Hit.GetActor());
+    if (!Eligible(Exact)) Exact = nullptr;
+    if (Exact && !Candidates) return Exact;
     AICInteractionActor* Best=nullptr;float BestScore=MAX_flt;
     for(TActorIterator<AICInteractionActor> It(GetWorld());It;++It)
     {
         auto* Object=*It;if(!Eligible(Object))continue;
+        if (Candidates) Candidates->Add(Object);
         const FVector Offset=InteractionPoint(Object)-Origin;
         const float Score=Offset.Size()-100.f*FVector::DotProduct(Forward,Offset.GetSafeNormal2D());
         if(Score<BestScore){Best=Object;BestScore=Score;}
     }
-    return Best;
+    return Exact ? Exact : Best;
 }
-AICNPCBase* AICPlayerController::FindNPCInteractionTarget() const
+AICNPCBase* AICPlayerController::FindNPCInteractionTarget(TArray<AActor*>* Candidates) const
 {
     const AICPlayerCharacter* PlayerPawn = Cast<AICPlayerCharacter>(GetPawn());
     if (!PlayerPawn || !GetWorld()) return nullptr;
@@ -454,7 +473,7 @@ AICNPCBase* AICPlayerController::FindNPCInteractionTarget() const
         if (!Candidate || !Candidate->IsActorInitialized()) continue;
         const FVector Offset = Candidate->GetActorLocation() - Origin;
         const float Distance = Offset.Size();
-        if (Distance > ClosestDistance || FVector::DotProduct(Forward, Offset.GetSafeNormal2D()) < 0.35f) continue;
+        if (Distance > 250.f || FVector::DotProduct(Forward, Offset.GetSafeNormal2D()) < 0.35f) continue;
         FHitResult Hit;
         FCollisionQueryParams NPCQuery=Params;
         for(TActorIterator<AICLifeObjectActor> Bed(GetWorld());Bed;++Bed)
@@ -462,6 +481,8 @@ AICNPCBase* AICPlayerController::FindNPCInteractionTarget() const
         GetWorld()->LineTraceSingleByChannel(Hit, PlayerPawn->GetPawnViewLocation(),
             Candidate->GetActorLocation(), ECC_Visibility, NPCQuery);
         if (Hit.bBlockingHit && Hit.GetActor() != Candidate) continue;
+        if (Candidates) Candidates->Add(Candidate);
+        if (Distance > ClosestDistance) continue;
         Closest = Candidate;
         ClosestDistance = Distance;
     }
@@ -497,19 +518,69 @@ void AICPlayerController::HandleNPCInteractionStarted(AICNPCBase* NPC, AICPlayer
     }
 }
 
+TArray<AActor*> AICPlayerController::GetInteractionChoices() const
+{
+    TArray<AActor*> Choices;
+    const auto* PlayerCharacter = Cast<AICPlayerCharacter>(GetPawn());
+    if (!PlayerCharacter || !GetWorld()) return Choices;
+
+    FCollisionQueryParams Query;
+    Query.AddIgnoredActor(PlayerCharacter);
+    const FVector Origin = PlayerCharacter->GetActorLocation();
+    const FVector Camera = PlayerCharacter->Camera->GetComponentLocation();
+    FHitResult Hit;
+    GetWorld()->LineTraceSingleByChannel(Hit, Camera, Camera + PlayerCharacter->Camera->GetForwardVector() * 1000.f, ECC_Visibility, Query);
+    if (auto* Drop = Cast<AICDroppedItem>(Hit.GetActor()); Drop && FVector::Dist(Origin, Drop->GetActorLocation()) <= 250.f)
+        Choices.Add(Drop);
+
+    // Keep the original preferred target first within each interaction category.
+    auto AppendGroup = [&](TArray<AActor*>& Group, AActor* Preferred)
+    {
+        if (Preferred) Choices.AddUnique(Preferred);
+        for (AActor* Actor : Group) if (Actor != Preferred) Choices.AddUnique(Actor);
+        Group.Reset();
+    };
+    TArray<AActor*> Group;
+    AppendGroup(Group, FindNPCInteractionTarget(&Group));
+    AppendGroup(Group, FindRanchInteractionTarget(&Group));
+    AppendGroup(Group, FindInteractionTarget(&Group));
+    // A second visible drop can be selected even when the camera ray hits the first.
+    const FVector Forward = FRotator(0, GetControlRotation().Yaw, 0).Vector();
+    for (TActorIterator<AICDroppedItem> It(GetWorld()); It; ++It)
+    {
+        auto* Drop = *It;
+        const FVector Offset = Drop->GetActorLocation() - Origin;
+        if (Choices.Contains(Drop) || Drop->IsHidden() || !Drop->GetActorEnableCollision()
+            || Offset.SizeSquared() > FMath::Square(250.f)
+            || FVector::DotProduct(Forward, Offset.GetSafeNormal2D()) < .35f) continue;
+        FHitResult Obstacle;
+        GetWorld()->LineTraceSingleByChannel(Obstacle, PlayerCharacter->GetPawnViewLocation(), Drop->GetActorLocation(), ECC_Visibility, Query);
+        if (!Obstacle.bBlockingHit || Obstacle.GetActor() == Drop) Choices.Add(Drop);
+    }
+    FVector Landing;
+    if (!HasTargetSelection() && PlayerCharacter->LifeActions)
+        if (auto* Zone = PlayerCharacter->LifeActions->ResolveFishingCast(Landing)) Choices.Add(Zone);
+    return Choices;
+}
+
 void AICPlayerController::Interact()
 {
     IC_TRACE_FUNCTION();
-    if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn()))
+    const TArray<AActor*> Choices = GetInteractionChoices();
+    AActor* Target = SelectedInteraction.Get();
+    if (!SelectedInteraction.IsExplicitlyNull() && !Choices.Contains(Target)) return;
+    if (!Target && !Choices.IsEmpty()) Target = Choices[0];
+    if (auto* Zone = Cast<AICLifeActor>(Target); Zone && Zone->LifeType == EICDefinitionType::FishingPoint)
     {
-        FHitResult Hit;FCollisionQueryParams Params;Params.AddIgnoredActor(PlayerPawn);
-        const FVector Start=PlayerPawn->Camera->GetComponentLocation();
-        GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+PlayerPawn->Camera->GetForwardVector()*1000.f,ECC_Visibility,Params);
-        if(auto* Dropped=Cast<AICDroppedItem>(Hit.GetActor());Dropped&&FVector::Dist(PlayerPawn->GetActorLocation(),Dropped->GetActorLocation())<=250.f)
-        {Dropped->TryPickup(this);return;}
+        RequestFishing();
+        return;
     }
-
-    if (AICNPCBase* NPC = FindNPCInteractionTarget())
+    if (auto* Drop = Cast<AICDroppedItem>(Target))
+    {
+        Drop->TryPickup(this);
+        return;
+    }
+    if (auto* NPC = Cast<AICNPCBase>(Target))
     {
         if(NPC->IsSleepingForInteraction()){ShowLocalized(NPC->GetInteractionText());return;}
         NPC->OnInteractionStarted.AddUniqueDynamic(this, &ThisClass::HandleNPCInteractionStarted);
@@ -517,8 +588,8 @@ void AICPlayerController::Interact()
         NPC->OnInteractionStarted.RemoveDynamic(this, &ThisClass::HandleNPCInteractionStarted);
         return;
     }
-    if(auto* Animal=FindRanchInteractionTarget()){Animal->TrySlaughter(this);return;}
-    auto* Object=FindInteractionTarget();
+    if(auto* Animal=Cast<AICRanchAnimal>(Target)){Animal->TrySlaughter(this);return;}
+    auto* Object=Cast<AICInteractionActor>(Target);
     if(!Object)
     {
         bool bAny=false,bNear=false,bFront=false;
@@ -534,7 +605,7 @@ void AICPlayerController::Interact()
 }
 
 
-AICRanchAnimal* AICPlayerController::FindRanchInteractionTarget() const
+AICRanchAnimal* AICPlayerController::FindRanchInteractionTarget(TArray<AActor*>* Candidates) const
 {
     if(!GetWorld()||!GetPawn())return nullptr;
     AICRanchAnimal* Best=nullptr;float Distance=250.f;const FVector Forward=FRotator(0,GetControlRotation().Yaw,0).Vector();
@@ -542,10 +613,12 @@ AICRanchAnimal* AICPlayerController::FindRanchInteractionTarget() const
     {
         if(It->IsHidden()||!It->GetActorEnableCollision()||It->IsSlaughtering())continue;
         const FVector Delta=It->GetActorLocation()-GetPawn()->GetActorLocation();const float Length=Delta.Size();
-        if(Length>Distance||FVector::DotProduct(Forward,Delta.GetSafeNormal2D())<.35f)continue;
+        if(Length>250.f||FVector::DotProduct(Forward,Delta.GetSafeNormal2D())<.35f)continue;
         FHitResult Hit;FCollisionQueryParams Query;Query.AddIgnoredActor(GetPawn());
         GetWorld()->LineTraceSingleByChannel(Hit,GetPawn()->GetPawnViewLocation(),It->GetActorLocation(),ECC_Visibility,Query);
-        if(Hit.bBlockingHit&&Hit.GetActor()!=*It)continue;Best=*It;Distance=Length;
+        if(Hit.bBlockingHit&&Hit.GetActor()!=*It)continue;
+        if (Candidates) Candidates->Add(*It);
+        if (Length <= Distance) { Best=*It; Distance=Length; }
     }
     return Best;
 }
@@ -684,8 +757,8 @@ void AICPlayerController::RequestFishing()
     if(Gathering->IsGathering()){Gathering->CancelGather();return;}
     auto* FishingCharacter=Cast<AICPlayerCharacter>(GetPawn());if(!FishingCharacter||!FishingCharacter->LifeActions)return;
     FVector Landing;auto* Zone=FishingCharacter->LifeActions->ResolveFishingCast(Landing);
-    if(!Zone){ShowLocalized(NSLOCTEXT("ICFishing","AimWater","화면 중앙으로 물고기 구역을 조준한 뒤 H를 누르세요. 찌가 구역에 닿아야 낚시할 수 있습니다."));return;}
+    if(!Zone){ShowLocalized(NSLOCTEXT("ICFishing","AimWater","화면 중앙으로 물고기 구역을 조준한 뒤 상호작용하세요. 찌가 구역에 닿아야 낚시할 수 있습니다."));return;}
     if(!Gathering->StartFishing(Zone,this,Landing))
-    {ShowLocalized(NSLOCTEXT("ICFishing","BlockedCast","낚싯줄을 던질 수 없습니다. 장애물과 낚시 구역을 확인하세요."));return;}
+    {ShowLocalized(NSLOCTEXT("ICFishing","BlockedCast","낚시를 시작할 수 없습니다. 전투·행동 상태, 장애물과 낚시 구역을 확인하세요."));return;}
     OnFishingRequested.Broadcast();
 }

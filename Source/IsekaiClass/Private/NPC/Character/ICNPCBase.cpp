@@ -44,6 +44,15 @@ AICNPCBase::AICNPCBase()
     LifeObjectUser=CreateDefaultSubobject<UICLifeObjectUserComponent>(TEXT("LifeObjectUser"));
     HomeBehavior=CreateDefaultSubobject<UICNPCHomeBehaviorComponent>(TEXT("HomeBehavior"));
 
+    // NPC는 플레이어(Pawn)·월드에는 막히되, NPC 전용 채널끼리는 겹쳐서 좁은 통로에서
+    // 서로 캡슐에 끼지 않는다. RVO는 이 Overlap 상태에서 회피 방향만 보조한다.
+    if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+    {
+        Capsule->SetCollisionObjectType(ECC_GameTraceChannel1); // Config의 NPC 채널
+        Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+        Capsule->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Overlap);
+    }
+
     auto* Movement=GetCharacterMovement();
     Movement->MaxWalkSpeed=ScheduleMoveSpeed;
 

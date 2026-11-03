@@ -78,14 +78,29 @@ void UICQuestGuideComponent::StopActiveLights(bool bImmediate)
     for (AICQuestGuideLight* Light : ActiveLights)
     {
         if (!IsValid(Light)) continue;
+        Light->OnDestroyed.RemoveDynamic(this, &ThisClass::HandleLightDestroyed);
         if (bImmediate)
         {
             Light->Stop();
             Light->Destroy();
         }
-        else Light->FadeOut();
+        else
+        {
+            Light->OnDestroyed.AddUniqueDynamic(this, &ThisClass::HandleLightDestroyed);
+            Light->FadeOut();
+        }
     }
     if (bImmediate) ActiveLights.Reset();
+}
+
+void UICQuestGuideComponent::HandleLightDestroyed(AActor* Light)
+{
+    ActiveLights.RemoveAll([Light](const TObjectPtr<AICQuestGuideLight>& Entry)
+    {
+        return !IsValid(Entry) || Entry.Get() == Light;
+    });
+    if (ActiveLights.IsEmpty() && !GuidedQuestID.IsNone())
+        SchedulePulse(FMath::IsFinite(RepeatInterval) ? FMath::Max(.1f, RepeatInterval) : .25f);
 }
 
 void UICQuestGuideComponent::HandleWorldRestored()
@@ -264,8 +279,8 @@ void UICQuestGuideComponent::SpawnPulse(APawn& Pawn, const TArray<FVector>& Poin
     FActorSpawnParameters Parameters;
     Parameters.Owner = &Pawn;
     Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    // Every pulse owns its route and Niagara simulation. Older pulses continue
-    // along their original route until their own distance limit is reached.
+    // The previous route, including its fading tail, must be gone first.
+    if (!ActiveLights.IsEmpty()) return;
     AICQuestGuideLight* Light = World->SpawnActor<AICQuestGuideLight>(
         GuideLightClass, Points[0], FRotator::ZeroRotator, Parameters);
     if (IsValid(Light))
@@ -273,7 +288,11 @@ void UICQuestGuideComponent::SpawnPulse(APawn& Pawn, const TArray<FVector>& Poin
         Light->TailLength = TailLength;
         Light->FadeOutDuration = FadeOutDuration;
         Light->PlayPath(Points, GuideDistance, GuideSpeed, GuideHeight);
-        if (IsValid(Light)) ActiveLights.Add(Light);
+        if (IsValid(Light))
+        {
+            ActiveLights.Add(Light);
+            Light->OnDestroyed.AddUniqueDynamic(this, &ThisClass::HandleLightDestroyed);
+        }
     }
 }
 
@@ -334,6 +353,7 @@ void UICQuestGuideComponent::RefreshGuide()
         NextPulseTime = 0;
         return;
     }
+    if (!ActiveLights.IsEmpty()) return;
     if (Now < NextPulseTime)
     {
         // The dedicated timer preserves intervals shorter than the state poll.
@@ -342,7 +362,7 @@ void UICQuestGuideComponent::RefreshGuide()
         return;
     }
     // Clamp both at authoring time and runtime. Invalid values must not create a busy loop.
-    const float Interval = FMath::IsFinite(RepeatInterval) ? FMath::Max(.1f, RepeatInterval) : 3.f;
+    const float Interval = FMath::IsFinite(RepeatInterval) ? FMath::Max(.1f, RepeatInterval) : .25f;
     SchedulePulse(Interval);
     TArray<FVector> Points;
     if (BuildGuidePath(*Pawn, Goal, Points)) SpawnPulse(*Pawn, Points);
