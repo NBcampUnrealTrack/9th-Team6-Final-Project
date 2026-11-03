@@ -11,6 +11,7 @@
 #include "Engine/GameInstance.h"
 #include "NPC/LifeObject/ICLifeObjectSubsystem.h"
 #include "HAL/IConsoleManager.h"
+#include "Data/Definitions/ICDefinitionSubsystem.h"
 
 void UICDebugCheatManager::ICCreateTestPlayer()
 {
@@ -175,6 +176,47 @@ void UICDebugCheatManager::ICSetAffinity(FName NpcId, int32 Value)
         { PC->Show(TEXT("해당 NPC 상태를 변경할 수 없습니다.")); return; }
         PC->Show(TEXT("NPC 원본 호감도 변경 완료"));
     }
+#endif
+}
+
+void UICDebugCheatManager::ICAddAffinity(FName NpcId, int32 Amount)
+{
+    IC_TRACE_FUNCTION();
+#if !UE_BUILD_SHIPPING
+    auto* PC = Cast<AICPlayerController>(GetOuterAPlayerController());
+    if (!PC) return;
+    auto* State = PC->GetWorldState();
+    auto* Definitions = PC->GetGameInstance()
+        ? PC->GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>() : nullptr;
+    FICNPCRow Definition;
+    if (!State || !Definitions || Amount <= 0
+        || !Definitions->GetNPC(NpcId, Definition).bSuccess
+        || Definition.Type == EICNPCType::Background)
+    {
+        PC->Show(TEXT("등록된 NPC ID와 0보다 큰 호감도 증가량을 입력하세요."));
+        return;
+    }
+    const EICCharacterKind Kind = Definition.Type == EICNPCType::Recruitable
+        ? EICCharacterKind::Recruitable : EICCharacterKind::Resident;
+    if (!State->EnsureCharacter(NpcId, Kind))
+    {
+        PC->Show(TEXT("NPC 호감도 상태를 준비할 수 없습니다."));
+        return;
+    }
+    const auto* Character = State->GetStoredCharacter(NpcId);
+    if (!Character) return;
+    const int32 Previous = Character->Affinity;
+    // Widen before adding so even a large console argument cannot overflow.
+    const int32 Next = static_cast<int32>(FMath::Clamp<int64>(
+        static_cast<int64>(Previous) + Amount, 0, 500));
+    if (!State->SetAffinity(NpcId, Next))
+    {
+        PC->Show(TEXT("NPC 호감도 변경에 실패했습니다."));
+        return;
+    }
+    UE_LOG(LogICWorldState, Log, TEXT("[Cheat.AddAffinity] NPC=%s Previous=%d Current=%d"),
+        *NpcId.ToString(), Previous, Next);
+    PC->Show(FString::Printf(TEXT("%s 호감도: %d → %d / 500"), *NpcId.ToString(), Previous, Next));
 #endif
 }
 
