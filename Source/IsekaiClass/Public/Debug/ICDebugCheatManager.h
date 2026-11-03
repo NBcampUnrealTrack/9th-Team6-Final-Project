@@ -23,6 +23,8 @@ public:
     UFUNCTION(Exec) void ICEquipTestPets();
     UFUNCTION(Exec) void ICGiveGold();
     UFUNCTION(Exec) void ICSetAffinity(FName NpcId, int32 Value);
+    /** Increase a registered NPC's current affinity, capped at five hearts (500). */
+    UFUNCTION(Exec) void ICAddAffinity(FName NpcId, int32 Amount);
     UFUNCTION(Exec) void ICTeleport(float X, float Y, float Z);
     UFUNCTION(Exec) void ICCompleteActiveQuests();
     UFUNCTION(Exec) void ICInteractNearestNPC();

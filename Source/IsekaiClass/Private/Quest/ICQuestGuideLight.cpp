@@ -1,7 +1,10 @@
 #include "Quest/ICQuestGuideLight.h"
 
 #include "Components/SceneComponent.h"
+#include "CollisionQueryParams.h"
+#include "CollisionShape.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "NiagaraComponent.h"
 #include "Time/ICTimeSubsystem.h"
@@ -44,10 +47,12 @@ void AICQuestGuideLight::PlayPath(const TArray<FVector>& Points, float MaxDistan
         Remaining -= Advance;
     }
     if (PathPoints.Num() < 2 || PulseDistance <= UE_KINDA_SMALL_NUMBER) { FinishPlayback(); return; }
-    DistanceRemaining = PulseDistance;
     TravelSpeed = Speed;
     HeightOffset = Height;
-    SetActorLocation(Points[0] + FVector(0, 0, HeightOffset));
+    ConformPathToGround(MaxDistance);
+    if (PathPoints.Num() < 2 || PulseDistance <= UE_KINDA_SMALL_NUMBER) { FinishPlayback(); return; }
+    DistanceRemaining = PulseDistance;
+    SetActorLocation(PathPoints[0] + FVector(0, 0, HeightOffset));
     SetActorRotation((PathPoints[1] - PathPoints[0]).Rotation());
     TrailEffect->SetRelativeTransform(FTransform::Identity);
     const float Lifetime = FMath::IsFinite(TailLength) ? FMath::Max(.05f, TailLength / Speed) : .4f;
@@ -66,6 +71,60 @@ void AICQuestGuideLight::PlayPath(const TArray<FVector>& Points, float MaxDistan
     SetActorTickEnabled(true);
 }
 
+void AICQuestGuideLight::ConformPathToGround(float MaxDistance)
+{
+    UWorld* World = GetWorld();
+    if (!World) return;
+    const TArray<FVector> Route = MoveTemp(PathPoints);
+    PathPoints.Reset();
+    PathDistances.Reset();
+    PulseDistance = 0.f;
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(QuestGuideGround), false, GetOwner());
+    Query.AddIgnoredActor(this);
+    FCollisionObjectQueryParams Objects;
+    Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+    // Stay near the selected NavMesh floor; a roof on another storey must not
+    // pull the guide upwards. Elevated step bridges keep their existing height.
+    auto AboveGround = [&](const FVector& Point)
+    {
+        FVector Visual = Point + FVector(0, 0, HeightOffset);
+        FHitResult Ground;
+        if (World->LineTraceSingleByObjectType(Ground,
+            Point + FVector(0, 0, 100), Point - FVector(0, 0, 200), Objects, Query)
+            && Ground.ImpactNormal.Z >= .45f)
+            Visual.Z = FMath::Max(Visual.Z, Ground.ImpactPoint.Z + FMath::Max(20.f, HeightOffset));
+        return Visual;
+    };
+    FVector Previous = AboveGround(Route[0]);
+    PathPoints.Add(Previous - FVector(0, 0, HeightOffset));
+    PathDistances.Add(0.f);
+    int32 Samples = 0;
+    for (int32 Index = 1; Index < Route.Num(); ++Index)
+    {
+        const double Length = FVector::Distance(Route[Index - 1], Route[Index]);
+        const int32 Steps = FMath::CeilToInt(FMath::Min(512., Length / 25.));
+        for (int32 Step = 1; Step <= Steps; ++Step)
+        {
+            if (++Samples > 512) return;
+            FVector Visual = AboveGround(FMath::Lerp(Route[Index - 1], Route[Index], double(Step) / Steps));
+            const double Distance = FVector::Distance(Previous, Visual);
+            if (Distance <= UE_KINDA_SMALL_NUMBER) continue;
+            const double Advance = FMath::Min(Distance, double(MaxDistance - PulseDistance));
+            Visual = FMath::Lerp(Previous, Visual, Advance / Distance);
+            FHitResult Hit;
+            // Check the entire segment as well as its sampled endpoints. If
+            // terrain or a wall still blocks it, stop before drawing through it.
+            if (World->SweepSingleByObjectType(Hit, Previous, Visual, FQuat::Identity,
+                Objects, FCollisionShape::MakeSphere(12.f), Query)) return;
+            PulseDistance += Advance;
+            PathPoints.Add(Visual - FVector(0, 0, HeightOffset));
+            PathDistances.Add(PulseDistance);
+            Previous = Visual;
+            if (PulseDistance >= MaxDistance - UE_KINDA_SMALL_NUMBER) return;
+        }
+    }
+}
+
 void AICQuestGuideLight::SetVisualOpacity(float Opacity)
 {
     VisualOpacity = FMath::Clamp(Opacity, 0.f, 1.f);
@@ -74,7 +133,7 @@ void AICQuestGuideLight::SetVisualOpacity(float Opacity)
     {
         if (!Material) continue;
         Material->SetScalarParameterValue(TEXT("GuideOpacity"), VisualOpacity);
-        Material->SetScalarParameterValue(TEXT("GuideBrightness"), Brightness * 2.f);
+        Material->SetScalarParameterValue(TEXT("GuideBrightness"), Brightness);
         Material->SetVectorParameterValue(TEXT("GuideColor"), GuideColor);
     }
 }

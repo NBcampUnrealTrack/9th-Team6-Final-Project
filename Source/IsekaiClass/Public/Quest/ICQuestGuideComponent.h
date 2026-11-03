@@ -35,7 +35,7 @@ public:
     float GuideSpeed = 600;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide", meta=(ClampMin="0.1", Units="s"))
-    float RepeatInterval = 3; // Spawn cadence, independent of previous effects.
+    float RepeatInterval = .25f; // Delay after the previous effect has completely disappeared.
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide", meta=(Units="cm"))
     float GuideHeight = 50;
@@ -44,7 +44,7 @@ public:
     float ArrivalRadius = 150;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide", meta=(ClampMin="1", Units="cm"))
-    float TailLength = 220.f;
+    float TailLength = 900.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Quest Guide", meta=(ClampMin="0.01", Units="s"))
     float FadeOutDuration = .6f;
@@ -74,8 +74,12 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+    friend class FICQuestGuideSequentialPulsesCheck;
+#endif
     UFUNCTION() void RefreshGuide();
     UFUNCTION() void HandleWorldRestored();
+    UFUNCTION() void HandleLightDestroyed(AActor* Light);
     bool ResolveTarget(const FICQuestRow& Definition, const FICQuestState& Quest,
         const FICWorldState& World, FVector& Location, FName& TargetKey) const;
     void ResetPulse(bool bImmediate = true);

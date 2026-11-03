@@ -8,6 +8,7 @@
 #include "Engine/LocalPlayer.h"
 #include "UI/Dialogue/ICAffinityHeartsWidget.h"
 #include "NPC/Character/ICNPCBase.h"
+#include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Data/Text/ICTextLibrary.h"
@@ -116,9 +117,26 @@ void UICNPCDialogueWidget::ShowInitialDialogue()
     UICQuestSubsystem* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>();
     const FName ObjectiveDialogueID = Quests ? Quests->GetNPCObjectiveDialogue(Definition.ID) : NAME_None;
     if (!ObjectiveDialogueID.IsNone() && TryShowNode(ObjectiveDialogueID)) return;
+    UICDefinitionSubsystem* Definitions = GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>();
+    const UICAbilitySystemComponent* AbilitySystem = NPC->GetICAbilitySystem();
+    TArray<FICDialogueRow> Candidates;
     for (FName DialogueID : Definition.DialogueIDs)
     {
-        if (TryShowNode(DialogueID)) return;
+        FICDialogueRow Dialogue;
+        if (!Definitions || !Definitions->GetDialogue(DialogueID, Dialogue).bSuccess
+            || Dialogue.NPCID != Definition.ID) continue;
+        if (!Dialogue.Availability.Conditions.IsEmpty()
+            && (!AbilitySystem || !AbilitySystem->Conditions(Dialogue.Availability))) continue;
+        Candidates.Add(MoveTemp(Dialogue));
+    }
+    // Equal priorities retain the NPC's configured order. Quest dialogue stays above this selection.
+    Candidates.StableSort([](const FICDialogueRow& A, const FICDialogueRow& B)
+    {
+        return A.SelectionPriority > B.SelectionPriority;
+    });
+    for (const FICDialogueRow& Dialogue : Candidates)
+    {
+        if (TryShowNode(Dialogue.ID)) return;
     }
     bShowingInteractionOptions = false;
     DialogueEventID = FGuid::NewGuid();
