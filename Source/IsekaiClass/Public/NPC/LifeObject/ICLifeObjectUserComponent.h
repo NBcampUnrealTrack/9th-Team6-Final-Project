@@ -45,10 +45,6 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Life", meta=(ClampMin="1"))
     int32 MaxMoveFailures = 3;
 
-    /** 화면에 Print String으로 생활 행동을 표시한다(개발 빌드 전용). */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="IC|Life|Debug")
-    bool bPrintToScreen = true;
-
     // ---------- 일과 ----------
 
     /** 현재 GameClock으로 일과를 다시 계산한다. 구간이 바뀌었으면 true. bForce가 아니면 게임 분이 바뀔 때만 계산한다. */
