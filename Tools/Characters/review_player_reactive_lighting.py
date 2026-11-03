@@ -78,7 +78,10 @@ def validate_material(material):
         if feature_root:
             assert isinstance(pins['opacitymask'],u.MaterialExpressionMultiply)
             assert root.get_editor_property('used_with_skeletal_mesh') and root.get_editor_property('used_with_morph_targets')
-            assert len(u.MaterialEditingLibrary.get_material_expressions(root))==9
+            normal=pins['normal']
+            if normal:
+                assert isinstance(normal,u.MaterialExpressionQualitySwitch)
+                assert normal.get_editor_property('desc')=='IC Low Quality Feature Normal'
         CHECK['graphs'][path] = {'emissive': 0., 'base_color': 'Separate masked surface with original diffuse RGB/alpha' if feature_root else 'Original toon output * ICAlbedoScale'}
     return {'material': material.get_path_name(), 'albedo_scale': scale, 'direct_diffuse_albedo':direct,'switches': switches, 'root': path}
 
