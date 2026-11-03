@@ -18,7 +18,6 @@
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Debug/ICLog.h"
@@ -90,12 +89,9 @@ double UICLifeObjectUserComponent::GetPlaySecond() const
     return GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 }
 
-void UICLifeObjectUserComponent::Say(const FString& Message, const FColor& Color) const
+void UICLifeObjectUserComponent::Say(const FString& Message, const FColor& /*Color*/) const
 {
     UE_LOG(LogICLifeObject, Log, TEXT("%s"), *Message);
-#if !UE_BUILD_SHIPPING
-    if (bPrintToScreen && GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, Color, Message);
-#endif
 }
 
 // ---------------------------------------------------------------- 일과
