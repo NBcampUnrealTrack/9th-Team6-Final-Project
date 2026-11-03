@@ -13,6 +13,16 @@
 #include "Life/World/ICFishingLine.h"
 #include "Inventory/Components/ICInventoryComponent.h"
 #include "Components/TextBlock.h"
+#include "Combat/GAS/ICAbilitySystemComponent.h"
+
+namespace
+{
+bool IsInCombatForGathering(const AICPlayerController& Player, const AICPlayerCharacter* Character)
+{
+    const auto* AbilitySystem = Character ? Character->GetICAbilitySystem() : nullptr;
+    return Player.bInCombat || (AbilitySystem && AbilitySystem->HasRecentCombat());
+}
+}
 
 void UICGatheringSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -56,8 +66,21 @@ bool UICGatheringSubsystem::StartAction(AICLifeActor* Resource,AICPlayerControll
     if (IsGathering() || !IsValid(Resource) || !IsValid(Player) || !Player->CanHandleGameplayInput()
         || Resource->GetWorld() != Player->GetWorld()) return false;
     auto* Character=Cast<AICPlayerCharacter>(Player->GetPawn());
+    if (Resource->LifeType == EICDefinitionType::Resource && IsInCombatForGathering(*Player, Character))
+    {
+        Player->ShowLocalized(NSLOCTEXT("ICGather", "CombatBlocked", "전투 중에는 채집하거나 채광할 수 없습니다."));
+        return false;
+    }
     if(FishingLanding)
     {
+        const auto* ASC=Character?Character->GetICAbilitySystem():nullptr;
+        // Enforce this at the action boundary, including Blueprint/direct callers.
+        if(!ASC||!ASC->CanAcceptInteractionInput()||IsInCombatForGathering(*Player, Character)
+            ||Character->IsSwitchingWeapon()||Player->bInDialogue||Player->bInEvent)
+        {
+            Player->ShowLocalized(NSLOCTEXT("ICFishing","BusyCast","전투 또는 다른 행동 중에는 낚시할 수 없습니다."));
+            return false;
+        }
         if(!Character||!Character->LifeActions||!Resource->ContainsFishingLanding(*FishingLanding)
             ||FVector::DistSquared(*FishingLanding,Character->GetActorLocation())>FMath::Square(Character->LifeActions->FishingCastRangeCm))return false;
     }
@@ -110,7 +133,8 @@ bool UICGatheringSubsystem::StartAction(AICLifeActor* Resource,AICPlayerControll
         ProgressWidget->SetGatherProgress(Resource->GetInteractionText(), 0);
         if(Activity==EICLifeActivity::Fishing)
             if(auto* Hint=Cast<UTextBlock>(ProgressWidget->GetWidgetFromName(TEXT("TXT_GatherCancel"))))
-                Hint->SetText(NSLOCTEXT("ICFishing","CancelHint","이동 / H / ESC  낚시 취소"));
+                Hint->SetText(Player->IsUsingGamepad() ? NSLOCTEXT("ICFishing","PadCancel","이동 / X  낚시 취소")
+                    : NSLOCTEXT("ICFishing","KeyCancel","이동 / F / ESC  낚시 취소"));
         ProgressWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
         ProgressWidget->AddToViewport(20);
     }
@@ -140,9 +164,19 @@ void UICGatheringSubsystem::Tick(float DeltaTime)
         || FVector::DistSquared(StartLocation, GatheringPawn->GetActorLocation()) > FMath::Square(15.f)
         || (ActiveResource->LifeType!=EICDefinitionType::FishingPoint&&FVector::DistSquared(ActiveResource->GetActorLocation(), GatheringPawn->GetActorLocation()) > FMath::Square(300.f)))
     { CancelGather(); return; }
+    const auto* Character=Cast<AICPlayerCharacter>(GatheringPawn.Get());
+    if (ActiveResource->LifeType == EICDefinitionType::Resource && IsInCombatForGathering(*Controller.Get(), Character))
+    {
+        CancelGather();
+        return;
+    }
     if(ActiveResource->LifeType==EICDefinitionType::FishingPoint)
     {
-        const auto* Character=Cast<AICPlayerCharacter>(GatheringPawn.Get());
+        const auto* ASC=Character?Character->GetICAbilitySystem():nullptr;
+        if(!ASC||!ASC->CanAcceptInteractionInput()||IsInCombatForGathering(*Controller.Get(), Character)
+            ||Controller->bInDialogue||Controller->bInEvent
+            ||!Character->LifeActions||!Character->LifeActions->IsWorking())
+        {CancelGather();return;}
         const auto* Line=Character&&Character->LifeActions?Character->LifeActions->GetFishingLine():nullptr;
         if(!IsValid(Line)||!Line->HasValidLanding()){CancelGather();return;}
     }

@@ -38,6 +38,21 @@ bool AICPlayerController::RouteGameplayGamepadKey(FKey Key,bool Pressed)
 }
 bool AICPlayerController::InputKey(const FInputKeyEventArgs& Args)
 {
+    if (Args.Key == EKeys::MouseWheelAxis && Args.Event == IE_Axis &&
+        !FMath::IsNearlyZero(Args.AmountDepressed) && CanHandleGameplayInput())
+    {
+        const TArray<AActor*> Choices = GetInteractionChoices();
+        if (Choices.Num() > 1)
+        {
+            int32 Index = Choices.IndexOfByKey(SelectedInteraction.Get());
+            if (Index == INDEX_NONE) Index = 0;
+            Index = (Index + (Args.AmountDepressed < 0 ? 1 : -1) + Choices.Num()) % Choices.Num();
+            SelectedInteraction = Choices[Index];
+            bInteractionPinned = true;
+            bLastInputGamepad = false;
+            return true;
+        }
+    }
     if(Screen&&Screen->IsControlGuideVisible()&&(Args.Key==EKeys::F||UICGameUserSettings::IsGamepadAcceptKey(Args.Key)))
     {
         if(Args.Event==IE_Pressed)Screen->AdvanceControlGuide();
