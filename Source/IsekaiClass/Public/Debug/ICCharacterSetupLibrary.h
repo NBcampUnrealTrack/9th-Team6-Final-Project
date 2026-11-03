@@ -45,6 +45,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="IC|Editor",meta=(DevelopmentOnly)) static AICEnemyBase* SpawnLiveReviewEnemy(UWorld* World,FVector Origin);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool BeginMonsterTestReview();
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool CaptureMonsterTestHUD(UWorld* World,const FString& File);
+    /** Set the outer PIE window size so visual comparisons use identical pixels. */
+    UFUNCTION(BlueprintCallable, Category="IC|Editor",meta=(DevelopmentOnly)) static bool SetUIReviewWindowSize(UWorld* World,int32 Width,int32 Height);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static bool PressUIReviewKey(UWorld* World,FKey Key);
     UFUNCTION(BlueprintCallable,Category="IC|Editor") static bool SetUIReviewKey(UWorld* World,FKey Key,bool Pressed);
     UFUNCTION(BlueprintCallable, Category="IC|Editor") static void CaptureLiveCharacterReview(UWorld* World, const FString& Name);

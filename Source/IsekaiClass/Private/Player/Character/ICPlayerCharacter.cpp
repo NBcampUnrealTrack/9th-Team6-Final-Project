@@ -138,7 +138,7 @@ void AICPlayerCharacter::ApplyPreset(int32 Preset)
         {
             AnimationProfile = Row->AnimationProfile;
             if (ICPlayerAppearance::Apply(GetMesh(), Row->Mesh.LoadSynchronous(), Row->AnimationClass.LoadSynchronous(), Row->MeshTransform))
-            { RefreshWeaponAppearance(); return; }
+            { RefreshWeaponAppearance();return; }
         }
     }
     if(!AppearancePresets.IsValidIndex(Preset)){UE_LOG(LogICCore, Warning, TEXT("[Appearance.PresetMissing] Character=%s Preset=%d Available=%d: BP Appearance Presets 확인 필요"),*GetNameSafe(this),Preset,AppearancePresets.Num());return;}

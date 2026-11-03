@@ -47,6 +47,8 @@ bool ICPlayerAppearance::Apply(USkeletalMeshComponent* Component,USkeletalMesh* 
     IC_TRACE_FUNCTION();
     if(!Component||!Mesh){UE_LOG(LogICCore, Verbose, TEXT("[Appearance.Apply.Rejected] Component=%s Mesh=%s"),*GetNameSafe(Component),*GetNameSafe(Mesh));return false;}
     Component->SetSkeletalMesh(Mesh);
+    // Presets use their mesh's authored materials, including when slot counts differ.
+    Component->EmptyOverrideMaterials();
     Component->SetRelativeTransform(Transform);
     if(AnimClass)Component->SetAnimInstanceClass(AnimClass);
     Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);

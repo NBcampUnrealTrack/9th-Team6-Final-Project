@@ -1,0 +1,41 @@
+{
+  "screenshots_unchanged": true,
+  "sources": [
+    {
+      "image": "images/before_inside.png",
+      "source": "Saved/CharacterLighting/WorldReactive/Preview/Current_Day_Inside.png",
+      "sha256": "ab9fa7543214b710fb988dc787311afea8a91e0392d24b5661b489571c3b2820"
+    },
+    {
+      "image": "images/before_eyes.png",
+      "source": "Saved/CharacterLighting/WorldReactive/EyeFix/F_Current.png",
+      "sha256": "18c39f99b5085c88c620c835bf37bbd23d0415d3997b73cb60c60fd007c4e1bc"
+    },
+    {
+      "image": "images/after_eyes.png",
+      "source": "Saved/CharacterLighting/WorldReactive/EyeFix/Final/F_Closeup_Day_Outside.png",
+      "sha256": "e7c6b5c301ddcb0ac6449e1bca93a6629aac42c4fc8766355af349bb875920c7"
+    },
+    {
+      "image": "images/night_outside.png",
+      "source": "Saved/CharacterLighting/WorldReactive/EyeFix/Final/F_Night_Outside.png",
+      "sha256": "e1f30e0f85b10016ced464ad9fad0bf2f41342c7fb39eb24795d1b11b94fcebd"
+    },
+    {
+      "image": "images/night_inside.png",
+      "source": "Saved/CharacterLighting/WorldReactive/EyeFix/Final/F_Night_Inside.png",
+      "sha256": "1a3da8ae33e0f1ce1abcc70fbb192bf27a000c2cca98c9a8f1ea0ea3aa271be7"
+    },
+    {
+      "image": "images/day_outside.png",
+      "source": "Saved/CharacterLighting/WorldReactive/EyeFix/Final/F_Day_Outside.png",
+      "sha256": "2a25f22141a5b2eab5ff16d63acde5ea8474353f2c951813aed3e610028ee5a9"
+    },
+    {
+      "image": "images/day_inside.png",
+      "source": "Saved/CharacterLighting/WorldReactive/EyeFix/Final/F_Day_Inside.png",
+      "sha256": "3b2d3822d6b8284cbe97ed4127ff5662f7918a0ed1743f73ae6ba76e439e0113"
+    }
+  ],
+  "final_verification": "Saved\\CharacterLighting\\WorldReactive\\EyeFix\\Final\\Verification.json"
+}
