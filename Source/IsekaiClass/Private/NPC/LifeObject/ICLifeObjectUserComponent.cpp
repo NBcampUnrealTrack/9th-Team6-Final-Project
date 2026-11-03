@@ -4,6 +4,7 @@
 #include "NPC/LifeObject/ICLifeObjectSubsystem.h"
 #include "NPC/LifeObject/ICLifeObjectBehaviorDefinition.h"
 #include "NPC/Character/ICNPCBase.h"
+#include "NPC/Behavior/ICNPCHomeBehaviorComponent.h"
 #include "NPC/Schedule/ICNPCScheduleLibrary.h"
 #include "AI/ICAIController.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -178,8 +179,34 @@ int32 UICLifeObjectUserComponent::FindCandidates()
     Candidates.Reset();
     const UICLifeObjectSubsystem* Life = UICLifeObjectSubsystem::Get(this);
     if (!Life || !Routine.WantsObject()) return 0;
+    if (AICNPCBase* NPC = GetNPC())
+        if (UICNPCHomeBehaviorComponent* HomeBehavior = NPC->GetHomeBehavior(); HomeBehavior && HomeBehavior->ShouldUseHomeObjectPool())
+            return HomeBehavior->FindNextHomeObjectCandidates(*this);
     const int32 Count = Life->GatherCandidates(*this, Routine, SearchRadiusCm, Candidates);
     UE_LOG(LogICLifeObject, Verbose, TEXT("[Life.Find] NPC=%s Activity=%s Candidates=%d"), *GetUserID().ToString(), *Routine.ActivityTag.ToString(), Count);
+    return Count;
+}
+
+int32 UICLifeObjectUserComponent::FindCandidatesForActivity(FGameplayTag ActivityTag, const AICLifeObjectActor* ExcludeObject)
+{
+    Candidates.Reset();
+    const UICLifeObjectSubsystem* Life = UICLifeObjectSubsystem::Get(this);
+    if (!Life || !Routine.bValid || !ActivityTag.IsValid()) return 0;
+    FICLifeRoutine SearchRoutine = Routine;
+    SearchRoutine.ActivityTag = ActivityTag;
+    Life->GatherCandidates(*this, SearchRoutine, SearchRadiusCm, Candidates);
+    // GatherCandidates는 대안이 없으면 직전 오브젝트를 남겨 둔다. 쿨다운 중에는 그것까지 뺀다.
+    int32 Excluded = 0;
+    if (ExcludeObject)
+    {
+        Excluded = Candidates.RemoveAll([ExcludeObject](const FICLifeObjectCandidate& Candidate)
+        {
+            return Candidate.Object.Get() == ExcludeObject;
+        });
+    }
+    const int32 Count = Candidates.Num();
+    UE_LOG(LogICLifeObject, Verbose, TEXT("[Life.HomeFind] NPC=%s Activity=%s Candidates=%d CooldownExcluded=%d"),
+        *GetUserID().ToString(), *ActivityTag.ToString(), Count, Excluded);
     return Count;
 }
 
@@ -241,6 +268,7 @@ bool UICLifeObjectUserComponent::BeginUse()
 
     Life->MarkOccupied(Claim, bOccupiedMarked);
     bUsing = true;
+    LastUsedObject = Object;
 
     ACharacter* Character = Cast<ACharacter>(GetOwner());
     FTransform Slot;

@@ -40,3 +40,16 @@ struct ISEKAICLASS_API FICSTTask_HomeBehavior : public FStateTreeTaskCommonBase
     virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
     virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 };
+
+/** 집 Leisure 오브젝트를 랜덤 시간 동안 사용한 뒤 Succeeded를 반환해 Acquire로 다시 보낸다. */
+USTRUCT(meta=(DisplayName="IC Home: Object Use Timer (집 오브젝트 사용 시간)", Category="IC|NPC|Home"))
+struct ISEKAICLASS_API FICSTTask_HomeObjectUseTimer : public FStateTreeTaskCommonBase
+{
+    GENERATED_BODY()
+    FICSTTask_HomeObjectUseTimer();
+    using FInstanceDataType = FICHomeBehaviorNodeInstanceData;
+    virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
+    virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
+    virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
+    virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
+};

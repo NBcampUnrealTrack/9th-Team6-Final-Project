@@ -62,9 +62,13 @@ public:
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="IC|LifeObject|ID")
     FName RegionID;
 
-    /** 시간표 목적지 앵커와 같으면 거리와 상관없이 최우선 후보가 된다(개인 침대, 상인 카운터 등). */
+    /** 구버전 단일 연결 앵커입니다. 기존 배치 액터 호환용으로 유지되며 LinkedAnchorIDs와 함께 사용됩니다. */
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="IC|LifeObject|ID")
     FName LinkedAnchorID;
+
+    /** 여러 NPC가 같은 생활 오브젝트를 교대로 쓰도록 연결할 시간표 목적지 앵커들입니다. */
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="IC|LifeObject|ID")
+    TArray<FName> LinkedAnchorIDs;
 
     // ---------- 사용 조건 ----------
 
@@ -118,6 +122,8 @@ public:
 
     UFUNCTION(BlueprintPure, Category="IC|LifeObject") FName GetDebugID() const;
     UFUNCTION(BlueprintPure, Category="IC|LifeObject") FGameplayTagContainer GetEffectiveActivityTags() const;
+    /** Legacy LinkedAnchorID와 다중 LinkedAnchorIDs를 모두 포함해 앵커 연결 여부를 확인합니다. */
+    UFUNCTION(BlueprintPure, Category="IC|LifeObject") bool IsLinkedToAnchor(FName AnchorID) const;
     UFUNCTION(BlueprintPure, Category="IC|LifeObject") int32 GetSlotCount() const;
     /** Smart Object 시스템에 등록되어 슬롯을 쓸 수 있는 상태인지. */
     UFUNCTION(BlueprintPure, Category="IC|LifeObject") bool IsSmartObjectReady() const;
