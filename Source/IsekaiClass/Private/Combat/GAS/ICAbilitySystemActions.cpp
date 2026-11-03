@@ -263,7 +263,8 @@ bool UICAbilitySystemComponent::BeginRequestedAction(UICGameplayAbility* Ability
         {Skill.Montage=Set->AttackCombo[ComboIndex];Skill.CastSection=NAME_None;}
         AttackCancelStart=Stage.GuardDodgeCancelStartPlaySeconds;
         AttackCancelEnd=Stage.GuardDodgeCancelEndPlaySeconds;
-        Skill.RecoveryPlaySeconds=FMath::Max(.3,Stage.Hit.StartOffsetPlaySeconds+Stage.Hit.TraceDurationPlaySeconds+.2);Skill.FirstEffectOffsetPlaySeconds=Stage.Hit.StartOffsetPlaySeconds;
+        const double LastSwing = Stage.Hit.StartOffsetPlaySeconds + (Stage.Hit.RepeatCount - 1) * Stage.Hit.RepeatIntervalPlaySeconds;
+        Skill.RecoveryPlaySeconds=FMath::Max(.3,LastSwing+Stage.Hit.TraceDurationPlaySeconds+.2);Skill.FirstEffectOffsetPlaySeconds=Stage.Hit.StartOffsetPlaySeconds;
         FVector Facing=TargetActor.IsValid()?TargetActor->GetActorLocation()-Character->GetActorLocation():Character->GetActorForwardVector();
         if(const auto* Player=Cast<AICPlayerCharacter>(Character))
         {FVector ViewLocation;FRotator ViewRotation;ICPlayerAttackView(Player,ViewLocation,ViewRotation);Facing=ViewRotation.Vector();}
@@ -488,9 +489,23 @@ void UICAbilitySystemComponent::AdvanceAction(double Now)
         if(RequestedAction==TEXT("Skill")&&!bCommitted&&Skill.CancelRules.bCancelOnUserMovement&&FVector::DistSquared(StartLocation,C->GetActorLocation())>25){CancelAction();return;}
         if(RequestedAction==TEXT("Skill")&&!bCommitted&&Now>=StartedAt+Skill.FirstEffectOffsetPlaySeconds&&Skill.FirstEffectEvent==EICFirstEffectEvent::EffectCommit)
             if(!CommitFirstEffect()){CancelAction();return;}
-        int32 Index=0;
-        for(const auto& H:Skill.Hits)for(int32 Repeat=0;Repeat<H.RepeatCount;++Repeat,++Index)
-            if(Now>=StartedAt+(H.StartOffsetPlaySeconds+Repeat*H.RepeatIntervalPlaySeconds)/(RequestedAction==TEXT("Attack")?FMath::Max(.01,Stat(EICStat::AttackSpeed)):1)&&!EmittedHits.Contains(Index))EmitHit(Index);
+        double HitClock = Now - StartedAt;
+        if (RequestedAction == TEXT("Attack"))
+        {
+            HitClock *= FMath::Max(.01, Stat(EICStat::AttackSpeed));
+            if (ComboWeaponFamily == EICWeaponFamily::Sword && ActiveMontageInstanceID != INDEX_NONE)
+            {
+                auto* Anim = C->GetMesh()->GetAnimInstance();
+                auto* Montage = Skill.Montage.Get();
+                if (Anim && Montage && Anim->Montage_IsPlaying(Montage))
+                    HitClock = Anim->Montage_GetPosition(Montage);
+            }
+        }
+        int32 Index = 0;
+        for (const auto& Hit : Skill.Hits)
+            for (int32 Repeat = 0; Repeat < Hit.RepeatCount; ++Repeat, ++Index)
+                if (HitClock >= Hit.StartOffsetPlaySeconds + Repeat * Hit.RepeatIntervalPlaySeconds && !EmittedHits.Contains(Index))
+                    EmitHit(Index);
     }
     TArray<int32> Traces=OpenTraceHits.Array();for(int32 Index:Traces){if(Now>=TraceEndsAt.FindRef(Index))OpenTraceHits.Remove(Index);else EmitHit(Index,true);}
     if(Now>=ActionEndsAt&&RunningAbility)

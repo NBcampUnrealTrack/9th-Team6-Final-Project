@@ -200,7 +200,7 @@ bool AICLifeActor::Plant(AICPlayerController* Controller)
 bool AICLifeActor::TryInteract_Implementation(AICPlayerController* Controller)
 {
     if(!Controller||!GetGameInstance())return false;
-    if(LifeType==EICDefinitionType::FishingPoint)return false; // Fishing is an aimed H cast, never an F interaction.
+    if(LifeType==EICDefinitionType::FishingPoint)return false; // The controller resolves the aimed landing before starting fishing.
     if(LifeType==EICDefinitionType::Crop&&bPlantingPlot&&!GetGameInstance()->GetSubsystem<UICWorldStateSubsystem>()->ExportState().Crops.Contains(PointKey()))return UICSeedPickerWidget::Open(Controller,this);
     return GetGameInstance()->GetSubsystem<UICGatheringSubsystem>()->StartGather(this,Controller);
 }
