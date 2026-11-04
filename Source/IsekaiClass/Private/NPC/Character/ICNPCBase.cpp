@@ -1,5 +1,6 @@
 #include "NPC/Character/ICNPCBase.h"
 #include "Character/Animation/ICCharacterAnimInstance.h"
+#include "Character/Animation/ICFacialAnimationComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "UI/Framework/ICText.h"
 #include "AI/ICAIController.h"
@@ -129,6 +130,7 @@ bool AICNPCBase::InitializeNPC(FName ID)
     AnimationProfile = Definition.AnimationProfile;
     if(auto* CharacterMesh=Definition.Mesh.LoadSynchronous()){GetMesh()->SetSkeletalMesh(CharacterMesh);GetMesh()->SetRelativeTransform(Definition.MeshTransform);}
     if(auto* Anim=Definition.AnimationClass.LoadSynchronous())GetMesh()->SetAnimInstanceClass(Anim);
+    RefreshFacialAnimation();
     RefreshWeaponAppearance();
     bInitialized=true;
     if(auto* MarkerClass=LoadClass<UICNPCQuestMarkerWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_NPCQuestMarker.WBP_IC_NPCQuestMarker_C")))
@@ -248,6 +250,7 @@ bool AICNPCBase::TryInteract(AICPlayerController* Requester)
 void AICNPCBase::EndInteraction()
 {
     IC_TRACE_FUNCTION();
+    if (FacialAnimation) FacialAnimation->StopDialogue();
     if(!bInteracting)return;
     bInteracting=false;
     if(auto* AI=Cast<AICAIController>(GetController()))

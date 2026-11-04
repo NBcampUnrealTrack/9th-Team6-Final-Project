@@ -4,6 +4,8 @@
 #include "ICCombatVFXSetupLibrary.generated.h"
 class UNiagaraSystem;
 class UNiagaraComponent;
+class UStaticMesh;
+class UMaterialInterface;
 
 /** Editor authoring for the editable combat effects; no editor code is cooked. */
 UCLASS()
@@ -15,6 +17,8 @@ public:
     static UNiagaraSystem* CreateCombatNiagara(const FString& Path,FName Shape);
     UFUNCTION(BlueprintCallable,Category="IC|Editor")
     static UNiagaraSystem* DuplicateCombatNiagara(const FString& Path,UNiagaraSystem* Source);
+    UFUNCTION(BlueprintCallable,Category="IC|Editor")
+    static UNiagaraSystem* CreateSimpleSwordSlash(const FString& Path,UNiagaraSystem* Source,UStaticMesh* SlashMesh,UMaterialInterface* Material);
     UFUNCTION(BlueprintPure,Category="IC|Editor")
     static bool IsCombatNiagaraReady(UNiagaraSystem* System);
     UFUNCTION(BlueprintCallable,Category="IC|Editor") static bool CompileCombatNiagara(UNiagaraSystem* System);

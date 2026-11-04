@@ -1,5 +1,6 @@
 #include "Character/Base/ICCharacterBase.h"
 #include "Character/Animation/ICCharacterAnimInstance.h"
+#include "Character/Animation/ICFacialAnimationComponent.h"
 #include "Life/Production/ICPlayerLifeComponent.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Combat/GAS/ICGameplayTags.h"
@@ -44,6 +45,16 @@ void AICCharacterBase::UpdatePresentationTransform(float GroundOffsetCm, const F
 AICCharacterBase::AICCharacterBase()
 {
     IC_TRACE_FUNCTION(); PrimaryActorTick.bCanEverTick = true;
+}
+void AICCharacterBase::RefreshFacialAnimation()
+{
+    if (!FacialAnimation)
+    {
+        FacialAnimation = NewObject<UICFacialAnimationComponent>(this, TEXT("FacialAnimation"));
+        AddInstanceComponent(FacialAnimation);
+        FacialAnimation->RegisterComponent();
+    }
+    FacialAnimation->InitializeFace(GetMesh());
 }
 void AICCharacterBase::RefreshWeaponAppearance()
 {
@@ -153,6 +164,7 @@ bool AICCharacterBase::CanRestoreWorldState_Implementation(const FICWorldState& 
 }
 void AICCharacterBase::RestoreFromWorldState_Implementation(const FICWorldState& Candidate)
 {
+    if(FacialAnimation)FacialAnimation->ResetFace();
     if(auto* Anim=Cast<UICCharacterAnimInstance>(GetMesh()->GetAnimInstance()))Anim->ResetForLoad();
     IC_TRACE_FUNCTION(); if (const auto* Snapshot = Candidate.Characters.Find(CharacterID))
     { if (AbilitySystem) { AbilitySystem->ResetExecutionForLoad(); AbilitySystem->Restore(*Snapshot); } bZeroHPHandled = Snapshot->IsDowned(); }
@@ -172,6 +184,7 @@ void AICCharacterBase::PartyBuffsChanged()
 void AICCharacterBase::HandleZeroHP()
 {
     IC_TRACE_FUNCTION(); if (bZeroHPHandled) return; bZeroHPHandled = true;
+    if(FacialAnimation)FacialAnimation->ResetFace();
     FlushToWorldState_Implementation(WorldState()); OnDefeated();
 }
 void AICCharacterBase::OnDefeated_Implementation() { IC_TRACE_FUNCTION(); }
@@ -189,6 +202,7 @@ void AICCharacterBase::EndPlay(const EEndPlayReason::Type Reason)
 void AICCharacterBase::ReleaseForLoad()
 {
     IC_TRACE_FUNCTION();bSuppressPersistence=true;
+    if(FacialAnimation)FacialAnimation->ResetFace();
     if(WorldState()){WorldState()->UnregisterStateParticipant(CharacterID,this);WorldState()->OnCharacterChanged.RemoveDynamic(this,&ThisClass::StoredCharacterChanged);WorldState()->OnInventoryChanged.RemoveDynamic(this,&ThisClass::PartyBuffsChanged);}bRegisteredState=false;
     if(AbilitySystem)AbilitySystem->Shutdown();
 }

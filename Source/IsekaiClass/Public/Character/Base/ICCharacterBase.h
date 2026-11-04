@@ -9,6 +9,7 @@ class UICCharacterAnimationProfile;
 class AICWeaponActor;
 class UAnimMontage;
 class USkeletalMesh;
+class UICFacialAnimationComponent;
 
 UCLASS(Abstract)
 class ISEKAICLASS_API AICCharacterBase : public ACharacter, public IAbilitySystemInterface, public IICStateParticipant
@@ -17,6 +18,9 @@ class ISEKAICLASS_API AICCharacterBase : public ACharacter, public IAbilitySyste
 public:
     AICCharacterBase();
     virtual void BeginPlay() override;
+    UPROPERTY(Transient, VisibleInstanceOnly, BlueprintReadOnly, Category="IC|Face") TObjectPtr<UICFacialAnimationComponent> FacialAnimation;
+    /** Called by player appearance changes and NPC initialization; enemies do not create a face component. */
+    void RefreshFacialAnimation();
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="IC|Presentation") TSoftObjectPtr<UICCharacterAnimationProfile> AnimationProfile;
     UPROPERTY(Transient, BlueprintReadOnly, Category="IC|Presentation") TObjectPtr<AICWeaponActor> EquippedWeaponActor;
     UFUNCTION(BlueprintCallable, Category="IC|Presentation") void RefreshWeaponAppearance();

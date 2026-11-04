@@ -85,6 +85,8 @@ private:
 
     void ShowInteractionOptions();
     void ShowInitialDialogue();
+    void SetSpokenLine(const FText& Line, FName SpeakerID);
+    void StopSpeaking();
     void ResetDialogue();
     bool TryShowNode(FName DialogueID, FName NodeID = NAME_None);
     void ShowGiftPicker();

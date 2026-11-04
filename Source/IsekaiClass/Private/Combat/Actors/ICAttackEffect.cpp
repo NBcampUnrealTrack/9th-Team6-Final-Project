@@ -8,6 +8,9 @@
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
 #include "Combat/VFX/ICCombatVFX.h"
+#include "Combat/Actors/ICWeaponActor.h"
+#include "Combat/GAS/ICAbilitySystemComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 
 AICAttackEffect::AICAttackEffect()
 {
@@ -51,6 +54,19 @@ void AICAttackEffect::SpawnSlash(AICCharacterBase* Character,double Radius,doubl
     if(!Effect)return;
     if(const auto* Style=ICCombatVFX::Resolve(Presentation))
     {
+        if(Style->bFollowWeaponSwing)
+        {
+            if(!Effect->InitializeSwordSwing(Character)){Effect->Destroy();return;}
+            const auto* Ability=Character->GetICAbilitySystem();
+            const float Speed=Ability?FMath::Max(.01f,float(Ability->Stat(EICStat::AttackSpeed))):1.f;
+            auto Slash=Style->Slash;
+            Slash.Duration=(Slash.Duration>0?Slash.Duration:.15f)/Speed;
+            if(!ICCombatVFX::Attach(Effect,Effect->RootComponent,Slash,Slash.Duration))
+            {Effect->Destroy();return;}
+            Effect->UseNiagaraLifetime(Slash.Duration);
+            Effect->SetActorTickEnabled(true);
+            return;
+        }
         const float Floor=-Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()+5;
         const bool Slash=ICCombatVFX::Attach(Effect,Effect->RootComponent,Style->Slash,.24f,Radius,Angle,Floor,Style->SlashSlope)!=nullptr;
         const bool Range=ICCombatVFX::Attach(Effect,Effect->RootComponent,Style->Range,.24f,Radius,Angle,Floor,0)!=nullptr;
@@ -74,6 +90,57 @@ void AICAttackEffect::SpawnSlash(AICCharacterBase* Character,double Radius,doubl
     Effect->Line(24,FVector(0,0,Floor),FVector(Radius*FMath::Cos(Half),-Radius*FMath::Sin(Half),Floor),.5f);
     Effect->Line(25,FVector(0,0,Floor),FVector(Radius*FMath::Cos(Half),Radius*FMath::Sin(Half),Floor),.5f);
 }
+bool AICAttackEffect::InitializeSwordSwing(AICCharacterBase* Character)
+{
+    auto* Weapon=Character?Character->EquippedWeaponActor.Get():nullptr;
+    auto* Mesh=Character?Character->GetMesh():nullptr;
+    if(!Weapon||!Mesh)return false;
+    SwordOwner=Character;SwordWeapon=Weapon;SetOwner(Character);
+    if(const auto* Ability=Character->GetICAbilitySystem())SwordAction=Ability->GetActionID();
+    bFollowSword=true;Tags.Add(TEXT("IC.SwordSlash"));
+    PrimaryActorTick.TickGroup=TG_PostUpdateWork;
+    AddTickPrerequisiteComponent(Mesh);
+    FVector Base,Tip;Weapon->GetBladeTrace(Base,Tip);PreviousSwordTip=Tip;
+    SwingTangent=Character->GetActorRightVector();
+    // Montage hit notifies arrive after pose evaluation. Recover the previous socket pose
+    // so the very first VFX frame already knows whether this is a forehand or a backhand.
+    const FName Socket=Weapon->GetRootComponent()->GetAttachSocketName();
+    const int32 Bone=Mesh->GetBoneIndex(Mesh->GetSocketBoneName(Socket));
+    const auto& Previous=Mesh->GetPreviousComponentTransformsArray();
+    if(Bone!=INDEX_NONE && Previous.IsValidIndex(Bone))
+    {
+        const FTransform SocketNow=Mesh->GetSocketTransform(Socket);
+        const FTransform BoneNow=Mesh->GetBoneTransform(Bone);
+        const FTransform SocketLocal=SocketNow.GetRelativeTransform(BoneNow);
+        const FTransform SocketBefore=SocketLocal*Previous[Bone]*Mesh->GetComponentTransform();
+        PreviousSwordTip=SocketBefore.TransformPosition(SocketNow.InverseTransformPosition(Tip));
+    }
+    UpdateSwordSwing();
+    return !IsActorBeingDestroyed();
+}
+void AICAttackEffect::UpdateSwordSwing()
+{
+    auto* Character=SwordOwner.Get();auto* Weapon=SwordWeapon.Get();
+    const auto* Ability=Character?Character->GetICAbilitySystem():nullptr;
+    if(!Character||!Weapon||Character->EquippedWeaponActor!=Weapon
+        ||(SwordAction.IsValid()&&(!Ability||Ability->GetActionID()!=SwordAction)))
+    {Destroy();return;}
+    FVector Base,Tip;Weapon->GetBladeTrace(Base,Tip);
+    const FVector Blade=Tip-Base;const float Length=Blade.Length();
+    if(Length<1.f){Destroy();return;}
+    const FVector Radial=Blade/Length;
+    FVector Tangent=FVector::VectorPlaneProject(Tip-PreviousSwordTip,Radial);
+    if(!Tangent.Normalize())
+    {
+        Tangent=FVector::VectorPlaneProject(SwingTangent,Radial).GetSafeNormal();
+        if(Tangent.IsNearlyZero())Tangent=FVector::CrossProduct(Radial,Character->GetActorForwardVector()).GetSafeNormal();
+        if(Tangent.IsNearlyZero())Tangent=FVector::CrossProduct(Radial,FVector::UpVector).GetSafeNormal();
+    }
+    SwingTangent=Tangent;PreviousSwordTip=Tip;
+    // The source Free Magic crescent has a 100 cm outer radius. Its leading edge
+    // is aligned with +X; scaling by the physical blade length keeps every weapon fitted.
+    SetActorTransform(FTransform(FRotationMatrix::MakeFromXY(Radial,Tangent).ToQuat(),Base,FVector(Length/100.f)));
+}
 void AICAttackEffect::SpawnImpact(UWorld* World,const FVector& Location,EICWeaponFamily Family)
 {
     if(!World||World->GetNetMode()==NM_DedicatedServer)return;
@@ -87,7 +154,7 @@ void AICAttackEffect::SpawnImpact(UWorld* World,const FVector& Location,EICWeapo
 }
 void AICAttackEffect::Tick(float Seconds)
 {
-    Super::Tick(Seconds);if(bNiagara)return;Age+=Seconds;const float Alpha=FMath::Clamp(Age/Duration,0.f,1.f);
+    Super::Tick(Seconds);if(bFollowSword){UpdateSwordSwing();return;}if(bNiagara)return;Age+=Seconds;const float Alpha=FMath::Clamp(Age/Duration,0.f,1.f);
     if(Glow)Glow->SetVectorParameterValue(TEXT("Color"),Color*(3.f*(1-Alpha)));
     if(bImpact)SetActorScale3D(FVector(1+Alpha*1.6f));
     else for(int32 I=12;I<24;++I)Pieces[I]->SetVisibility(float(I-12)/12<=Alpha*1.8f);
