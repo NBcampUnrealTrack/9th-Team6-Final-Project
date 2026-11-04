@@ -20,6 +20,11 @@
 #include "Components/BoxComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "EnhancedPlayerInput.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputKeyEventArgs.h"
+#include "Inventory/Actors/ICDroppedItem.h"
+#include "GameFramework/SpringArmComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICCraftingStationCheck,"IC.Life.CraftingStationFlow",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FICCraftingStationCheck::RunTest(const FString&)
@@ -82,6 +87,34 @@ bool FICCraftingStationReachCheck::RunTest(const FString&)
         Player->SetActorLocation(Position);PC->SetControlRotation(FRotator::ZeroRotator);
         const FVector Camera=Position+FVector(-180,0,140);Player->Camera->SetWorldLocationAndRotation(Camera,(Bounds.GetCenter()-Camera).Rotation());
         TestEqual(TEXT("F selector finds the visible edge of the station"),PC->FindInteractionTarget(),static_cast<AICInteractionActor*>(Station));
+        if (!PC->InputComponent) PC->InitInputSystem();
+        FModifyContextOptions Options;
+        Options.bForceImmediately = true;
+        PC->GetLocalPlayer()->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>()->RequestRebuildControlMappings(Options);
+        auto Wheel = [&](float Delta)
+        {
+            auto* Input = CastChecked<UEnhancedPlayerInput>(PC->PlayerInput);
+            PC->InputKey(FInputKeyEventArgs(nullptr, FInputDeviceId::CreateFromInternalId(0),
+                EKeys::MouseWheelAxis, Delta, .016f, 1, FPlatformTime::Cycles64()));
+            Input->ProcessInputStack({PC->InputComponent}, .016f, false);
+        };
+        auto* Drop = World->SpawnActor<AICDroppedItem>(Camera + Player->Camera->GetForwardVector() * 75, FRotator::ZeroRotator);
+        PC->PlayerTick(.016f);
+        TestTrue(TEXT("Overlapping pickup and station show wheel choices"), PC->InteractionHint.Contains(TEXT("휠")));
+        const float ArmBefore = Player->CameraArm->TargetArmLength;
+        Wheel(-1);
+        PC->PlayerTick(.016f);
+        TestTrue(TEXT("Wheel down highlights the station"), PC->InteractionHint.Contains(TEXT("▶ [F] ") + Station->GetInteractionText().ToString()));
+        Player->UpdateCameraDistance(1);
+        TestEqual(TEXT("Selecting a target does not zoom"), Player->CameraArm->TargetArmLength, ArmBefore);
+        Wheel(1);
+        PC->PlayerTick(.016f);
+        TestTrue(TEXT("Wheel up returns to pickup"), PC->InteractionHint.Contains(TEXT("▶ [F] 줍기")));
+        Drop->Destroy();
+        PC->HandleInputCommand(EICInputCommand::Interact,0);
+        TestTrue(TEXT("Vanished selection cannot open the station instead"), PC->Menu.IsEmpty());
+        PC->PlayerTick(.016f);
+        TestFalse(TEXT("Single station does not show the wheel selector"), PC->InteractionHint.Contains(TEXT("휠")));
         PC->HandleInputCommand(EICInputCommand::Interact,0);TestEqual(TEXT("Actual F input opens the station screen"),PC->Menu,FString(TEXT("Station")));
         TestEqual(TEXT("Actual F input selects the station's production anchor"),PC->ActiveWorkAnchor,Station->WorkAnchorID);
         TArray<UUserWidget*> Widgets;UWidgetBlueprintLibrary::GetAllWidgetsOfClass(PC,Widgets,UICCraftingStationWidget::StaticClass(),false);

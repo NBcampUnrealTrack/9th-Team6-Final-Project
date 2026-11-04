@@ -232,6 +232,65 @@ bool UICCombatVFXSetupLibrary::DumpCombatNiagara(UNiagaraSystem* System)
     return false;
 #endif
 }
+
+UNiagaraSystem* UICCombatVFXSetupLibrary::CreateSimpleSwordSlash(const FString& Path,UNiagaraSystem* Source,UStaticMesh* SlashMesh,UMaterialInterface* Material)
+{
+#if WITH_EDITOR
+    using namespace ICCombatNiagaraAuthoring;
+    if(!Source||!SlashMesh||!Material||!Path.StartsWith(TEXT("/Game/IsekaiClass/VFX/CombatEffect/NormalAttack/")))return nullptr;
+    if(auto* Existing=LoadObject<UNiagaraSystem>(nullptr,*Path))return Existing;
+    // Keep a derived copy of the owned effect, but reduce it to one crescent mesh.
+    auto* System=DuplicateObject<UNiagaraSystem>(Source,CreatePackage(*Path),*FPackageName::GetLongPackageAssetName(Path));
+    TSet<FGuid> OldHandles;
+    for(const auto& Handle:System->GetEmitterHandles())OldHandles.Add(Handle.GetId());
+    System->RemoveEmitterHandlesById(OldHandles);
+    Parameters(System);
+    auto* Emitter=NewObject<UNiagaraEmitter>(System,NAME_None,RF_Transactional);
+    UNiagaraEmitterFactoryNew::InitializeEmitter(Emitter,false);
+    auto* Data=Emitter->GetLatestEmitterData();Data->bLocalSpace=true;Data->bDeterminism=true;
+    Data->InterpolatedSpawnMode=ENiagaraInterpolatedSpawnMode::NoInterpolation;
+    Data->SpawnScriptProps.Script->SetUsage(ENiagaraScriptUsage::ParticleSpawnScript);
+    auto* Graph=CastChecked<UNiagaraScriptSource>(Data->GraphSource)->NodeGraph.Get();
+    auto* EmitterUpdate=Graph->FindEquivalentOutputNode(ENiagaraScriptUsage::EmitterUpdateScript);
+    auto* Spawn=Graph->FindEquivalentOutputNode(ENiagaraScriptUsage::ParticleSpawnScript);
+    auto* Update=Graph->FindEquivalentOutputNode(ENiagaraScriptUsage::ParticleUpdateScript);
+    Module(EmitterUpdate,TEXT("/Niagara/Modules/Emitter/EmitterState.EmitterState"));
+    auto* Burst=Module(EmitterUpdate,TEXT("/Niagara/Modules/Emitter/SpawnBurst_Instantaneous.SpawnBurst_Instantaneous"));
+    const auto CountHandle=FNiagaraParameterHandle::CreateAliasedModuleParameterHandle(FNiagaraParameterHandle(TEXT("Module.Spawn Count")),Burst);
+    auto& Count=FNiagaraStackGraphUtilities::GetOrCreateStackFunctionInputOverridePin(*Burst,CountHandle,FNiagaraTypeDefinition::GetIntDef(),FGuid(),FGuid());Count.DefaultValue=TEXT("1");
+    auto Rapid=FNiagaraUtilities::ConvertVariableToRapidIterationConstantName(FNiagaraVariable(FNiagaraTypeDefinition::GetIntDef(),CountHandle.GetParameterHandleString()),*Emitter->GetUniqueEmitterName(),Data->EmitterUpdateScriptProps.Script->GetUsage());
+    Rapid.SetValue(1);Data->EmitterUpdateScriptProps.Script->RapidIterationParameters.SetParameterData(Rapid.GetData(),Rapid,true);
+    const TArray<FNiagaraVariable> Vars={
+        FNiagaraVariable(FNiagaraTypeDefinition::GetPositionDef(),TEXT("Particles.Position")),
+        FNiagaraVariable(FNiagaraTypeDefinition::GetVec3Def(),TEXT("Particles.Scale")),
+        FNiagaraVariable(FNiagaraTypeDefinition::GetQuatDef(),TEXT("Particles.MeshOrientation")),
+        FNiagaraVariable(FNiagaraTypeDefinition::GetColorDef(),TEXT("Particles.Color")),
+        FNiagaraVariable(FNiagaraTypeDefinition::GetFloatDef(),TEXT("Particles.Lifetime")),
+        FNiagaraVariable(FNiagaraTypeDefinition::GetBoolDef(),TEXT("Particles.Alive"))};
+    const TArray<FString> Defaults={TEXT("0,0,0"),TEXT("1,1,1"),TEXT("0,0,0,1"),TEXT("1,1,1,1"),TEXT("1"),TEXT("true")};
+    for(auto* Output:{Spawn,Update})
+    {
+        auto* Values=FNiagaraStackGraphUtilities::AddParameterModuleToStack(Vars,*Output,INDEX_NONE,Defaults);
+        Expression(Values,TEXT("Particles.Position"),FNiagaraTypeDefinition::GetPositionDef(),TEXT("CustomHLSLOutput = float3(0,0,0);"));
+        Expression(Values,TEXT("Particles.Scale"),FNiagaraTypeDefinition::GetVec3Def(),TEXT("CustomHLSLOutput = float3(1,1,1);"));
+        // The material keeps a 104-degree sector. Rotate it so its leading edge is the live blade.
+        Expression(Values,TEXT("Particles.MeshOrientation"),FNiagaraTypeDefinition::GetQuatDef(),TEXT("CustomHLSLOutput = float4(0,0,-0.43837115,0.89879405);"));
+        Expression(Values,TEXT("Particles.Color"),FNiagaraTypeDefinition::GetColorDef(),TEXT("float t = saturate(Engine.System.Age / max(User.IC_Duration, 0.001)); float tail = saturate((t-0.35)/0.65); float fade = saturate(t / 0.12) * (1.0-tail*tail*(3.0-2.0*tail)); CustomHLSLOutput = float4(User.IC_Color.rgb,min(1.0,User.IC_Color.a)*fade);"));
+        Expression(Values,TEXT("Particles.Lifetime"),FNiagaraTypeDefinition::GetFloatDef(),TEXT("CustomHLSLOutput = max(User.IC_Duration,0.001);"));
+        Expression(Values,TEXT("Particles.Alive"),FNiagaraTypeDefinition::GetBoolDef(),TEXT("CustomHLSLOutput = Engine.System.Age < User.IC_Duration;"));
+    }
+    auto* Renderer=NewObject<UNiagaraMeshRendererProperties>(Emitter);
+    FNiagaraMeshRendererMeshProperties Mesh;Mesh.Mesh=SlashMesh;Renderer->Meshes.Reset();Renderer->Meshes.Add(Mesh);
+    Renderer->bOverrideMaterials=true;FNiagaraMeshMaterialOverride Override;Override.ExplicitMat=Material;Renderer->OverrideMaterials.Add(Override);
+    Emitter->AddRenderer(Renderer,Data->Version.VersionGuid);
+    FNiagaraEditorUtilities::AddEmitterToSystem(*System,*Emitter,Data->Version.VersionGuid);
+    System->RequestCompile(true);System->WaitForCompilationComplete(false,false);
+    System->SetFlags(RF_Public|RF_Standalone);FAssetRegistryModule::AssetCreated(System);System->MarkPackageDirty();
+    return IsCombatNiagaraReady(System)?System:nullptr;
+#else
+    return nullptr;
+#endif
+}
 bool UICCombatVFXSetupLibrary::CompileCombatNiagara(UNiagaraSystem* System)
 {
 #if WITH_EDITOR

@@ -6,6 +6,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "Player/Character/ICPlayerCharacter.h"
+#include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "EnhancedPlayerInput.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -135,11 +136,32 @@ bool FICGatheringCheck::RunTest(const FString&)
     TestTrue(TEXT("Full bag reports why reward failed"),PC->Notice.Contains(TEXT("가방")));
     TestEqual(TEXT("Full bag displays no reward notice"),NoticeCount(),0);
 
+    auto CheckCombatInterrupt = [&](AICLifeActor* Node, FName RewardItem)
+    {
+        Reset();
+        PC->SetCombatState(true);
+        TestFalse(TEXT("Resource interaction cannot start in combat"), Node->TryInteract(PC));
+        PC->SetCombatState(false);
+        TestTrue(TEXT("Resource interaction starts outside combat"), Node->TryInteract(PC));
+        Step(4.9);
+        Pawn->GetICAbilitySystem()->MarkCombat();
+        Step(.2);
+        TestFalse(TEXT("Combat without damage cancels before completion"), Gather->IsGathering());
+        TestEqual(TEXT("Interrupted work grants no item"), Pawn->Inventory->CountItem(RewardItem), 0);
+        TestFalse(TEXT("Interrupted node has no cooldown"), State->ExportState().ResourceReadyAtGameMinute.Contains(Node->PointID));
+        TestFalse(TEXT("Recent combat prevents immediate retry"), Node->TryInteract(PC));
+        Step(60);
+        TestTrue(TEXT("Node can be used after combat expires"), Node->TryInteract(PC));
+        Gather->CancelGather();
+    };
+    CheckCombatInterrupt(Plant, Resource->Yields[0].ItemID);
     Reset();TestTrue(TEXT("Final gathering starts"),Plant->TryInteract(PC));Plant->Destroy();Gather->Tick(0);
     TestNull(TEXT("Destroying target removes the overlay"),Gather->GetProgressWidget());TestEqual(TEXT("Destroyed target grants no reward"),Count(),0);
     Reset();const auto* OreRow=D->Find<FICResourceRow>(TEXT("RES_R01_ORE_01"),R);
     auto* Ore=World->SpawnActor<AICLifeActor>(OreRow->ResourceActorClass.LoadSynchronous(),Pawn->GetActorLocation()+FVector(180,0,0),FRotator::ZeroRotator);
-    Ore->PointID=TEXT("TEST_MINING_NOTICE");TestTrue(TEXT("Real ore begins mining"),Ore->TryInteract(PC));Step(5);
+    Ore->PointID=TEXT("TEST_MINING_NOTICE");
+    CheckCombatInterrupt(Ore, OreRow->Yields[0].ItemID);
+    TestTrue(TEXT("Real ore begins mining"),Ore->TryInteract(PC));Step(5);
     TestEqual(TEXT("Mining creates one HUD reward notice"),NoticeCount(),1);
     if(auto* Toast=FirstNotice())
         TestEqual(TEXT("Mining HUD names the real ore and quantity"),CastChecked<UTextBlock>(Toast->GetWidgetFromName(TEXT("TXT_Items")))->GetText().ToString(),FString(TEXT("+ 광석1 1개 획득")));

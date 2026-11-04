@@ -8,6 +8,7 @@
 #include "Engine/LocalPlayer.h"
 #include "UI/Dialogue/ICAffinityHeartsWidget.h"
 #include "NPC/Character/ICNPCBase.h"
+#include "Character/Animation/ICFacialAnimationComponent.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -47,6 +48,7 @@ void UICNPCDialogueWidget::NativeConstruct()
 
 void UICNPCDialogueWidget::OpenForNPC(AICNPCBase* InNPC)
 {
+    StopSpeaking();
     NPC = InNPC;
     if (!NPC || !GetGameInstance()) return;
 
@@ -102,6 +104,7 @@ void UICNPCDialogueWidget::ShowInteractionOptions()
 
 void UICNPCDialogueWidget::ResetDialogue()
 {
+    StopSpeaking();
     SelectedDialogueID = NAME_None;
     SelectedNodeID = NAME_None;
     DialogueEventID.Invalidate();
@@ -141,12 +144,27 @@ void UICNPCDialogueWidget::ShowInitialDialogue()
     bShowingInteractionOptions = false;
     DialogueEventID = FGuid::NewGuid();
     ClearEntries();
-    DialogueText->SetText(NSLOCTEXT("ICDialogue","Greeting","안녕하세요. 무슨 일로 오셨나요?"));
+    SetSpokenLine(NSLOCTEXT("ICDialogue","Greeting","안녕하세요. 무슨 일로 오셨나요?"), NPC->GetNPCDefinition().ID);
     AddEntry(DialogueOptionsEntry, NextText);
+}
+
+void UICNPCDialogueWidget::StopSpeaking()
+{
+    if (IsValid(NPC) && NPC->FacialAnimation) NPC->FacialAnimation->StopDialogue();
+}
+
+void UICNPCDialogueWidget::SetSpokenLine(const FText& Line, FName SpeakerID)
+{
+    StopSpeaking();
+    DialogueText->SetText(Line);
+    // An unset speaker denotes the player/narration in existing quest conversations.
+    if (IsValid(NPC) && NPC->FacialAnimation)
+        NPC->FacialAnimation->PlayDialogueLine(Line, SpeakerID);
 }
 
 void UICNPCDialogueWidget::NativeDestruct()
 {
+    StopSpeaking();
     if(GiftPicker)
     {
         auto* Closing=GiftPicker.Get();GiftPicker=nullptr;
@@ -201,6 +219,7 @@ void UICNPCDialogueWidget::ShowGiftPicker()
     auto* Class=LoadClass<UICNPCGiftWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_NPCGiftPicker.WBP_IC_NPCGiftPicker_C"));
     GiftPicker=Class?CreateWidget<UICNPCGiftWidget>(PC,Class):nullptr;
     if(!GiftPicker)return;
+    StopSpeaking();
     GiftPicker->OnClosed.AddUniqueDynamic(this,&ThisClass::GiftPickerClosed);
     GiftPicker->OpenForNPC(NPC);
     if(!GetOwningLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>()->OpenScreen(GiftPicker,true,200))
@@ -420,7 +439,7 @@ bool UICNPCDialogueWidget::TryShowNode(FName DialogueID, FName NodeID)
         DialogueEventID = FGuid::NewGuid();
     }
     SelectedNodeID = CurrentNodeID;
-    DialogueText->SetText(Line.Text);
+    SetSpokenLine(Line.Text, Node->SpeakerNPCID);
     ClearEntries();
     for (const FICDialogueChoice& Choice : Node->Choices)
     {
@@ -551,6 +570,7 @@ void UICNPCDialogueWidget::CompleteDialogue(bool IsTerminalChoice)
 
 void UICNPCDialogueWidget::CloseDialogue()
 {
+    StopSpeaking();
     if (AICPlayerController* Controller = Cast<AICPlayerController>(GetOwningPlayer()))
     {
         Controller->SetMenu(TEXT(""));

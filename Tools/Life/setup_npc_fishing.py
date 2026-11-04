@@ -30,23 +30,13 @@ floating=material(game+'/Life/Fishing/Materials/M_IC_FishingFloat',(1,.12,.015))
 for component in line_default.get_components_by_class(u.StaticMeshComponent):
     component.set_material(0,floating if component.get_name()=='Float' else thread)
 save(line)
-imc=u.load_asset(game+'/Input/Contexts/IMC_Gameplay');fishing=u.load_asset(game+'/Input/Actions/IA_Fishing')
-keys=[m.key for m in imc.get_editor_property('default_key_mappings').get_editor_property('mappings') if m.action==fishing]
-if not any(str(k.get_editor_property('key_name'))=='H' for k in keys):
-    key=u.Key();key.set_editor_property('key_name','H')
-    imc.unmap_all_keys_from_action(fishing);imc.map_key(fishing,key);save(imc)
-controller=u.load_asset(game+'/Core/GameFramework/BP_ICPlayerController');default=u.get_default_object(controller.generated_class())
-bindings=list(default.get_editor_property('CommandActions'))
-if not any(b.get_editor_property('command')==u.ICInputCommand.FISHING and b.get_editor_property('action')==fishing for b in bindings):
-    binding=u.ICInputCommandBinding();binding.set_editor_property('action',fishing);binding.set_editor_property('command',u.ICInputCommand.FISHING);binding.set_editor_property('slot',0)
-    bindings.append(binding);default.set_editor_property('CommandActions',bindings);save(controller)
 u.EditorLoadingAndSavingUtils.load_map(game+'/World/L_TestMap')
 zone_bp=u.load_asset(game+'/Life/Fishing/Blueprints/BP_R01_RandomFishingZone')
-u.get_default_object(zone_bp.generated_class()).set_editor_property('interaction_text',u.Text('물고기 구역 · H 낚시 (20초)'));save(zone_bp)
+u.get_default_object(zone_bp.generated_class()).set_editor_property('interaction_text',u.Text('물고기 구역 · F 낚시 (20초)'));save(zone_bp)
 for actor in actors.get_all_level_actors():
     if isinstance(actor,u.ICLifeActor) and actor.get_editor_property('life_type')==u.ICDefinitionType.FISHING_POINT:
-        actor.set_editor_property('interaction_text',u.Text('물고기 구역 · H 낚시 (20초)'))
-        actor.set_actor_label('IC_Fishing_Random_H_20sec')
+        actor.set_editor_property('interaction_text',u.Text('물고기 구역 · F 낚시 (20초)'))
+        actor.set_actor_label('IC_Fishing_Random_F_20sec')
 assert u.EditorLoadingAndSavingUtils.save_current_level()
-(out/'AuthoredFishing.json').write_text(json.dumps({'line':line.get_path_name(),'fishing_key':'H'},ensure_ascii=False,indent=2),encoding='utf-8')
+(out/'AuthoredFishing.json').write_text(json.dumps({'line':line.get_path_name(),'fishing_key':'F'},ensure_ascii=False,indent=2),encoding='utf-8')
 u.log('NPC_FISHING_SETUP_OK')

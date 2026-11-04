@@ -27,6 +27,8 @@
 #include "Combat/GAS/Cues/ICCombatCueNotify.h"
 #include "Combat/Actors/ICProjectile.h"
 #include "Combat/Actors/ICWeaponActor.h"
+#include "Combat/Actors/ICAttackEffect.h"
+#include "NiagaraComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Settings/ICGameUserSettings.h"
 #include "GameFramework/ProjectileMovementComponent.h"
@@ -833,32 +835,74 @@ bool FICSwordComboDamageCheck::RunTest(const FString&)
         Target->SetNumericAttributeBase(UICCombatAttributeSet::GetAutoDodgeChanceAttribute(),0);
         auto Step=[&](){F.Step(.01);F.Player->GetMesh()->TickAnimation(.01f,false);F.Player->GetMesh()->RefreshBoneTransforms();F.Player->GetMesh()->ConditionallyDispatchQueuedAnimEvents();};
         TestTrue(TEXT("Sword combo starts"),F.ASC->RequestAction(TEXT("Attack"),NAME_None,Enemy).bSuccess);
-        float LastDamage=0;
+        const TArray<TArray<double>> ContactTimes = {{.15}, {.15, .45}, {11./60., 44./60.}};
         for(int32 Stage=0;Stage<3;++Stage)
         {
             const float Before=Target->Capture().HP;const auto ID=F.ASC->GetActionID();
             F.ASC->RequestAction(TEXT("Attack"),NAME_None,Enemy);
             const double Began=F.Time->GetClock().PlaySecond;
-            // The finisher's wind-up lets an enemy enter just after its release.
-            // It must still hit during the DT's authored 0.15-second hit window.
-            if(Stage==2)Enemy->SetActorLocation(F.Player->GetActorLocation()+FVector(-100,0,0));
+            int32 Contacts = 0;
+            float PreviousHP = Before;
             for(int32 Frame=0;Frame<600&&F.ASC->GetActionID()==ID;++Frame)
             {
-                if(Stage==2&&F.Time->GetClock().PlaySecond-Began>.83)
-                    Enemy->SetActorLocation(F.Player->GetActorLocation()+FVector(100,0,0));
                 Step();
+                const float HP = Target->Capture().HP;
+                if (HP < PreviousHP)
+                {
+                    const double Elapsed = F.Time->GetClock().PlaySecond - Began;
+                    if (ContactTimes[Stage].IsValidIndex(Contacts))
+                        TestTrue(TEXT("Damage follows the swing frame"), FMath::Abs(Elapsed - ContactTimes[Stage][Contacts]) < .055);
+                    ++Contacts;
+                }
+                PreviousHP = HP;
             }
+            TestEqual(TEXT("Exactly one damage event per sword swing"), Contacts, ContactTimes[Stage].Num());
             const float Damage=Before-Target->Capture().HP;
             AddInfo(FString::Printf(TEXT("%s stage %d damage %.0f reach %.1f distance %.1f"),*Gender,Stage+1,Damage,Weapon->GetMeleeReachCm(),FVector::Distance(F.Player->GetActorLocation(),Enemy->GetActorLocation())));
             TestTrue(FString::Printf(TEXT("%s sword stage %d reduces actual enemy HP"),*Gender,Stage+1),Damage>0);
             const double Coefficients[]={1.,1.1,1.4};
-            TestEqual(TEXT("Each stage applies its damage exactly once"),Damage,float(FMath::RoundToDouble(F.ASC->Stat(EICStat::PhysicalAttack)*Coefficients[Stage])));
-            if(Stage==2)TestTrue(TEXT("Finisher damage exceeds stage two"),Damage>LastDamage);
-            LastDamage=Damage;
+            TestEqual(TEXT("Repeated sampling cannot duplicate a swing"), Damage,
+                ContactTimes[Stage].Num() * float(FMath::RoundToDouble(F.ASC->Stat(EICStat::PhysicalAttack)*Coefficients[Stage])));
         }
         F.ASC->CancelAction();F.Player->EquippedWeaponActor=nullptr;Weapon->Destroy();Enemy->Destroy();F.Step(1.);
     }
     return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICSwordSlashCheck,"IC.Combat.NormalAttack.SwordSlashFollowsBlade",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICSwordSlashCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureNormalAttackWeapons(F);
+    for(int32 I=0;I<6&&F.ASC->GetEquippedWeaponFamily()!=EICWeaponFamily::Sword;++I)F.Player->Inventory->CycleWeapon();
+    auto* GearTable=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Equipment/DT_IC_Equipment.DT_IC_Equipment"));
+    const auto* Gear=GearTable?GearTable->FindRow<FICEquipmentRow>(TEXT("EQU_WPN_SWORD_001"),TEXT("sword slash")):nullptr;
+    if(!TestNotNull(TEXT("Equipped sword definition"),Gear))return false;
+    auto* Weapon=F.World->SpawnActor<AICWeaponActor>(Gear->WeaponActorClass.LoadSynchronous());Weapon->Configure(*Gear);F.Player->EquippedWeaponActor=Weapon;
+    for(const float Speed:{1.f,2.f})
+    {
+        F.ASC->SetNumericAttributeBase(UICCombatAttributeSet::GetAttackSpeedAttribute(),Speed);
+        const auto Action=F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr);
+        if(!TestTrue(TEXT("Attack starts"),Action.bSuccess))return false;
+        // EmitHit returns damage success; a swing into empty space still needs its slash.
+        F.ASC->NotifyCombatEvent(Action.ActionID,TEXT("AN_HitStart"),0);
+        AICAttackEffect* Slash=nullptr;
+        for(TActorIterator<AICAttackEffect> It(F.World);It;++It)if(It->IsFollowingSword()&&!It->IsActorBeingDestroyed())Slash=*It;
+        if(!TestNotNull(TEXT("Contact creates the weapon-following slash"),Slash))return false;
+        auto* Niagara=Slash->FindComponentByClass<UNiagaraComponent>();
+        if(TestNotNull(TEXT("Slash uses Niagara"),Niagara))
+        {
+            bool Valid=false;const float Duration=Niagara->GetVariableFloat(TEXT("User.IC_Duration"),Valid);
+            TestTrue(TEXT("Slash lifetime follows attack speed"),Valid&&FMath::IsNearlyEqual(Duration,.14f/Speed));
+        }
+        Weapon->SetActorLocationAndRotation(FVector(50,80,120),FRotator(35,60,20));Slash->Tick(.016f);
+        FVector Base,Tip;Weapon->GetBladeTrace(Base,Tip);
+        TestTrue(TEXT("Slash origin follows the blade base"),Slash->GetActorLocation().Equals(Base,.01));
+        TestTrue(TEXT("Slash leading edge follows the blade tip"),Slash->GetActorTransform().TransformPosition(FVector(100,0,0)).Equals(Tip,.01));
+        F.ASC->CancelAction();Slash->Tick(.016f);
+        TestTrue(TEXT("Interrupted attacks remove the remaining slash"),Slash->IsActorBeingDestroyed());
+        F.Step(1.);
+    }
+    F.Player->EquippedWeaponActor=nullptr;Weapon->Destroy();return !HasAnyErrors();
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICSwordWindowCheck,"IC.Combat.NormalAttack.SwordHitWindow",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)

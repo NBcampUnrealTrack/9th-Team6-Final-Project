@@ -1,59 +1,30 @@
-플레이어 밝기 수동 조정 안내 — 2026-11-02
+플레이어 밝기 조절 — 실제 조명과 그림자를 받는 재질
 
-이번 작업에서는 플레이어·몬스터의 재질, 텍스처, 조명, 노출을 변경하지 않았다.
-Tools/Characters/audit_character_brightness.py로 읽기만 했으며 전체 결과는
-Saved/CharacterBrightness/Materials.json에 있다.
+현재 남녀 플레이어 재질: /Game/IsekaiClass/Player/Materials/WorldReactive
+원래 툰 색 계산 → Base Color, Emissive Color → 0, Shading Model → Default Lit.
+표면이 월드의 직접광·간접광·그림자를 받도록 연결했다.
 
-확인한 재질 차이
+눈동자·흰자·하이라이트·아이라인·눈썹·속눈썹·입은 M_ICAuthoredFeatureLit 부모를 사용한다.
+ICFeatureAlbedoTexture는 원본 diffuse 텍스처, ICFeatureAlbedoTint는 원본 색 인자다.
+RGB는 Base Color, 알파는 Opacity Mask로 연결하며 Default Lit · Masked · Emissive 0이다.
+남성은 눈이 포함된 머리 아틀라스 한 슬롯에 적용한다. 기존 MToon 최종 색 출력은 눈에 재사용하지 않는다.
 
-플레이어 남녀는 VRM4U의 MToon Unlit 계열 재질을 사용한다.
-몬스터 SK_DragonSD_B는 Default Lit 재질을 사용한다.
-따라서 같은 조명을 받아도 밝기 변화 방식이 다르다. 플레이어만 밝다면
-우선 플레이어의 재질 인스턴스를 비교하는 것이 적절하다.
+Material Instance의 ICAlbedoScale = 0.65가 표면색 배율이다.
+높이면 밝아지고 낮추면 어두워지지만 최종 화면 밝기의 퍼센트는 아니다.
+주간과 야간에 공통 적용된다. 시간별 강제 배율로 실내를 어둡게 만드는 방식은 쓰지 않는다.
+ColorScaleAllMat는 1로 둔다. bUseLight, bUseLightForce, bUseFilmTonemapInverse,
+bDivAdaptation, MatCap, Rim은 현재 꺼져 있으므로 별도 이유 없이 켜지 않는다.
 
-플레이어 재질에서 확인한 현재 값:
-  ColorScaleAllMat = 1.0
-  FilmicTonemapInvWeight = 1.0
-  bUseFilmTonemapInverse = true
-  bUseLight = false
-  bEmissiveAsBaseColor = true
+원본 텍스처·불투명도·얼굴용 노멀 보정은 유지했다. 실제 조명에 따라 앞머리 그림자가 얼굴에 생길 수 있다.
+남성은 원래 아틀라스 두 슬롯을 사용하며 피부·눈만 따로 조절하는 UV 마스크는 없다.
 
-안전하게 비교하는 순서
+월드는 직전 8번의 단일 태양광 구성을 유지한다. 이번 수정에서는 맵·노출·후처리·SkyLight를 추가로 바꾸지 않았다.
+ToonBrightness / ICCharacterBrightness / NightBrightness / ICPartProfile은 현재 플레이어에서 사용하지 않는다.
+프리셋을 바꾸면 기본 메시의 재질을 다시 사용한다.
 
-1. Content Browser에서 다음 Skeletal Mesh를 연다.
-   남: /Game/IsekaiClass/Player/SamplePlayer/Male/SK_Player_M
-   여: /Game/IsekaiClass/Player/SamplePlayer/Female/SK_Player_F
-   Details의 Materials에서 밝은 부분에 해당하는 재질 인스턴스를 찾는다.
-   남성 몸 재질 예:
-   /Game/IsekaiClass/Player/SamplePlayer/Male/MI_N00_000_00_Body_00_SKIN__Instance_
-   여성 몸 재질 예:
-   /Game/IsekaiClass/Player/SamplePlayer/Female/MI_N00_000_00_Body_00_SKIN__Instance_
-   여성 의상은 Tops, Bottoms, Shoes 등 별도 슬롯이다.
-
-2. 해당 재질 인스턴스를 복제하고 복제본을 같은 Materials 슬롯에 연결한다.
-   원래 슬롯의 경로를 기록해 두면 즉시 되돌릴 수 있다.
-   VRM4U 플러그인의 공통 부모 재질은 그대로 둔다.
-
-3. 복제한 재질 인스턴스에서 ColorScaleAllMat을 검색한다.
-   오버라이드 체크박스를 켜고 1.0에서 0.8 정도로 낮춰 확인한다.
-   같은 맵·같은 시간대·같은 카메라에서 비교하며 필요하면 0.7 정도로 더 낮춘다.
-   우선 몸 슬롯 하나로 효과를 확인한 다음 얼굴·의상 슬롯에도 맞춘다.
-   이 숫자는 확정 보정값이 아니라 현재 외형을 보고 정할 시작값이다.
-
-4. 색이 계속 지나치게 하얗거나 떠 보이면 ColorScaleAllMat 비교를 마친 뒤
-   FilmicTonemapInvWeight를 따로 비교한다. 현재 1.0이며 0.5, 0.0 순으로
-   미리보기해 색과 대비가 자연스러운 값을 선택한다.
-   bUseFilmTonemapInverse 스위치를 끄는 방법도 있으나 두 항목을 동시에
-   바꾸면 원인을 구분하기 어려우므로 먼저 Weight만 조절한다.
-
-주의할 항목
-
-이 Unlit 계열은 Emissive를 기본 색 출력에도 사용한다.
-Emissive 출력을 통째로 0으로 만들거나 bEmissiveAsBaseColor를 임의로 바꾸면
-밝기만 줄어드는 대신 모델 전체가 어두워지거나 외형이 달라질 수 있다.
-남녀·부위에 따라 mtoon_EmissionColor도 다르므로 일괄 검정 변경은 피한다.
-
-몬스터와 배경의 밝기가 괜찮다면 전체 Exposure, Directional Light, Sky Light부터
-내리지 않는다. 그 설정은 플레이어 외의 장면에도 영향을 준다.
-조명에 반응하는 외형으로 바꾸려면 별도로 VRM4U의 Lit 계열 부모를 검토해야 한다.
-단순 밝기 조정과 부모 재질·Shading Model 변경은 나누어 비교한다.
+실제 캡처는 항상 밤 외부·밤 내부·낮 외부·낮 내부를 함께 확인한다.
+최신 남녀 캡처: Saved/CharacterLighting/WorldReactive/Comparison.html
+실행 검증 기록: Saved/CharacterLighting/WorldReactive/Final/Verification.json
+눈 수정 후 최신 캡처: Saved/CharacterLighting/WorldReactive/EyeFix/Comparison.html
+눈 수정 후 실행 검증: Saved/CharacterLighting/WorldReactive/EyeFix/Final/Verification.json
+상세 설정과 복원 경로: Player_WorldLighting.ko.md

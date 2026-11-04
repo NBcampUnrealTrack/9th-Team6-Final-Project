@@ -33,7 +33,7 @@ TArray<FICControlGuidePage> ICControlGuide::Pages(const AICPlayerController* PC)
         {NSLOCTEXT("ICGuide","PartyTitle","동료와 함께하는 모험"),FText::FromString(FString::Printf(TEXT("%s: 파티 메뉴\n영입한 동료의 상태가 왼쪽에 표시됩니다. 파티에 편성한 동료는 함께 이동하고 전투하며, 동료 스킬도 직접 사용할 수 있습니다."),*Key(PC,EICInputCommand::Party))),TEXT("HUD_Companions")},
         {NSLOCTEXT("ICGuide","QuestTitle","다음 목적지를 확인하세요"),FText::FromString(FString::Printf(TEXT("%s: 퀘스트 메뉴\n오른쪽 퀘스트 추적창에서 현재 목표를 확인하세요. NPC와 대화하고 의뢰를 수행하며 이야기를 진행할 수 있습니다."),*Key(PC,EICInputCommand::Quest))),TEXT("HUD_QuestTracker")},
         {NSLOCTEXT("ICGuide","MapTitle","워프돌과 목적지 목록"),FText::FromString(FString::Printf(TEXT("%s: 워프 목록\n집은 처음부터 열려 있습니다. 다른 목적지는 현장의 워프돌과 상호작용하면 열립니다. 목록에서 목적지를 선택하고 이동 팝업의 확인을 누르면 동료와 함께 이동합니다."),*Key(PC,EICInputCommand::Map))),TEXT("HUD_Minimap")},
-        {NSLOCTEXT("ICGuide","LifeTitle","이제 직접 탐험해 보세요"),FText::FromString(FString::Printf(TEXT("%s: 상호작용  ·  %s: 낚시\nNPC·채집물·워프돌 가까이에서 안내 문구를 확인하세요. %s로 인벤토리, Esc로 메뉴를 열 수 있습니다. 준비됐다면 F를 눌러 안내를 마치세요."),*Key(PC,EICInputCommand::Interact),*Key(PC,EICInputCommand::Fishing),*Key(PC,EICInputCommand::Inventory))),NAME_None}
+        {NSLOCTEXT("ICGuide","LifeTitle","이제 직접 탐험해 보세요"),FText::FromString(FString::Printf(TEXT("%s: 상호작용/낚시\nNPC·채집물·워프돌 가까이에서 안내 문구를 확인하세요. %s로 인벤토리, Esc로 메뉴를 열 수 있습니다. 준비됐다면 F를 눌러 안내를 마치세요."),*Key(PC,EICInputCommand::Interact),*Key(PC,EICInputCommand::Inventory))),NAME_None}
     };
 }
 

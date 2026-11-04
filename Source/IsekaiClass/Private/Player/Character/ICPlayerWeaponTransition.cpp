@@ -9,6 +9,7 @@
 void AICPlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
+    if(GetMesh()->GetSkeletalMeshAsset())RefreshFacialAnimation();
     Inventory->OnChanged.AddUniqueDynamic(this, &ThisClass::WeaponInventoryChanged);
 }
 

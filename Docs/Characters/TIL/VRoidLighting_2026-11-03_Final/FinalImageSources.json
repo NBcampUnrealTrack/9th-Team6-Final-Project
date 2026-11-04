@@ -1,0 +1,372 @@
+[
+  {
+    "image": "final-all-Night_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Night_Outside_Full.png",
+        "caption": "Player_M"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Night_Outside_Full.png",
+        "caption": "Player_F"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_001_Night_Outside_Full.png",
+        "caption": "NPC_R01_001"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_002_Night_Outside_Full.png",
+        "caption": "NPC_R01_002"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_003_Night_Outside_Full.png",
+        "caption": "NPC_R01_003"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_004_Night_Outside_Full.png",
+        "caption": "NPC_R01_004"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_005_Night_Outside_Full.png",
+        "caption": "NPC_R01_005"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_006_Night_Outside_Full.png",
+        "caption": "NPC_R01_006"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_007_Night_Outside_Full.png",
+        "caption": "NPC_R01_007"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_008_Night_Outside_Full.png",
+        "caption": "NPC_R01_008"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_009_Night_Outside_Full.png",
+        "caption": "NPC_R01_009"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_010_Night_Outside_Full.png",
+        "caption": "NPC_R01_010"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_011_Night_Outside_Full.png",
+        "caption": "NPC_R01_011"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "final-players-Night_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Night_Outside_Full.png",
+        "caption": "남성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Night_Outside_Full.png",
+        "caption": "여성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Night_Outside_Closeup.png",
+        "caption": "남성 · 얼굴"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Night_Outside_Closeup.png",
+        "caption": "여성 · 얼굴"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "final-all-Night_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Night_Inside_Full.png",
+        "caption": "Player_M"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Night_Inside_Full.png",
+        "caption": "Player_F"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_001_Night_Inside_Full.png",
+        "caption": "NPC_R01_001"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_002_Night_Inside_Full.png",
+        "caption": "NPC_R01_002"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_003_Night_Inside_Full.png",
+        "caption": "NPC_R01_003"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_004_Night_Inside_Full.png",
+        "caption": "NPC_R01_004"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_005_Night_Inside_Full.png",
+        "caption": "NPC_R01_005"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_006_Night_Inside_Full.png",
+        "caption": "NPC_R01_006"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_007_Night_Inside_Full.png",
+        "caption": "NPC_R01_007"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_008_Night_Inside_Full.png",
+        "caption": "NPC_R01_008"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_009_Night_Inside_Full.png",
+        "caption": "NPC_R01_009"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_010_Night_Inside_Full.png",
+        "caption": "NPC_R01_010"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_011_Night_Inside_Full.png",
+        "caption": "NPC_R01_011"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "final-players-Night_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Night_Inside_Full.png",
+        "caption": "남성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Night_Inside_Full.png",
+        "caption": "여성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Night_Inside_Closeup.png",
+        "caption": "남성 · 얼굴"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Night_Inside_Closeup.png",
+        "caption": "여성 · 얼굴"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "final-all-Day_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Day_Outside_Full.png",
+        "caption": "Player_M"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Day_Outside_Full.png",
+        "caption": "Player_F"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_001_Day_Outside_Full.png",
+        "caption": "NPC_R01_001"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_002_Day_Outside_Full.png",
+        "caption": "NPC_R01_002"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_003_Day_Outside_Full.png",
+        "caption": "NPC_R01_003"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_004_Day_Outside_Full.png",
+        "caption": "NPC_R01_004"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_005_Day_Outside_Full.png",
+        "caption": "NPC_R01_005"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_006_Day_Outside_Full.png",
+        "caption": "NPC_R01_006"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_007_Day_Outside_Full.png",
+        "caption": "NPC_R01_007"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_008_Day_Outside_Full.png",
+        "caption": "NPC_R01_008"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_009_Day_Outside_Full.png",
+        "caption": "NPC_R01_009"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_010_Day_Outside_Full.png",
+        "caption": "NPC_R01_010"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_011_Day_Outside_Full.png",
+        "caption": "NPC_R01_011"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "final-players-Day_Outside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Day_Outside_Full.png",
+        "caption": "남성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Day_Outside_Full.png",
+        "caption": "여성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Day_Outside_Closeup.png",
+        "caption": "남성 · 얼굴"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Day_Outside_Closeup.png",
+        "caption": "여성 · 얼굴"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "final-all-Day_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Day_Inside_Full.png",
+        "caption": "Player_M"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Day_Inside_Full.png",
+        "caption": "Player_F"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_001_Day_Inside_Full.png",
+        "caption": "NPC_R01_001"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_002_Day_Inside_Full.png",
+        "caption": "NPC_R01_002"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_003_Day_Inside_Full.png",
+        "caption": "NPC_R01_003"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_004_Day_Inside_Full.png",
+        "caption": "NPC_R01_004"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_005_Day_Inside_Full.png",
+        "caption": "NPC_R01_005"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_006_Day_Inside_Full.png",
+        "caption": "NPC_R01_006"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_007_Day_Inside_Full.png",
+        "caption": "NPC_R01_007"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_008_Day_Inside_Full.png",
+        "caption": "NPC_R01_008"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_009_Day_Inside_Full.png",
+        "caption": "NPC_R01_009"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_010_Day_Inside_Full.png",
+        "caption": "NPC_R01_010"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_011_Day_Inside_Full.png",
+        "caption": "NPC_R01_011"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "final-players-Day_Inside.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Day_Inside_Full.png",
+        "caption": "남성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Day_Inside_Full.png",
+        "caption": "여성 · 전신"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_M_Day_Inside_Closeup.png",
+        "caption": "남성 · 얼굴"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\Player_F_Day_Inside_Closeup.png",
+        "caption": "여성 · 얼굴"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  },
+  {
+    "image": "final-npc-faces.png",
+    "sources": [
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_001_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_001"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_002_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_002"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_003_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_003"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_004_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_004"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_005_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_005"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_006_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_006"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_007_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_007"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_008_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_008"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_009_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_009"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_010_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_010"
+      },
+      {
+        "path": "Saved\\CharacterLighting\\AllCharacterOutline_20261103\\FinalCaptures\\NPC_R01_011_Day_Outside_Closeup.png",
+        "caption": "NPC_R01_011"
+      }
+    ],
+    "layout_only_no_colour_retouch": true
+  }
+]

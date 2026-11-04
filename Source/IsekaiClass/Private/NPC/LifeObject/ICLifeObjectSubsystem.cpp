@@ -110,7 +110,7 @@ int32 UICLifeObjectSubsystem::GatherCandidates(const UICLifeObjectUserComponent&
     const FName Region = User.GetRegionID();
 
     // 탐색 기준점: 시간표 목적지 앵커(로드되어 있으면) → 없으면 NPC 현재 위치.
-    // 넓은 오픈 월드에서 다른 집 오브젝트까지 가다가 시간표가 바뀌지 않도록 반경(기본 25m) 안에서만 찾는다.
+    // 넓은 오픈 월드에서 다른 집 오브젝트까지 가다가 시간표가 바뀌지 않도록 반경(기본 50m) 안에서만 찾는다.
     FVector Origin = UserActor->GetActorLocation();
     FTransform AnchorTransform;
     if (!Routine.DestinationAnchorID.IsNone() && User.ResolveAnchor(Routine.DestinationAnchorID, AnchorTransform))
@@ -124,6 +124,11 @@ int32 UICLifeObjectSubsystem::GatherCandidates(const UICLifeObjectUserComponent&
         if (!Object || !Object->IsSmartObjectReady() || Object->IsPlayerLocked()) continue;
         if (!Object->GetEffectiveActivityTags().HasTag(Routine.ActivityTag)) continue;
         if (!Object->CanBeUsedBy(UserID, Occupation, Region)) continue;
+        // Work는 부모 태그라 Work.Cook/Farm 같은 모든 하위 활동에도 매칭된다.
+        // 근무 중에는 현재 근무 목적지 앵커에 연결한 전용 오브젝트만 허용한다.
+        // 연결 슬롯이 없으면 Fallback이 근무 앵커에서 대기한다.
+        const bool bLinkedToDestination = Object->IsLinkedToAnchor(Routine.DestinationAnchorID);
+        if (Routine.Activity == EICScheduleActivity::Work && !bLinkedToDestination) continue;
         if (SearchRadiusCm > 0.f && FVector::DistSquared(Origin, Object->GetActorLocation()) > FMath::Square(static_cast<double>(SearchRadiusCm))) continue;
 
         const double ObjectRoll = FMath::FRand();
@@ -137,6 +142,22 @@ int32 UICLifeObjectSubsystem::GatherCandidates(const UICLifeObjectUserComponent&
             Candidate.SlotIndex = Slot.GetSlotIndex();
             // 같은 오브젝트 안에서는 빈 자리 중 앞 번호부터 쓴다.
             Candidate.Score = ObjectRoll + Slot.GetSlotIndex() * 1.0e-6;
+        }
+    }
+    // 같은 NPC가 막 사용한 액터를 즉시 다시 고르지 않게 한다. 다른 액터 후보가 하나라도
+    // 있으면 이전 액터의 모든 슬롯을 제외하고, 그것뿐이면 그대로 남겨 생활이 멈추지 않는다.
+    if (const AICLifeObjectActor* LastUsed = User.GetLastUsedObject())
+    {
+        const bool bHasAlternativeObject = OutCandidates.ContainsByPredicate([LastUsed](const FICLifeObjectCandidate& Candidate)
+        {
+            return Candidate.Object.IsValid() && Candidate.Object.Get() != LastUsed;
+        });
+        if (bHasAlternativeObject)
+        {
+            OutCandidates.RemoveAll([LastUsed](const FICLifeObjectCandidate& Candidate)
+            {
+                return Candidate.Object.Get() == LastUsed;
+            });
         }
     }
     OutCandidates.Sort([](const FICLifeObjectCandidate& A, const FICLifeObjectCandidate& B) { return A.Score < B.Score; });

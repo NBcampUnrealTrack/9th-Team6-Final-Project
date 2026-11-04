@@ -41,7 +41,6 @@ buttons = {
     u.ICInputCommand.JUMP: 'Gamepad_FaceButton_Bottom',
     u.ICInputCommand.DODGE: 'Gamepad_LeftTrigger',
     u.ICInputCommand.INTERACT: 'Gamepad_FaceButton_Left',
-    u.ICInputCommand.FISHING: 'Gamepad_FaceButton_Top',
     u.ICInputCommand.SWITCH_WEAPON: 'Gamepad_RightShoulder',
     u.ICInputCommand.ATTACK: 'Gamepad_RightTrigger',
     u.ICInputCommand.NEXT_TARGET: 'Gamepad_LeftShoulder',

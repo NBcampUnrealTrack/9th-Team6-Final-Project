@@ -16,6 +16,70 @@
 #include "NavigationSystem.h"
 #include "Components/CapsuleComponent.h"
 #include "Debug/ICLog.h"
+#include "NPC/LifeObject/ICLifeObjectActor.h"
+#include "Engine/OverlapResult.h"
+
+namespace ICSpawnNPC
+{
+    void GetCapsuleSize(UClass* Type, float& Radius, float& HalfHeight)
+    {
+        const AICNPCBase* CDO = Type ? Cast<AICNPCBase>(Type->GetDefaultObject()) : nullptr;
+        const UCapsuleComponent* Capsule = CDO ? CDO->GetCapsuleComponent() : nullptr;
+        Radius = Capsule ? Capsule->GetScaledCapsuleRadius() : 42.f;
+        HalfHeight = Capsule ? Capsule->GetScaledCapsuleHalfHeight() : 90.f;
+    }
+
+    // 앵커를 막고 있는 것이 침대(생활 오브젝트)뿐인지 확인한다.
+    // NPC 캡슐은 원래 침대를 무시하고 움직이므로(AICNPCBase::BeginPlay) 침대와 겹쳐 생성해도 된다.
+    bool IsBlockedOnlyByBeds(UWorld* World, UClass* Type, const FVector& Location)
+    {
+        float Radius, HalfHeight; GetCapsuleSize(Type, Radius, HalfHeight);
+        TArray<FOverlapResult> Overlaps;
+        World->OverlapMultiByChannel(Overlaps, Location, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeCapsule(Radius, HalfHeight));
+        bool bAnyBed = false;
+        for (const FOverlapResult& Overlap : Overlaps)
+        {
+            if (!Overlap.bBlockingHit) continue;
+            const AICLifeObjectActor* Object = Cast<AICLifeObjectActor>(Overlap.GetActor());
+            if (!Object || Object->ObjectType != EICLifeObjectType::Bed) return false;
+            bAnyBed = true;
+        }
+        return bAnyBed;
+    }
+
+    // 앵커 주변(1~3m) 빈 바닥을 찾는다. 침대는 NPC가 통과하므로 막힘으로 보지 않는다.
+    bool FindClearSpotNear(UWorld* World, UClass* Type, const FTransform& Anchor, FTransform& Out)
+    {
+        float Radius, HalfHeight; GetCapsuleSize(Type, Radius, HalfHeight);
+        auto* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+        const bool bHasNav = Nav && Nav->GetDefaultNavDataInstance(FNavigationSystem::DontCreate);
+        for (const float Ring : {100.f, 200.f, 300.f})
+        for (int32 I = 0; I < 8; ++I)
+        {
+            const double Angle = I * PI / 4.;
+            FVector Position = Anchor.GetLocation() + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.) * Ring;
+            if (bHasNav)
+            {
+                FNavLocation Point;
+                if (Nav->ProjectPointToNavigation(Position, Point, FVector(80, 80, 300))) Position = Point.Location;
+            }
+            FHitResult Floor;
+            if (!World->LineTraceSingleByChannel(Floor, Position + FVector(0, 0, 200), Position - FVector(0, 0, 400), ECC_Visibility) || Floor.ImpactNormal.Z < .65f) continue;
+            Position = Floor.ImpactPoint + FVector(0, 0, HalfHeight + Radius * (1.f / Floor.ImpactNormal.Z - 1.f) + 2.f);
+            TArray<FOverlapResult> Overlaps;
+            World->OverlapMultiByChannel(Overlaps, Position, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeCapsule(Radius, HalfHeight));
+            const bool bBlocked = Overlaps.ContainsByPredicate([](const FOverlapResult& Overlap)
+            {
+                const AICLifeObjectActor* Object = Cast<AICLifeObjectActor>(Overlap.GetActor());
+                return Overlap.bBlockingHit && !(Object && Object->ObjectType == EICLifeObjectType::Bed);
+            });
+            if (bBlocked) continue;
+            Out = FTransform(FRotator(0., Anchor.Rotator().Yaw, 0.), Position);
+            return true;
+        }
+        return false;
+    }
+}
 bool UICSpawnSubsystem::DoesSupportWorldType(EWorldType::Type Type) const { IC_TRACE_FUNCTION();return Type==EWorldType::Game||Type==EWorldType::PIE; }
 void UICSpawnSubsystem::OnWorldBeginPlay(UWorld& World)
 {
@@ -129,6 +193,23 @@ void UICSpawnSubsystem::RefreshSpawns()
         FActorSpawnParameters SpawnParams;
         SpawnParams.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
         auto* Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Position,SpawnParams);
+        if(!Actor)
+        {
+            // 침대 위 앵커(누울 자리)는 침대와 겹쳐도 생성한다. 그 밖에 막혀 있으면 앵커 주변 빈 바닥에 생성한다.
+            FActorSpawnParameters ForceParams;
+            ForceParams.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            FTransform Nearby;
+            if(ICSpawnNPC::IsBlockedOnlyByBeds(GetWorld(),Type,Position.GetLocation()))
+            {
+                Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Position,ForceParams);
+                if(Actor)UE_LOG(LogICWorldState,Log,TEXT("[Spawn.NPCOnBed] NPC=%s 앵커가 침대와 겹쳐 있어 침대 위에 생성"),*ID.ToString());
+            }
+            else if(ICSpawnNPC::FindClearSpotNear(GetWorld(),Type,Position,Nearby))
+            {
+                Actor=GetWorld()->SpawnActor<AICNPCBase>(Type,Nearby,ForceParams);
+                if(Actor)UE_LOG(LogICWorldState,Warning,TEXT("[Spawn.NPCMovedNearAnchor] NPC=%s Anchor=%s → %s (앵커가 막혀 있어 주변 빈 자리에 생성)"),*ID.ToString(),*Position.GetLocation().ToCompactString(),*Nearby.GetLocation().ToCompactString());
+            }
+        }
         if(!Actor)
         {
             UE_LOG(LogICWorldState,Warning,TEXT("[Spawn.NPCCreateFailed] NPC=%s Class=%s Location=%s 앵커 위치가 바닥/벽/다른 오브젝트에 막혀 있습니다. 앵커를 바닥에서 약 100cm 위, 빈 공간으로 옮겨 주세요."),*ID.ToString(),*GetNameSafe(Type),*Position.GetLocation().ToCompactString());

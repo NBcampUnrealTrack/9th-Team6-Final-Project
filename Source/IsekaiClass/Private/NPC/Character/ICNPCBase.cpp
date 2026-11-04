@@ -1,5 +1,6 @@
 #include "NPC/Character/ICNPCBase.h"
 #include "Character/Animation/ICCharacterAnimInstance.h"
+#include "Character/Animation/ICFacialAnimationComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "UI/Framework/ICText.h"
 #include "AI/ICAIController.h"
@@ -43,6 +44,15 @@ AICNPCBase::AICNPCBase()
     QuestMarker->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     LifeObjectUser=CreateDefaultSubobject<UICLifeObjectUserComponent>(TEXT("LifeObjectUser"));
     HomeBehavior=CreateDefaultSubobject<UICNPCHomeBehaviorComponent>(TEXT("HomeBehavior"));
+
+    // NPC는 플레이어(Pawn)·월드에는 막히되, NPC 전용 채널끼리는 겹쳐서 좁은 통로에서
+    // 서로 캡슐에 끼지 않는다. RVO는 이 Overlap 상태에서 회피 방향만 보조한다.
+    if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+    {
+        Capsule->SetCollisionObjectType(ECC_GameTraceChannel1); // Config의 NPC 채널
+        Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+        Capsule->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Overlap);
+    }
 
     auto* Movement=GetCharacterMovement();
     Movement->MaxWalkSpeed=ScheduleMoveSpeed;
@@ -120,6 +130,7 @@ bool AICNPCBase::InitializeNPC(FName ID)
     AnimationProfile = Definition.AnimationProfile;
     if(auto* CharacterMesh=Definition.Mesh.LoadSynchronous()){GetMesh()->SetSkeletalMesh(CharacterMesh);GetMesh()->SetRelativeTransform(Definition.MeshTransform);}
     if(auto* Anim=Definition.AnimationClass.LoadSynchronous())GetMesh()->SetAnimInstanceClass(Anim);
+    RefreshFacialAnimation();
     RefreshWeaponAppearance();
     bInitialized=true;
     if(auto* MarkerClass=LoadClass<UICNPCQuestMarkerWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_NPCQuestMarker.WBP_IC_NPCQuestMarker_C")))
@@ -239,6 +250,7 @@ bool AICNPCBase::TryInteract(AICPlayerController* Requester)
 void AICNPCBase::EndInteraction()
 {
     IC_TRACE_FUNCTION();
+    if (FacialAnimation) FacialAnimation->StopDialogue();
     if(!bInteracting)return;
     bInteracting=false;
     if(auto* AI=Cast<AICAIController>(GetController()))

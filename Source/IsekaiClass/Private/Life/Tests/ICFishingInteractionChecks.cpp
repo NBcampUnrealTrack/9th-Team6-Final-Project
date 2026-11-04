@@ -28,6 +28,8 @@
 #include "UI/Dialogue/ICNPCDialogueWidget.h"
 #include "Editor.h"
 #include "EngineUtils.h"
+#include "Combat/GAS/ICAbilitySystemComponent.h"
+#include "Combat/GAS/ICGameplayTags.h"
 
 namespace ICFishingChecks
 {
@@ -69,21 +71,57 @@ bool FICFishingLandingCheck::RunTest(const FString&)
     F.PC->SetControlRotation(FRotator::ZeroRotator);
     FVector Resolved;TestEqual(TEXT("Screen center ray finds water surface"),F.Pawn->LifeActions->ResolveFishingCast(Resolved),Zone);
     TestTrue(TEXT("Resolved float lies inside the zone"),Zone->ContainsFishingLanding(Resolved));
-    TestFalse(TEXT("F never fishes"),Zone->TryInteract(F.PC));TestFalse(TEXT("Generic gather cannot bypass aimed fishing"),F.Gather->StartGather(Zone,F.PC));
+    TestFalse(TEXT("Direct actor interaction cannot bypass aiming"),Zone->TryInteract(F.PC));TestFalse(TEXT("Generic gather cannot bypass aimed fishing"),F.Gather->StartGather(Zone,F.PC));
     TestFalse(TEXT("A float outside the water cannot start fishing"),F.Gather->StartFishing(Zone,F.PC,Landing+FVector(2000,0,0)));
-    auto* IMC=LoadObject<UInputMappingContext>(nullptr,TEXT("/Game/IsekaiClass/Input/Contexts/IMC_Gameplay.IMC_Gameplay"));bool H=false;
-    if(IMC)for(const auto& Mapping:IMC->GetMappings())if(Mapping.Action&&Mapping.Action->GetName()==TEXT("IA_Fishing"))H|=Mapping.Key==EKeys::H;
-    TestTrue(TEXT("Authored fishing input is H"),H);
+    auto* IMC=LoadObject<UInputMappingContext>(nullptr,TEXT("/Game/IsekaiClass/Input/Contexts/IMC_Gameplay.IMC_Gameplay"));bool HasInteract = false;
+    if (IMC) for (const auto& Mapping : IMC->GetMappings())
+        if (Mapping.Action && Mapping.Action->GetName() == TEXT("IA_Interact")) HasInteract |= Mapping.Key == EKeys::F;
+    TestTrue(TEXT("Fishing uses the authored F interaction"), HasInteract);
     F.PC->HandleInputCommand(EICInputCommand::Fishing,0);
-    if(!TestTrue(TEXT("H starts a long cast farther than F interaction distance"),F.Gather->IsGathering()))return false;
+    TestFalse(TEXT("Retired fishing command cannot cast"), F.Gather->IsGathering());
+    F.PC->HandleInputCommand(EICInputCommand::Interact,0);
+    if(!TestTrue(TEXT("F starts a long cast farther than F interaction distance"),F.Gather->IsGathering()))return false;
     auto* Line=F.Pawn->LifeActions->GetFishingLine();TestTrue(TEXT("Real rod line and float are valid"),Line&&Line->HasValidLanding());
     F.Step(19.9);TestEqual(TEXT("No reward before twenty seconds"),F.FishCount(),0);TestTrue(TEXT("Fishing remains active"),F.Gather->IsGathering());
     F.Step(.1);TestEqual(TEXT("One fish after twenty seconds"),F.FishCount(),1);TestFalse(TEXT("Gauge closes on completion"),F.Gather->IsGathering());TestNull(TEXT("Rod line is removed on completion"),F.Pawn->LifeActions->GetFishingLine());
-    F.PC->HandleInputCommand(EICInputCommand::Fishing,0);TestTrue(TEXT("No cooldown: H immediately starts next cast"),F.Gather->IsGathering());
-    F.Step(5);F.PC->HandleInputCommand(EICInputCommand::Fishing,0);F.Step(25);
-    TestFalse(TEXT("Second H cancels rather than restarting"),F.Gather->IsGathering());TestEqual(TEXT("Canceled cast grants no fish"),F.FishCount(),1);
-    F.PC->HandleInputCommand(EICInputCommand::Fishing,0);Zone->SetActorLocation(Zone->GetActorLocation()+FVector(2000,0,0));F.Step(20);
+    F.PC->HandleInputCommand(EICInputCommand::Interact,0);TestTrue(TEXT("No cooldown: F immediately starts next cast"),F.Gather->IsGathering());
+    F.Step(5);F.PC->HandleInputCommand(EICInputCommand::Interact,0);F.Step(25);
+    TestFalse(TEXT("Second F cancels rather than restarting"),F.Gather->IsGathering());TestEqual(TEXT("Canceled cast grants no fish"),F.FishCount(),1);
+    F.PC->HandleInputCommand(EICInputCommand::Interact,0);Zone->SetActorLocation(Zone->GetActorLocation()+FVector(2000,0,0));F.Step(20);
     TestEqual(TEXT("A float that loses its zone cannot grant a catch"),F.FishCount(),1);
+    return !HasAnyErrors();
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICFishingStateCheck,"IC.Life.Fishing.StateGatesAndCleanup",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICFishingStateCheck::RunTest(const FString&)
+{
+    ICFishingChecks::FSession F;FICDefinitionResult R;
+    const auto* Point=F.GI->GetSubsystem<UICDefinitionSubsystem>()->Find<FICFishingPointRow>(TEXT("FPT_R01_RANDOM_001"),R);
+    if(!TestNotNull(TEXT("Fishing definition"),Point))return false;
+    auto* Zone=F.World->SpawnActor<AICLifeActor>(Point->PointActorClass.LoadSynchronous(),FVector(600,0,60),FRotator::ZeroRotator);
+    if(!TestNotNull(TEXT("Fishing zone"),Zone))return false;
+    FVector Landing,Normal;Zone->GetFishingSurface(Landing,Normal);
+    auto* ASC=F.Pawn->GetICAbilitySystem();
+    ASC->SetLooseGameplayTagCount(ICTags::Staggered,1);
+    TestFalse(TEXT("Direct call cannot bypass stagger"),F.Gather->StartFishing(Zone,F.PC,Landing));
+    ASC->SetLooseGameplayTagCount(ICTags::Staggered,0);
+    ASC->MarkCombat();
+    TestFalse(TEXT("Direct call cannot bypass recent combat"),F.Gather->StartFishing(Zone,F.PC,Landing));
+    ASC->ResetExecutionForLoad();
+    if(!TestTrue(TEXT("Fishing starts when ready"),F.Gather->StartFishing(Zone,F.PC,Landing)))return false;
+    ASC->MarkCombat();F.Step(.1);F.Step(20);
+    TestFalse(TEXT("Combat cancels before reward"),F.Gather->IsGathering());
+    TestFalse(TEXT("Work state is released"),F.Pawn->LifeActions->IsWorking());
+    TestNull(TEXT("Fishing line is removed"),F.Pawn->LifeActions->GetFishingLine());
+    TestEqual(TEXT("Interrupted cast gives no reward"),F.FishCount(),0);
+    ASC->ResetExecutionForLoad();
+    if(!TestTrue(TEXT("Can restart after cleanup"),F.Gather->StartFishing(Zone,F.PC,Landing)))return false;
+    F.GI->GetSubsystem<UICWorldStateSubsystem>()->OnCombatDamageReceived.Broadcast(F.Pawn,1.f);
+    TestFalse(TEXT("Damage cancels immediately"),F.Gather->IsGathering());
+    TestNull(TEXT("Damage removes line"),F.Pawn->LifeActions->GetFishingLine());
+    if(!TestTrue(TEXT("Restart before death check"),F.Gather->StartFishing(Zone,F.PC,Landing)))return false;
+    ASC->ChangeResource(TEXT("HP"),-100000);F.Step(20);
+    TestFalse(TEXT("Zero HP cancels without waiting for controller death flag"),F.Gather->IsGathering());
+    TestEqual(TEXT("Death gives no reward"),F.FishCount(),0);
     return !HasAnyErrors();
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICHiddenFishingRegionsCheck,"IC.Life.Fishing.HiddenAndMultipleRegions",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
@@ -106,7 +144,7 @@ bool FICHiddenFishingRegionsCheck::RunTest(const FString&)
     Water->SetActorLocation(Target);
     TestEqual(TEXT("A shallow cast tolerates water five centimetres above the zone"),F.Pawn->LifeActions->ResolveFishingCast(Landing),Zone);
     TestTrue(TEXT("The float uses the real water height"),FMath::IsNearlyEqual(Landing.Z,Target.Z+5.f,.1f));
-    F.PC->HandleInputCommand(EICInputCommand::Fishing,0);TestTrue(TEXT("H starts fishing on the hidden additional region"),F.Gather->IsGathering());
+    F.PC->HandleInputCommand(EICInputCommand::Interact,0);TestTrue(TEXT("F starts fishing on the hidden additional region"),F.Gather->IsGathering());
     auto* Line=F.Pawn->LifeActions->GetFishingLine();
     if(TestNotNull(TEXT("Shallow shore cast owns a fishing line"),Line))TestTrue(TEXT("Line float rests on real water"),Line->GetLandingPoint().Equals(Landing,.1f));
     F.Step(20);TestEqual(TEXT("Hidden additional region grants the normal catch"),F.FishCount(),1);
