@@ -27,6 +27,8 @@
 #include "Combat/GAS/Cues/ICCombatCueNotify.h"
 #include "Combat/Actors/ICProjectile.h"
 #include "Combat/Actors/ICWeaponActor.h"
+#include "Combat/Actors/ICAttackEffect.h"
+#include "NiagaraComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Settings/ICGameUserSettings.h"
 #include "GameFramework/ProjectileMovementComponent.h"
@@ -865,6 +867,42 @@ bool FICSwordComboDamageCheck::RunTest(const FString&)
         F.ASC->CancelAction();F.Player->EquippedWeaponActor=nullptr;Weapon->Destroy();Enemy->Destroy();F.Step(1.);
     }
     return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICSwordSlashCheck,"IC.Combat.NormalAttack.SwordSlashFollowsBlade",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICSwordSlashCheck::RunTest(const FString&)
+{
+    FGASFixture F;ConfigureNormalAttackWeapons(F);
+    for(int32 I=0;I<6&&F.ASC->GetEquippedWeaponFamily()!=EICWeaponFamily::Sword;++I)F.Player->Inventory->CycleWeapon();
+    auto* GearTable=LoadObject<UDataTable>(nullptr,TEXT("/Game/IsekaiClass/Data/DataTable/Equipment/DT_IC_Equipment.DT_IC_Equipment"));
+    const auto* Gear=GearTable?GearTable->FindRow<FICEquipmentRow>(TEXT("EQU_WPN_SWORD_001"),TEXT("sword slash")):nullptr;
+    if(!TestNotNull(TEXT("Equipped sword definition"),Gear))return false;
+    auto* Weapon=F.World->SpawnActor<AICWeaponActor>(Gear->WeaponActorClass.LoadSynchronous());Weapon->Configure(*Gear);F.Player->EquippedWeaponActor=Weapon;
+    for(const float Speed:{1.f,2.f})
+    {
+        F.ASC->SetNumericAttributeBase(UICCombatAttributeSet::GetAttackSpeedAttribute(),Speed);
+        const auto Action=F.ASC->RequestAction(TEXT("Attack"),NAME_None,nullptr);
+        if(!TestTrue(TEXT("Attack starts"),Action.bSuccess))return false;
+        // EmitHit returns damage success; a swing into empty space still needs its slash.
+        F.ASC->NotifyCombatEvent(Action.ActionID,TEXT("AN_HitStart"),0);
+        AICAttackEffect* Slash=nullptr;
+        for(TActorIterator<AICAttackEffect> It(F.World);It;++It)if(It->IsFollowingSword()&&!It->IsActorBeingDestroyed())Slash=*It;
+        if(!TestNotNull(TEXT("Contact creates the weapon-following slash"),Slash))return false;
+        auto* Niagara=Slash->FindComponentByClass<UNiagaraComponent>();
+        if(TestNotNull(TEXT("Slash uses Niagara"),Niagara))
+        {
+            bool Valid=false;const float Duration=Niagara->GetVariableFloat(TEXT("User.IC_Duration"),Valid);
+            TestTrue(TEXT("Slash lifetime follows attack speed"),Valid&&FMath::IsNearlyEqual(Duration,.14f/Speed));
+        }
+        Weapon->SetActorLocationAndRotation(FVector(50,80,120),FRotator(35,60,20));Slash->Tick(.016f);
+        FVector Base,Tip;Weapon->GetBladeTrace(Base,Tip);
+        TestTrue(TEXT("Slash origin follows the blade base"),Slash->GetActorLocation().Equals(Base,.01));
+        TestTrue(TEXT("Slash leading edge follows the blade tip"),Slash->GetActorTransform().TransformPosition(FVector(100,0,0)).Equals(Tip,.01));
+        F.ASC->CancelAction();Slash->Tick(.016f);
+        TestTrue(TEXT("Interrupted attacks remove the remaining slash"),Slash->IsActorBeingDestroyed());
+        F.Step(1.);
+    }
+    F.Player->EquippedWeaponActor=nullptr;Weapon->Destroy();return !HasAnyErrors();
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICSwordWindowCheck,"IC.Combat.NormalAttack.SwordHitWindow",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)

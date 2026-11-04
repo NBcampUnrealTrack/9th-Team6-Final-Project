@@ -42,6 +42,8 @@ struct ISEKAICLASS_API FICCombatVFXRow : public FTableRowBase
     UPROPERTY(EditAnywhere,BlueprintReadWrite) bool bCastAtTarget=false;
     UPROPERTY(EditAnywhere,BlueprintReadWrite) bool bImpactFollowsTarget=false;
     UPROPERTY(EditAnywhere,BlueprintReadWrite) float SlashSlope=.22f;
+    /** Normal sword afterimages follow the live blade instead of drawing a fixed damage cone. */
+    UPROPERTY(EditAnywhere,BlueprintReadWrite) bool bFollowWeaponSwing=false;
     /** Retain the original mesh effect if a Niagara asset is missing. */
     UPROPERTY(EditAnywhere,BlueprintReadWrite) bool bLegacyMeshFallback=true;
 };
