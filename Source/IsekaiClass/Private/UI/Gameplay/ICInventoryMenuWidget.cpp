@@ -550,8 +550,18 @@ void UICInventoryMenuWidget::QuickAction(){BeginQuickSlot();}
 void UICInventoryMenuWidget::TrashAction(){BeginTrash();}
 void UICInventoryMenuWidget::EquipAction(){EquipSelected();}
 void UICInventoryMenuWidget::CancelAction(){if(bPickingQuickSlot||bConfirming){CancelPending();RefreshInventory();NotifyNavigation();}}
-FText UICInventoryMenuWidget::NavigationHint() const
+FText UICInventoryMenuWidget::NavigationHint(bool Gamepad) const
 {
+    if(Gamepad)
+    {
+        if(bPickingUseTarget||bConfirming||bPickingQuickSlot)return NSLOCTEXT("ICInventory","PadPickHint","방향키 / LS 선택   ·   {Accept} 확인   ·   {Back} 취소");
+        if(bDetailOpen)return NSLOCTEXT("ICInventory","PadDetailHint","← / → 버튼 선택   ·   ↑ / ↓ 설명 스크롤   ·   {Accept} 실행   ·   {Back} 뒤로");
+        if(NavigationArea==0)return NSLOCTEXT("ICInventory","PadRosterHint","↑ / ↓ 캐릭터 선택   ·   → 장비   ·   LB / RB 탭 이동   ·   {Back} 닫기");
+        if(NavigationArea==1)return NSLOCTEXT("ICInventory","PadEquipmentHint","← / → 무기 선택   ·   ↓ 퀵슬롯   ·   {Accept} 무기 해제");
+        if(NavigationArea==2)return NSLOCTEXT("ICInventory","PadItemTabsHint","← / → 일반 / 퀘스트   ·   ↓ 아이템   ·   ↑ 상단 탭");
+        if(NavigationArea==3)return NSLOCTEXT("ICInventory","PadItemsHint","방향키 / LS 아이템 이동   ·   {Accept} 아이템 작업   ·   {FaceLeft} 정렬   ·   {FaceTop} 필터");
+        return NSLOCTEXT("ICInventory","PadQuickHint","← / → 퀵슬롯 선택   ·   {Accept} 아이템 보기   ·   ↑ 무기   ·   {Back} 닫기");
+    }
     if(bPickingUseTarget)return NSLOCTEXT("ICInventory","UseTargetHint","A / D  대상 선택     Enter  사용     ESC  취소");
     if(bConfirming)return NSLOCTEXT("ICInventory","ConfirmHint","WASD  수락 / 취소 선택     Enter  결정     ESC  취소");
     if(bPickingQuickSlot)return NSLOCTEXT("ICInventory","PickHint","A / D  슬롯 선택     Enter  등록 확인     ESC  취소");
@@ -564,8 +574,8 @@ FText UICInventoryMenuWidget::NavigationHint() const
 }
 bool UICInventoryMenuWidget::HandleMenuKey(FKey Key,bool Repeat)
 {
-    if(!IsBusy()&&(Key==EKeys::V||Key==EKeys::Gamepad_FaceButton_Left)){if(!Repeat)SortItems();return true;}
-    if(!IsBusy()&&(Key==EKeys::C||Key==EKeys::Gamepad_FaceButton_Top)){if(!Repeat)CycleFilter();return true;}
+    if(!IsBusy()&&(Key==EKeys::V||Key==UICGameUserSettings::GamepadFaceKey(0))){if(!Repeat)SortItems();return true;}
+    if(!IsBusy()&&(Key==EKeys::C||Key==UICGameUserSettings::GamepadFaceKey(1))){if(!Repeat)CycleFilter();return true;}
     if(bPickingUseTarget)return CastChecked<UICCodexTargetsWidget>(GetWidgetFromName(TEXT("UseTargets")))->HandleKey(Key,Repeat);
     if(bConfirming)return CastChecked<UICItemConfirmWidget>(GetWidgetFromName(TEXT("ItemConfirm")))->HandleKey(Key,Repeat);
     const bool Up=Key==EKeys::W||Key==EKeys::Up||Key==EKeys::Gamepad_DPad_Up,Down=Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down;

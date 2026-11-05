@@ -117,7 +117,7 @@ public:
     UFUNCTION(BlueprintCallable) void ResolveConfirmation(bool bAccept);
     bool HandleMenuKey(FKey Key,bool bRepeat=false);
     bool IsBusy() const {return bDetailOpen||bPickingQuickSlot||bConfirming||bPickingUseTarget;}
-    FText NavigationHint() const;
+    FText NavigationHint(bool Gamepad=false) const;
     void Activate();
     static bool BuildLayout(UWidgetTree* Tree);
 protected:

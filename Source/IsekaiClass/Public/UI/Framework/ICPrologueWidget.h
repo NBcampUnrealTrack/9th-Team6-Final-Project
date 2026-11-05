@@ -30,6 +30,7 @@ protected:
     virtual void NativeTick(const FGeometry& Geometry,float DeltaSeconds) override;
     virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& Event) override;
     virtual FReply NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& Event) override;
+    virtual FReply NativeOnMouseButtonDown(const FGeometry& Geometry,const FPointerEvent& Event) override;
     virtual void GoBack() override {}
 private:
     friend struct FICPrologueTestAccess;

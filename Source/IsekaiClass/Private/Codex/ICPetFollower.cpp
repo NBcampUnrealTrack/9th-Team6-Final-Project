@@ -1,4 +1,5 @@
 #include "Codex/ICPetFollower.h"
+#include "Enemy/ICMonsterPresentation.h"
 #include "Character/Base/ICCharacterBase.h"
 #include "Data/Rows/Combat/ICMonsterRows.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -26,17 +27,16 @@ bool AICPetFollower::InitializePet(AICCharacterBase* Character,const FICMonsterR
     if(!Mesh)return false;
     FollowedCharacter=Character;CharacterID=Character->GetCharacterID();PetIndex=Definition.PetCodexIndex;SetOwner(Character);
     Visual->SetSkeletalMesh(Mesh);
+    Visual->SetRelativeLocation(FVector::ZeroVector);
+    Visual->SetRelativeScale3D(FVector::OneVector);
     if(Source)
     {
         Visual->SetRelativeRotation(Source->GetRelativeRotation());
         for(int32 Index=0;Index<Source->GetNumMaterials();++Index)Visual->SetMaterial(Index,Source->GetMaterial(Index));
     }
-    // Existing monsters retain their materials, but become small companions.
-    const auto Bounds=Visual->CalcBounds(Visual->GetRelativeTransform());
-    const float Scale=FMath::Clamp(65.f/FMath::Max(1.f,Bounds.BoxExtent.Z*2.f),.01f,2.f);
-    Visual->SetRelativeScale3D(FVector(Scale));
-    const auto PetBounds=Visual->CalcBounds(Visual->GetRelativeTransform());
-    Visual->SetRelativeLocation({0,0,float(PetBounds.BoxExtent.Z-PetBounds.Origin.Z)});
+    // Pets use the shared field reference so the boss keeps a compact companion size.
+    if(!ICMonsterPresentation::FitHeight(Visual,ICMonsterPresentation::PetHeight(Definition)))return false;
+    ICMonsterPresentation::SetFeetHeight(Visual,GetActorLocation().Z);
     IdleAnimation=Definition.IdleAnimation.LoadSynchronous();MoveAnimation=Definition.MoveAnimation.LoadSynchronous();
     if(!MoveAnimation)MoveAnimation=IdleAnimation;
     PlayAnimation(false);SetActorLocation(Destination());SetActorRotation(FRotator(0,Character->GetActorRotation().Yaw,0));

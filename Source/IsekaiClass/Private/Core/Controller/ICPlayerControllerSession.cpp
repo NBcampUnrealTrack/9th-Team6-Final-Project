@@ -1,5 +1,7 @@
 #include "Core/Controller/ICPlayerController.h"
 #include "UI/Framework/ICText.h"
+#include "UI/Framework/ICInputPresentation.h"
+#include "Settings/ICGameUserSettings.h"
 #include "Debug/ICLog.h"
 #include "Save/ICSaveSubsystem.h"
 #include "Core/Flow/ICGameFlowSubsystem.h"
@@ -19,7 +21,7 @@
 FString AICPlayerController::MenuCancelLabel() const
 {
     IC_TRACE_FUNCTION();
-    if(IsUsingGamepad())return TEXT("B");
+    if(IsUsingGamepad())return ICInputPresentation::KeyLabel(UICGameUserSettings::GamepadFaceKey(2)).ToString();
     if(DefaultMappingContext)
         for(const FICInputCommandBinding& Binding:CommandActions)
             if(Binding.Command==EICInputCommand::Menu&&Binding.Action)

@@ -1,4 +1,5 @@
 #include "Enemy/Character/ICEnemyBase.h"
+#include "Enemy/ICMonsterPresentation.h"
 #include "Audio/ICBGMSubsystem.h"
 #include "Time/ICTimeSubsystem.h"
 #include "Settings/ICGameUserSettings.h"
@@ -101,6 +102,8 @@ bool AICEnemyBase::InitializeEnemy(FName SpawnerID,const FICSpawnSlotDefinition&
     if(auto* Anim=Definition.AnimationClass.LoadSynchronous())GetMesh()->SetAnimInstanceClass(Anim);
     bEnemyInitialized=true;
     GetMesh()->SetRelativeScale3D(GetMesh()->GetRelativeScale3D()*FMath::Max(.01f,Definition.VisualScaleMultiplier));
+    if(Definition.Kind==EICMonsterKind::Normal)
+        ICMonsterPresentation::FitHeight(GetMesh(),ICMonsterPresentation::NormalFieldHeightCm*FMath::Max(.01f,Definition.VisualScaleMultiplier));
     PresentAnimation(Definition.IdleAnimation.LoadSynchronous(),true);
     if(auto* WidgetClass=LoadClass<UICMonsterHealthWidget>(nullptr,TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_MonsterHealthBar.WBP_IC_MonsterHealthBar_C")))
     {

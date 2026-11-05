@@ -28,20 +28,43 @@ bool AICPlayerController::ForwardDialogueMovementKey(FKey,bool)
 }
 namespace
 {
-void DialoguePose(AICNPCBase* NPC,AICPlayerController* PC,const FICDialoguePresentationRow& Rules,FVector& Position,FRotator& Rotation)
+void DialoguePose(ACharacter* Speaker, AActor* Listener, const FICDialoguePresentationRow& Rules,
+    FVector& Position, FRotator& Rotation)
 {
-    FVector Head=NPC->GetActorLocation()+FVector(0,0,65);
-    if(auto* Mesh=NPC->GetMesh())for(const FName Bone:{Rules.HeadBone,FName(TEXT("head"))})
+    FVector Head=Speaker->GetActorLocation()+FVector(0,0,65);
+    if(auto* Mesh=Speaker->GetMesh())for(const FName Bone:{Rules.HeadBone,FName(TEXT("head"))})
         if(Mesh->DoesSocketExist(Bone)){Head=Mesh->GetSocketLocation(Bone);break;}
-    const FVector Focus=Head+NPC->GetActorQuat().RotateVector(Rules.FocusOffset);
-    Position=Head+NPC->GetActorForwardVector()*FMath::Max(50.f,Rules.CameraDistanceCm)+NPC->GetActorRightVector()*Rules.CameraSideOffsetCm+FVector(0,0,Rules.CameraHeightCm);
-    FCollisionQueryParams Query(SCENE_QUERY_STAT(NPCDialogueCamera),false);Query.AddIgnoredActor(NPC);Query.AddIgnoredActor(PC->GetPawn());
-    TArray<AActor*> Attached;NPC->GetAttachedActors(Attached,true,true);Query.AddIgnoredActors(Attached);
-    if(PC->GetPawn()){PC->GetPawn()->GetAttachedActors(Attached,true,true);Query.AddIgnoredActors(Attached);}
+    const FVector Focus=Head+Speaker->GetActorQuat().RotateVector(Rules.FocusOffset);
+    Position=Head+Speaker->GetActorForwardVector()*FMath::Max(50.f,Rules.CameraDistanceCm)+Speaker->GetActorRightVector()*Rules.CameraSideOffsetCm+FVector(0,0,Rules.CameraHeightCm);
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(NPCDialogueCamera), false);
+    for (AActor* Actor : {static_cast<AActor*>(Speaker), Listener})
+    {
+        if (!Actor) continue;
+        Query.AddIgnoredActor(Actor);
+        TArray<AActor*> Attached;
+        Actor->GetAttachedActors(Attached, true, true);
+        Query.AddIgnoredActors(Attached);
+    }
     FHitResult Hit;
-    if(PC->GetWorld()->SweepSingleByChannel(Hit,Head,Position,FQuat::Identity,ECC_Camera,FCollisionShape::MakeSphere(FMath::Max(.1f,Rules.CameraCollisionRadiusCm)),Query))Position=Hit.Location;
+    if(Speaker->GetWorld()->SweepSingleByChannel(Hit,Head,Position,FQuat::Identity,ECC_Camera,FCollisionShape::MakeSphere(FMath::Max(.1f,Rules.CameraCollisionRadiusCm)),Query))Position=Hit.Location;
     Rotation=(Focus-Position).Rotation();
 }
+}
+
+void AICPlayerController::SetDialogueHiddenActor(AActor* ActorToHide)
+{
+    for (AActor* Actor : DialogueHiddenActors) HiddenActors.Remove(Actor);
+    DialogueHiddenActors.Reset();
+    if (!IsValid(ActorToHide)) return;
+    TArray<AActor*> Attached;
+    ActorToHide->GetAttachedActors(Attached, true, true);
+    Attached.AddUnique(ActorToHide);
+    for (AActor* Actor : Attached)
+        if (IsValid(Actor) && !HiddenActors.Contains(Actor))
+        {
+            HiddenActors.Add(Actor);
+            DialogueHiddenActors.Add(Actor);
+        }
 }
 
 void AICPlayerController::BeginNPCDialogueCamera(AICNPCBase* NPC)
@@ -51,23 +74,16 @@ void AICPlayerController::BeginNPCDialogueCamera(AICNPCBase* NPC)
     DialogueNPC=NPC;
     const auto Rules=GetDialoguePresentation();if(!Rules.bUseCloseUpCamera)return;
     DialoguePreviousViewTarget=GetViewTarget();
-    FVector Position;FRotator Rotation;DialoguePose(NPC,this,Rules,Position,Rotation);
+    FVector Position;FRotator Rotation;DialoguePose(NPC,GetPawn(),Rules,Position,Rotation);
     FActorSpawnParameters Params;Params.Owner=this;Params.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     NPCDialogueCamera=GetWorld()->SpawnActor<ACameraActor>(Position,Rotation,Params);
     if(!NPCDialogueCamera)return;
     // The close-up may sit behind the player's shoulder. Hide only this viewer's player/tool primitives.
-    if(GetPawn()&&Rules.bHidePlayerInCamera)
-    {
-        TArray<AActor*> Attached;
-        GetPawn()->GetAttachedActors(Attached,true,true);Attached.AddUnique(GetPawn());
-        for(auto* Actor:Attached)if(IsValid(Actor)&&!HiddenActors.Contains(Actor))
-        {HiddenActors.Add(Actor);DialogueHiddenActors.Add(Actor);}
-    }
+    SetDialogueHiddenActor(Rules.bHidePlayerInCamera ? GetPawn() : nullptr);
     auto* Camera=NPCDialogueCamera->GetCameraComponent();Camera->SetFieldOfView(FMath::Clamp(Rules.FieldOfView,15.f,100.f));
     Camera->bConstrainAspectRatio=false;
     Camera->PostProcessSettings.bOverride_MotionBlurAmount=true;
     Camera->PostProcessSettings.MotionBlurAmount=0.f;
-    // Dialogue pauses the world, so switching directly also works on the first paused frame.
     SetViewTarget(NPCDialogueCamera);
     if(PlayerCameraManager)
     {
@@ -75,6 +91,29 @@ void AICPlayerController::BeginNPCDialogueCamera(AICNPCBase* NPC)
         PlayerCameraManager->UpdateCamera(0.f);
     }
 }
+
+void AICPlayerController::FocusDialogueCameraOnPlayer(bool bFocusPlayer)
+{
+    auto* NPC = DialogueNPC.Get();
+    auto* PlayerCharacter = Cast<ACharacter>(GetPawn());
+    bFocusPlayer = bFocusPlayer && IsValid(PlayerCharacter);
+    if (!IsValid(NPCDialogueCamera) || !IsValid(NPC) || bDialogueCameraOnPlayer == bFocusPlayer) return;
+
+    bDialogueCameraOnPlayer = bFocusPlayer;
+    const auto Rules = GetDialoguePresentation();
+    // Keep the listener out of the shot when the two characters stand close together.
+    SetDialogueHiddenActor(bFocusPlayer ? static_cast<AActor*>(NPC) : (Rules.bHidePlayerInCamera ? GetPawn() : nullptr));
+    FVector Position;
+    FRotator Rotation;
+    DialoguePose(bFocusPlayer ? PlayerCharacter : NPC, bFocusPlayer ? static_cast<AActor*>(NPC) : GetPawn(), Rules, Position, Rotation);
+    NPCDialogueCamera->SetActorLocationAndRotation(Position, Rotation);
+    if (PlayerCameraManager)
+    {
+        PlayerCameraManager->SetGameCameraCutThisFrame();
+        PlayerCameraManager->UpdateCamera(0.f);
+    }
+}
+
 void AICPlayerController::UpdateNPCDialogue(float DeltaSeconds)
 {
     if(!IsLiveNPCDialogue())return;
@@ -84,7 +123,9 @@ void AICPlayerController::UpdateNPCDialogue(float DeltaSeconds)
     {SetMenu(TEXT(""));return;}
     if(NPCDialogueCamera&&Rules.bUseCloseUpCamera)
     {
-        FVector Position;FRotator Rotation;DialoguePose(NPC,this,Rules,Position,Rotation);
+        auto* PlayerCharacter = bDialogueCameraOnPlayer ? Cast<ACharacter>(GetPawn()) : nullptr;
+        FVector Position;FRotator Rotation;
+        DialoguePose(PlayerCharacter ? PlayerCharacter : NPC, PlayerCharacter ? static_cast<AActor*>(NPC) : GetPawn(), Rules, Position, Rotation);
         const float Speed=FMath::Max(0.f,Rules.FollowSpeed);
         NPCDialogueCamera->SetActorLocationAndRotation(Speed>0?FMath::VInterpTo(NPCDialogueCamera->GetActorLocation(),Position,DeltaSeconds,Speed):Position,
             Speed>0?FMath::RInterpTo(NPCDialogueCamera->GetActorRotation(),Rotation,DeltaSeconds,Speed):Rotation);
@@ -93,8 +134,8 @@ void AICPlayerController::UpdateNPCDialogue(float DeltaSeconds)
 }
 void AICPlayerController::EndNPCDialogueCamera()
 {
-    for(AActor* Actor:DialogueHiddenActors)HiddenActors.Remove(Actor);
-    DialogueHiddenActors.Reset();
+    SetDialogueHiddenActor(nullptr);
+    bDialogueCameraOnPlayer = false;
     DialogueNPC.Reset();
     if(!NPCDialogueCamera)return;
     if(GetViewTarget()==NPCDialogueCamera)

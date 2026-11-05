@@ -1,4 +1,5 @@
 #include "UI/Framework/ICPrologueWidget.h"
+#include "UI/Framework/ICInputPresentation.h"
 #include "UI/Framework/ICFrontendLayout.h"
 #include "UI/Management/ICUIManagerSubsystem.h"
 #include "Core/Controller/ICPlayerController.h"
@@ -64,10 +65,14 @@ void UICPrologueWidget::NativeOnInitialized()
 void UICPrologueWidget::NativeConstruct()
 {
     Super::NativeConstruct();
-    if(auto* Music=GetWorld()->GetSubsystem<UICBGMSubsystem>())Music->SetPrologueMusic(Presentation.InitialMusicRow);
     SkipGauge->SetProgress(0);
     SkipGauge->SetVisibility(State==EState::Revealing?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);
-    if(State!=EState::Revealing)StartLine();
+    if (State != EState::Revealing)
+    {
+        if (auto* Music = GetWorld()->GetSubsystem<UICBGMSubsystem>())
+            Music->SetPrologueMusic(Presentation.InitialMusicRow);
+        StartLine();
+    }
     if(!ProgressInput&&FSlateApplication::IsInitialized())
     {
         ProgressInput=MakeShared<FICPrologueInput>(this);
@@ -85,16 +90,16 @@ void UICPrologueWidget::NativeDestruct()
 UWidget* UICPrologueWidget::NativeGetDesiredFocusTarget() const {return const_cast<UICPrologueWidget*>(this);}
 bool UICPrologueWidget::HandleProgressKey(const FKeyEvent& Event)
 {
-    if(Event.GetKey()==EKeys::H||Event.GetKey()==EKeys::Gamepad_FaceButton_Top)
+    if(Event.GetKey()==EKeys::H||Event.GetKey()==UICGameUserSettings::GamepadFaceKey(1))
     {if(State==EState::Reading||State==EState::FadeIn)bSkipHeld=true;return true;}
-    if(Event.GetKey()!=EKeys::G&&!UICGameUserSettings::IsGamepadAcceptKey(Event.GetKey()))return false;
+    if(Event.GetKey()!=EKeys::G&&Event.GetKey()!=EKeys::F&&Event.GetKey()!=EKeys::Enter&&Event.GetKey()!=EKeys::SpaceBar&&!UICGameUserSettings::IsGamepadAcceptKey(Event.GetKey()))return false;
     if(!Event.IsRepeat())Advance();return true;
 }
 bool UICPrologueWidget::HandleProgressKeyUp(const FKeyEvent& Event)
 {
-    if(Event.GetKey()==EKeys::H||Event.GetKey()==EKeys::Gamepad_FaceButton_Top)
+    if(Event.GetKey()==EKeys::H||Event.GetKey()==UICGameUserSettings::GamepadFaceKey(1))
     {bSkipHeld=false;SkipElapsed=0;if(SkipGauge)SkipGauge->SetProgress(0);return true;}
-    return Event.GetKey()==EKeys::G||UICGameUserSettings::IsGamepadAcceptKey(Event.GetKey());
+    return Event.GetKey()==EKeys::G||Event.GetKey()==EKeys::F||Event.GetKey()==EKeys::Enter||Event.GetKey()==EKeys::SpaceBar||UICGameUserSettings::IsGamepadAcceptKey(Event.GetKey());
 }
 void UICPrologueWidget::StartLine()
 {
@@ -111,6 +116,8 @@ void UICPrologueWidget::FinishReading()
 {
     if(State==EState::Traveling||State==EState::Revealing||State==EState::FadeOut)return;
     State=EState::FadeOut;Elapsed=0;bSkipHeld=false;SkipElapsed=0;
+    if (auto* Music = GetWorld()->GetSubsystem<UICBGMSubsystem>())
+        Music->EndPrologueMusic();
     Prompt->SetText(FText::GetEmpty());SkipPrompt->SetText(FText::GetEmpty());SkipGauge->SetVisibility(ESlateVisibility::Collapsed);
 }
 bool UICPrologueWidget::Advance()
@@ -130,7 +137,7 @@ void UICPrologueWidget::NativeTick(const FGeometry& Geometry,float DeltaSeconds)
     {
         if(!Script.IsValidIndex(LineIndex)){FinishReading();return;}
         const auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
-        SkipPrompt->SetText(PC&&PC->IsUsingGamepad()?Presentation.GamepadSkipPrompt:Presentation.SkipPrompt);
+        SkipPrompt->SetText(ICInputPresentation::ForDevice(PC,Presentation.SkipPrompt,NSLOCTEXT("ICPrologue","PadSkipPrompt","{FaceTop} 길게 · 건너뛰기")));
         SkipElapsed=bSkipHeld?SkipElapsed+DeltaSeconds:0.f;
         const float SkipProgress=FMath::Clamp(SkipElapsed/FMath::Max(.1f,Presentation.SkipHoldSeconds),0.f,1.f);
         SkipGauge->SetProgress(SkipProgress);
@@ -150,7 +157,7 @@ void UICPrologueWidget::NativeTick(const FGeometry& Geometry,float DeltaSeconds)
         if(Count!=Characters){Characters=Count;LineText->SetText(FText::FromString(Text.Left(Characters)));}
         if(IsLineComplete())
         {
-            Prompt->SetText(PC&&PC->IsUsingGamepad()?Presentation.GamepadNextPrompt:Presentation.NextPrompt);
+            Prompt->SetText(ICInputPresentation::ForDevice(PC,Presentation.NextPrompt,NSLOCTEXT("ICPrologue","PadNextPrompt","{Accept} · 다음")));
         }
         return;
     }
@@ -186,3 +193,9 @@ FReply UICPrologueWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const
 
 FReply UICPrologueWidget::NativeOnKeyUp(const FGeometry& Geometry,const FKeyEvent& Event)
 {HandleProgressKeyUp(Event);return FReply::Handled();}
+
+FReply UICPrologueWidget::NativeOnMouseButtonDown(const FGeometry& Geometry,const FPointerEvent& Event)
+{
+    if(Event.GetEffectingButton()==EKeys::LeftMouseButton){Advance();return FReply::Handled();}
+    return Super::NativeOnMouseButtonDown(Geometry,Event);
+}

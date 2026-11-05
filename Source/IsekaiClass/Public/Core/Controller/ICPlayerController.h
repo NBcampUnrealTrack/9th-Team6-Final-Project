@@ -86,6 +86,7 @@ public:
     UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="IC|Dialogue") TSoftObjectPtr<UDataTable> DialoguePresentationTable;
     UFUNCTION(BlueprintPure,Category="IC|Dialogue") FICDialoguePresentationRow GetDialoguePresentation() const;
     UFUNCTION(BlueprintPure,Category="IC|Dialogue") bool IsLiveNPCDialogue() const;
+    void FocusDialogueCameraOnPlayer(bool bFocusPlayer);
     bool ForwardDialogueMovementKey(FKey Key,bool Pressed);
     UFUNCTION(BlueprintPure, Category="IC|Input") bool HasTargetSelection() const { return !PendingItem.IsNone() || !PendingSkill.IsNone(); }
     UFUNCTION(BlueprintCallable, Category="IC|Input") bool SelectTarget(FName CharacterID);
@@ -278,7 +279,9 @@ private:
     void BeginNPCDialogueCamera(AICNPCBase* NPC);
     void UpdateNPCDialogue(float DeltaSeconds);
     void EndNPCDialogueCamera();
+    void SetDialogueHiddenActor(AActor* ActorToHide);
     TWeakObjectPtr<AICNPCBase> DialogueNPC;
+    bool bDialogueCameraOnPlayer = false;
     UPROPERTY(Transient) TObjectPtr<ACameraActor> NPCDialogueCamera;
     UPROPERTY(Transient) TArray<TObjectPtr<AActor>> DialogueHiddenActors;
     TWeakObjectPtr<AActor> DialoguePreviousViewTarget;

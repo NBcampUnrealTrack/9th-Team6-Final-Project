@@ -1,6 +1,8 @@
 #include "UI/Gameplay/ICCharacterStatusWidget.h"
 #include "UI/Framework/ICWidgetTemplates.h"
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Framework/ICInputPresentation.h"
+#include "Core/Controller/ICPlayerController.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Image.h"
 #include "Components/Border.h"
@@ -116,7 +118,10 @@ void UICCharacterStatusWidget::UpdateSkillCooldown(bool bHasSkill, float Progres
         Remaining->SetVisibility(bCoolingDown&&!bDowned ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
     }
     if (auto* Key = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_SkillKey"))))
+    {
+        Key->SetText(ICInputPresentation::CommandLabel(Cast<AICPlayerController>(GetOwningPlayer()),EICInputCommand::Skill));
         Key->SetVisibility(bHasSkill&&(CharacterID.IsNone()||CharacterID==UICWorldStateSubsystem::PlayerId()) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+    }
 }
 
 void UICCharacterStatusWidget::UpdateVitals(const FICCharacterState& State)

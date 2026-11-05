@@ -90,7 +90,7 @@ public:
     UFUNCTION(BlueprintCallable) void ClosePopup();
     UFUNCTION(BlueprintPure) bool IsModalOpen() const{return Popup!=0||bNoticeOpen;}
     bool HandleMenuKey(FKey Key,bool Repeat=false);
-    FText NavigationHint() const;
+    FText NavigationHint(bool Gamepad=false) const;
     static bool BuildLayout(UWidgetTree* Tree);
 private:
     UPROPERTY(Transient) TObjectPtr<UICWorldStateSubsystem> BoundState;

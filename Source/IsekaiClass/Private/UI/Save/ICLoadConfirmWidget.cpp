@@ -1,5 +1,6 @@
 #include "UI/Save/ICLoadConfirmWidget.h"
 #include "UI/Framework/ICText.h"
+#include "UI/Framework/ICInputPresentation.h"
 #include "UI/Management/ICUIManagerSubsystem.h"
 #include "Engine/LocalPlayer.h"
 #include "Debug/ICLog.h"
@@ -30,6 +31,11 @@ void UICLoadConfirmWidget::NativeConstruct()
         for(auto* Parent=Widget->GetParent();Parent;Parent=Parent->GetParent())if(Parent==IC_LoadConfirm_Confirm)
         {Label->SetText(ICText::Get(TEXT("Native_468266d639b5")));break;}
     });
+    auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
+    if(IC_LoadConfirm_Confirm)ICInputPresentation::SetHint(Cast<UTextBlock>(IC_LoadConfirm_Confirm->GetContent()),PC,
+        ICText::Get(TEXT("Native_468266d639b5")),NSLOCTEXT("ICSaveUI","PadConfirm","{Accept} · 확인"));
+    if(IC_LoadConfirm_Cancel)ICInputPresentation::SetHint(Cast<UTextBlock>(IC_LoadConfirm_Cancel->GetContent()),PC,
+        ICText::Get(TEXT("Save_Cancel")),NSLOCTEXT("ICSaveUI","PadCancel","{Back} · 취소"));
 }
 FReply UICLoadConfirmWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const FKeyEvent& KeyEvent)
 {

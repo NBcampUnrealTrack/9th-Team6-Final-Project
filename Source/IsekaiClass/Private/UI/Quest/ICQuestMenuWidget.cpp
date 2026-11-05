@@ -340,8 +340,14 @@ bool UICQuestMenuWidget::AbandonSelectedQuest()
 }
 void UICQuestMenuWidget::StartAction(){StartSelectedQuest();}
 void UICQuestMenuWidget::AbandonAction(){AbandonSelectedQuest();}
-FText UICQuestMenuWidget::NavigationHint() const
+FText UICQuestMenuWidget::NavigationHint(bool Gamepad) const
 {
+    if(Gamepad)
+    {
+        if(!bShowingDetails)return NSLOCTEXT("ICQuestMenu","PadListHint","↑ / ↓ 퀘스트 선택   ·   {Accept} / → 상세 보기   ·   LB / RB 탭 이동   ·   {Back} 닫기");
+        if(bReadingDetails)return NSLOCTEXT("ICQuestMenu","PadReadHint","↑ / ↓ 설명 스크롤   ·   → / {Accept} 버튼 이동   ·   ← / {Back} 목록으로");
+        return NSLOCTEXT("ICQuestMenu","PadDetailHint","방향키 / LS 작업 선택   ·   {Accept} 실행   ·   {Back} 목록으로");
+    }
     if(!bShowingDetails)return NSLOCTEXT("ICQuestMenu","ListHint","W / S  퀘스트 선택     Enter / D  상세 보기     A  상단 탭     ESC  닫기");
     if(bReadingDetails)return NSLOCTEXT("ICQuestMenu","ReadHint","W / S  설명 스크롤     D / Enter  버튼 이동     A / ESC  목록으로");
     return NSLOCTEXT("ICQuestMenu","DetailHint","A / D  포기 / 시작하기     W / S  경로 안내 / 뒤로가기     Enter  실행     ESC  목록으로");

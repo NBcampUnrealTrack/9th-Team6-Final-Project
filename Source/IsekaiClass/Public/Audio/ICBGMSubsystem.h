@@ -40,6 +40,7 @@ public:
     UFUNCTION(BlueprintCallable,Category="BGM") void SetMusicOverride(FName Row){OverrideRow=Row;RefreshIn=0;}
     UFUNCTION(BlueprintCallable,Category="BGM") void ClearMusicOverride(){OverrideRow=NAME_None;RefreshIn=0;}
     UFUNCTION(BlueprintCallable,Category="BGM") void SetPrologueMusic(FName Row){PrologueRow=Row;RefreshIn=0;}
+    void EndPrologueMusic();
     void SilenceForDeath();
     void ResetForRestore();
     static bool CanPlayEffects(const UWorld* World);
@@ -51,7 +52,7 @@ private:
     UPROPERTY(Transient) TObjectPtr<UAudioComponent> Current;
     UPROPERTY(Transient) TObjectPtr<USoundBase> CurrentSource;
     FName CurrentRow,OverrideRow;
-    FName PrologueRow=TEXT("BGM_Prologue");
+    FName PrologueRow;
     bool bCurrentLoop=true;
     float CurrentFadeOut=1.5f,RefreshIn=0;
     void ChangeMusic(FName Row);
