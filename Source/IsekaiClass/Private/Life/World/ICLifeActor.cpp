@@ -1,4 +1,5 @@
 #include "Life/World/ICLifeActor.h"
+#include "Life/World/ICLifeTargetSubsystem.h"
 #include "Life/Production/ICGatheringSubsystem.h"
 #include "UI/Life/ICLifeWidgets.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -40,6 +41,7 @@ FName AICLifeActor::PointKey() const { return PointID.IsNone()?GetFName():PointI
 void AICLifeActor::BeginPlay()
 {
     Super::BeginPlay();
+    GetWorld()->GetSubsystem<UICLifeTargetSubsystem>()->Register(this);
     if(GetGameInstance())
     {
         GetGameInstance()->GetSubsystem<UICTimeSubsystem>()->OnTimeJumped.AddUniqueDynamic(this,&ThisClass::GameTimeJumped);
@@ -58,6 +60,7 @@ void AICLifeActor::BeginPlay()
 }
 void AICLifeActor::EndPlay(const EEndPlayReason::Type Reason)
 {
+    if (auto* Targets=GetWorld()->GetSubsystem<UICLifeTargetSubsystem>()) Targets->Unregister(this);
     GetWorldTimerManager().ClearTimer(RefreshTimer);
     if(GetGameInstance())
     {
@@ -232,6 +235,30 @@ void AICLifeActor::GetFishingSurface(FVector& Center,FVector& Normal) const
     TArray<UStaticMeshComponent*> Regions;GetFishingRegions(Regions);
     if(Regions.IsEmpty()){Center=GetActorLocation();Normal=GetActorUpVector();return;}
     FishingSurface(Regions[0],Center,Normal);
+}
+void AICLifeActor::GetFishingGuideSamples(const FVector& Origin,TArray<FVector>& Samples) const
+{
+    Samples.Reset();
+    TArray<UStaticMeshComponent*> Regions;GetFishingRegions(Regions);
+    for(const auto* Surface:Regions)
+    {
+        const FBox Box=Surface->GetStaticMesh()->GetBoundingBox().ExpandBy(FVector(-.01,-.01,0));
+        const FTransform Transform=Surface->GetComponentTransform();
+        const FVector LocalOrigin=Transform.InverseTransformPosition(Origin);
+        // Include the nearest point as well as spaced edge samples for blocked banks.
+        Samples.Add(Transform.TransformPosition(FVector(
+            FMath::Clamp(LocalOrigin.X,Box.Min.X,Box.Max.X),
+            FMath::Clamp(LocalOrigin.Y,Box.Min.Y,Box.Max.Y),Box.Max.Z)));
+        for(int32 Index=0;Index<5;++Index)
+        {
+            const double X=FMath::Lerp(Box.Min.X,Box.Max.X,Index/4.);
+            const double Y=FMath::Lerp(Box.Min.Y,Box.Max.Y,Index/4.);
+            Samples.Add(Transform.TransformPosition(FVector(X,Box.Min.Y,Box.Max.Z)));
+            Samples.Add(Transform.TransformPosition(FVector(X,Box.Max.Y,Box.Max.Z)));
+            Samples.Add(Transform.TransformPosition(FVector(Box.Min.X,Y,Box.Max.Z)));
+            Samples.Add(Transform.TransformPosition(FVector(Box.Max.X,Y,Box.Max.Z)));
+        }
+    }
 }
 bool AICLifeActor::ResolveFishingLanding(const FVector& Origin,const FVector& Direction,FVector& Landing) const
 {

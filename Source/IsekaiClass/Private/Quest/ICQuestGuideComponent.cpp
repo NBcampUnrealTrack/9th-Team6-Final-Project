@@ -12,6 +12,12 @@
 #include "ICQuestGuidePath.h"
 #include "Quest/ICQuestGuideLight.h"
 #include "Quest/ICQuestSubsystem.h"
+#include "ICQuestLifeTarget.h"
+#include "Life/World/ICLifeActor.h"
+#include "Life/World/ICLifeTargetSubsystem.h"
+#include "Life/Production/ICPlayerLifeComponent.h"
+#include "Player/Character/ICPlayerCharacter.h"
+#include "Core/Controller/ICPlayerController.h"
 #include "Time/ICTimeSubsystem.h"
 #include "World/Spawn/ICSpawnSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
@@ -179,6 +185,7 @@ bool UICQuestGuideComponent::ResolveTarget(const FICQuestRow& Definition, const 
             {
                 if (ResolveNPC(Objective.Target.ID)) return true;
             }
+            if (ResolveLifeTarget(Objective, World, Location, TargetKey)) return true;
             if (!Objective.GuidanceAnchorID.IsNone())
             {
                 if (ResolveAnchor(Objective.GuidanceAnchorID)) return true;
@@ -188,6 +195,126 @@ bool UICQuestGuideComponent::ResolveTarget(const FICQuestRow& Definition, const 
                 if (ResolveAnchor(Objective.Target.ID)) return true;
             }
         }
+    }
+    return false;
+}
+
+bool UICQuestGuideComponent::ResolveLifeTarget(const FICQuestObjectiveDefinition& Objective,
+    const FICWorldState& Snapshot, FVector& Location, FName& TargetKey) const
+{
+    if (Objective.Type != EICQuestObjectiveType::DeliverItem
+        && Objective.Type != EICQuestObjectiveType::PossessItem
+        && Objective.Type != EICQuestObjectiveType::Collect
+        && Objective.Type != EICQuestObjectiveType::Craft) return false;
+    UWorld* World = GetWorld();
+    APawn* Pawn = Cast<APawn>(GetOwner());
+    auto* Definitions = World && World->GetGameInstance()
+        ? World->GetGameInstance()->GetSubsystem<UICDefinitionSubsystem>() : nullptr;
+    auto* Targets = World ? World->GetSubsystem<UICLifeTargetSubsystem>() : nullptr;
+    auto* Controller = Pawn ? Cast<AICPlayerController>(Pawn->GetController()) : nullptr;
+    if (!Definitions || !Targets || !Pawn) return false;
+
+    struct FCandidate { AICLifeActor* Actor; FVector Goal; double Distance; };
+    TArray<FCandidate> Candidates;
+    TArray<FName> CropIDs;
+    // Planting definitions come from the catalog, not a plot's last planted crop.
+    if (Objective.Type == EICQuestObjectiveType::Craft
+        && (!Objective.bFilterLifeActivity || Objective.LifeActivity == EICLifeActivity::Planting))
+        Definitions->GetDefinitionIDs(EICDefinitionType::Crop, CropIDs);
+    for (const auto& Weak : Targets->GetTargets())
+    {
+        AICLifeActor* Actor = Weak.Get();
+        if (!IsValid(Actor) || Actor->IsActorBeingDestroyed()) continue;
+        bool bMatches = false;
+        FICDefinitionResult Result;
+        if (Actor->LifeType == EICDefinitionType::Resource)
+        {
+            if (const auto* Row = Definitions->Find<FICResourceRow>(Actor->DefinitionID, Result))
+                bMatches = ICQuestLifeTarget::Matches(Objective, Actor->LifeType, Actor->DefinitionID,
+                    Row->ProductionID, Row->Activity, Row->Yields) && Actor->IsResourceAvailable();
+        }
+        else if (Actor->LifeType == EICDefinitionType::Crop)
+        {
+            const FName PointID = Actor->PointID.IsNone() ? Actor->GetFName() : Actor->PointID;
+            const FICCropState* Planted = Snapshot.Crops.Find(PointID);
+            const FName CropID = Planted ? Planted->CropID : Actor->DefinitionID;
+            if (Planted && !CropID.IsNone())
+            {
+                if (const auto* Row = Definitions->Find<FICCropRow>(CropID, Result))
+                    bMatches = ICQuestLifeTarget::Matches(Objective, EICDefinitionType::Crop, CropID,
+                        Row->HarvestProductionID, EICLifeActivity::Harvesting, Row->HarvestYields)
+                        && Actor->IsHarvestable();
+            }
+            if (!bMatches && Actor->bPlantingPlot && !Planted && Controller)
+            {
+                for (FName ID : CropIDs)
+                {
+                    const auto* Row = Definitions->Find<FICCropRow>(ID, Result);
+                    FText Failure;
+                    if (Row && ICQuestLifeTarget::Matches(Objective, EICDefinitionType::Crop, ID,
+                        Row->PlantingProductionID, EICLifeActivity::Planting, {})
+                        && Actor->CanPlantCrop(Controller, ID, Failure))
+                    { bMatches = true; break; }
+                }
+            }
+        }
+        else if (Actor->LifeType == EICDefinitionType::FishingPoint)
+        {
+            if (const auto* Row = Definitions->Find<FICFishingPointRow>(Actor->DefinitionID, Result))
+            {
+                if (Row->SuccessChance <= 0) continue;
+                for (const auto& Selection : Row->FishSelections)
+                {
+                    if (Selection.Weight <= 0 || Selection.CatchCount <= 0) continue;
+                    const auto* Fish = Definitions->Find<FICFishRow>(Selection.FishID, Result);
+                    if (!Fish) continue;
+                    FICItemAmount Yield; Yield.ItemID = Fish->ItemID; Yield.Count = Selection.CatchCount;
+                    const TArray<FICItemAmount> Yields = {Yield};
+                    bMatches = ICQuestLifeTarget::Matches(Objective, Actor->LifeType, Actor->DefinitionID,
+                        Row->ProductionID, EICLifeActivity::Fishing, Yields)
+                        || ICQuestLifeTarget::Matches(Objective, EICDefinitionType::Fish, Selection.FishID,
+                            Row->ProductionID, EICLifeActivity::Fishing, Yields);
+                    if (bMatches) break;
+                }
+            }
+        }
+        if (!bMatches) continue;
+        if (Actor->LifeType != EICDefinitionType::FishingPoint)
+        {
+            const FVector Goal = Actor->GetActorLocation();
+            if (!Goal.ContainsNaN()) Candidates.Add({Actor, Goal, FVector::DistSquared(Pawn->GetActorLocation(), Goal)});
+            continue;
+        }
+        // Water centers need not be walkable. Probe the water perimeter and project onto shore.
+        auto* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+        if (!Navigation) continue;
+        const auto* Player = Cast<AICPlayerCharacter>(Pawn);
+        const double CastRange = Player && Player->LifeActions ? Player->LifeActions->FishingCastRangeCm : 1200.;
+        TArray<FVector> WaterSamples;
+        Actor->GetFishingGuideSamples(Pawn->GetActorLocation(), WaterSamples);
+        for (const FVector& Water : WaterSamples)
+        {
+            if (!Actor->ContainsFishingLanding(Water)) continue;
+            FNavLocation Shore;
+            const FNavAgentProperties& Agent = Pawn->GetNavAgentPropertiesRef();
+            if (!Navigation->ProjectPointToNavigation(Water, Shore,
+                FVector(400, 400, 1000), &Agent)) continue;
+            if (FVector::DistSquared(Shore.Location, Water) > FMath::Square(CastRange)) continue;
+            Candidates.Add({Actor, Shore.Location, FVector::DistSquared(Pawn->GetActorLocation(), Shore.Location)});
+        }
+    }
+    Candidates.Sort([](const FCandidate& A, const FCandidate& B)
+    {
+        return A.Distance == B.Distance ? A.Actor->GetPathName() < B.Actor->GetPathName() : A.Distance < B.Distance;
+    });
+    for (const FCandidate& Candidate : Candidates)
+    {
+        TArray<FVector> Points;
+        if (Candidate.Distance > FMath::Square(FMath::Max(0.f, ArrivalRadius))
+            && !BuildGuidePath(*Pawn, Candidate.Goal, Points)) continue;
+        Location = Candidate.Goal;
+        TargetKey = FName(*(Objective.ObjectiveID.ToString() + TEXT(":") + Candidate.Actor->GetPathName()));
+        return true;
     }
     return false;
 }

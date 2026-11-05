@@ -12,6 +12,7 @@ class UICWorldStateSubsystem;
 struct FICQuestRow;
 struct FICQuestState;
 struct FICWorldState;
+struct FICQuestObjectiveDefinition;
 
 /** Local presentation only. Quest acceptance and completion remain in ICQuestSubsystem. */
 UCLASS(ClassGroup=(IC), meta=(BlueprintSpawnableComponent))
@@ -76,12 +77,16 @@ protected:
 private:
 #if WITH_DEV_AUTOMATION_TESTS
     friend class FICQuestGuideSequentialPulsesCheck;
+    friend class FICQuestLifeTargetSelectionCheck;
+    friend class FICQuestGuideOpenWorldCheck;
 #endif
     UFUNCTION() void RefreshGuide();
     UFUNCTION() void HandleWorldRestored();
     UFUNCTION() void HandleLightDestroyed(AActor* Light);
     bool ResolveTarget(const FICQuestRow& Definition, const FICQuestState& Quest,
         const FICWorldState& World, FVector& Location, FName& TargetKey) const;
+    bool ResolveLifeTarget(const FICQuestObjectiveDefinition& Objective, const FICWorldState& World,
+        FVector& Location, FName& TargetKey) const;
     void ResetPulse(bool bImmediate = true);
     void StopActiveLights(bool bImmediate);
     void SchedulePulse(float Delay);

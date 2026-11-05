@@ -37,6 +37,8 @@ public:
     /** Uses the placed water mesh bounds, so editing the box/plane also edits the catch area. */
     UFUNCTION(BlueprintPure, Category="IC|Fishing") bool ContainsFishingLanding(FVector Point) const;
     void GetFishingSurface(FVector& Center,FVector& Normal) const;
+    /** Perimeter samples on every placed fishing surface, including rotated/child meshes. */
+    void GetFishingGuideSamples(const FVector& Origin,TArray<FVector>& Samples) const;
     bool ResolveFishingLanding(const FVector& Origin,const FVector& Direction,FVector& Landing) const;
     static int32 ResolveGrowthStage(const FICCropRow& Crop,double ElapsedMinutes);
 private:
