@@ -265,6 +265,7 @@ bool UICLifeObjectUserComponent::BeginUse()
     Life->MarkOccupied(Claim, bOccupiedMarked);
     bUsing = true;
     LastUsedObject = Object;
+    Object->OnNPCUseStarted(GetNPC());
 
     ACharacter* Character = Cast<ACharacter>(GetOwner());
     FTransform Slot;

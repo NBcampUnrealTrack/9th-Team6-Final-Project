@@ -74,6 +74,8 @@ public:
     UFUNCTION(BlueprintCallable) bool ClearQuickSlot(int32 QuickIndex);
     UFUNCTION(BlueprintCallable) bool ExpandUsingTicket();
     UFUNCTION(BlueprintCallable) void EnsureStorage(FName ContainerID);
+    /** Adds an item to a specific 40-slot storage in a caller-owned snapshot. No commit is made. */
+    bool AddItemToStorage(FICInventoryState& Snapshot, FName ContainerID, FName ItemID, int32 Count) const;
     /** Compatibility entry point. A single chest always has forty slots. */
     UFUNCTION(BlueprintCallable, Category="IC|Home") bool SetHomeStorageStage(int32 Stage);
     UFUNCTION(BlueprintCallable) bool Transfer(FName ContainerID, int32 Index, bool bToStorage);

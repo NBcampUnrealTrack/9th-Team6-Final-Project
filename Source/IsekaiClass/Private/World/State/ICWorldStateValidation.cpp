@@ -115,6 +115,14 @@ bool UICWorldStateSubsystem::ValidateAdditionalState(const FICWorldState& S, FSt
             || !TimeValid(Crop.PlantedAtGameMinute) || !TimeValid(Crop.HarvestableAtGameMinute)
             || !TimeValid(Crop.RegrowthAtGameMinute) || Crop.HarvestableAtGameMinute < FMath::Max(Crop.PlantedAtGameMinute,Crop.RegrowthAtGameMinute)) return Fail(TEXT("Crops.") + Pair.Key.ToString());
     }
+    for (const auto& Pair : S.NPCFarmPlots)
+    {
+        const auto& Plot = Pair.Value;
+        // CropID is intentionally empty for a harvested/idle 0-stage NPC field;
+        // its next NPC interaction will pick a fresh entry from PlantableCropIDs.
+        if (Pair.Key.IsNone() || (Plot.CropID.IsNone() && Plot.GrowthStage != 0) || Plot.GrowthStage < 0 || Plot.Cycle < 0
+            || Plot.LastTendedDay < INDEX_NONE || Plot.LastGrowthDay < INDEX_NONE) return Fail(TEXT("NPCFarmPlots.") + Pair.Key.ToString());
+    }
     TSet<FString> SpawnKeys;
     for (const auto& Pair : S.SpawnSlots)
     {

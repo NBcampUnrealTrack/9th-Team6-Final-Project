@@ -49,6 +49,19 @@ struct FICCropState
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) double RegrowthAtGameMinute = 0;
 };
 
+/** Persistent state for an NPC-managed field. This is intentionally separate from player crops. */
+USTRUCT(BlueprintType)
+struct FICNPCFarmPlotState
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) FName CropID;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) int32 GrowthStage = 0;
+    /** Incremented after a harvest so the same calendar day may tend the new crop. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) int32 Cycle = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) int32 LastTendedDay = INDEX_NONE;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame) int32 LastGrowthDay = INDEX_NONE;
+};
+
 USTRUCT(BlueprintType)
 struct FICRanchAnimalState
 {
