@@ -16,7 +16,13 @@ void UICSaveSlotWidget::NativeConstruct()
     {IC_SaveSlot_Label->SetText(Label);IC_SaveSlot_Label->SetAutoWrapText(false);IC_SaveSlot_Label->SetWrapTextAt(0);IC_SaveSlot_Label->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);}
     SetSelected(bIsSelected);
     ApplyData();
-    if (IC_SaveSlot_Button) IC_SaveSlot_Button->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleClicked);
+    if (IC_SaveSlot_Button)
+    {
+        // Picking a list row is a press action. Releasing after input-device or
+        // scroll-layout changes must not silently discard the selected row.
+        IC_SaveSlot_Button->SetClickMethod(EButtonClickMethod::MouseDown);
+        IC_SaveSlot_Button->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleClicked);
+    }
 }
 void UICSaveSlotWidget::Configure(int32 InSlot, const FText& InLabel)
 {

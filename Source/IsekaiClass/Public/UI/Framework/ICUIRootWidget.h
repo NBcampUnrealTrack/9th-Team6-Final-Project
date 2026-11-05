@@ -16,6 +16,7 @@ public:
     void Unmount(UUserWidget* Widget);
     void SetHUD(UUserWidget* Widget);
     void AddHUDWidget(UUserWidget* Widget);
+    void SetPointerUIVisible(bool Visible);
 
 protected:
     virtual void NativeOnInitialized() override;

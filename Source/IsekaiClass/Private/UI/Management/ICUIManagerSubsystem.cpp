@@ -9,6 +9,8 @@
 #include "Debug/ICLog.h"
 #include "UI/Framework/ICUIRootWidget.h"
 #include "UI/Framework/ICUITheme.h"
+#include "UI/Framework/ICInputPresentation.h"
+#include "Input/CommonUIActionRouterBase.h"
 #include "CommonActivatableWidget.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/NavigationConfig.h"
@@ -112,11 +114,11 @@ bool UICUIManagerSubsystem::EnsureRoot()
 void UICUIManagerSubsystem::SetHUD(UUserWidget* Widget)
 {
     if (EnsureRoot())
-        Root->SetHUD(Widget);
+    {Root->SetHUD(Widget);ICInputPresentation::BindTreeHints(Widget);}
 }
 void UICUIManagerSubsystem::AddHUDWidget(UUserWidget* Widget)
 {
-    if(EnsureRoot())Root->AddHUDWidget(Widget);
+    if(EnsureRoot()){Root->AddHUDWidget(Widget);ICInputPresentation::BindTreeHints(Widget);}
 }
 bool UICUIManagerSubsystem::OpenScreen(UUserWidget* Widget, bool PauseWorld, int32 ZOrder)
 {
@@ -128,6 +130,7 @@ bool UICUIManagerSubsystem::OpenScreen(UUserWidget* Widget, bool PauseWorld, int
         return false;
     Root->Mount(Widget, ZOrder);
     if(Widget->WidgetTree)ICUITheme::Apply(Widget->WidgetTree);
+    ICInputPresentation::BindTreeHints(Widget);
     Screens.Add({Widget, PauseWorld, ZOrder});
     RefreshContext();
     return true;
@@ -184,8 +187,12 @@ void UICUIManagerSubsystem::RefreshContext()
             Focus = S.Widget.Get();
             Z = S.Z;
         }
-    const auto* GameController=Cast<AICPlayerController>(PC);
-    const bool HasMenu=bMenuOpen||!Screens.IsEmpty()||(GameController&&!GameController->Menu.IsEmpty());
+    const bool HasMenu=IsPointerUIActive();
+    if(Root)Root->SetPointerUIVisible(HasMenu);
+    if(auto* Router=GetLocalPlayer()->GetSubsystem<UCommonUIActionRouterBase>();Router&&PC->PlayerInput&&!PC->IsActorBeingDestroyed())
+        Router->SetActiveUIInputConfig(FUIInputConfig(HasMenu?ECommonInputMode::All:ECommonInputMode::Game,
+            HasMenu?EMouseCaptureMode::NoCapture:EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown,
+            HasMenu?EMouseLockMode::DoNotLock:EMouseLockMode::LockOnCapture,!HasMenu),this);
     PC->bShowMouseCursor=HasMenu;
     PC->bEnableClickEvents=HasMenu;PC->bEnableMouseOverEvents=HasMenu;
     // These screens use focused-widget key navigation. A synthetic mouse click bypasses their A-key handlers.
@@ -250,6 +257,7 @@ void UICUIManagerSubsystem::CloseAllScreens()
 void UICUIManagerSubsystem::Tick(float DeltaTime)
 {
     IC_TRACE_FUNCTION();
+    ICInputPresentation::RefreshHints(GetLocalPlayer());
     // Newly mounted screens may not have a Slate path until the next layout pass.
     // Complete the original focus request once; never take focus back on every key.
     if(auto* Target=PendingFocus.Get())
@@ -286,7 +294,12 @@ void UICUIManagerSubsystem::Tick(float DeltaTime)
 bool UICUIManagerSubsystem::IsTickable() const
 {
     IC_TRACE_FUNCTION();
-    return !IsTemplate() && (!Screens.IsEmpty() || bMenuOpen);
+    return !IsTemplate() && (Root || !Screens.IsEmpty() || bMenuOpen);
+}
+bool UICUIManagerSubsystem::IsPointerUIActive() const
+{
+    const auto* PC=GetLocalPlayer()?Cast<AICPlayerController>(GetLocalPlayer()->GetPlayerController(GetWorld())):nullptr;
+    return bMenuOpen||!Screens.IsEmpty()||(PC&&(!PC->Menu.IsEmpty()||PC->bInDialogue||PC->IsMainMenuLevel()));
 }
 TStatId UICUIManagerSubsystem::GetStatId() const
 {

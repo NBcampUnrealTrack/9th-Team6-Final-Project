@@ -1,6 +1,8 @@
 #include "UI/Gameplay/ICGameMenuWidget.h"
 #include "Settings/ICGameUserSettings.h"
 #include "UI/Framework/ICFrontendLayout.h"
+#include "UI/Framework/ICInputPresentation.h"
+#include "Core/Controller/ICPlayerController.h"
 #include "UI/Framework/ICUITheme.h"
 #include "UI/Gameplay/ICPartyMenuWidget.h"
 #include "UI/Gameplay/ICInventoryMenuWidget.h"
@@ -111,7 +113,16 @@ void UICGameMenuWidget::RefreshNavigation()
     else if(SelectedTab==TEXT("Quest")){if(auto* Quests=Cast<UICQuestMenuWidget>(GetWidgetFromName(TEXT("QuestContent"))))Hint=Quests->NavigationHint();}
     else if(CodexContent)Hint=CodexContent->NavigationHint();
     else Hint=NSLOCTEXT("ICParty","EmptyHint","A / D  상단 탭     ESC  닫기");
-    if(auto* Text=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Navigation"))))Text->SetText(Hint);
+    FText PadHint;
+    if(NavigationArea==0)PadHint=NSLOCTEXT("ICParty","PadTabsHint","← / → 또는 LB / RB 탭 이동   ·   ↓ / {Accept} 열기   ·   {Back} 닫기");
+    else if(SelectedTab==TEXT("Party")&&NavigationArea==2)PadHint=NSLOCTEXT("ICParty","PadStoryHint","↑ / ↓ 이야기 스크롤   ·   ← 인물 목록   ·   LB / RB 탭 이동   ·   {Back} 닫기");
+    else if(SelectedTab==TEXT("Party"))PadHint=NSLOCTEXT("ICParty","PadPartyHint","↑ / ↓ 인물 선택   ·   → 이야기 읽기   ·   LB / RB 탭 이동   ·   {Back} 닫기");
+    else if(SelectedTab==TEXT("Settings"))PadHint=NSLOCTEXT("ICParty","PadSettingsHint","↑ / ↓ 버튼 이동   ·   {Accept} 선택   ·   LB / RB 탭 이동   ·   {Back} 닫기");
+    else if(Inventory)PadHint=Inventory->NavigationHint(true);
+    else if(SelectedTab==TEXT("Quest")){if(auto* Quests=Cast<UICQuestMenuWidget>(GetWidgetFromName(TEXT("QuestContent"))))PadHint=Quests->NavigationHint(true);}
+    else if(CodexContent)PadHint=CodexContent->NavigationHint(true);
+    else PadHint=NSLOCTEXT("ICParty","PadEmptyHint","LB / RB 탭 이동   ·   {Back} 닫기");
+    ICInputPresentation::SetHint(Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Navigation"))),Cast<AICPlayerController>(GetOwningPlayer()),Hint,PadHint);
     if(auto* Body=Cast<UBorder>(GetWidgetFromName(TEXT("MenuContent"))))Body->SetBrushColor(
         NavigationArea==2?FLinearColor(.055f,.067f,.085f):FLinearColor(.025f,.038f,.06f));
 }
@@ -123,6 +134,15 @@ void UICGameMenuWidget::InventoryNavigationChanged()
 
 bool UICGameMenuWidget::HandleMenuKey(FKey Key,bool bRepeat)
 {
+    if(Key==EKeys::Gamepad_LeftShoulder||Key==EKeys::Gamepad_RightShoulder)
+    {
+        const auto* Inventory=Cast<UICInventoryMenuWidget>(GetWidgetFromName(TEXT("InventoryContent")));
+        const auto* Codex=Cast<UICCodexMenuWidget>(GetWidgetFromName(TEXT("CodexContent")));
+        if((Inventory&&Inventory->IsBusy())||(Codex&&Codex->IsModalOpen()))return true;
+        if(auto* TabBar=GetWidgetFromName(TEXT("MenuTabs"));TabBar&&TabBar->IsVisible()&&!bRepeat)
+            SelectTab(Tabs()[(Tabs().IndexOfByKey(SelectedTab)+(Key==EKeys::Gamepad_RightShoulder?1:Tabs().Num()-1))%Tabs().Num()]);
+        return true;
+    }
     auto* CodexContent=SelectedTab==TEXT("Codex")?Cast<UICCodexMenuWidget>(GetWidgetFromName(TEXT("CodexContent"))):nullptr;
     if(CodexContent&&(NavigationArea!=0||CodexContent->IsModalOpen()))
     {

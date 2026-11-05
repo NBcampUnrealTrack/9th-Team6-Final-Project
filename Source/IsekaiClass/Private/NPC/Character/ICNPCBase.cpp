@@ -250,7 +250,11 @@ bool AICNPCBase::TryInteract(AICPlayerController* Requester)
 void AICNPCBase::EndInteraction()
 {
     IC_TRACE_FUNCTION();
-    if (FacialAnimation) FacialAnimation->StopDialogue();
+    if (FacialAnimation)
+    {
+        FacialAnimation->StopDialogue();
+        FacialAnimation->ClearDialogueExpression();
+    }
     if(!bInteracting)return;
     bInteracting=false;
     if(auto* AI=Cast<AICAIController>(GetController()))

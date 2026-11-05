@@ -68,7 +68,7 @@ public:
     UFUNCTION(BlueprintCallable) bool AbandonSelectedQuest();
     void Activate();
     bool HandleMenuKey(FKey Key,bool bRepeat=false);
-    FText NavigationHint() const;
+    FText NavigationHint(bool Gamepad=false) const;
     static bool BuildLayout(UWidgetTree* Tree);
 protected:
     virtual void NativeOnInitialized() override;

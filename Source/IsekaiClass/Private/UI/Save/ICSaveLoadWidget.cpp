@@ -1,5 +1,7 @@
 #include "UI/Save/ICSaveLoadWidget.h"
 #include "UI/Framework/ICText.h"
+#include "UI/Framework/ICInputPresentation.h"
+#include "Blueprint/WidgetTree.h"
 #include "Settings/ICGameUserSettings.h"
 #include "UI/Management/ICUIManagerSubsystem.h"
 #include "UI/Save/ICSaveSlotWidget.h"
@@ -14,6 +16,8 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Components/ScrollBox.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "HAL/PlatformTime.h"
 
 UICSaveSubsystem* UICSaveLoadWidget::GetSaves() const
@@ -24,10 +28,31 @@ UICSaveSubsystem* UICSaveLoadWidget::GetSaves() const
 void UICSaveLoadWidget::NativeOnInitialized()
 {
     IC_TRACE_FUNCTION();Super::NativeOnInitialized();SetIsFocusable(true);
+    // Upgrade already-authored screens too, retaining their bound buttons and styles.
+    if(auto* HiddenActions=GetWidgetFromName(TEXT("SaveCompatibilityActions")))
+        if(auto* Form=Cast<UVerticalBox>(HiddenActions->GetParent()))
+        {
+            auto* Bar=WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),TEXT("SaveActionBar"));
+            for(auto* Button:{IC_SaveLoad_Save.Get(),IC_SaveLoad_Load.Get(),IC_SaveLoad_Delete.Get(),IC_SaveLoad_Close.Get()})
+                if(Button)
+                {
+                    Button->RemoveFromParent();
+                    auto* ActionSlot=Bar->AddChildToHorizontalBox(Button);ActionSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));ActionSlot->SetPadding(FMargin(0,12,12,0));
+                }
+            HiddenActions->RemoveFromParent();Form->AddChildToVerticalBox(Bar);
+        }
     if(IC_SaveLoad_Load)IC_SaveLoad_Load->OnClicked.AddUniqueDynamic(this,&ThisClass::HandleLoadClicked);
     if(IC_SaveLoad_Save)IC_SaveLoad_Save->OnClicked.AddUniqueDynamic(this,&ThisClass::HandleSaveClicked);
     if(IC_SaveLoad_Delete)IC_SaveLoad_Delete->OnClicked.AddUniqueDynamic(this,&ThisClass::HandleDeleteClicked);
     if(IC_SaveLoad_Close)IC_SaveLoad_Close->OnClicked.AddUniqueDynamic(this,&ThisClass::HandleCloseClicked);
+    // Older serialized hidden buttons referenced removed string-table keys.
+    const TPair<UButton*,FText> Actions[]={
+        {IC_SaveLoad_Save,NSLOCTEXT("ICSaveUI","SaveAction","저장")},
+        {IC_SaveLoad_Load,NSLOCTEXT("ICSaveUI","LoadAction","불러오기")},
+        {IC_SaveLoad_Delete,NSLOCTEXT("ICSaveUI","DeleteAction","삭제")},
+        {IC_SaveLoad_Close,NSLOCTEXT("ICSaveUI","CloseAction","닫기")}};
+    for(const auto& Action:Actions)if(Action.Key)
+        if(auto* Label=Cast<UTextBlock>(Action.Key->GetContent()))Label->SetText(Action.Value);
 }
 void UICSaveLoadWidget::Configure(bool bInAllowSave,TSoftObjectPtr<UWorld> InGameplayMap)
 {
@@ -52,6 +77,9 @@ void UICSaveLoadWidget::NativeConstruct()
     {if(bAllowSave)PC->OpenSaveMenu();else PC->OpenLoadMenu();}
     else PC->RefreshSaveSlots();
     HandleMenuChanged(PC->Menu);HandleNoticeChanged(PC->Notice);
+    ICInputPresentation::SetHint(Cast<UTextBlock>(GetWidgetFromName(TEXT("SaveHelp"))),PC,
+        NSLOCTEXT("ICSaveUI","MouseKeyboardControls","클릭 / W·S / ↑·↓ 선택   ·   F / Enter 확인   ·   Delete 삭제   ·   Esc 뒤로"),
+        NSLOCTEXT("ICSaveUI","GamepadControls","방향키 / LS 선택   ·   {Accept} 확인   ·   {FaceTop} 삭제   ·   {Back} 뒤로"));
     UE_LOG(LogICUI,Log,TEXT("[SaveUI.Opened] Widget=%s SessionMenu=%s"),*GetName(),*PC->GetSessionMenu());
 }
 void UICSaveLoadWidget::NativeDestruct()
@@ -95,10 +123,14 @@ FReply UICSaveLoadWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry,const
     }
     else if(Key==EKeys::Enter||Key==EKeys::SpaceBar)
     {
+        // A clicked/focused toolbar button must activate itself, not the list's default action.
+        if(HasFocusedDescendants())return Super::NativeOnPreviewKeyDown(Geometry,KeyEvent);
         if(!KeyEvent.IsRepeat())
         {if(PC->GetSessionMenu()==TEXT("Save"))HandleSaveClicked();else HandleLoadClicked();}
     }
-    else if(Key==EKeys::Delete&&!KeyEvent.IsRepeat())HandleDeleteClicked();
+    else if(Key==EKeys::Delete||KeyEvent.GetKey()==UICGameUserSettings::GamepadFaceKey(1))
+    {if(!KeyEvent.IsRepeat())HandleDeleteClicked();}
+    else return Super::NativeOnPreviewKeyDown(Geometry,KeyEvent);
     return FReply::Handled();
 }
 FReply UICSaveLoadWidget::NativeOnAnalogValueChanged(const FGeometry& Geometry,const FAnalogInputEvent& Event)

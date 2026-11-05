@@ -1,8 +1,10 @@
 #include "Character/Animation/ICFacialAnimationComponent.h"
+#include "Algo/AllOf.h"
 #include "Character/Animation/ICCharacterAnimInstance.h"
 #include "Character/Base/ICCharacterBase.h"
 #include "NPC/Character/ICNPCBase.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
+#include "Animation/MorphTarget.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Life/Production/ICPlayerLifeComponent.h"
@@ -12,6 +14,18 @@ namespace
 {
 const FName MouthTargets[] = {TEXT("Fcl_MTH_A"), TEXT("Fcl_MTH_I"), TEXT("Fcl_MTH_U"), TEXT("Fcl_MTH_E"), TEXT("Fcl_MTH_O")};
 constexpr float BlinkClose = .055f, BlinkHold = .025f, BlinkOpen = .10f;
+struct FExpressionPreset
+{
+    EICDialogueExpression Expression;
+    const TCHAR* Suffix;
+};
+constexpr FExpressionPreset ExpressionPresets[] = {
+    {EICDialogueExpression::Joy, TEXT("Joy")},
+    {EICDialogueExpression::Smile, TEXT("Fun")},
+    {EICDialogueExpression::Angry, TEXT("Angry")},
+    {EICDialogueExpression::Sad, TEXT("Sorrow")},
+    {EICDialogueExpression::Surprised, TEXT("Surprised")},
+};
 
 int32 MouthForCharacter(TCHAR Character)
 {
@@ -46,6 +60,7 @@ void UICFacialAnimationComponent::InitializeFace(USkeletalMeshComponent* Mesh)
     FaceMesh = Mesh;
     BoundMesh = Mesh ? Mesh->GetSkeletalMeshAsset() : nullptr;
     BlinkTargets.Reset();
+    ExpressionMorphs.Reset();
     bFaceReady = false; bSpeechReady = false;
     if (const auto* Asset = BoundMesh.Get())
     {
@@ -53,10 +68,24 @@ void UICFacialAnimationComponent::InitializeFace(USkeletalMeshComponent* Mesh)
         else for (FName Name : {FName(TEXT("Fcl_EYE_Close_L")), FName(TEXT("Fcl_EYE_Close_R"))})
             if (Asset->FindMorphTarget(Name)) BlinkTargets.Add(Name);
         bFaceReady = !BlinkTargets.IsEmpty();
-        bSpeechReady = Cast<AICNPCBase>(GetOwner()) != nullptr;
+        bSpeechReady = Cast<AICCharacterBase>(GetOwner()) != nullptr;
         for (FName Name : MouthTargets) bSpeechReady &= Asset->FindMorphTarget(Name) != nullptr;
+        const TPair<const TCHAR*, EExpressionPart> Parts[] = {
+            {TEXT("BRW"), EExpressionPart::Brow},
+            {TEXT("EYE"), EExpressionPart::Eye},
+            {TEXT("MTH"), EExpressionPart::Mouth},
+        };
+        for (const auto& Preset : ExpressionPresets)
+            for (const auto& Part : Parts)
+            {
+                const FName Name(*FString::Printf(TEXT("Fcl_%s_%s"), Part.Key, Preset.Suffix));
+                const auto* Morph = Asset->FindMorphTarget(Name);
+                if (Morph && Morph->HasDataForLOD(0))
+                    ExpressionMorphs.Add({Name, Preset.Expression, Part.Value});
+            }
     }
-    if (FaceMesh && (bFaceReady || bSpeechReady))
+    const bool bCanAnimate = bFaceReady || bSpeechReady || !ExpressionMorphs.IsEmpty();
+    if (FaceMesh && bCanAnimate)
     {
         // Feed component overrides before the skeletal mesh evaluates its existing post-process graph.
         FaceMesh->AddTickPrerequisiteComponent(this);
@@ -64,14 +93,14 @@ void UICFacialAnimationComponent::InitializeFace(USkeletalMeshComponent* Mesh)
     }
     BlinkRandom.Initialize(int32(FPlatformTime::Cycles()) ^ GetTypeHash(GetOwner()->GetFName()));
     BlinkWait = BlinkRandom.FRandRange(1.f, 3.f);
-    SetComponentTickEnabled(bFaceReady || bSpeechReady);
+    SetComponentTickEnabled(bCanAnimate);
 }
 
 void UICFacialAnimationComponent::PlayDialogueLine(const FText& Line, FName SpeakerID)
 {
     StopDialogue();
-    const auto* NPC = Cast<AICNPCBase>(GetOwner());
-    if (!bSpeechReady || !NPC || SpeakerID.IsNone() || SpeakerID != NPC->GetNPCDefinition().ID) return;
+    const auto* Speaker = Cast<AICCharacterBase>(GetOwner());
+    if (!bSpeechReady || !Speaker || SpeakerID.IsNone() || SpeakerID != Speaker->GetCharacterID()) return;
     float End = 0.f;
     for (TCHAR Character : Line.ToString())
     {
@@ -92,17 +121,21 @@ bool UICFacialAnimationComponent::IsSpeaking() const
 void UICFacialAnimationComponent::StopDialogue()
 {
     Speech.Reset(); SpeechIndex = 0; SpeechSeconds = 0.f;
-    // Player faces never write or clear mouth overrides, including on load/preset changes.
-    if (!bSpeechReady) return;
     bool bChanged = false;
     for (int32 Index = 0; Index < UE_ARRAY_COUNT(MouthTargets); ++Index)
     {
-        bChanged |= MouthWeights[Index] > 0.f;
+        if (MouthWeights[Index] <= 0.f) continue;
         MouthWeights[Index] = 0.f;
         if (FaceMesh) FaceMesh->SetMorphTarget(MouthTargets[Index], 0.f);
+        bChanged = true;
     }
-    // Gift/menu screens can pause before another mesh tick. Publish the closed mouth now.
-    if (bChanged && FaceMesh && FaceMesh->IsRegistered())
+    if (bChanged) RefreshRenderedFace();
+}
+
+void UICFacialAnimationComponent::RefreshRenderedFace()
+{
+    // A menu can pause before the next mesh tick.
+    if (FaceMesh && FaceMesh->IsRegistered())
     {
         FaceMesh->HandleExistingParallelEvaluationTask(true, true);
         FaceMesh->RefreshBoneTransforms();
@@ -111,14 +144,53 @@ void UICFacialAnimationComponent::StopDialogue()
     }
 }
 
+void UICFacialAnimationComponent::SetDialogueExpression(EICDialogueExpression Expression, float Strength)
+{
+    DialogueExpression = Expression;
+    ExpressionStrength = FMath::IsFinite(Strength) ? FMath::Clamp(Strength, 0.f, 1.f) : 0.f;
+}
+
+void UICFacialAnimationComponent::ClearDialogueExpression()
+{
+    SetDialogueExpression(EICDialogueExpression::Neutral, 0.f);
+    bool bChanged = false;
+    for (auto& Morph : ExpressionMorphs)
+    {
+        if (Morph.Weight <= 0.f) continue;
+        Morph.Weight = 0.f;
+        if (FaceMesh) FaceMesh->SetMorphTarget(Morph.Name, 0.f);
+        bChanged = true;
+    }
+    if (bChanged) RefreshRenderedFace();
+}
+
+void UICFacialAnimationComponent::UpdateExpression(float DeltaSeconds)
+{
+    const float Blend = 1.f - FMath::Exp(-16.f * DeltaSeconds);
+    float SpeechOpening = 0.f;
+    for (float Weight : MouthWeights) SpeechOpening = FMath::Max(SpeechOpening, Weight);
+    for (auto& Morph : ExpressionMorphs)
+    {
+        const float Target = Morph.Expression == DialogueExpression ? ExpressionStrength : 0.f;
+        if (Target == 0.f && Morph.Weight == 0.f) continue;
+        Morph.Weight = FMath::Lerp(Morph.Weight, Target, Blend);
+        if (Morph.Weight < .001f) Morph.Weight = 0.f;
+        float Weight = Morph.Weight;
+        if (Morph.Part == EExpressionPart::Eye) Weight *= 1.f - BlinkWeight;
+        if (Morph.Part == EExpressionPart::Mouth) Weight *= 1.f - SpeechOpening;
+        FaceMesh->SetMorphTarget(Morph.Name, Weight);
+    }
+}
+
 void UICFacialAnimationComponent::SetBlink(float Weight)
 {
+    BlinkWeight = Weight;
     if (FaceMesh) for (FName Name : BlinkTargets) FaceMesh->SetMorphTarget(Name, Weight);
 }
 
 void UICFacialAnimationComponent::ResetFace()
 {
-    StopDialogue(); SetBlink(0.f);
+    StopDialogue(); SetBlink(0.f); ClearDialogueExpression();
     BlinkSeconds = -1.f; BlinkWait = BlinkRandom.FRandRange(2.5f, 5.5f);
 }
 
@@ -144,6 +216,7 @@ void UICFacialAnimationComponent::UpdateBlink(float DeltaSeconds)
 
 void UICFacialAnimationComponent::UpdateSpeech(float DeltaSeconds)
 {
+    if (Speech.IsEmpty() && Algo::AllOf(MouthWeights, [](float Weight) { return Weight == 0.f; })) return;
     SpeechSeconds += DeltaSeconds;
     while (Speech.IsValidIndex(SpeechIndex) && SpeechSeconds >= Speech[SpeechIndex].End) ++SpeechIndex;
     const FSpeechCue* Cue = Speech.IsValidIndex(SpeechIndex) ? &Speech[SpeechIndex] : nullptr;
@@ -153,9 +226,11 @@ void UICFacialAnimationComponent::UpdateSpeech(float DeltaSeconds)
     const float Blend = 1.f - FMath::Exp(-24.f * DeltaSeconds);
     for (int32 Index = 0; Index < UE_ARRAY_COUNT(MouthTargets); ++Index)
     {
-        MouthWeights[Index] = FMath::Lerp(MouthWeights[Index], Cue && Cue->Mouth == Index ? Opening : 0.f, Blend);
+        const float Previous = MouthWeights[Index];
+        MouthWeights[Index] = FMath::Lerp(Previous, Cue && Cue->Mouth == Index ? Opening : 0.f, Blend);
         if (MouthWeights[Index] < .001f) MouthWeights[Index] = 0.f;
-        FaceMesh->SetMorphTarget(MouthTargets[Index], MouthWeights[Index]);
+        if (Previous > 0.f || MouthWeights[Index] > 0.f)
+            FaceMesh->SetMorphTarget(MouthTargets[Index], MouthWeights[Index]);
     }
     if (!Cue && Speech.Num()) { Speech.Reset(); SpeechIndex = 0; SpeechSeconds = 0.f; }
 }
@@ -163,7 +238,7 @@ void UICFacialAnimationComponent::UpdateSpeech(float DeltaSeconds)
 void UICFacialAnimationComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
-    if (!FaceMesh || (!bFaceReady && !bSpeechReady)) return;
+    if (!FaceMesh) return;
     if (BoundMesh.Get() != FaceMesh->GetSkeletalMeshAsset()) { InitializeFace(FaceMesh); return; }
     const auto* NPC = Cast<AICNPCBase>(GetOwner());
     const auto* Character = Cast<AICCharacterBase>(GetOwner());
@@ -176,6 +251,7 @@ void UICFacialAnimationComponent::TickComponent(float DeltaSeconds, ELevelTick T
     const float Step = FMath::Max(0.f, DeltaSeconds);
     if (bFaceReady) UpdateBlink(Step);
     if (bSpeechReady) UpdateSpeech(Step);
+    UpdateExpression(Step);
 }
 
 void UICFacialAnimationComponent::EndPlay(const EEndPlayReason::Type Reason)

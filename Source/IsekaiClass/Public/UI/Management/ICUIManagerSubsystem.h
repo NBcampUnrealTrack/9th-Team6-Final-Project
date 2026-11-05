@@ -32,6 +32,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void CloseAllScreens();
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void SetHUD(UUserWidget* Widget);
     void AddHUDWidget(UUserWidget* Widget);
+    UFUNCTION(BlueprintPure, Category = "IC|UI") bool IsPointerUIActive() const;
 
 private:
     UPROPERTY(Transient) TObjectPtr<UICUIRootWidget> Root;

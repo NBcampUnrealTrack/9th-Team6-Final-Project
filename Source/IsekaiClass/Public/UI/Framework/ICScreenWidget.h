@@ -10,7 +10,7 @@ class ISEKAICLASS_API UICScreenWidget : public UCommonActivatableWidget
 public:
     virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override
     {
-        return TOptional<FUIInputConfig>();
+        return FUIInputConfig(ECommonInputMode::All, EMouseCaptureMode::NoCapture, EMouseLockMode::DoNotLock, false);
     }
 
 protected:
