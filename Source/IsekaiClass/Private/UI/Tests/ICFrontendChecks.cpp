@@ -97,7 +97,6 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UI/Gameplay/ICGameplayWidget.h"
 #include "UI/Gameplay/ICGameMenuWidget.h"
-#include "UI/CharacterCreate/ICNameKeyButton.h"
 #include "Core/Controller/ICPlayerController.h"
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
@@ -172,6 +171,9 @@ public:
         }
         if(Flow->Phase==EICGameFlowPhase::Loading&&PC->IsMainMenuLevel()&&PC->Menu==TEXT("Loading"))
         {
+            auto* Music = World->GetSubsystem<UICBGMSubsystem>();
+            Music->Tick(1.f);
+            Test->TestEqual(TEXT("Loading after the story is silent"), Music->GetCurrentMusicRow(), NAME_None);
             TArray<UUserWidget*> Loaders;
             UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World,Loaders,UICLoadingWidget::StaticClass(),false);
             for(auto* Loader:Loaders)if(Loader->IsVisible()&&Loader->GetCachedGeometry().GetLocalSize().X>1)
@@ -197,6 +199,9 @@ public:
             {
                 if(FICPrologueTestAccess::Revealing(Prologue))
                 {
+                    auto* Music = World->GetSubsystem<UICBGMSubsystem>();
+                    Music->Tick(1.f);
+                    Test->TestEqual(TEXT("Revealing the open world does not restart story music"), Music->GetCurrentMusicRow(), NAME_None);
                     auto* Player=Cast<AICPlayerCharacter>(PC->GetPawn());
                     Test->TestTrue(TEXT("World reveal starts with an evaluated arm pose rather than a reference T-pose"),Player&&ICPlayerAppearance::IsFirstPoseReady(Player->GetMesh()));
                     bSawPreparedReveal=true;return false;
@@ -204,6 +209,8 @@ public:
                 Test->TestTrue(TEXT("Prologue UI keeps the cursor visible"),PC->bShowMouseCursor);
                 auto* Music=World->GetSubsystem<UICBGMSubsystem>();Music->Tick(1.f);
                 if(FICPrologueTestAccess::Reading(Prologue))Test->TestEqual(TEXT("Prologue reading uses its editable music row"),Music->GetCurrentMusicRow(),FName(TEXT("BGM_Prologue")));
+                if (FICPrologueTestAccess::Finishing(Prologue))
+                    Test->TestEqual(TEXT("The story fade begins in silence"), Music->GetCurrentMusicRow(), NAME_None);
                 const int32 Before=Prologue->GetLineIndex();
                 Test->TestEqual(TEXT("The WBP loads all fifty-five DT entries"),Prologue->GetLineCount(),55);
                 if(bSkipRun&&Before>=17)
@@ -223,6 +230,7 @@ public:
                     FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::H,FModifierKeysState(),0,false,0,0));
                     FICPrologueTestAccess::Tick(Prologue,1.6f);
                     Test->TestTrue(TEXT("A complete H hold fades into the normal new-game path"),FICPrologueTestAccess::Finishing(Prologue));
+                    Test->TestEqual(TEXT("Skipping stops story music immediately"), Music->GetCurrentMusicRow(), NAME_None);
                     FSlateApplication::Get().ProcessKeyUpEvent(FKeyEvent(EKeys::H,FModifierKeysState(),0,false,0,0));
                     return false;
                 }
@@ -246,6 +254,7 @@ public:
                     Test->TestEqual(TEXT("Held G cannot advance a complete line"),Prologue->GetLineIndex(),Before);
                     PressKey(EKeys::G);
                     if(Before<54)Test->TestEqual(TEXT("G advances even when viewport has the keyboard focus"),Prologue->GetLineIndex(),Before+1);
+                    else Test->TestEqual(TEXT("Completing the last line stops story music immediately"), Music->GetCurrentMusicRow(), NAME_None);
                 }
                 return false;
             }
@@ -257,7 +266,6 @@ public:
             auto* TitleMusic=World->GetSubsystem<UICBGMSubsystem>();TitleMusic->Tick(1.f);
             Test->TestEqual(TEXT("Title uses its editable music row"),TitleMusic->GetCurrentMusicRow(),FName(TEXT("BGM_MainMenu")));
             Test->TestNull(TEXT("Title does not spawn a pawn"), PC->GetPawn());
-            GI = PC->GetGameInstance();
             auto* Saves = PC->GetSaves();
             const FString Prefix = TEXT("IC_Frontend_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
             TArray<UUserWidget*> Widgets;
@@ -271,8 +279,10 @@ public:
                 return false;
             if (!bSeededSaves)
             {
-                Test->TestTrue(TEXT("Save files isolated from player saves"),
-                               Saves->ConfigureServices(PC->GetWorldState(), PC->GetTime(), Prefix));
+                if (!Test->TestTrue(TEXT("Save files isolated from player saves"),
+                                    Saves->ConfigureServices(PC->GetWorldState(), PC->GetTime(), Prefix)))
+                    return true;
+                GI = PC->GetGameInstance();
                 auto* Continue = Cast<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Continue")));
                 Test->TestTrue(TEXT("Continue stays clickable with no save"), Continue && Continue->GetIsEnabled());
                 if (!Click(Client, Continue)) return false;
@@ -371,6 +381,50 @@ public:
             if (!Click(Client, CastChecked<UButton>(Wizard->GetWidgetFromName(TEXT("BTN_Next"))))) return false;
             NextStage(11); return false;
         }
+        if (Stage >= 16 && Stage <= 18)
+        {
+            if (FPlatformTime::Seconds() - StageAt < .3) return false;
+            auto* Wizard = PC->CharacterCreateScreen.Get();
+            if (!Wizard) return false;
+            auto* Keyboard = Wizard->GetWidgetFromName(TEXT("NameKeyboard"));
+            auto* Name = CastChecked<UEditableTextBox>(Wizard->GetWidgetFromName(TEXT("EDIT_Name")));
+            const FKey Accept = UICGameUserSettings::GamepadFaceKey(3);
+            if (Stage == 16)
+            {
+                Test->TestTrue(TEXT("Controller input opens the name keyboard"), Keyboard && Keyboard->IsVisible());
+                const auto ChooseVirtualKey = [&](int32 Index)
+                {
+                    auto* Key = Wizard->GetWidgetFromName(FName(*FString::Printf(TEXT("NameKey%d"), Index)));
+                    Key->SetUserFocus(PC);
+                    FICKeyboardTestAccess::Sync(Wizard);
+                    PressKey(Accept);
+                };
+                for (int32 Index : {14, 17, 11})
+                    ChooseVirtualKey(Index);
+                Test->TestEqual(TEXT("Gamepad keyboard composes Hangul without OS IME"), Flow->Answers.Name, FString(TEXT("한")));
+                PressKey(EKeys::Gamepad_LeftShoulder);
+                ChooseVirtualKey(0);
+                Test->TestEqual(TEXT("English name keys work with the controller"), Flow->Answers.Name, FString(TEXT("한q")));
+                NextStage(17);
+                return false;
+            }
+            if (Stage == 17)
+            {
+                Capture(Client, TEXT("01_Name_Gamepad"));
+                PressKey(EKeys::LeftShift);
+                NextStage(18);
+                return false;
+            }
+            Test->TestTrue(TEXT("Returning to physical input hides the name keyboard"), Keyboard && !Keyboard->IsVisible());
+            Test->TestEqual(TEXT("Changing input devices preserves the name"), Flow->Answers.Name, FString(TEXT("한q")));
+            Test->TestTrue(TEXT("Physical input focus returns to the name field"), Name->HasKeyboardFocus() || Name->HasFocusedDescendants());
+            Name->SetText(FText::GetEmpty());
+            for (TCHAR Character : FString(TEXT("테스트여행자")))
+                FSlateApplication::Get().ProcessKeyCharEvent(FCharacterEvent(Character, FModifierKeysState(), 0, false));
+            Test->TestEqual(TEXT("Typed name reaches creation state"), Flow->Answers.Name, FString(TEXT("테스트여행자")));
+            NextStage(15);
+            return false;
+        }
         if (Stage >= 10 && Stage <= 14)
         {
             if (FPlatformTime::Seconds() - StageAt < .3) return false;
@@ -394,26 +448,14 @@ public:
             {
                 auto* CreationMusic=World->GetSubsystem<UICBGMSubsystem>();CreationMusic->Tick(1.f);
                 Test->TestEqual(TEXT("Creation uses its editable music row"),CreationMusic->GetCurrentMusicRow(),FName(TEXT("BGM_CharacterCreate")));
-                auto* Name = CastChecked<UEditableTextBox>(Wizard->GetWidgetFromName(TEXT("EDIT_Name")));
+                auto* Keyboard = Wizard->GetWidgetFromName(TEXT("NameKeyboard"));
                 auto* Next = CastChecked<UButton>(Wizard->GetWidgetFromName(TEXT("BTN_Next")));
+                Test->TestTrue(TEXT("Keyboard and mouse entry starts with no virtual keyboard"), Keyboard && !Keyboard->IsVisible());
                 Test->TestFalse(TEXT("Empty name cannot advance"), Next->GetIsEnabled());
-                const int32 HangulKeys[]={14,17,11}; // ㅎ ㅏ ㄴ -> 한
-                for(int32 KeyIndex:HangulKeys)
-                {
-                    auto* KeyButton=CastChecked<UICNameKeyButton>(Wizard->GetWidgetFromName(FName(*FString::Printf(TEXT("NameKey%d"),KeyIndex))));
-                    KeyButton->SetUserFocus(PC);FICKeyboardTestAccess::Sync(Wizard);PressKey(UICGameUserSettings::GamepadFaceKey(3));
-                }
-                Test->TestEqual(TEXT("Gamepad keyboard composes Hangul without OS IME"),Flow->Answers.Name,FString(TEXT("한")));
-                CastChecked<UButton>(Wizard->GetWidgetFromName(TEXT("NameKey36")))->SetUserFocus(PC);FICKeyboardTestAccess::Sync(Wizard);PressKey(EKeys::G);
-                CastChecked<UButton>(Wizard->GetWidgetFromName(TEXT("NameKey0")))->SetUserFocus(PC);FICKeyboardTestAccess::Sync(Wizard);PressKey(EKeys::F);
-                Test->TestEqual(TEXT("English keyboard uses the same confirm controls"),Flow->Answers.Name,FString(TEXT("한q")));
-                Name->SetText(FText::GetEmpty());
-                Name->SetUserFocus(PC);
-                for (TCHAR Character : FString(TEXT("테스트여행자")))
-                    FSlateApplication::Get().ProcessKeyCharEvent(FCharacterEvent(Character, FModifierKeysState(), 0, false));
-                Test->TestEqual(TEXT("Typed name reaches creation state"), Flow->Answers.Name, FString(TEXT("테스트여행자")));
                 Test->TestEqual(TEXT("Name button caption"), CastChecked<UTextBlock>(Next->GetContent())->GetText().ToString(), FString(TEXT("이름 설정")));
-                NextStage(15); return false;
+                PressKey(EKeys::Gamepad_DPad_Down);
+                NextStage(16);
+                return false;
             }
             else
             {
@@ -450,6 +492,10 @@ public:
             }
             if (Flow->Phase != EICGameFlowPhase::Playing || !PC->bCreated)
                 return false;
+            auto* Music = World->GetSubsystem<UICBGMSubsystem>();
+            Music->Tick(1.f);
+            Test->TestEqual(TEXT("World music resumes from its area rules"), Music->GetCurrentMusicRow(),
+                            Music->ResolveMusicRow(PC->GetPawn()->GetActorLocation(), PC->bInCombat));
             Test->TestTrue(TEXT("Finishing the story presents a painted loading screen before travel"),bSawStoryLoading);
             Test->TestTrue(TEXT("Post-story loading remains visible long enough to read"),StoryLoadingLast-StoryLoadingFirst>=.8);
             Test->TestTrue(TEXT("Loading cover remains after save while the character is prepared"),bSawCharacterPreparation);

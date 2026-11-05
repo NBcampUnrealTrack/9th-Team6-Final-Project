@@ -37,6 +37,7 @@ private:
     FICNameComposer NameComposer;
     UPROPERTY(Transient) TArray<TObjectPtr<UICNameKeyButton>> NameKeys;
     void RefreshKeyboard();
+    void RefreshNameKeyboardVisibility();
     UFUNCTION() void ChooseKey(int32 Index);
     UPROPERTY(Transient) TObjectPtr<UEditableTextBox> NameInput;
     UPROPERTY(Transient) TArray<TObjectPtr<UButton>> ChoiceButtons;

@@ -1,4 +1,5 @@
 #include "UI/Settings/ICSettingsWidget.h"
+#include "UI/Framework/ICInputPresentation.h"
 #include "UI/Framework/ICWidgetTemplates.h"
 #include "UI/Settings/ICSettingsLayout.h"
 #include "UI/Framework/ICFrontendLayout.h"
@@ -350,6 +351,9 @@ TArray<UWidget*> UICSettingsWidget::NavigationOptions() const
 }
 void UICSettingsWidget::RefreshNavigation()
 {
+    ICInputPresentation::SetHint(Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_SettingsKeys"))),Cast<AICPlayerController>(GetOwningPlayer()),
+        NSLOCTEXT("ICSettings","MouseKeyboardHelp","클릭으로 선택 / 변경   ·   W/S 이동   ·   A/D 변경   ·   F/Enter 선택   ·   Esc 뒤로"),
+        NSLOCTEXT("ICSettings","GamepadHelp","LB/RB 분류   ·   ↑/↓ 이동   ·   ←/→ 변경   ·   {Accept} 선택   ·   {Back} 뒤로   ·   마우스 클릭 가능"));
     const auto Options=NavigationOptions();OptionIndex=FMath::Clamp(OptionIndex,0,FMath::Max(0,Options.Num()-1));
     UWidget* Selected=Options.IsValidIndex(OptionIndex)?Options[OptionIndex]:nullptr;
     for(const auto& Spec:ICSettingsLayout::Specs())
@@ -398,6 +402,11 @@ void UICSettingsWidget::AdjustSelected(int32 Direction)
 }
 bool UICSettingsWidget::HandleNavigationKey(FKey Raw,bool Repeat)
 {
+    if(Raw==EKeys::Gamepad_LeftShoulder||Raw==EKeys::Gamepad_RightShoulder)
+    {
+        if(!bPreview&&!Repeat)SelectTab((ActiveTab+(Raw==EKeys::Gamepad_RightShoulder?1:ICSettingsLayout::Tabs().Num()-1))%ICSettingsLayout::Tabs().Num());
+        return true;
+    }
     const FKey Key=UICGameUserSettings::MenuKey(Raw);
     const bool Up=Key==EKeys::W||Key==EKeys::Up,Down=Key==EKeys::S||Key==EKeys::Down;
     const bool Left=Key==EKeys::A||Key==EKeys::Left,Right=Key==EKeys::D||Key==EKeys::Right;

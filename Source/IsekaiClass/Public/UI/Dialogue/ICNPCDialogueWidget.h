@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Data/Rows/NPC/ICDialogueRow.h"
 #include "ICNPCDialogueWidget.generated.h"
 
 class AICNPCBase;
@@ -12,6 +13,7 @@ class UVerticalBox;
 class UICAffinityHeartsWidget;
 class UICWorldStateSubsystem;
 class UICNPCGiftWidget;
+class UICFacialAnimationComponent;
 
 UCLASS(Blueprintable)
 class ISEKAICLASS_API UICNPCDialogueWidget : public UUserWidget
@@ -81,11 +83,13 @@ private:
     bool bUpdatingOptions = false;
     bool bEntryFocusPending = false;
     TWeakObjectPtr<UICDialogueEntryWidget> SelectedEntry;
+    TWeakObjectPtr<UICFacialAnimationComponent> DialoguePlayerFace;
     UPROPERTY(Transient) TObjectPtr<UICNPCGiftWidget> GiftPicker;
 
     void ShowInteractionOptions();
     void ShowInitialDialogue();
-    void SetSpokenLine(const FText& Line, FName SpeakerID);
+    void SetSpokenLine(const FText& Line, FName SpeakerID,
+        EICDialogueExpression Expression = EICDialogueExpression::Neutral, float Strength = 0.f);
     void StopSpeaking();
     void ResetDialogue();
     bool TryShowNode(FName DialogueID, FName NodeID = NAME_None);

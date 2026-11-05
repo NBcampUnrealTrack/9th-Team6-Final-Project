@@ -495,6 +495,14 @@ void UICInventoryComponent::EnsureStorage(FName ID)
     auto Next = GetSnapshot(); if (!ID.IsNone() && !Next.Storage.Contains(ID)) { Next.Storage.Add(ID).Slots.SetNum(40); Commit(Next); }
 }
 
+bool UICInventoryComponent::AddItemToStorage(FICInventoryState& Snapshot, FName ContainerID, FName ItemID, int32 Count) const
+{
+    if (ContainerID.IsNone() || Count <= 0 || !Find(ItemID)) return false;
+    FPlayerContainer& Storage = Snapshot.Storage.FindOrAdd(ContainerID);
+    if (Storage.Slots.IsEmpty()) Storage.Slots.SetNum(40);
+    return Storage.Slots.Num() == 40 && Insert(Storage, ItemID, Count) == Count;
+}
+
 bool UICInventoryComponent::Transfer(FName ID, int32 Index, bool bToStorage)
 {
     FText Reason;return TransferAmount(ID,Index,GetTransferableCount(ID,Index,bToStorage),bToStorage,Reason);

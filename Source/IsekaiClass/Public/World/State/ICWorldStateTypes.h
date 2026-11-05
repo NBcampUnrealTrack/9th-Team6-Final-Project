@@ -38,6 +38,7 @@ struct FICWorldState
 
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FGuid, FICProductionJobState> ProductionJobs;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, FICCropState> Crops;
+    UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, FICNPCFarmPlotState> NPCFarmPlots;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, FICSpawnSlotState> SpawnSlots;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, FICResourcePointState> ResourcePoints;
     UPROPERTY(BlueprintReadOnly, SaveGame) TMap<FName, FICContainerOwnershipState> ContainerOwnership;

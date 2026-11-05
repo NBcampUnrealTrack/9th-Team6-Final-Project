@@ -108,11 +108,16 @@ public:
             Window->Resize(FVector2D(Size)+FVector2D(Window->GetClientSizeInScreen())-FVector2D(Viewport->GetSizeXY()));
             Window->BringToFront(true);auto& App=FSlateApplication::Get();App.ReleaseAllPointerCapture();
             App.ProcessWindowActivatedEvent(FWindowActivateEvent(FWindowActivateEvent::EA_Activate,Window.ToSharedRef()));
+            Next(203);return false;
+        }
+        if(FPlatformTime::Seconds()-StageAt<.3)return false;
+        if(Stage==203)
+        {
+            // Scroll after the resized Slate geometry has been laid out.
             PC->SelectSessionSlot(1);
             if(auto* Row=FindRow(World,2))if(auto* Scroll=Cast<UScrollBox>(View->GetWidgetFromName(TEXT("IC_SaveLoad_Scroll"))))Scroll->ScrollWidgetIntoView(Row,false);
             Next(3);return false;
         }
-        if(FPlatformTime::Seconds()-StageAt<.3)return false;
         if(Stage==3)
         {
             FSceneViewProjectionData Projection;PC->GetLocalPlayer()->GetProjectionData(Viewport,Projection);
@@ -124,6 +129,10 @@ public:
             const auto Max=FVector2D(VG.AbsoluteToLocal(UI.LocalToAbsolute(UI.GetLocalSize())))*Scale;
             Test->TestTrue(TEXT("Save UI follows the WBP 1920x1080 ScaleBox after resize"),Min.Equals(FVector2D(Rect.Min),2)&&Max.Equals(FVector2D(Rect.Max),2));
             auto* Row=FindRow(World,2);if(!Row)return false;
+            Capture(Client,FString::Printf(TEXT("BeforeClick_%d"),SizeIndex));
+            Test->TestTrue(TEXT("Save rows accept real mouse clicks"),Click(Client,Row,TEXT("IC_SaveSlot_Button")));
+            Test->TestEqual(TEXT("Mouse click selects the visible save row"),PC->SelectedSaveSlot,2);
+            PC->SelectSessionSlot(1);
             const int32 Before=PC->SelectedSaveSlot;
             Press(EKeys::D);Press(EKeys::Right);Press(EKeys::A);Press(EKeys::Left);
             Test->TestEqual(TEXT("Horizontal keys never change the selected save"),PC->SelectedSaveSlot,Before);
@@ -143,7 +152,7 @@ public:
             if(++SizeIndex<UE_ARRAY_COUNT(Sizes)){Stage=2;return false;}
             PC->SelectSessionSlot(1);Next(5);return false;
         }
-        if(Stage==5){Press(EKeys::F);Next(6);return false;}
+        if(Stage==5){Test->TestTrue(TEXT("Visible save action is pointer-clickable"),Click(Client,View,TEXT("IC_SaveLoad_Save")));Next(6);return false;}
         if(Stage==6)
         {
             if(Saves->bSaving||!Saves->GetSlotList()[1].bValid)return false;
@@ -169,14 +178,14 @@ public:
         if(Stage==8)
         {
             Test->TestTrue(TEXT("Cancel overwrite preserves save and restores controls"),PC->Menu==TEXT("Save")&&Saves->GetSlotList()[1].bValid&&View->GetIsEnabled());
-            Press(EKeys::F);Next(9);return false;
+            Test->TestTrue(TEXT("Mouse save still works after cancelling overwrite"),Click(Client,View,TEXT("IC_SaveLoad_Save")));Next(9);return false;
         }
         if(Stage==9){if(!Popup)return false;Click(Client,Popup,TEXT("IC_LoadConfirm_Confirm"));Next(10);return false;}
         if(Stage==10)
         {
             if(Saves->bSaving||PC->Menu==TEXT("Confirm"))return false;
             Test->TestTrue(TEXT("Confirmed overwrite leaves valid save"),Saves->GetSlotList()[1].bValid);
-            Press(EKeys::Delete);Next(11);return false;
+            Test->TestTrue(TEXT("Visible delete action is pointer-clickable"),Click(Client,View,TEXT("IC_SaveLoad_Delete")));Next(11);return false;
         }
         if(Stage==11){if(!Popup)return false;Click(Client,Popup,TEXT("IC_LoadConfirm_Cancel"));Next(12);return false;}
         if(Stage==12)
@@ -194,13 +203,13 @@ public:
         {
             auto* Load=Cast<UButton>(View->GetWidgetFromName(TEXT("IC_SaveLoad_Load")));
             Test->TestTrue(TEXT("Load mode shows enabled load action"),Load&&Load->IsVisible()&&Load->GetIsEnabled());
-            Capture(Client,TEXT("Load"));Press(EKeys::F);Next(16);return false;
+            Capture(Client,TEXT("Load"));Test->TestTrue(TEXT("Visible load action is pointer-clickable"),Click(Client,View,TEXT("IC_SaveLoad_Load")));Next(16);return false;
         }
         if(Stage==16){if(!Popup)return false;Capture(Client,TEXT("LoadConfirm"));Click(Client,Popup,TEXT("IC_LoadConfirm_Cancel"));Next(17);return false;}
         if(Stage==17)
         {
             Test->TestTrue(TEXT("Cancel load preserves current session"),PC->Menu==TEXT("Load")&&PC->bCreated);
-            Press(EKeys::Escape);Next(18);return false;
+            Test->TestTrue(TEXT("Visible close action is pointer-clickable"),Click(Client,View,TEXT("IC_SaveLoad_Close")));Next(18);return false;
         }
         if(Stage==20){Press(EKeys::F);Next(21);return false;}
         if(Stage==21){if(!Popup)return false;Click(Client,Popup,TEXT("IC_LoadConfirm_Confirm"));Next(23);return false;}
@@ -232,8 +241,20 @@ private:
     {
         auto* Button=Cast<UButton>(View->GetWidgetFromName(Name));if(!Button||!Button->GetIsEnabled())return false;
         const auto G=Button->GetCachedGeometry();if(G.GetLocalSize().X<1||G.GetLocalSize().Y<1)return false;
-        const FVector2D Position=G.LocalToAbsolute(G.GetLocalSize()*.5f);auto& App=FSlateApplication::Get();App.SetCursorPos(Position);
-        FPointerEvent Move(0,Position,Position,TSet<FKey>{},EKeys::Invalid,0,FModifierKeysState());App.ProcessMouseMoveEvent(Move);
+        auto VisibleRect=G.GetLayoutBoundingRect();
+        if(FString(Name)==TEXT("IC_SaveSlot_Button"))
+            if(auto* Screen=Mounted<UICSaveLoadWidget>(Client->GetWorld()))
+                if(auto* Scroll=Screen->GetWidgetFromName(TEXT("IC_SaveLoad_Scroll")))VisibleRect=VisibleRect.IntersectionWith(Scroll->GetCachedGeometry().GetLayoutBoundingRect());
+        if(VisibleRect.Right<=VisibleRect.Left||VisibleRect.Bottom<=VisibleRect.Top)return false;
+        const FVector2D Position((VisibleRect.Left+VisibleRect.Right)*.5,(VisibleRect.Top+VisibleRect.Bottom)*.5);auto& App=FSlateApplication::Get();const FVector2D Before=App.GetCursorPos();App.SetCursorPos(Position);
+        FPointerEvent Move(0,Position,Before,TSet<FKey>{},EKeys::Invalid,0,FModifierKeysState());App.ProcessMouseMoveEvent(Move);
+        if(FString(Name)==TEXT("IC_SaveSlot_Button"))
+        {
+            const auto Hit=App.LocateWindowUnderMouse(Position,App.GetInteractiveTopLevelWindows(),false);
+            Test->TestTrue(FString::Printf(TEXT("Visible row click reaches its actual button at size %d"),SizeIndex),Hit.ContainsWidget(Button->GetCachedWidget().Get()));
+            FString Types;for(int32 Index=0;Index<Hit.Widgets.Num();++Index)Types+=Hit.Widgets[Index].Widget->GetTypeAsString()+TEXT(" > ");
+            Test->AddInfo(FString::Printf(TEXT("Row click size=%d position=%s bounds=%s path=%s"),SizeIndex,*Position.ToString(),*G.GetLayoutBoundingRect().ToString(),*Types));
+        }
         FPointerEvent Down(0,Position,Position,TSet<FKey>{EKeys::LeftMouseButton},EKeys::LeftMouseButton,0,FModifierKeysState());App.ProcessMouseButtonDownEvent(Client->GetWindow()->GetNativeWindow(),Down);
         FPointerEvent Up(0,Position,Position,TSet<FKey>{},EKeys::LeftMouseButton,0,FModifierKeysState());App.ProcessMouseButtonUpEvent(Up);return true;
     }

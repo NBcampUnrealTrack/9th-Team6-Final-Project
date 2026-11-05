@@ -5,7 +5,9 @@
 #include "Components/EditableTextBox.h"
 #include "Components/TextBlock.h"
 #include "Blueprint/WidgetTree.h"
+#include "CommonInputSubsystem.h"
 #include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
 #include "UI/CharacterCreate/ICNameKeyButton.h"
 #include "UI/Framework/ICPrologueWidget.h"
 #include "Settings/ICGameUserSettings.h"
@@ -32,6 +34,9 @@ void UICCharacterCreateWidget::NativeOnInitialized()
     for(int32 I=0;I<40;++I)
         if(auto* Key=Cast<UICNameKeyButton>(GetWidgetFromName(FName(*FString::Printf(TEXT("NameKey%d"),I)))))
         {Key->KeyIndex=I;Key->BindKey();Key->OnKeyChosen.AddUniqueDynamic(this,&ThisClass::ChooseKey);NameKeys.Add(Key);}
+    if (const auto* Player = GetOwningLocalPlayer())
+        if (auto* Input = Player->GetSubsystem<UCommonInputSubsystem>())
+            Input->OnInputMethodChangedNative.AddWeakLambda(this, [this](ECommonInputType) { RefreshNameKeyboardVisibility(); });
     RefreshKeyboard();
     RefreshState();
 }
@@ -39,6 +44,9 @@ UWidget* UICCharacterCreateWidget::NativeGetDesiredFocusTarget() const
 {
     if (Step == 0)
     {
+        const auto* Keyboard = GetWidgetFromName(TEXT("NameKeyboard"));
+        if (!Keyboard || !Keyboard->IsVisible())
+            return NameInput.Get();
         // CommonUI asks again when switching between a pad and keyboard. Retain the selected key.
         for(const auto& Key:NameKeys)if(Key&&(Key->HasKeyboardFocus()||Key->HasUserFocus(GetOwningPlayer())))return Key.Get();
         if(auto* Done=GetWidgetFromName(TEXT("BTN_Next"));Done&&(Done->HasKeyboardFocus()||Done->HasUserFocus(GetOwningPlayer())))return Done;
@@ -65,6 +73,22 @@ void UICCharacterCreateWidget::NativeTick(const FGeometry& Geometry,float DeltaS
     for(int32 I=0;I<NameKeys.Num();++I)if(NameKeys[I]->HasKeyboardFocus()||NameKeys[I]->HasUserFocus(GetOwningPlayer()))KeyboardIndex=I;
     if(auto* Done=GetWidgetFromName(TEXT("BTN_Next"));Done&&(Done->HasKeyboardFocus()||Done->HasUserFocus(GetOwningPlayer())))KeyboardIndex=40;
 }
+void UICCharacterCreateWidget::RefreshNameKeyboardVisibility()
+{
+    auto* Keyboard = GetWidgetFromName(TEXT("NameKeyboard"));
+    if (!Keyboard)
+        return;
+
+    const auto* Player = GetOwningLocalPlayer();
+    const auto* Input = Player ? Player->GetSubsystem<UCommonInputSubsystem>() : nullptr;
+    const bool bShowKeyboard = Step == 0 && Input && Input->GetCurrentInputType() == ECommonInputType::Gamepad;
+    const bool bVisibilityChanged = Keyboard->IsVisible() != bShowKeyboard;
+    Keyboard->SetVisibility(bShowKeyboard ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    if (auto* Help = GetWidgetFromName(TEXT("TXT_CreationHelp")))
+        Help->SetVisibility(Step != 0 || bShowKeyboard ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+    if (Step == 0 && IsActivated() && bVisibilityChanged)
+        RequestRefreshFocus();
+}
 void UICCharacterCreateWidget::RefreshState()
 {
     auto* Flow = GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
@@ -77,7 +101,6 @@ void UICCharacterCreateWidget::RefreshState()
         if (auto* Widget = GetWidgetFromName(Name))
             Widget->SetVisibility(ESlateVisibility::Collapsed);
     SetText(TEXT("TXT_Question"), ICFrontendLayout::Text(*FString::Printf(TEXT("Question%d"), Step + 1)));
-    if(auto* Keyboard=GetWidgetFromName(TEXT("NameKeyboard")))Keyboard->SetVisibility(Step==0?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     if (NameInput)
     {
         NameInput->SetVisibility(Step == 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -107,6 +130,7 @@ void UICCharacterCreateWidget::RefreshState()
     SetText(TEXT("TXT_Error"), FText::FromString(Flow->LastError));
     if (auto* Error = GetWidgetFromName(TEXT("TXT_Error")))
         Error->SetVisibility(Flow->LastError.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+    RefreshNameKeyboardVisibility();
 }
 void UICCharacterCreateWidget::NameChanged(const FText& Value)
 {
@@ -237,11 +261,14 @@ FReply UICCharacterCreateWidget::NativeOnPreviewKeyDown(const FGeometry& Geometr
 {
     if(bStartingNewGame)return FReply::Handled();
     if(Step!=0)return Super::NativeOnPreviewKeyDown(Geometry,Event);
-    if(NameInput&&(NameInput->HasKeyboardFocus()||NameInput->HasFocusedDescendants())&&!Event.GetKey().IsGamepadKey())
+    if (!Event.GetKey().IsGamepadKey())
     {
         if(Event.GetKey()==EKeys::Enter){if(!Event.IsRepeat())Next();return FReply::Handled();}
         return Super::NativeOnPreviewKeyDown(Geometry,Event);
     }
+    const auto* Keyboard = GetWidgetFromName(TEXT("NameKeyboard"));
+    if (!Keyboard || !Keyboard->IsVisible())
+        return Super::NativeOnPreviewKeyDown(Geometry, Event);
     for(int32 I=0;I<NameKeys.Num();++I)if(NameKeys[I]->HasKeyboardFocus()||NameKeys[I]->HasUserFocus(GetOwningPlayer()))KeyboardIndex=I;
     if(auto* Done=GetWidgetFromName(TEXT("BTN_Next"));Done&&(Done->HasKeyboardFocus()||Done->HasUserFocus(GetOwningPlayer())))KeyboardIndex=40;
     const FKey Key=UICGameUserSettings::MenuKey(Event.GetKey());

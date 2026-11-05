@@ -316,8 +316,14 @@ void UICCodexMenuWidget::NotifyNavigation(){OnNavigationChanged.Broadcast();}
 void UICCodexMenuWidget::Category0(){SelectCategory(0);}void UICCodexMenuWidget::Category1(){SelectCategory(1);}void UICCodexMenuWidget::Category2(){SelectCategory(2);}void UICCodexMenuWidget::Category3(){SelectCategory(3);}
 void UICCodexMenuWidget::Category4(){SelectCategory(4);}
 void UICCodexMenuWidget::Tab0(){SelectSubTab(0);}void UICCodexMenuWidget::Tab1(){SelectSubTab(1);}void UICCodexMenuWidget::Tab2(){SelectSubTab(2);}void UICCodexMenuWidget::Tab3(){SelectSubTab(3);}void UICCodexMenuWidget::Tab4(){SelectSubTab(4);}
-FText UICCodexMenuWidget::NavigationHint() const
+FText UICCodexMenuWidget::NavigationHint(bool Gamepad) const
 {
+    if(Gamepad)
+    {
+        if(IsModalOpen())return NSLOCTEXT("ICCodex","PadModalHint","방향키 / LS 선택   ·   ↑ / ↓ 설명 스크롤   ·   {Accept} 확인   ·   {Back} 뒤로");
+        return NavigationArea==0?NSLOCTEXT("ICCodex","PadCategoriesHint","↑ / ↓ 분류 선택   ·   {Accept} / ← 열기   ·   LB / RB 탭 이동   ·   {Back} 닫기")
+            :NSLOCTEXT("ICCodex","PadCellsHint","방향키 / LS 이동   ·   {Accept} 상세 보기   ·   LB / RB 탭 이동   ·   {Back} 닫기");
+    }
     if(IsModalOpen())return Txt(Popup==2&&!bNoticeOpen?TEXT("W A S D  캐릭터 선택     G/F  선택     ESC  뒤로가기"):TEXT("A / D  버튼 선택     W / S  설명 스크롤     G/F  선택     ESC  뒤로가기"));
     return Txt(NavigationArea==0?TEXT("W / S  분류 선택     A / Enter  열기     D  상단 탭     ESC  닫기"):TEXT("W A S D  이동     G / F  상세 보기     A / W  상단 탭     ESC  닫기"));
 }

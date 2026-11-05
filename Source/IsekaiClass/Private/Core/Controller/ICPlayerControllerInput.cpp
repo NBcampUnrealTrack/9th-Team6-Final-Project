@@ -1,6 +1,7 @@
 #include "Core/Controller/ICPlayerController.h"
 #include "Life/Production/ICPlayerLifeComponent.h"
 #include "UI/Framework/ICText.h"
+#include "UI/Framework/ICInputPresentation.h"
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Combat/GAS/ICGameplayTags.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
@@ -184,7 +185,7 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
     }
     if (Choices.Num() > 1)
         Hint += NSLOCTEXT("ICInteraction","WheelChoice","\n휠 ↑↓ 선택").ToString();
-    if (IsUsingGamepad()) Hint.ReplaceInline(TEXT("[F]"), TEXT("[X]"));
+    Hint.ReplaceInline(TEXT("[F]"),*FString::Printf(TEXT("[%s]"),*ICInputPresentation::CommandLabel(this,EICInputCommand::Interact).ToString()));
     if (Hint!=InteractionHint) { InteractionHint=Hint; bDirty=true; }
     auto* C=Cast<AICPlayerCharacter>(GetPawn());
     auto* ASC=C?C->GetICAbilitySystem():nullptr;
@@ -506,8 +507,8 @@ void AICPlayerController::OpenNPCDialogue(AICNPCBase* NPC)
     DialogueScreen = Dialogue;
     bInDialogue = true;
     SetMenu(TEXT("Dialogue"));
-    Dialogue->OpenForNPC(NPC);
     BeginNPCDialogueCamera(NPC);
+    Dialogue->OpenForNPC(NPC);
 }
 
 void AICPlayerController::HandleNPCInteractionStarted(AICNPCBase* NPC, AICPlayerController* Requester, FName)

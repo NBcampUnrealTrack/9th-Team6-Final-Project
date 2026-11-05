@@ -150,16 +150,51 @@ void UICNPCDialogueWidget::ShowInitialDialogue()
 
 void UICNPCDialogueWidget::StopSpeaking()
 {
-    if (IsValid(NPC) && NPC->FacialAnimation) NPC->FacialAnimation->StopDialogue();
+    if (IsValid(NPC) && NPC->FacialAnimation)
+    {
+        NPC->FacialAnimation->StopDialogue();
+        NPC->FacialAnimation->ClearDialogueExpression();
+    }
+    if (auto* Face = DialoguePlayerFace.Get())
+    {
+        Face->StopDialogue();
+        Face->ClearDialogueExpression();
+    }
+    DialoguePlayerFace.Reset();
+    if (auto* Controller = Cast<AICPlayerController>(GetOwningPlayer()))
+        Controller->FocusDialogueCameraOnPlayer(false);
 }
 
-void UICNPCDialogueWidget::SetSpokenLine(const FText& Line, FName SpeakerID)
+void UICNPCDialogueWidget::SetSpokenLine(const FText& Line, FName SpeakerID, EICDialogueExpression Expression, float Strength)
 {
-    StopSpeaking();
     DialogueText->SetText(Line);
-    // An unset speaker denotes the player/narration in existing quest conversations.
+    const bool bPlayerLine = SpeakerID == UICWorldStateSubsystem::PlayerId();
     if (IsValid(NPC) && NPC->FacialAnimation)
+    {
         NPC->FacialAnimation->PlayDialogueLine(Line, SpeakerID);
+        const bool bNPCLine = SpeakerID == NPC->GetNPCDefinition().ID;
+        NPC->FacialAnimation->SetDialogueExpression(bNPCLine ? Expression : EICDialogueExpression::Neutral, Strength);
+    }
+    if (bPlayerLine)
+    {
+        if (auto* Player = Cast<AICCharacterBase>(GetOwningPlayerPawn()))
+        {
+            if (auto* Previous = DialoguePlayerFace.Get(); Previous && Previous != Player->FacialAnimation.Get())
+            {
+                Previous->StopDialogue();
+                Previous->ClearDialogueExpression();
+            }
+            DialoguePlayerFace = Player->FacialAnimation.Get();
+        }
+    }
+    if (auto* Face = DialoguePlayerFace.Get())
+    {
+        if (bPlayerLine) Face->PlayDialogueLine(Line, SpeakerID);
+        else Face->StopDialogue();
+        Face->SetDialogueExpression(bPlayerLine ? Expression : EICDialogueExpression::Neutral, Strength);
+    }
+    if (auto* Controller = Cast<AICPlayerController>(GetOwningPlayer()))
+        Controller->FocusDialogueCameraOnPlayer(bPlayerLine);
 }
 
 void UICNPCDialogueWidget::NativeDestruct()
@@ -439,7 +474,7 @@ bool UICNPCDialogueWidget::TryShowNode(FName DialogueID, FName NodeID)
         DialogueEventID = FGuid::NewGuid();
     }
     SelectedNodeID = CurrentNodeID;
-    SetSpokenLine(Line.Text, Node->SpeakerNPCID);
+    SetSpokenLine(Line.Text, Node->SpeakerNPCID, Node->Expression, Node->ExpressionStrength);
     ClearEntries();
     for (const FICDialogueChoice& Choice : Node->Choices)
     {
@@ -585,7 +620,7 @@ FReply UICNPCDialogueWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry, c
     {MoveSelection(-1);return FReply::Handled();}
     if(Key==EKeys::S||Key==EKeys::Down||Key==EKeys::Gamepad_DPad_Down)
     {MoveSelection(1);return FReply::Handled();}
-    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::Virtual_Accept||UICGameUserSettings::IsGamepadAcceptKey(Key))
+    if((Key==EKeys::G||Key==EKeys::F||Key==EKeys::Enter)||Key==EKeys::Virtual_Gamepad_Accept.GetVirtualKey()||UICGameUserSettings::IsGamepadAcceptKey(Key))
     {
         if(!KeyEvent.IsRepeat())
         {

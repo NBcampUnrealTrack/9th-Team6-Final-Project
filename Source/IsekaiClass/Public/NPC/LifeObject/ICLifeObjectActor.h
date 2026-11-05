@@ -133,6 +133,9 @@ public:
     UFUNCTION(BlueprintPure, Category="IC|LifeObject") TArray<FName> GetUserIDs() const;
     UFUNCTION(BlueprintPure, Category="IC|LifeObject") bool IsPlayerLocked() const { return bPlayerLocked; }
 
+    /** Called exactly once when an NPC has arrived and begun using this object. */
+    virtual void OnNPCUseStarted(AICNPCBase* NPC);
+
     bool GetSlotHandle(int32 SlotIndex, FSmartObjectSlotHandle& OutSlot) const;
     bool GetSlotTransform(int32 SlotIndex, FTransform& OutTransform) const;
     const FICLifeSlotPresentation* FindActorPresentation(int32 SlotIndex) const;

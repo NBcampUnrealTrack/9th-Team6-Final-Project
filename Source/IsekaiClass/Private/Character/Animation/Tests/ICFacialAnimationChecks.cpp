@@ -16,6 +16,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "NPC/Character/ICNPCBase.h"
 #include "Player/Character/ICPlayerCharacter.h"
+#include "Quest/ICQuestSubsystem.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "UI/Dialogue/ICDialogueEntryWidget.h"
 #include "UI/Dialogue/ICNPCDialogueWidget.h"
@@ -173,7 +174,107 @@ bool FICNPCDialogueFaceCheck::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICAllCharacterFaceCheck, "IC.Characters.Face.AllCharactersAndPlayerOnlyBlink",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICFirstDialogueExpressionCheck, "IC.Characters.Face.FirstQuestExpressions",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FICFirstDialogueExpressionCheck::RunTest(const FString&)
+{
+    FFaceSession Session;
+    const FName FriendID(TEXT("NPC_R01_009"));
+    const FName FirstDialogue(TEXT("DLG_SCN_R01_001_READY"));
+    auto* Quests = Session.GI->GetSubsystem<UICQuestSubsystem>();
+    Quests->RefreshAvailableQuests();
+    if (!TestEqual(TEXT("The first quest selects the authored reunion"), Quests->GetNPCObjectiveDialogue(FriendID), FirstDialogue))
+        return false;
+
+    auto* Friend = Session.SpawnNPC(9);
+    Session.Player = Session.World->SpawnActor<AICPlayerCharacter>();
+    Session.Player->EnableCombat(true, true);
+    Session.Player->InitializeState(UICWorldStateSubsystem::PlayerId());
+    Session.Player->ApplyPreset(1);
+    FAssetCompilingManager::Get().FinishAllCompilation();
+
+    auto& Context = *GEngine->GetWorldContextFromWorld(Session.World);
+    auto* Viewport = NewObject<UGameViewportClient>(GEngine);
+    Context.GameViewport = Viewport;
+    Viewport->Init(Context, Session.GI, false);
+    auto* PC = Session.World->SpawnActor<AICPlayerController>();
+    FString Error;
+    PC->SetPlayer(Session.GI->CreateLocalPlayer(0, Error, false));
+    PC->Possess(Session.Player);
+    auto* Class = LoadClass<UICNPCDialogueWidget>(nullptr, TEXT("/Game/IsekaiClass/UI/Widget/WBP_IC_NPCDialogue.WBP_IC_NPCDialogue_C"));
+    auto* Dialogue = Class ? CreateWidget<UICNPCDialogueWidget>(PC, Class) : nullptr;
+    if (!TestNotNull(TEXT("The normal dialogue screen loads"), Dialogue)) return false;
+    auto* FriendFace = Friend->FacialAnimation.Get();
+    auto* PlayerFace = Session.Player->FacialAnimation.Get();
+    if (!TestTrue(TEXT("Both speakers have facial animation"), FriendFace && PlayerFace)) return false;
+
+    TSharedPtr<SWidget> Host = Dialogue->TakeWidget();
+    auto* Entries = Cast<UVerticalBox>(Dialogue->GetWidgetFromName(TEXT("Entries")));
+    auto Advance = [&]()
+    {
+        auto* Next = Entries ? Cast<UICDialogueEntryWidget>(Entries->GetChildAt(0)) : nullptr;
+        if (!TestTrue(TEXT("The current line offers a next button"), Next && Next->CanSelectEntry())) return false;
+        Next->ActivateEntry();
+        return true;
+    };
+    auto TickFaces = [&](int32 Frames)
+    {
+        for (int32 Frame = 0; Frame < Frames; ++Frame)
+        {
+            FriendFace->TickComponent(1.f / 60.f, LEVELTICK_All, nullptr);
+            PlayerFace->TickComponent(1.f / 60.f, LEVELTICK_All, nullptr);
+        }
+    };
+    auto Weight = [](AICCharacterBase* Speaker, const TCHAR* Suffix)
+    {
+        float Maximum = 0.f;
+        for (const TCHAR* Part : {TEXT("BRW"), TEXT("EYE"), TEXT("MTH")})
+        {
+            const FName Name(*FString::Printf(TEXT("Fcl_%s_%s"), Part, Suffix));
+            Maximum = FMath::Max(Maximum, Speaker->GetMesh()->GetMorphTarget(Name));
+        }
+        return Maximum;
+    };
+    auto PlayerMouth = [&]()
+    {
+        float Maximum = 0.f;
+        for (const FName Name : MouthNames)
+            Maximum = FMath::Max(Maximum, Session.Player->GetMesh()->GetMorphTarget(Name));
+        return Maximum;
+    };
+
+    Dialogue->OpenForNPC(Friend);
+    TickFaces(24);
+    TestTrue(TEXT("Friend's reunion joy blends with the existing speech"), Weight(Friend, TEXT("Joy")) > .4f && FriendFace->IsSpeaking());
+    if (!Advance()) return false;
+    TickFaces(24);
+    TestTrue(TEXT("The player's worried expression belongs to the explicit player line"), Weight(Session.Player, TEXT("Sorrow")) > .12f);
+    TestTrue(TEXT("The player's expression blends with their spoken line"), PlayerFace->IsSpeaking() && PlayerMouth() > .1f);
+    TestTrue(TEXT("The listener returns toward neutral"), Weight(Friend, TEXT("Joy")) < .02f);
+    TestFalse(TEXT("The player's line does not animate NPC speech"), FriendFace->IsSpeaking());
+    if (!Advance()) return false;
+    TestEqual(TEXT("Changing speaker clears the player's mouth immediately"), PlayerMouth(), 0.f);
+    TickFaces(24);
+    TestTrue(TEXT("Friend's reply uses its own smile"), Weight(Friend, TEXT("Fun")) > .15f);
+    TestTrue(TEXT("The player returns toward neutral"), Weight(Session.Player, TEXT("Sorrow")) < .02f);
+    if (!Advance()) return false;
+    TickFaces(36);
+    TestEqual(TEXT("The fourth line has no authored expression"), Weight(Friend, TEXT("Fun")), 0.f);
+    TestFalse(TEXT("A line with no speaker ID leaves the player silent"), PlayerFace->IsSpeaking());
+
+    Dialogue->OpenForNPC(Friend);
+    TickFaces(24);
+    if (!Advance()) return false;
+    TickFaces(24);
+    Host.Reset();
+    Dialogue->ReleaseSlateResources(true);
+    TestEqual(TEXT("Closing clears the player's expression immediately"), Weight(Session.Player, TEXT("Sorrow")), 0.f);
+    TestEqual(TEXT("Closing clears the player's spoken mouth immediately"), PlayerMouth(), 0.f);
+    TestEqual(TEXT("Closing clears the NPC's expression immediately"), Weight(Friend, TEXT("Joy")), 0.f);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICAllCharacterFaceCheck, "IC.Characters.Face.AllCharactersBlinkAndSpeak",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FICAllCharacterFaceCheck::RunTest(const FString&)
 {
@@ -225,14 +326,22 @@ bool FICAllCharacterFaceCheck::RunTest(const FString&)
         Session.Player->ApplyPreset(Preset); FAssetCompilingManager::Get().FinishAllCompilation();
         auto* PlayerFace = Session.Player->FacialAnimation.Get(); auto* PlayerMesh = Session.Player->GetMesh();
         if(!TestTrue(TEXT("Both player presets receive blinking"), PlayerFace && PlayerFace->IsFaceReady()))continue;
-        TestFalse(TEXT("Player mouth animation is disabled"), PlayerFace->CanAnimateSpeech());
+        TestTrue(TEXT("Both player presets support spoken mouth shapes"), PlayerFace->CanAnimateSpeech());
         PlayerMesh->SetMorphTarget(MouthNames[0], .23f);
-        PlayerFace->PlayDialogueLine(FText::FromString(TEXT("플레이어 대사")), Session.Player->GetCharacterID());
+        PlayerFace->PlayDialogueLine(FText::FromString(TEXT("플레이어 대사")), NAME_None);
+        TestFalse(TEXT("An unspecified speaker does not start player speech"), PlayerFace->IsSpeaking());
         PlayerFace->ResetFace(); Session.Player->GetCharacterMovement()->Velocity = FVector(180,0,0);
         TestTrue(TEXT("Player blinks while moving after preset changes"), BlinkMaximum(PlayerFace, PlayerMesh) > .7f);
-        TestFalse(TEXT("Player dialogue never starts mouth animation"), PlayerFace->IsSpeaking());
         TestEqual(TEXT("Blinking never modifies player mouth overrides"), PlayerMesh->GetMorphTarget(MouthNames[0]), .23f);
         PlayerMesh->SetMorphTarget(MouthNames[0], 0.f);
+        PlayerFace->PlayDialogueLine(FText::FromString(TEXT("아아아")), Session.Player->GetCharacterID());
+        PlayerFace->TickComponent(.07f, LEVELTICK_All, nullptr);
+        PlayerMesh->TickAnimation(1.f / 60.f, false);
+        PlayerMesh->RefreshBoneTransforms();
+        PlayerMesh->HandleExistingParallelEvaluationTask(true, true);
+        TestTrue(TEXT("The player's spoken shape survives mesh evaluation"), RenderedWeight(PlayerMesh, MouthNames[0]) > .1f);
+        PlayerFace->StopDialogue();
+        TestEqual(TEXT("Finishing the player line restores the rendered mouth"), RenderedWeight(PlayerMesh, MouthNames[0]), 0.f);
     }
     return true;
 }

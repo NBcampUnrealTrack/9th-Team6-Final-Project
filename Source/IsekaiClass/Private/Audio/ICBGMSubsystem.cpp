@@ -44,7 +44,16 @@ void UICBGMSubsystem::Tick(float DeltaSeconds)
     if(FPlatformTime::Seconds()<SilentUntil)return;
     RefreshIn-=DeltaSeconds;if(RefreshIn>0)return;RefreshIn=.2f;
     const auto* Flow=GetWorld()->GetGameInstance()?GetWorld()->GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>():nullptr;
-    if(Flow&&(Flow->Phase==EICGameFlowPhase::Prologue||Flow->bPendingNewGame)){ChangeMusic(PrologueRow);return;}
+    if (Flow && Flow->Phase == EICGameFlowPhase::Prologue)
+    {
+        ChangeMusic(PrologueRow);
+        return;
+    }
+    if (Flow && Flow->bPendingNewGame)
+    {
+        ChangeMusic(NAME_None);
+        return;
+    }
     if(PC&&(PC->Menu==TEXT("Create")||(Flow&&Flow->Phase==EICGameFlowPhase::Questions))){ChangeMusic(TEXT("BGM_CharacterCreate"));return;}
     if(PC&&PC->IsMainMenuLevel()){ChangeMusic(TEXT("BGM_MainMenu"));return;}
     if(!PC||!PC->bCreated||!PC->GetPawn()){ChangeMusic(NAME_None);return;}
@@ -54,6 +63,11 @@ void UICBGMSubsystem::StopMusic()
 {
     if(Current){Current->OnAudioFinished.RemoveDynamic(this,&ThisClass::MusicFinished);Current->Stop();Current->DestroyComponent();}
     Current=nullptr;CurrentSource=nullptr;CurrentRow=NAME_None;RefreshIn=0;
+}
+void UICBGMSubsystem::EndPrologueMusic()
+{
+    PrologueRow = NAME_None;
+    StopMusic();
 }
 void UICBGMSubsystem::ResetForRestore()
 {

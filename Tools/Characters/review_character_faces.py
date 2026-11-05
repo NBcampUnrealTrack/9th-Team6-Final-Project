@@ -1,4 +1,4 @@
-"""Render blinking on both player presets and all eleven NPCs, plus NPC speech.
+"""Render blinking and explicit speech on both player presets and all eleven NPCs.
 
 Run a dedicated editor with -ICCharacterFaceReview -ExecutePythonScript=<this file>.
 Uses an isolated L_TestMap PIE/save namespace and never saves content packages.
@@ -56,13 +56,10 @@ def advance():
         target.apply_preset(preset)
     face = target.get_editor_property('facial_animation')
     assert face and face.is_face_ready(), identifier + ' must support blinking'
-    assert face.can_animate_speech() == (preset is None), identifier + ' speech policy'
-    if preset is not None:
-        face.play_dialogue_line(u.Text('아아아'), target.get_character_id())
-        assert not face.is_speaking(), 'Players must never animate their mouths'
+    assert face.can_animate_speech(), identifier + ' speech support'
     S['subjects'][identifier] = {'speech_enabled': face.can_animate_speech(), 'captures': {}}
     S.update(id=identifier, target=target, face=face, mesh=target.get_editor_property('mesh'),
-             player_case=preset is not None, stage='idle', ready=time.monotonic(), camera_frames=0)
+             stage='idle', ready=time.monotonic(), camera_frames=0)
     report()
 
 
@@ -128,22 +125,18 @@ def tick(delta):
                 capture('neutral')
             if 'blink' not in captures and blink > .8:
                 capture('blink')
-            if S['player_case']:
-                assert all(S['mesh'].get_morph_target(name) == 0 for name in MOUTHS), 'Blinking changed the player mouth'
+            assert all(S['mesh'].get_morph_target(name) == 0 for name in MOUTHS), 'Blinking changed the mouth'
             if 'neutral' in captures and 'blink' in captures:
-                if S['player_case']:
-                    advance()
-                else:
-                    S['face'].play_dialogue_line(u.Text('아' * 16 + '.'), S['id'])
-                    S.update(stage='speaking', speech_started=now)
-                    report()
+                S['face'].play_dialogue_line(u.Text('아' * 16 + '.'), S['target'].get_character_id())
+                S.update(stage='speaking', speech_started=now)
+                report()
             return
         if S['stage'] == 'speaking':
             if 'speech' not in captures and S['mesh'].get_morph_target('Fcl_MTH_A') > .4:
                 capture('speech')
             if not S['face'].is_speaking() and now - S['speech_started'] > 3:
-                assert 'speech' in captures, 'NPC mouth must visibly move'
-                assert all(S['mesh'].get_morph_target(name) == 0 for name in MOUTHS), 'NPC mouth did not close'
+                assert 'speech' in captures, 'Mouth must visibly move during speech'
+                assert all(S['mesh'].get_morph_target(name) == 0 for name in MOUTHS), 'Mouth did not close'
                 S['subjects'][S['id']]['finished_mouth_closed'] = True
                 advance()
     except Exception:

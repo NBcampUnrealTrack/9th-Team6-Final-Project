@@ -153,9 +153,9 @@ static UVerticalBox* SavePanel(UWidgetTree* Tree,float Width,float Height,bool M
     auto* Card=Tree->ConstructWidget<UBorder>();Card->SetBrushColor(FLinearColor(.035f,.048f,.075f));Card->SetPadding(FMargin(32));Size->SetContent(Card);
     auto* Box=Tree->ConstructWidget<UVerticalBox>();Card->SetContent(Box);return Box;
 }
-static void SaveActions(UWidgetTree* Tree,UVerticalBox* Box,const TArray<TPair<FName,const TCHAR*>>& Actions)
+static void SaveActions(UWidgetTree* Tree,UVerticalBox* Box,const TArray<TPair<FName,const TCHAR*>>& Actions,FName Name=NAME_None)
 {
-    auto* Bar=Tree->ConstructWidget<UHorizontalBox>();
+    auto* Bar=Tree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),Name);
     for(const auto& Action:Actions)
     {
         auto* Slot=Bar->AddChildToHorizontalBox(Button(Tree,Action.Key,Action.Value));
@@ -199,11 +199,8 @@ static void BuildSave(UWidgetTree* Tree,FName Kind)
     auto* Notice=Label(Tree,TEXT("IC_SaveLoad_Notice"),FText::GetEmpty(),16);Notice->SetWrapTextAt(1450);Row(Box,Notice,12);
     auto* Help=Label(Tree,TEXT("SaveHelp"),NSLOCTEXT("ICSaveUI","VerticalControls","W/S · ↑/↓  선택     F/G  확인     Delete  삭제     ESC  뒤로"),16);
     Help->SetColorAndOpacity(FLinearColor(.48f,.76f,.84f));Row(Box,Help,0);
-    // Keep existing Blueprint bindings and commands; the list itself is the only navigation surface.
-    auto* Compatibility=Tree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),TEXT("SaveCompatibilityActions"));
-    Compatibility->SetVisibility(ESlateVisibility::Collapsed);Row(Box,Compatibility,0);
-    for(const auto* Key:{TEXT("Save"),TEXT("Load"),TEXT("Delete"),TEXT("Close")})
-        Compatibility->AddChildToVerticalBox(Button(Tree,FName(*FString::Printf(TEXT("IC_SaveLoad_%s"),Key)),Key));
+    SaveActions(Tree,Box,{{TEXT("IC_SaveLoad_Save"),TEXT("Save")},{TEXT("IC_SaveLoad_Load"),TEXT("Load")},
+        {TEXT("IC_SaveLoad_Delete"),TEXT("Delete")},{TEXT("IC_SaveLoad_Close"),TEXT("Close")}},TEXT("SaveActionBar"));
 
 }
 void Build(UWidgetTree* Tree, FName Kind)

@@ -75,6 +75,11 @@ void AICLifeObjectActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
     Super::EndPlay(EndPlayReason);
 }
 
+void AICLifeObjectActor::OnNPCUseStarted(AICNPCBase* NPC)
+{
+    // Base life objects are presentation-only. Specialized children opt into gameplay effects.
+}
+
 bool AICLifeObjectActor::TryInteract_Implementation(AICPlayerController* Controller)
 {
     if (ObjectType != EICLifeObjectType::Bed || !bPlayerCanSleep)
