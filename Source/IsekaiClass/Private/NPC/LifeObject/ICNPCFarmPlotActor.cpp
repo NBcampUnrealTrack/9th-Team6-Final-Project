@@ -159,7 +159,6 @@ bool AICNPCFarmPlotActor::HarvestToNPC(AICNPCBase& NPC)
     }
     FICWorldState Next = State->ExportState();
     const bool bRewardRolled = FMath::FRand() < FMath::Clamp(HarvestRewardChance, 0.f, 1.f);
-    bool bReceivedHarvest = false;
     if (bRewardRolled && !Harvests.IsEmpty())
     {
         UICDefinitionSubsystem* Definitions = GI ? GI->GetSubsystem<UICDefinitionSubsystem>() : nullptr;
@@ -168,12 +167,10 @@ bool AICNPCFarmPlotActor::HarvestToNPC(AICNPCBase& NPC)
         {
             UICInventoryComponent* Inventory = NewObject<UICInventoryComponent>();
             Inventory->BeginStaging(Definitions, Next.Job);
-            bReceivedHarvest = true;
             for (const FICNPCWorkReward& Yield : Harvests)
             {
                 if (!Inventory->AddItemToStorage(Next.Inventory, NPCStorageID, Yield.ItemID, Yield.Count))
                 {
-                    bReceivedHarvest = false;
                     Next.Inventory = State->ExportState().Inventory;
                     break;
                 }
@@ -191,8 +188,6 @@ bool AICNPCFarmPlotActor::HarvestToNPC(AICNPCBase& NPC)
     const bool bCommitted = State->CommitGameplayTransaction(Next, FGuid::NewGuid());
     if (bCommitted)
     {
-        if (bReceivedHarvest)
-            for (const FICNPCWorkReward& Yield : Harvests) ShowRewardDebugMessage(NPC, Yield.ItemID, Yield.Count);
         RefreshFarmPresentation();
     }
     return bCommitted;
