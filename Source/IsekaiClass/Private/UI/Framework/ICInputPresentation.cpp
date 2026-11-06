@@ -25,10 +25,11 @@ TMap<TWeakObjectPtr<ULocalPlayer>, uint32> HintSignatures;
 
 FKey ICKeyboardCommandKey(const AICPlayerController* Controller, EICInputCommand Command, int32 Slot)
 {
-    if (Controller && Controller->DefaultMappingContext)
+    const auto* Context = Controller ? Controller->GetKeyboardInputMapping() : nullptr;
+    if (Context)
         for (const auto& Binding : Controller->CommandActions)
             if (Binding.Command == Command && Binding.Slot == Slot)
-                for (const auto& Mapping : Controller->DefaultMappingContext->GetMappings())
+                for (const auto& Mapping : Context->GetMappings())
                     if (Mapping.Action == Binding.Action && !Mapping.Key.IsGamepadKey()) return Mapping.Key;
     return EKeys::Invalid;
 }

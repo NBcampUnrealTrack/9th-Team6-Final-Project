@@ -17,6 +17,56 @@
 #include "InputAction.h"
 #include "Misc/Paths.h"
 #include "UObject/UObjectIterator.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/GameViewportClient.h"
+#include "UI/Framework/ICInputPresentation.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICRemappedHintCheck,"IC.Settings.RemappedCommandHints",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICRemappedHintCheck::RunTest(const FString&)
+{
+    auto* Settings = UICGameUserSettings::Get();
+    TGuardValue<int32> DeviceGuard(Settings->InputDeviceMode, 1);
+    TGuardValue<TMap<FString, FString>> BindingGuard(Settings->KeyOverrides, {});
+    auto* GI = NewObject<UGameInstance>(GEngine);
+    GI->InitializeStandalone();
+    auto* World = GI->GetWorld();
+    auto& WorldContext = *GEngine->GetWorldContextFromWorld(World);
+    auto* Viewport = NewObject<UGameViewportClient>(GEngine);
+    WorldContext.GameViewport = Viewport;
+    Viewport->Init(WorldContext, GI, false);
+    World->InitializeActorsForPlay(FURL(), false);
+    auto* Controller = World->SpawnActor<AICPlayerController>();
+    auto* Context = NewObject<UInputMappingContext>(Controller);
+    auto* Action = NewObject<UInputAction>(Controller, TEXT("IA_TestInteract"));
+    Context->MapKey(Action, EKeys::F);
+    Controller->DefaultMappingContext = Context;
+    FICInputCommandBinding Binding;
+    Binding.Action = Action;
+    Binding.Command = EICInputCommand::Interact;
+    Controller->CommandActions.Add(Binding);
+    auto Label = [&]() { return ICInputPresentation::CommandLabel(Controller, EICInputCommand::Interact).ToString(); };
+    TestEqual(TEXT("Default key is available before mapping initialization"), Label(), ICInputPresentation::KeyLabel(EKeys::F).ToString());
+    FString Error;
+    Controller->SetPlayer(GI->CreateLocalPlayer(0, Error, false));
+    const FString BindingID = Action->GetName() + TEXT(":F");
+    Settings->KeyOverrides.Add(BindingID, TEXT("G"));
+    Controller->RefreshUserInputMapping();
+    TestEqual(TEXT("Active input uses the changed key"), Controller->GetKeyboardInputMapping()->GetMappings()[0].Key, EKeys::G);
+    TestEqual(TEXT("Interaction and fishing hint follows changed key"), Label(), ICInputPresentation::KeyLabel(EKeys::G).ToString());
+    TestEqual(TEXT("Default asset is not modified"), Context->GetMappings()[0].Key, EKeys::F);
+    Settings->KeyOverrides.Add(BindingID, TEXT("Escape"));
+    Controller->RefreshUserInputMapping();
+    TestEqual(TEXT("Rejected override displays the key actually applied"), Label(), ICInputPresentation::KeyLabel(EKeys::F).ToString());
+    Settings->KeyOverrides.Add(BindingID, TEXT("G"));
+    Controller->RefreshUserInputMapping();
+    Settings->KeyOverrides.Reset();
+    Controller->RefreshUserInputMapping();
+    TestEqual(TEXT("Restoring default keys restores the hint"), Label(), ICInputPresentation::KeyLabel(EKeys::F).ToString());
+    GI->Shutdown();
+    GEngine->DestroyWorldContext(World);
+    World->DestroyWorld(false);
+    return !HasAnyErrors();
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICSettingsPersistenceCheck,"IC.Settings.ConfigAndInputMapping",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FICSettingsPersistenceCheck::RunTest(const FString&)
