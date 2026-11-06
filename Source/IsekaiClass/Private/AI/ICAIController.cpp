@@ -226,7 +226,7 @@ void AICAIController::Decide()
     }
     SetFocus(Target.Get());const double Distance=FVector::Distance(C->GetActorLocation(),Target->GetActorLocation());
     if(Distance>M.DetectionRangeCm||(M.bRequiresLineOfSight&&!LineOfSightTo(Target.Get()))){StopMovement();Enemy->BeginReturn();return;}
-    if(Distance>M.AttackRangeCm){MoveToActor(Target.Get(),FMath::Max(20.,M.AttackRangeCm*.7),false,true,false,GetNonCompanionNavigationFilter());return;}StopMovement();
+    if(Distance>Enemy->GetAttackRangeCm()){MoveToActor(Target.Get(),FMath::Max(20.,Enemy->GetAttackRangeCm()*.7),false,true,false,GetNonCompanionNavigationFilter());return;}StopMovement();
     C->GetCharacterMovement()->StopMovementImmediately();
     const FVector Facing=(Target->GetActorLocation()-C->GetActorLocation()).GetSafeNormal2D();
     if(!Facing.IsNearlyZero())
@@ -238,3 +238,4 @@ void AICAIController::Decide()
     if(Weight>0){double Roll=FMath::FRand()*Weight;for(const auto* Choice:Choices){Roll-=Choice->Weight;if(Roll<=0){ASC->RequestAction(TEXT("Skill"),Choice->SkillID,Target.Get());return;}}}
     ASC->RequestAction(TEXT("Attack"),NAME_None,Target.Get());NextDecisionAt=T->GetClock().PlaySecond+FMath::Max(.25,M.AttackIntervalPlaySeconds);
 }
+

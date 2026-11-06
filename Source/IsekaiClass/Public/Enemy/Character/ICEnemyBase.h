@@ -27,6 +27,7 @@ public:
     virtual void Tick(float DeltaSeconds) override;
     virtual bool FlushToWorldState_Implementation(UICWorldStateSubsystem* State) override;
     const FICMonsterRow& GetMonsterDefinition() const { return Definition; }
+    virtual double GetAttackRangeCm() const { return Definition.AttackRangeCm; }
     FName GetSpawnKey() const { return SpawnKey; }
     bool OutsideLeash() const;
     bool IsOutsideLeash(const FVector& WorldLocation) const;
