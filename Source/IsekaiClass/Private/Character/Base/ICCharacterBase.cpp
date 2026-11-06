@@ -9,6 +9,7 @@
 #include "Debug/ICLog.h"
 #include "Character/Animation/ICCharacterAnimationProfile.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Combat/Actors/ICWeaponActor.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
 #include "Inventory/Components/ICInventoryComponent.h"
@@ -90,6 +91,13 @@ void AICCharacterBase::RefreshWeaponAppearance()
         EquippedWeaponActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, Socket);
         EquippedWeaponActor->SetActorRelativeTransform(Gear->AttachmentTransform);
         EquippedWeaponActor->Configure(*Gear);
+        if (State.Kind == EICCharacterKind::Player && Gear->WeaponFamily == EICWeaponFamily::Bow)
+        {
+            // Turn the string toward the player around the bow's length axis at the grip.
+            const FVector BowAxis = EquippedWeaponActor->Visual->GetRelativeTransform()
+                .TransformVectorNoScale(EquippedWeaponActor->LengthAxis).GetSafeNormal();
+            EquippedWeaponActor->AddActorLocalRotation(FQuat(BowAxis, PI));
+        }
         EquippedWeaponActor->SetActorHiddenInGame(bSleepPresentation||bWeaponSheathed||HideForLife);
     }
 }

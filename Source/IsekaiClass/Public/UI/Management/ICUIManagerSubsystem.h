@@ -7,6 +7,7 @@ class UUserWidget;
 class UWidget;
 class APlayerController;
 class UICUIRootWidget;
+class UICMapWidget;
 UCLASS()
 class ISEKAICLASS_API UICUIManagerSubsystem : public ULocalPlayerSubsystem, public FTickableGameObject
 {
@@ -33,9 +34,11 @@ public:
     UFUNCTION(BlueprintCallable, Category = "IC|UI") void SetHUD(UUserWidget* Widget);
     void AddHUDWidget(UUserWidget* Widget);
     UFUNCTION(BlueprintPure, Category = "IC|UI") bool IsPointerUIActive() const;
+    bool ToggleVillageMap();
 
 private:
     UPROPERTY(Transient) TObjectPtr<UICUIRootWidget> Root;
+    UPROPERTY(Transient) TObjectPtr<UICMapWidget> VillageMapScreen;
     bool EnsureRoot();
     struct FScreen
     {
@@ -49,5 +52,8 @@ private:
     TWeakObjectPtr<UWidget> PendingFocus;
     bool bMenuOpen = false;
     bool bKeyboardNavigationRegistered = false;
+#if WITH_DEV_AUTOMATION_TESTS
+    friend class FICVillageMapCheck;
+#endif
     void RefreshContext();
 };

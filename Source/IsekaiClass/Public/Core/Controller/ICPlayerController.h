@@ -104,6 +104,7 @@ public:
     bool RouteGameplayGamepadKey(FKey Key,bool Pressed);
     virtual void FlushPressedKeys() override;
     void RefreshUserInputMapping();
+    const UInputMappingContext* GetKeyboardInputMapping() const;
     virtual void PlayerTick(float DeltaSeconds) override;
     virtual void OnPossess(APawn* InPawn) override;
     virtual void OnUnPossess() override;

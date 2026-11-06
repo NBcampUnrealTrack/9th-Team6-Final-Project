@@ -273,6 +273,11 @@ void AICPlayerController::RefreshUserInputMapping()
     FlushPressedKeys();RemoveInputMapping();ApplyInputMapping();
 }
 
+const UInputMappingContext* AICPlayerController::GetKeyboardInputMapping() const
+{
+    return AppliedMappingContext ? AppliedMappingContext.Get() : DefaultMappingContext.Get();
+}
+
 void AICPlayerController::UpdateScreens()
 {
     IC_TRACE_FUNCTION();

@@ -22,7 +22,18 @@ AICInteractionActor::AICInteractionActor()
 }
 
 FText AICInteractionActor::GetInteractionText() const
-{ IC_TRACE_FUNCTION(); return InteractionText.IsEmpty()?Label->Text:InteractionText; }
+{
+    IC_TRACE_FUNCTION();
+    if (!InteractionText.IsEmpty()) return InteractionText;
+    // TextRender's default "Text" is a placeholder, not a player-facing action.
+    if (Label && !Label->Text.IsEmpty() && Label->Text.ToString() != TEXT("Text")) return Label->Text;
+    if (Action == TEXT("Storage")) return NSLOCTEXT("ICInteraction", "StorageHint", "보관함 열기");
+    if (Action == TEXT("Sleep")) return NSLOCTEXT("ICInteraction", "SleepHint", "잠자기");
+    if (Action == TEXT("Kitchen")) return NSLOCTEXT("ICInteraction", "KitchenHint", "요리하기");
+    if (Action == TEXT("Forge")) return NSLOCTEXT("ICInteraction", "ForgeHint", "제작하기");
+    if (Action == TEXT("Loot") || Action == TEXT("Quest")) return NSLOCTEXT("ICInteraction", "LootHint", "획득하기");
+    return FText::GetEmpty();
+}
 
 bool AICInteractionActor::TryInteract_Implementation(AICPlayerController* Controller)
 {
