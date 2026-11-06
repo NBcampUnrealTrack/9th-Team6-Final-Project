@@ -17,6 +17,8 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map image") FVector2D UVMax=FVector2D(1.0,1.0);
     UFUNCTION(BlueprintCallable) void SetTexture(UTexture2D* Value);
     UFUNCTION(BlueprintCallable) void SetUVRegion(FVector2D Min,FVector2D Max);
+    /** Clip geometry, not the requested UV window, so map edges never stretch under markers. */
+    static bool ClipUVRegion(FVector2D Min,FVector2D Max,FVector2D& LocalMin,FVector2D& LocalMax);
     virtual void SynchronizeProperties() override;
     virtual void ReleaseSlateResources(bool Children) override;
 protected:

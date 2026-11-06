@@ -24,6 +24,14 @@
 #include "Time/ICTimeSubsystem.h"
 #include "Settings/ICGameUserSettings.h"
 #include "UI/Map/ICMapWidget.h"
+#include "UI/Map/ICMapTextureImage.h"
+#include "UI/Management/ICUIManagerSubsystem.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/DataTable.h"
+#include "AssetCompilingManager.h"
+#include "UObject/Package.h"
+#include "Framework/Application/IInputProcessor.h"
+#include "Framework/Application/SlateApplication.h"
 #include "World/Warp/ICWarpStone.h"
 #include "Components/Button.h"
 #include "Components/CanvasPanel.h"
@@ -296,5 +304,163 @@ bool FICOpenWorldDefinitionsCheck::RunTest(const FString&)
     FICDefinitionResult R;TestNotNull(TEXT("Runtime spawn group has a production ID"),F.Definitions->Find<FICSpawnerRow>(TEXT("SPN_R01_001"),R));
     TestNull(TEXT("Obsolete combat dummy is outside the runtime catalog"),F.Definitions->Find<FICMonsterRow>(TEXT("MON_COMBAT_TEST_001"),R));
     return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICMinimapWheelCheck,"IC.UI.Map.MinimapWheelZoom",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICMinimapWheelCheck::RunTest(const FString&)
+{
+    FOpenWorldUIFixture F;
+    auto* HUD=F.HUD();
+    if(!TestNotNull(TEXT("Actual HUD loads"),HUD))return false;
+    auto Surface=HUD->TakeWidget();
+    auto* Map=Cast<UICMapWidget>(HUD->GetWidgetFromName(TEXT("HUD_Minimap")));
+    if(!TestNotNull(TEXT("Actual HUD minimap exists"),Map))return false;
+    Map->NativeConstruct();
+    TestTrue(TEXT("Minimap input processor registers"),Map->MinimapWheelInput.IsValid());
+    const auto Input=Map->MinimapWheelInput;
+    Map->NativeConstruct();
+    TestTrue(TEXT("Reconstructing does not duplicate input registration"),Input==Map->MinimapWheelInput);
+    Map->MapMinimumZoom=1.;Map->MapMaximumZoom=8.;Map->MinimapZoom=4.f;
+    const FVector PlayerPosition=F.Player->GetActorLocation();
+    const auto Wheel=[](float Delta,bool Alt)
+    {
+        return FPointerEvent(0,FVector2D(100,100),FVector2D(100,100),TSet<FKey>{},EKeys::Invalid,Delta,
+            FModifierKeysState(false,false,false,false,Alt,false,false,false,false));
+    };
+    TestFalse(TEXT("Ordinary wheel stays available for camera and interaction"),Map->HandleMinimapWheel(Wheel(1,false)));
+    TestEqual(TEXT("Ordinary wheel leaves zoom unchanged"),Map->MinimapZoom,4.f);
+    TestTrue(TEXT("Alt wheel up is consumed"),Map->HandleMinimapWheel(Wheel(1,true)));
+    TestEqual(TEXT("One notch enlarges by 25 percent"),Map->MinimapZoom,5.f);
+    TestTrue(TEXT("Player remains centred after zoom"),Map->DisplayUV(PlayerPosition).Equals({.5,.5},1.e-6));
+    if(auto* Image=Cast<UICMapTextureImage>(Map->GetWidgetFromName(TEXT("IMG_Map"))))
+    {
+        TestTrue(TEXT("Background updates immediately"),(Image->UVMax-Image->UVMin).Equals({.2,.2},1.e-6));
+        TestTrue(TEXT("Background and markers share centre"),((Image->UVMin+Image->UVMax)*.5).Equals(Map->WorldToMapUV(PlayerPosition),1.e-6));
+    }
+    else AddError(TEXT("Actual minimap image is missing"));
+    TestTrue(TEXT("Alt wheel down is consumed"),Map->HandleMinimapWheel(Wheel(-1,true)));
+    TestEqual(TEXT("Opposite notch restores zoom"),Map->MinimapZoom,4.f);
+    Map->HandleMinimapWheel(Wheel(100,true));TestEqual(TEXT("Zoom stops at maximum"),Map->MinimapZoom,8.f);
+    TestTrue(TEXT("Wheel at limit remains consumed to prevent camera movement"),Map->HandleMinimapWheel(Wheel(1,true)));
+    Map->HandleMinimapWheel(Wheel(-100,true));TestEqual(TEXT("Zoom stops at minimum"),Map->MinimapZoom,1.f);
+    Map->HandleMinimapWheel(Wheel(.5f,true));TestTrue(TEXT("Fractional wheel input is supported"),FMath::IsNearlyEqual(Map->MinimapZoom,FMath::Sqrt(1.25f)));
+    const float Before=Map->MinimapZoom;
+    F.PC->Menu=TEXT("Map");TestFalse(TEXT("Warp menu does not zoom minimap"),Map->HandleMinimapWheel(Wheel(1,true)));F.PC->Menu.Empty();
+    F.PC->bInDialogue=true;TestFalse(TEXT("Dialogue does not zoom minimap"),Map->HandleMinimapWheel(Wheel(1,true)));F.PC->bInDialogue=false;
+    Map->SetVisibility(ESlateVisibility::Collapsed);TestFalse(TEXT("Hidden minimap does not consume input"),Map->HandleMinimapWheel(Wheel(1,true)));Map->SetVisibility(ESlateVisibility::HitTestInvisible);
+    Map->bMinimap=false;TestFalse(TEXT("Warp list does not zoom"),Map->HandleMinimapWheel(Wheel(1,true)));Map->bMinimap=true;
+    TestEqual(TEXT("Blocked inputs leave zoom unchanged"),Map->MinimapZoom,Before);
+    TestFalse(TEXT("No focused captured game viewport leaves editor wheel untouched"),Input->HandleMouseWheelOrGestureEvent(FSlateApplication::Get(),Wheel(1,true),nullptr));
+    Map->NativeDestruct();TestFalse(TEXT("Closing HUD unregisters input processor"),Map->MinimapWheelInput.IsValid());
+    return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FICVillageMapCheck,"IC.UI.Map.VillageMapScreen",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FICVillageMapCheck::RunTest(const FString&)
+{
+    FOpenWorldUIFixture F;
+    F.World->Rename(TEXT("L_OpenWorld"),CreatePackage(TEXT("/Temp/UIMapReview/Village/L_OpenWorld")),REN_DontCreateRedirectors|REN_NonTransactional);
+    auto* HUD=F.HUD();if(!TestNotNull(TEXT("HUD loads for N shortcut"),HUD))return false;
+    auto HUDSlate=HUD->TakeWidget();
+    auto* Mini=Cast<UICMapWidget>(HUD->GetWidgetFromName(TEXT("HUD_Minimap")));
+    if(!TestNotNull(TEXT("HUD minimap owns N shortcut"),Mini))return false;
+    auto* UI=F.PC->GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>();
+    const auto Key=[](FKey Value,bool Repeat=false){return FKeyEvent(Value,FModifierKeysState(),0,Repeat,0,0);};
+    TestFalse(TEXT("M is left to the existing warp binding"),Mini->HandleVillageMapShortcut(Key(EKeys::M)));
+    TestTrue(TEXT("N opens the village map"),Mini->HandleVillageMapShortcut(Key(EKeys::N)));
+    auto* Map=UI->VillageMapScreen.Get();
+    if(!TestNotNull(TEXT("Village map is mounted"),Map))return false;
+    TestEqual(TEXT("Village screen selects the actual level projection"),Map->ActiveLevelMap,FName(TEXT("L_OpenWorld")));
+    TestTrue(TEXT("Village screen uses the village-only capture"),Map->MapTexture&&Map->MapTexture->GetName()==TEXT("T_OpenWorld_Village_UI"));
+    FAssetCompilingManager::Get().FinishAllCompilation();
+    TestEqual(TEXT("Map has a distinct menu context"),F.PC->Menu,FString(TEXT("VillageMap")));
+    TestTrue(TEXT("Opening the map exposes the cursor"),F.PC->bShowMouseCursor);
+    TestNotNull(TEXT("Village image exists"),Map->GetWidgetFromName(TEXT("IMG_Map")));
+    TestNull(TEXT("Village map is separate from warp destinations"),Map->GetWidgetFromName(TEXT("WarpDestinations")));
+    TestEqual(TEXT("Village starts fully zoomed out"),Map->VillageZoom,1.);
+    TestFalse(TEXT("Map viewing cannot request a warp"),Map->RequestTravel(TEXT("WRP_OW_01_HOME")));
+    if(!GUsingNullRHI)
+    {
+        FWidgetRenderer Renderer(true,true);auto Slate=Map->TakeWidget();
+        auto* Target=Renderer.DrawWidget(Slate,FVector2D(1920,1080));
+        TestEqual(TEXT("Village zoom bound comes from level data"),Map->MapMaximumZoom,8.);Map->RefreshVisuals(Map->GetPaintSpaceGeometry());
+        Renderer.DrawWidget(Target,Slate,FVector2D(1920,1080),.1f);
+        const auto G=Map->GetPaintSpaceGeometry();const auto Rect=Map->ImageRect(G);
+        TestTrue(TEXT("Map has a laid-out visible area"),Rect.Right>Rect.Left&&Rect.Bottom>Rect.Top);
+        const FVector2D CursorUV(.6,.4);
+        const FVector2D Local=FVector2D(Rect.Left,Rect.Top)+CursorUV*FVector2D(Rect.Right-Rect.Left,Rect.Bottom-Rect.Top);
+        const auto Pos=G.LocalToAbsolute(Local);
+        const auto Wheel=[&](float Delta){return FPointerEvent(0,Pos,Pos,TSet<FKey>{},EKeys::Invalid,Delta,FModifierKeysState());};
+        TestTrue(TEXT("Ordinary wheel on map is consumed"),Map->NativeOnMouseWheel(G,Wheel(1)).IsEventHandled());
+        TestEqual(TEXT("Wheel up zooms without Alt"),Map->VillageZoom,1.25);
+        const auto UnderCursor=Map->VillageCenterUV+(CursorUV-FVector2D(.5,.5))/Map->VillageZoom;
+        TestTrue(TEXT("Cursor keeps pointing to the same map location"),UnderCursor.Equals(CursorUV,1.e-6));
+        Map->NativeOnMouseWheel(G,Wheel(100));TestEqual(TEXT("Map zoom has an upper bound"),Map->VillageZoom,8.);
+        const FVector2D MapSize(Rect.Right-Rect.Left,Rect.Bottom-Rect.Top);
+        const auto Pointer=[](FVector2D At,FVector2D Previous,bool Held,FKey Button=EKeys::Invalid)
+        {return FPointerEvent(0,At,Previous,Held?TSet<FKey>{EKeys::LeftMouseButton}:TSet<FKey>{},Button,0,FModifierKeysState());};
+        Map->VillageCenterUV=FVector2D(.5,.5);Map->RefreshVisuals(G);
+        const auto Down=Map->NativeOnMouseButtonDown(G,Pointer(Pos,Pos,true,EKeys::LeftMouseButton));
+        TestTrue(TEXT("Left drag captures mouse on enlarged map"),Down.IsEventHandled()&&Down.GetMouseCaptor().IsValid()&&Map->bDraggingVillageMap);
+        const FVector2D LocalDelta(40,-24);const auto Moved=G.LocalToAbsolute(Local+LocalDelta);
+        const FVector MarkerWorld(Map->Layer.WorldOriginCm.X,Map->Layer.WorldOriginCm.Y,0);
+        const FVector2D MarkerBefore=Map->DisplayUV(MarkerWorld);
+        Map->NativeOnMouseMove(G,Pointer(Moved,Pos,true));
+        TestTrue(TEXT("Map follows drag at the current zoom and DPI"),Map->VillageCenterUV.Equals(FVector2D(.5,.5)-LocalDelta/(MapSize*Map->VillageZoom),1.e-6));
+        TestTrue(TEXT("Marker moves with the image"),(Map->DisplayUV(MarkerWorld)-MarkerBefore).Equals(LocalDelta/MapSize,1.e-6));
+        auto* PannedImage=Cast<UICMapTextureImage>(Map->GetWidgetFromName(TEXT("IMG_Map")));
+        TestTrue(TEXT("Pan updates texture window immediately"),PannedImage&&((PannedImage->UVMin+PannedImage->UVMax)*.5).Equals(Map->VillageCenterUV,1.e-6));
+        const auto Far=G.LocalToAbsolute(Local+FVector2D(100000,-100000));
+        Map->NativeOnMouseMove(G,Pointer(Far,Moved,true));
+        const double Half=.5/Map->VillageZoom;
+        TestTrue(TEXT("Dragging outside the widget stops at map edges"),Map->VillageCenterUV.Equals({Half,1.-Half},1.e-6));
+        const auto FarOther=G.LocalToAbsolute(Local+FVector2D(-100000,100000));
+        Map->NativeOnMouseMove(G,Pointer(FarOther,Far,true));
+        TestTrue(TEXT("Opposite map edges are also bounded"),Map->VillageCenterUV.Equals({1.-Half,Half},1.e-6));
+        const auto Up=Map->NativeOnMouseButtonUp(G,Pointer(FarOther,FarOther,false,EKeys::LeftMouseButton));
+        TestTrue(TEXT("Release outside the image ends capture"),Up.ShouldReleaseMouse()&&!Map->bDraggingVillageMap);
+        const FVector2D AfterRelease=Map->VillageCenterUV;
+        Map->NativeOnMouseMove(G,Pointer(Pos,FarOther,false));
+        TestTrue(TEXT("Pointer movement after release does not pan"),Map->VillageCenterUV.Equals(AfterRelease));
+        Map->NativeOnMouseButtonDown(G,Pointer(Pos,Pos,true,EKeys::LeftMouseButton));
+        Map->NativeOnMouseCaptureLost(FCaptureLostEvent(0,0));
+        TestFalse(TEXT("Losing mouse capture cancels drag"),Map->bDraggingVillageMap);
+        Map->NativeOnMouseButtonDown(G,Pointer(Pos,Pos,true,EKeys::RightMouseButton));
+        TestFalse(TEXT("Right click does not start a pan"),Map->bDraggingVillageMap);
+        const auto Outside=G.LocalToAbsolute(FVector2D(20,20));
+        Map->NativeOnMouseButtonDown(G,Pointer(Outside,Outside,true,EKeys::LeftMouseButton));
+        TestFalse(TEXT("Header and margins do not start a pan"),Map->bDraggingVillageMap);
+        Map->NativeOnMouseButtonDown(G,Pointer(Pos,Pos,true,EKeys::LeftMouseButton));
+        Map->NativeOnMouseWheel(G,Wheel(-100));TestEqual(TEXT("Zooming out restores the overview"),Map->VillageZoom,1.);
+        TestFalse(TEXT("Returning to full view cancels dragging"),Map->bDraggingVillageMap);
+        const auto FullViewDown=Map->NativeOnMouseButtonDown(G,Pointer(Pos,Pos,true,EKeys::LeftMouseButton));
+        TestTrue(TEXT("Overview cannot be dragged into blank space"),!Map->bDraggingVillageMap&&!FullViewDown.GetMouseCaptor().IsValid());
+        TestTrue(TEXT("Overview restores its centre"),Map->VillageCenterUV.Equals({.5,.5},1.e-6));
+        Renderer.DrawWidget(Target,Slate,FVector2D(1920,1080),.1f);FlushRenderingCommands();
+        TArray<FColor> Pixels;FReadSurfaceDataFlags Flags;Flags.SetLinearToGamma(false);
+        if(Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels,Flags))
+        {
+            for(auto& Pixel:Pixels)Pixel.A=255;TArray64<uint8> PNG;FImageUtils::PNGCompressImageArray(1920,1080,Pixels,PNG);
+            const FString Folder=FPaths::ProjectSavedDir()/TEXT("OpenWorldMapReview");IFileManager::Get().MakeDirectory(*Folder,true);
+            FFileHelper::SaveArrayToFile(PNG,*(Folder/TEXT("VillageMapN.png")));
+        }
+    }
+    Map->NativeOnPreviewKeyDown(FGeometry(),Key(EKeys::N,true));TestNotNull(TEXT("Holding N does not close the map immediately"),UI->VillageMapScreen.Get());
+    Map->NativeOnPreviewKeyDown(FGeometry(),Key(EKeys::N));
+    TestFalse(TEXT("Closing the map clears drag state"),Map->bDraggingVillageMap);
+    TestNull(TEXT("N closes the map"),UI->VillageMapScreen.Get());TestTrue(TEXT("Closing restores gameplay context"),F.PC->Menu.IsEmpty());TestFalse(TEXT("Closing restores hidden gameplay cursor"),F.PC->bShowMouseCursor);
+    Mini->HandleVillageMapShortcut(Key(EKeys::N));Map=UI->VillageMapScreen.Get();
+    if(Map)Map->NativeOnPreviewKeyDown(FGeometry(),Key(EKeys::Escape));
+    TestNull(TEXT("Escape closes map"),UI->VillageMapScreen.Get());
+    Mini->HandleVillageMapShortcut(Key(EKeys::N));Map=UI->VillageMapScreen.Get();
+    if(Map)if(auto* Button=Cast<UButton>(Map->GetWidgetFromName(TEXT("BTN_MapClose"))))Button->OnClicked.Broadcast();
+    TestNull(TEXT("Close button closes map"),UI->VillageMapScreen.Get());
+    Mini->HandleVillageMapShortcut(Key(EKeys::N));Map=UI->VillageMapScreen.Get();
+    if(Map)Map->NativeOnPreviewKeyDown(FGeometry(),Key(EKeys::M));
+    TestNull(TEXT("M closes village view"),UI->VillageMapScreen.Get());TestEqual(TEXT("M opens existing warp menu"),F.PC->Menu,FString(TEXT("Map")));
+    TestFalse(TEXT("N does not open underneath another menu"),Mini->HandleVillageMapShortcut(Key(EKeys::N)));
+    F.PC->SetMenu(TEXT(""));Mini->HandleVillageMapShortcut(Key(EKeys::N));F.PC->SetMenu(TEXT("Loading"));UI->Tick(.01f);
+    TestNull(TEXT("Other screen transitions release village map"),UI->VillageMapScreen.Get());
+    F.PC->SetMenu(TEXT(""));UI->CloseAllScreens();return !HasAnyErrors();
 }
 #endif
