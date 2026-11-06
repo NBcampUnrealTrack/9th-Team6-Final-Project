@@ -18,6 +18,8 @@ void UICMainMenuWidget::NativeOnInitialized()
         StartButton->OnClicked.AddUniqueDynamic(this, &ThisClass::Start);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Continue"))))
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::Continue);
+    if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer()))
+        PC->OnNoticeChanged.AddUniqueDynamic(this, &ThisClass::RefreshNotice);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_SaveList"))))
         Button->OnClicked.AddUniqueDynamic(this, &ThisClass::SaveList);
     if (auto* Button = Cast<UButton>(GetWidgetFromName(TEXT("BTN_Settings"))))
@@ -63,9 +65,13 @@ void UICMainMenuWidget::Start()
 void UICMainMenuWidget::Continue()
 {
     if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer()))
-        if (!PC->ContinueLatestSave())
-            if (auto* Subtitle = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Subtitle"))))
-                Subtitle->SetText(PC->NoticeDisplayText);
+        PC->ContinueLatestSave();
+}
+void UICMainMenuWidget::RefreshNotice(const FString& Notice)
+{
+    if (auto* PC = Cast<AICPlayerController>(GetOwningPlayer()); PC && PC->Menu == TEXT("MainMenu"))
+        if (auto* Subtitle = Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_Subtitle"))))
+            Subtitle->SetText(PC->NoticeDisplayText);
 }
 void UICMainMenuWidget::Settings()
 {

@@ -6,6 +6,10 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
+#include "ContentStreaming.h"
+#include "Camera/PlayerCameraManager.h"
+#include "UObject/UObjectGlobals.h"
 #include "Components/Border.h"
 #include "UI/Framework/ICPrologueWidget.h"
 #include "Player/Character/ICPlayerCharacter.h"
@@ -22,15 +26,27 @@ void UICLoadingWidget::NativeTick(const FGeometry& Geometry,float DeltaSeconds)
     Super::NativeTick(Geometry,DeltaSeconds);
     auto* Flow=GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
     auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
-    if(!Flow->bPendingNewGame||Flow->Phase!=EICGameFlowPhase::Initializing||!PC||!PC->bCreated||PC->Menu!=TEXT("Loading"))return;
+    if(Flow->Phase!=EICGameFlowPhase::Initializing||!PC||!PC->bCreated||PC->Menu!=TEXT("Loading"))return;
+    UWorld* World = GetWorld();
     auto* Player=Cast<AICPlayerCharacter>(PC->GetPawn());auto* Mesh=Player?Player->GetMesh():nullptr;
-    if(!ICPlayerAppearance::PrepareFirstPose(Mesh))
+    if(!World->AreActorsInitialized()||World->GetNumStreamingLevelsBeingLoaded()>0||World->IsVisibilityRequestPending()||
+        (!ICPlayerAppearance::IsFirstPoseReady(Mesh)&&!ICPlayerAppearance::PrepareFirstPose(Mesh)))
         {FirstPoseFrame=MAX_uint64;PreparedAnimation.Reset();return;}
     if(PreparedAnimation.Get()!=Mesh->GetAnimInstance()||FirstPoseFrame==MAX_uint64)
-        {PreparedAnimation=Mesh->GetAnimInstance();FirstPoseFrame=GFrameCounter;return;}
-    // Keep the cover through subsequent rendered frames, so skinning receives
-    // the evaluated pose before the existing world-reveal fade begins.
-    if(GFrameCounter-FirstPoseFrame>=2)UICPrologueWidget::Show(PC,true);
+    {
+        PreparedAnimation=Mesh->GetAnimInstance();FirstPoseFrame=GFrameCounter;
+        if (PC->PlayerCameraManager) PC->PlayerCameraManager->UpdateCamera(0.f);
+        WorldWarmupStarted=FPlatformTime::Seconds();
+        return;
+    }
+    // Give the restored view time to request its render assets. Background
+    // streaming can stay busy under memory pressure, so bound that part of the wait.
+    const double Warmup=FPlatformTime::Seconds()-WorldWarmupStarted;
+    if(GFrameCounter-FirstPoseFrame<2||Warmup<.5||
+        (Warmup<3.0&&(IsAsyncLoading()||IStreamingManager::Get().GetNumWantingResources()>0)))return;
+    if(Flow->bPendingNewGame&&UICPrologueWidget::Show(PC,true))return;
+    Flow->CompleteNewGame();
+    PC->SetMenu(TEXT(""));
 }
 void UICLoadingWidget::NativeOnInitialized()
 {
@@ -66,7 +82,7 @@ void UICLoadingWidget::Refresh()
         Spinner->SetVisibility(Failed ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
     for (const auto* Name : {TEXT("BTN_Retry"), TEXT("BTN_Title")})
         if (auto* Button = GetWidgetFromName(Name))
-            Button->SetVisibility(Failed ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+            Button->SetVisibility(Failed && (Flow->bPendingNewGame || FCString::Strcmp(Name,TEXT("BTN_Title"))==0) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
     if (Failed)
         RequestRefreshFocus();
 }

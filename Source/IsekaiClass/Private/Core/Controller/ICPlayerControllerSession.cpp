@@ -84,56 +84,77 @@ void AICPlayerController::RequestLoadPlayer()
     auto* Saves=GetSaves();if(!Saves||Menu!=TEXT("Load"))return;
     if(Saves->bSaving){ShowLocalized(ICText::Get(TEXT("Native_519c9c884838")));return;}
     if(IsMainMenuLevel()&&SessionGameplayMap.IsNull()){ShowLocalized(ICText::Get(TEXT("Native_649fe9810a66")));return;}
-    RefreshSaveSlots();
     if(!SaveSlots.IsValidIndex(SelectedLoadSlot)||!SaveSlots[SelectedLoadSlot].bValid){ShowLocalized(ICText::Get(TEXT("Native_12080ba88469")));return;}
+    if(IsMainMenuLevel()){LoadSelectedSessionSlot();return;}
     ShowModal(TEXT("Load"),ICText::FormatText(TEXT("Native_85f281a56d17"),SelectedLoadSlot==0?ICText::Get(TEXT("Native_f79024b509aa")):ICText::FormatText(TEXT("Native_8ace6aff0651"),SelectedLoadSlot),FText::FromString(SaveSlots[SelectedLoadSlot].PlayerName)),SelectedLoadSlot);
 }
 bool AICPlayerController::ContinueLatestSave()
 {
     IC_TRACE_FUNCTION();
-    if (!IsMainMenuLevel()) return false;
+    if (!IsMainMenuLevel() || Menu != TEXT("MainMenu")) return false;
     auto* Saves = GetSaves();
     if (!Saves || Saves->bSaving)
     {
         ShowLocalized(ICText::Get(TEXT("Continue_SaveBusy")));
         return false;
     }
-    RefreshSaveSlots();
-    const FICSaveSlotInfo* Latest = nullptr;
-    for (const FICSaveSlotInfo& Slot : SaveSlots)
-        if (Slot.bValid && (!Latest || Slot.SavedAt > Latest->SavedAt)) Latest = &Slot;
-    if (!Latest)
-    {
-        ShowLocalized(ICText::Get(TEXT("Continue_NoSave")));
-        return false;
-    }
-    SelectedLoadSlot = Latest->Slot;
     SessionGameplayMap = GetDefault<UICGameFlowSettings>()->PlayMap;
     if (SessionGameplayMap.IsNull())
     {
         ShowLocalized(ICText::Get(TEXT("Continue_MapMissing")));
         return false;
     }
-    return LoadSelectedSessionSlot();
+    return LoadSelectedSessionSlot(true);
 }
-bool AICPlayerController::LoadSelectedSessionSlot()
+bool AICPlayerController::LoadSelectedSessionSlot(bool bContinue)
 {
     IC_TRACE_FUNCTION();
-    if(!IsMainMenuLevel())
+    if (!GetSaves() || Menu == TEXT("Loading") || (IsMainMenuLevel() && SessionGameplayMap.IsNull())) return false;
+    auto* Flow = GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>();
+    const auto PreviousPhase = Flow->Phase;
+    const FString ReturnMenu = Menu;
+    Flow->ShowLoadingThen(this, FSimpleDelegate::CreateWeakLambda(this, [this, Flow, PreviousPhase, ReturnMenu, bContinue]
     {
-        if(LoadPlayer()){SetMenu(TEXT(""));return true;}
-        return false;
-    }
-    auto* Saves=GetSaves();if(!Saves||SessionGameplayMap.IsNull())return false;
-    if(!Saves->LoadSlot(SelectedLoadSlot)){ShowLocalized(Saves->GetLastMessageText());RefreshSaveSlots();return false;}
-    Saves->SetAutoSaveSuspended(true);
-    if(GetLocalPlayer())if(auto* UI=GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())UI->CloseAllScreens();
-    SetMenu(TEXT("Loading"));
-    if(auto* Time=GetTime())Time->PrepareForTravel();
-    if(auto* Loading=GetGameInstance()->GetSubsystem<UICLoadingScreenSubsystem>())Loading->Arm();
-    UGameplayStatics::SetGamePaused(this,false);
-    UE_LOG(LogICSave,Log,TEXT("[Session.Load.Travel] Slot=%d Map=%s"),SelectedLoadSlot,*SessionGameplayMap.ToSoftObjectPath().ToString());
-    UGameplayStatics::OpenLevelBySoftObjectPtr(this,SessionGameplayMap);
+        if (Menu != TEXT("Loading")) return;
+        auto* Saves = GetSaves();
+        const auto ReturnWithError = [this, Flow, PreviousPhase, &ReturnMenu](const FText& Reason)
+        {
+            Flow->Phase = PreviousPhase;
+            SetMenu(ReturnMenu);
+            ShowLocalized(Reason);
+        };
+        if (bContinue)
+        {
+            RefreshSaveSlots();
+            const FICSaveSlotInfo* Latest = nullptr;
+            for (const FICSaveSlotInfo& Slot : SaveSlots)
+                if (Slot.bValid && (!Latest || Slot.SavedAt > Latest->SavedAt)) Latest = &Slot;
+            if (!Latest)
+            {
+                ReturnWithError(ICText::Get(TEXT("Continue_NoSave")));
+                return;
+            }
+            SelectedLoadSlot = Latest->Slot;
+        }
+        if (!IsMainMenuLevel())
+        {
+            if (LoadPlayer()) Flow->BeginInitialization();
+            else ReturnWithError(Saves->GetLastMessageText());
+            return;
+        }
+        if (!Saves->LoadSlot(SelectedLoadSlot))
+        {
+            RefreshSaveSlots();
+            ReturnWithError(Saves->GetLastMessageText());
+            return;
+        }
+        Saves->SetAutoSaveSuspended(true);
+        if (auto* Time = GetTime()) Time->PrepareForTravel();
+        GetGameInstance()->GetSubsystem<UICLoadingScreenSubsystem>()->Arm();
+        UGameplayStatics::SetGamePaused(this, false);
+        UE_LOG(LogICSave, Log, TEXT("[Session.Load.Travel] Slot=%d Map=%s"), SelectedLoadSlot, *SessionGameplayMap.ToSoftObjectPath().ToString());
+        UGameplayStatics::OpenLevelBySoftObjectPtr(this, SessionGameplayMap);
+    }));
     return true;
 }
 void AICPlayerController::OpenSaveMenu(bool bQuitAfter)
