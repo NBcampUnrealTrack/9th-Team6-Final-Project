@@ -20,6 +20,7 @@ private:
     int32 Selected=0;
     UFUNCTION() void Start();
     UFUNCTION() void Continue();
+    UFUNCTION() void RefreshNotice(const FString& Notice);
     UFUNCTION() void SaveList();
     UFUNCTION() void Settings();
     UFUNCTION() void Quit();

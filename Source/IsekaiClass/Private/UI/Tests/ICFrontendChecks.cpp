@@ -107,7 +107,6 @@ bool FICCreationRewardCheck::RunTest(const FString& Parameters)
 #include "UI/Settings/ICSettingsWidget.h"
 #include "UI/Save/ICSaveLoadWidget.h"
 #include "UI/Save/ICSaveSlotWidget.h"
-#include "UI/Save/ICLoadConfirmWidget.h"
 #include "UI/Tests/ICPlayWindowSettingsRestore.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
@@ -169,7 +168,7 @@ public:
             if(!bSawCharacterPreparation)
                 {bSawCharacterPreparation=true;Capture(Client,bSkipRun?TEXT("Loading_Preparing_Pose_H"):TEXT("Loading_Preparing_Pose_G"));}
         }
-        if(Flow->Phase==EICGameFlowPhase::Loading&&PC->IsMainMenuLevel()&&PC->Menu==TEXT("Loading"))
+        if(Flow->bPendingNewGame&&Flow->Phase==EICGameFlowPhase::Loading&&PC->IsMainMenuLevel()&&PC->Menu==TEXT("Loading"))
         {
             auto* Music = World->GetSubsystem<UICBGMSubsystem>();
             Music->Tick(1.f);
@@ -279,13 +278,19 @@ public:
                 return false;
             if (!bSeededSaves)
             {
-                if (!Test->TestTrue(TEXT("Save files isolated from player saves"),
-                                    Saves->ConfigureServices(PC->GetWorldState(), PC->GetTime(), Prefix)))
-                    return true;
-                GI = PC->GetGameInstance();
-                auto* Continue = Cast<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Continue")));
-                Test->TestTrue(TEXT("Continue stays clickable with no save"), Continue && Continue->GetIsEnabled());
-                if (!Click(Client, Continue)) return false;
+                if (!bRequestedEmptyContinue)
+                {
+                    if (!Test->TestTrue(TEXT("Save files isolated from player saves"),
+                                        Saves->ConfigureServices(PC->GetWorldState(), PC->GetTime(), Prefix)))
+                        return true;
+                    GI = PC->GetGameInstance();
+                    auto* Continue = Cast<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Continue")));
+                    Test->TestTrue(TEXT("Continue stays clickable with no save"), Continue && Continue->GetIsEnabled());
+                    if (!Click(Client, Continue)) return false;
+                    Test->TestEqual(TEXT("Continue covers the title before checking files"), PC->Menu, FString(TEXT("Loading")));
+                    bRequestedEmptyContinue = true;
+                    return false;
+                }
                 Test->TestEqual(TEXT("Empty continue stays on title"), PC->Menu, FString(TEXT("MainMenu")));
                 Test->TestEqual(TEXT("Empty continue explains the missing save"),
                                 CastChecked<UTextBlock>(Menu->GetWidgetFromName(TEXT("TXT_Subtitle")))->GetText().ToString(),
@@ -590,12 +595,13 @@ public:
             Test->TestTrue(TEXT("Continue is enabled after returning to title"),
                            CastChecked<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Continue")))->GetIsEnabled());
             if (!Click(Client, CastChecked<UButton>(Menu->GetWidgetFromName(TEXT("BTN_Continue"))))) return false;
+            Test->TestEqual(TEXT("Continue covers the title before reading the latest save"), PC->Menu, FString(TEXT("Loading")));
             NextStage(5);
             return false;
         }
         if (Stage == 5)
         {
-            if (PC->IsMainMenuLevel() || !PC->bCreated || !PC->GetPawn()) return false;
+            if (PC->IsMainMenuLevel() || !PC->bCreated || !PC->GetPawn() || Flow->Phase != EICGameFlowPhase::Playing) return false;
             Test->TestEqual(TEXT("Continue loads the newest valid save"), PC->PlayerName, FString(TEXT("테스트여행자")));
             Test->TestEqual(TEXT("Continue restores playing flow"), Flow->Phase, EICGameFlowPhase::Playing);
             Test->TestTrue(TEXT("Continue unlocks gameplay"), PC->Menu.IsEmpty() && !World->IsPaused());
@@ -617,7 +623,7 @@ public:
             NextStage(31);
             return false;
         }
-        if (Stage >= 31 && Stage <= 34)
+        if (Stage >= 31 && Stage <= 33)
         {
             if (FPlatformTime::Seconds() - StageAt < .3) return false;
             TArray<UUserWidget*> Widgets;
@@ -639,28 +645,19 @@ public:
                 if (!Row || !Click(Client, CastChecked<UButton>(Row->GetWidgetFromName(TEXT("IC_SaveSlot_Button"))))) return false;
                 Test->TestEqual(TEXT("Clicking a saved row changes selected load slot"), PC->SelectedLoadSlot, Slot);
             }
-            else if (Stage == 33)
+            else
             {
                 auto* Load = CastChecked<UButton>(List->GetWidgetFromName(TEXT("IC_SaveLoad_Load")));
                 Test->TestTrue(TEXT("Selected save can be loaded"), Load->GetIsEnabled());
-                PressKey(EKeys::F);
-            }
-            else
-            {
-                Widgets.Reset();
-                UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Widgets, UICLoadConfirmWidget::StaticClass(), false);
-                UICLoadConfirmWidget* Confirm = nullptr;
-                for (auto* Widget : Widgets)
-                    if (auto* Candidate = Cast<UICLoadConfirmWidget>(Widget))
-                        if (Candidate->GetParent()) Confirm = Candidate;
-                if (!Confirm || !Click(Client, CastChecked<UButton>(Confirm->GetWidgetFromName(TEXT("IC_LoadConfirm_Confirm"))))) return false;
+                if (!Click(Client, Load)) return false;
+                Test->TestEqual(TEXT("Clicking title load shows loading before restoring the slot"), PC->Menu, FString(TEXT("Loading")));
             }
             NextStage(Stage + 1);
             return false;
         }
-        if (Stage == 35)
+        if (Stage == 34)
         {
-            if (PC->IsMainMenuLevel() || !PC->bCreated || !PC->GetPawn()) return false;
+            if (PC->IsMainMenuLevel() || !PC->bCreated || !PC->GetPawn() || Flow->Phase != EICGameFlowPhase::Playing) return false;
             Test->TestEqual(TEXT("Chosen title save restores the player"), PC->PlayerName, FString(TEXT("테스트여행자")));
             Test->TestTrue(TEXT("Chosen title save returns to active gameplay"), PC->Menu.IsEmpty() && !World->IsPaused());
             Cleanup();
@@ -674,6 +671,7 @@ private:
     TWeakObjectPtr<UGameInstance> GI;
     int32 Stage = 0;
     bool bSeededSaves = false;
+    bool bRequestedEmptyContinue = false;
     bool bSkipRun=false,bPartialSkip=false;
     bool bSawStoryLoading=false;
     bool bSawCharacterPreparation=false,bSawPreparedReveal=false;

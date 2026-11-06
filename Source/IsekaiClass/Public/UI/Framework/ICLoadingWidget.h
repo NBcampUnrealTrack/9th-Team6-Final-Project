@@ -15,6 +15,7 @@ protected:
 
 private:
     uint64 FirstPoseFrame=MAX_uint64;
+    double WorldWarmupStarted=0.0;
     TWeakObjectPtr<class UAnimInstance> PreparedAnimation;
     UFUNCTION() void Refresh();
     UFUNCTION() void Retry();

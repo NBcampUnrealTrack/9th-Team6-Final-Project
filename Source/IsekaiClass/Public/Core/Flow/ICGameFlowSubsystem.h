@@ -84,6 +84,7 @@ public:
     UFUNCTION(BlueprintCallable) void ReturnToTitle(AICPlayerController* Controller);
     UFUNCTION(BlueprintPure) FICCreationOptionRow GetOption(int32 Question, int32 Option) const;
     const FICCreationOptionRow* FindOption(int32 Question, int32 Option) const;
+    void ShowLoadingThen(AICPlayerController* Controller, FSimpleDelegate Work, float Delay = .15f);
     void BeginInitialization(bool bRetry = false);
     void CompleteNewGame();
     void Fail(const FString& Reason);
