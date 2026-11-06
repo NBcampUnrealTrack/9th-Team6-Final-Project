@@ -5,6 +5,7 @@
 #include "Combat/GAS/ICAbilitySystemComponent.h"
 #include "Combat/GAS/ICGameplayTags.h"
 #include "Data/Definitions/ICDefinitionSubsystem.h"
+#include "Data/Text/ICLocalization.h"
 #include "Debug/ICLog.h"
 #include "World/State/ICWorldStateSubsystem.h"
 #include "Player/Character/ICPlayerCharacter.h"
@@ -171,7 +172,15 @@ void AICPlayerController::PlayerTick(float DeltaSeconds)
         if (auto* Drop = Cast<AICDroppedItem>(Choice))
             Label = NSLOCTEXT("ICInteraction","PickupChoice","줍기").ToString() + TEXT(" · ") + Drop->Label->Text.ToString();
         else if (auto* NPC = Cast<AICNPCBase>(Choice))
-            Label = NPC->GetInteractionText().ToString();
+        {
+            const auto& Definition = NPC->GetNPCDefinition();
+            const FText Name = Definition.NameKey.IsEmpty()
+                ? FText::FromName(Definition.ID)
+                : ICLocalization::Localize(FText::FromStringTable(
+                    TEXT("/Game/IsekaiClass/Data/DataTable/StringTables/ST_IC_Definitions.ST_IC_Definitions"), Definition.NameKey));
+            Label = FText::Format(NSLOCTEXT("ICInteraction", "NPCNamedChoice", "{0} · {1}"),
+                Name, NSLOCTEXT("ICInteraction", "NPCTalkAction", "대화하기")).ToString();
+        }
         else if (Cast<AICRanchAnimal>(Choice))
             Label = NSLOCTEXT("ICInteraction","AnimalChoice","닭 잡기").ToString();
         else if (auto* Zone = Cast<AICLifeActor>(Choice); Zone && Zone->LifeType == EICDefinitionType::FishingPoint)
@@ -433,6 +442,7 @@ AICInteractionActor* AICPlayerController::FindInteractionTarget(TArray<AActor*>*
     {
         IC_TRACE_FUNCTION();
         if(!IsValid(Object)||Object->IsHidden()||!Object->GetActorEnableCollision())return false;
+        if(Object->GetInteractionText().IsEmpty())return false;
         if(const auto* Life=Cast<AICLifeActor>(Object);Life&&Life->LifeType==EICDefinitionType::FishingPoint)return false;
         const FVector Point=InteractionPoint(Object),Offset=Point-Origin;
         const bool AtStation=Object->IsA<AICCraftingStation>()&&Offset.SizeSquared2D()<FMath::Square(25.f);
