@@ -1,0 +1,21 @@
+{
+  "level": "/Game/IsekaiClass/World/Maps/L_OpenWorld",
+  "centre_cm": [
+    -56000,
+    610000
+  ],
+  "ortho_width_cm": 65000,
+  "resolution": [
+    3072,
+    3072
+  ],
+  "right_axis": [
+    0,
+    1
+  ],
+  "down_axis": [
+    -1,
+    0
+  ],
+  "level_saved": false
+}

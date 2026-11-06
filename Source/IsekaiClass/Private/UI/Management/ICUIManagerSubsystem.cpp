@@ -1,4 +1,5 @@
 #include "UI/Management/ICUIManagerSubsystem.h"
+#include "UI/Map/ICMapWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/PlayerController.h"
 #include "Core/Controller/ICPlayerController.h"
@@ -120,6 +121,25 @@ void UICUIManagerSubsystem::AddHUDWidget(UUserWidget* Widget)
 {
     if(EnsureRoot()){Root->AddHUDWidget(Widget);ICInputPresentation::BindTreeHints(Widget);}
 }
+bool UICUIManagerSubsystem::ToggleVillageMap()
+{
+    auto* PC=Cast<AICPlayerController>(GetLocalPlayer()->GetPlayerController(GetWorld()));
+    if(!PC)return false;
+    if(VillageMapScreen)
+    {
+        CloseScreen(VillageMapScreen);
+        if(PC->Menu==TEXT("VillageMap"))PC->SetMenu(TEXT(""));
+        return true;
+    }
+    if(!PC->bCreated||!PC->GetPawn()||PC->IsDead()||PC->IsPaused()||!PC->Menu.IsEmpty()||PC->bInEvent||PC->bInDialogue)return false;
+    auto* Map=UICMapWidget::CreateVillageMap(PC);
+    if(!Map)return false;
+    PC->SetMenu(TEXT("VillageMap"));
+    if(PC->Menu!=TEXT("VillageMap"))return false;
+    if(!OpenScreen(Map,true,200)){PC->SetMenu(TEXT(""));return false;}
+    VillageMapScreen=Map;
+    return true;
+}
 bool UICUIManagerSubsystem::OpenScreen(UUserWidget* Widget, bool PauseWorld, int32 ZOrder)
 {
     IC_TRACE_FUNCTION();
@@ -139,6 +159,7 @@ void UICUIManagerSubsystem::CloseScreen(UUserWidget* Widget)
 {
     IC_TRACE_FUNCTION();
 
+    if(VillageMapScreen==Widget)VillageMapScreen=nullptr;
     Screens.RemoveAll([Widget](const FScreen& S) { return S.Widget == Widget; });
     if (MenuFocus.Get() == Widget)
         MenuFocus.Reset();
@@ -230,6 +251,7 @@ void UICUIManagerSubsystem::RefreshContext()
 void UICUIManagerSubsystem::CloseAllScreens()
 {
     IC_TRACE_FUNCTION();
+    VillageMapScreen=nullptr;
     auto Copy = Screens;
     Screens.Reset();
     for (const FScreen& S : Copy)
@@ -258,6 +280,11 @@ void UICUIManagerSubsystem::Tick(float DeltaTime)
 {
     IC_TRACE_FUNCTION();
     ICInputPresentation::RefreshHints(GetLocalPlayer());
+    if(VillageMapScreen)
+    {
+        auto* PC=Cast<AICPlayerController>(GetLocalPlayer()->GetPlayerController(GetWorld()));
+        if(!PC||PC->Menu!=TEXT("VillageMap"))CloseScreen(VillageMapScreen);
+    }
     // Newly mounted screens may not have a Slate path until the next layout pass.
     // Complete the original focus request once; never take focus back on every key.
     if(auto* Target=PendingFocus.Get())

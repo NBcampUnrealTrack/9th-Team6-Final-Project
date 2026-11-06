@@ -10,6 +10,7 @@ class AActor;
 class UTextBlock;
 class UWidgetTree;
 class UTexture2D;
+class IInputProcessor;
 
 UCLASS(Blueprintable)
 class ISEKAICLASS_API UICMapWidget : public UUserWidget
@@ -20,6 +21,8 @@ public:
     /** How much of the map the HUD minimap magnifies around the player. */
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map|Minimap",meta=(ClampMin="1.0",ClampMax="8.0")) float MinimapZoom=4.f;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map") TSoftObjectPtr<UDataTable> MapTable;
+    /** Optional map projections keyed by level name (without the PIE prefix). */
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map") TSoftObjectPtr<UDataTable> LevelMapTable = TSoftObjectPtr<UDataTable>(FSoftObjectPath(TEXT("/Game/IsekaiClass/UI/Map/DT_IC_LevelMap.DT_IC_LevelMap")));
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Map") TSoftObjectPtr<UDataTable> PresentationTable;
     UFUNCTION(BlueprintCallable,Category="Map") bool RequestTravel(FName WarpID);
     UFUNCTION(BlueprintPure,Category="Map") bool IsTraveling() const{return bTraveling;}
@@ -28,6 +31,10 @@ public:
     UFUNCTION(BlueprintPure,Category="Map|Minimap") int32 GetTrackedBuildingCount() const;
     UFUNCTION(BlueprintPure,Category="Map|Minimap") int32 GetTrackedNPCCount() const;
     UFUNCTION(BlueprintPure,Category="Map|Minimap") int32 GetTrackedMonsterCount() const;
+    /** Alt + wheel is consumed by the HUD before camera/interaction input. */
+    bool HandleMinimapWheel(const FPointerEvent& Event);
+    bool HandleVillageMapShortcut(const FKeyEvent& Event);
+    static UICMapWidget* CreateVillageMap(APlayerController* PC);
     static void BuildLayout(UWidgetTree* Tree,bool Mini);
     static float MinimapOpacity(FVector2D UV);
     static FVector2D MinimapDisplayUV(FVector2D MapUV,FVector2D CenterUV,float Zoom);
@@ -36,6 +43,10 @@ protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
     virtual void NativeTick(const FGeometry& Geometry,float Delta) override;
+    virtual FReply NativeOnMouseMove(const FGeometry&,const FPointerEvent&) override;
+    virtual FReply NativeOnMouseButtonUp(const FGeometry&,const FPointerEvent&) override;
+    virtual void NativeOnMouseCaptureLost(const FCaptureLostEvent&) override;
+    virtual FReply NativeOnMouseWheel(const FGeometry&,const FPointerEvent&) override;
     virtual FReply NativeOnMouseButtonDown(const FGeometry&,const FPointerEvent&) override;
     virtual FReply NativeOnPreviewKeyDown(const FGeometry&,const FKeyEvent&) override;
 private:
@@ -57,6 +68,16 @@ private:
     int32 SelectedPortal=0;
     FName PendingWarp;
     FText Status;
+    FName ActiveLevelMap;
+    bool bVillageMap=false;
+    double VillageZoom=1.;
+    bool bDraggingVillageMap=false;
+    int32 VillageDragUser=0;
+    FVector2D VillageDragLastScreen=FVector2D::ZeroVector;
+    void ClampVillageCenter();
+    void EndVillageDrag();
+    FVector2D VillageCenterUV=FVector2D(.5,.5);
+    TSharedPtr<IInputProcessor> MinimapWheelInput;
     void RefreshMap();
     void RefreshVisuals(const FGeometry& Geometry);
     FVector2D DisplayUV(FVector Position) const;
@@ -77,5 +98,8 @@ private:
 #if WITH_DEV_AUTOMATION_TESTS
     friend class FICMinimapWorldMarkerCheck;
     friend class FICWarpRequestCheck;
+    friend class FICStaticMapProjectionCheck;
+    friend class FICMinimapWheelCheck;
+    friend class FICVillageMapCheck;
 #endif
 };

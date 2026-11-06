@@ -1,4 +1,6 @@
 #include "UI/Map/ICMapWidget.h"
+#include "UI/Management/ICUIManagerSubsystem.h"
+#include "Engine/LocalPlayer.h"
 #include "UI/Map/ICMapTextureImage.h"
 #include "UI/Map/ICMapPlayerMarkerShape.h"
 #include "UI/Framework/ICWidgetTemplates.h"
@@ -24,11 +26,15 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "EngineUtils.h"
+#include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/Character/ICPlayerCharacter.h"
 #include "Life/Production/ICPlayerLifeComponent.h"
 #include "Rendering/DrawElementTypes.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/IInputProcessor.h"
+#include "Engine/GameViewportClient.h"
+#include "UnrealClient.h"
 #include "Rendering/SlateRenderer.h"
 #include "Settings/ICGameUserSettings.h"
 #include "Styling/CoreStyle.h"
@@ -41,6 +47,32 @@
 
 namespace
 {
+class FICMinimapWheelInput final : public IInputProcessor
+{
+public:
+    explicit FICMinimapWheelInput(UICMapWidget* Widget):Owner(Widget){}
+    virtual void Tick(const float,FSlateApplication&,TSharedRef<ICursor>) override {}
+    virtual bool HandleKeyDownEvent(FSlateApplication&,const FKeyEvent& Event) override
+    {
+        auto* Widget=Owner.Get();auto* World=Widget?Widget->GetWorld():nullptr;
+        auto* Client=World?World->GetGameViewport():nullptr;
+        if(!World||!World->IsGameWorld()||!Client||!Client->Viewport||
+            !Client->Viewport->HasFocus()||!Client->Viewport->HasMouseCapture())return false;
+        return Widget->HandleVillageMapShortcut(Event);
+    }
+    virtual bool HandleMouseWheelOrGestureEvent(FSlateApplication&,const FPointerEvent& Event,const FPointerEvent*) override
+    {
+        auto* Widget=Owner.Get();
+        auto* World=Widget?Widget->GetWorld():nullptr;
+        auto* Client=World?World->GetGameViewport():nullptr;
+        // Never intercept the editor, another PIE window, or an uncaptured cursor.
+        if(!World||!World->IsGameWorld()||!Client||!Client->Viewport||
+            !Client->Viewport->HasFocus()||!Client->Viewport->HasMouseCapture())return false;
+        return Widget->HandleMinimapWheel(Event);
+    }
+private:
+    TWeakObjectPtr<UICMapWidget> Owner;
+};
 FText Local(const FText& Text){return ICLocalization::Localize(Text);}
 void WarpButtonStyle(UButton* Button,const FLinearColor& Color)
 {
@@ -101,6 +133,30 @@ void BuildWarpListLayout(UWidgetTree* Tree)
 
 }
 
+UICMapWidget* UICMapWidget::CreateVillageMap(APlayerController* PC)
+{
+    auto* Map=CreateWidget<UICMapWidget>(PC,StaticClass());if(!Map)return nullptr;
+    Map->bVillageMap=true;Map->bMinimap=false;Map->VillageZoom=1.;
+    auto* Tree=Map->WidgetTree.Get();
+    auto* Root=Tree->ConstructWidget<UCanvasPanel>();Tree->RootWidget=Root;
+    const auto Fill=[&](UWidget* W,FAnchors A,FMargin Offsets)
+    {auto* Slot=Root->AddChildToCanvas(W);Slot->SetAnchors(A);Slot->SetOffsets(Offsets);return Slot;};
+    auto* Back=Tree->ConstructWidget<UBorder>();Back->SetBrushColor(FLinearColor(.018f,.026f,.045f,.98f));
+    Fill(Back,FAnchors(0,0,1,1),FMargin(0));
+    auto* Surface=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("MapSurface"));Surface->SetBrushColor(FLinearColor(.055f,.075f,.095f,1));
+    Fill(Surface,FAnchors(.035f,.17f,.965f,.91f),FMargin(0));
+    auto* Content=Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("MapContent"));Content->SetVisibility(ESlateVisibility::HitTestInvisible);
+    Fill(Content,FAnchors(0,0,1,1),FMargin(0));
+    Content->AddChildToCanvas(Tree->ConstructWidget<UICMapTextureImage>(UICMapTextureImage::StaticClass(),TEXT("IMG_Map")));
+    const auto Text=[&](const TCHAR* Name,int32 FontSize,float Y)
+    {auto* T=Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),Name);T->SetFont(ICFrontendLayout::Font(FontSize));Fill(T,FAnchors(.035f,0,.85f,0),FMargin(0,Y,0,42));return T;};
+    Text(TEXT("TXT_MapTitle"),32,30);Text(TEXT("TXT_MapHelp"),18,86);
+    auto* Close=Tree->ConstructWidget<UButton>(UButton::StaticClass(),TEXT("BTN_MapClose"));WarpButtonStyle(Close,FLinearColor(.08f,.2f,.27f));
+    auto* Caption=Tree->ConstructWidget<UTextBlock>();Caption->SetFont(ICFrontendLayout::Font(22));Caption->SetText(NSLOCTEXT("ICMap","Close","닫기"));Close->SetContent(Caption);
+    Fill(Close,FAnchors(1,0),FMargin(-170,35,110,46));Close->OnClicked.AddUniqueDynamic(Map,&UICMapWidget::CloseMap);
+    Map->RefreshMap();Map->RefreshLabels();return Map;
+}
+
 void UICMapWidget::BuildLayout(UWidgetTree* Tree,bool Mini)
 {
     if(!Mini){BuildWarpListLayout(Tree);return;}
@@ -111,7 +167,7 @@ void UICMapWidget::BuildLayout(UWidgetTree* Tree,bool Mini)
     auto* Surface=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),TEXT("MapSurface"));Surface->SetBrushColor(FLinearColor(.055f,.075f,.095f,Mini?.88f:1.f));
     Fill(Surface,Mini?FAnchors(0,0,1,1):FAnchors(.035f,.17f,.965f,.87f));
     auto* Content=Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("MapContent"));Content->SetVisibility(ESlateVisibility::HitTestInvisible);Fill(Content);
-    auto* Image=Tree->ConstructWidget<UICMapTextureImage>(UICMapTextureImage::StaticClass(),TEXT("IMG_Map"));Image->bFadeEdges=Mini;Content->AddChildToCanvas(Image);
+    auto* Image=Tree->ConstructWidget<UICMapTextureImage>(UICMapTextureImage::StaticClass(),TEXT("IMG_Map"));Image->bFadeEdges=false;Content->AddChildToCanvas(Image);
     if(Mini)
     {
         const TCHAR* EdgeNames[]={TEXT("MinimapFrameTop"),TEXT("MinimapFrameBottom"),TEXT("MinimapFrameLeft"),TEXT("MinimapFrameRight")};
@@ -131,7 +187,7 @@ void UICMapWidget::NativeOnInitialized()
     // HUD silently fall back to full-map coordinates when that happens.
     bMinimap=bMinimap||GetWidgetFromName(TEXT("TXT_MiniHelp"))!=nullptr||GetClass()->GetName().Contains(TEXT("Minimap"));
     SetIsFocusable(!bMinimap);
-    if(bMinimap)if(auto* Help=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_MiniHelp"))))Help->SetText(NSLOCTEXT("ICMap","WarpListShortcut","M · 워프 목록"));
+    if(bMinimap)if(auto* Help=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_MiniHelp"))))Help->SetText(NSLOCTEXT("ICMap","VillageShortcut","N 지도 · M 워프"));
 
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_MapClose"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::CloseMap);
     if(auto* B=Cast<UButton>(GetWidgetFromName(TEXT("BTN_WarpConfirm"))))B->OnClicked.AddUniqueDynamic(this,&ThisClass::ConfirmTravel);
@@ -146,9 +202,17 @@ void UICMapWidget::NativeConstruct()
     Super::NativeConstruct();
     // Nested HUD widgets may initialize before their owning player is assigned.
     RefreshMap();RefreshLabels();UpdateCanTick();
+    if(bMinimap&&!MinimapWheelInput&&FSlateApplication::IsInitialized())
+    {
+        MinimapWheelInput=MakeShared<FICMinimapWheelInput>(this);
+        FSlateApplication::Get().RegisterInputPreProcessor(MinimapWheelInput,0);
+    }
 }
 void UICMapWidget::NativeDestruct()
 {
+    EndVillageDrag();
+    if(MinimapWheelInput&&FSlateApplication::IsInitialized())FSlateApplication::Get().UnregisterInputPreProcessor(MinimapWheelInput);
+    MinimapWheelInput.Reset();
     if(bTraveling)if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->bInEvent=false;
     bTraveling=false;bConfirming=false;Super::NativeDestruct();
 }
@@ -157,13 +221,24 @@ void UICMapWidget::RefreshMap()
     if(MapTable.IsNull())MapTable=TSoftObjectPtr<UDataTable>(FSoftObjectPath(TEXT("/Game/IsekaiClass/Data/DataTable/World/DT_IC_Map.DT_IC_Map")));
     if(PresentationTable.IsNull())PresentationTable=TSoftObjectPtr<UDataTable>(FSoftObjectPath(TEXT("/Game/IsekaiClass/Data/DataTable/Settings/DT_IC_MapPresentation.DT_IC_MapPresentation")));
     if(auto* T=PresentationTable.LoadSynchronous())if(auto* R=T->FindRow<FICMapPresentationRow>(TEXT("Default"),TEXT("Map"),false))Rules=*R;
-    if(auto* T=MapTable.LoadSynchronous())if(auto* R=T->FindRow<FICMapRow>(Rules.MapID,TEXT("Map"),false);R&&!R->Layers.IsEmpty())
-    {Layer=R->Layers[0];MapTexture=Layer.MapTexture.LoadSynchronous();MapMinimumZoom=R->MinimumZoom;MapMaximumZoom=R->MaximumZoom;}
+    const FICMapRow* MapRow=nullptr;
+    ActiveLevelMap=NAME_None;
+    const FName LevelName(*UGameplayStatics::GetCurrentLevelName(this,true));
+    if(auto* T=LevelMapTable.LoadSynchronous())
+        if(const auto* R=T->FindRow<FICMapRow>(LevelName,TEXT("Level map"),false);R&&!R->Layers.IsEmpty())
+        {MapRow=R;ActiveLevelMap=LevelName;}
+    if(!MapRow)if(auto* T=MapTable.LoadSynchronous())MapRow=T->FindRow<FICMapRow>(Rules.MapID,TEXT("Map"),false);
+    Layer=FICMapLayerDefinition();MapTexture=nullptr;MapMinimumZoom=1.;MapMaximumZoom=4.;
+    if(MapRow&&!MapRow->Layers.IsEmpty())
+    {
+        Layer=MapRow->Layers[0];MapTexture=Layer.MapTexture.LoadSynchronous();
+        MapMinimumZoom=FMath::Max(1.,MapRow->MinimumZoom);MapMaximumZoom=FMath::Max(MapMinimumZoom,MapRow->MaximumZoom);
+    }
     Portals.Reset();if(auto* World=GetWorld())for(TActorIterator<AICWarpStone> It(World);It;++It)if(!It->WarpID.IsNone())Portals.Add(*It);
     Portals.Sort([](const auto& A,const auto& B){return A->WarpID.LexicalLess(B->WarpID);});
     SelectedPortal=FMath::Clamp(SelectedPortal,0,FMath::Max(0,Portals.Num()-1));
     Buildings.Reset();NPCs.Reset();Monsters.Reset();
-    if(bMinimap)if(auto* World=GetWorld())
+    if(bMinimap||bVillageMap)if(auto* World=GetWorld())
     {
         for(TActorIterator<AActor> It(World);It;++It)if(It->ActorHasTag(TEXT("IC.Map.Building")))Buildings.Add(*It);
         // L_OpenWorld's houses are modular kits rather than one tagged root actor.
@@ -214,6 +289,12 @@ FText UICMapWidget::DestinationName(FName ID) const
 void UICMapWidget::RefreshLabels()
 {
     if(bMinimap)return;
+    if(bVillageMap)
+    {
+        if(auto* T=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_MapTitle"))))T->SetText(NSLOCTEXT("ICMap","VillageTitle","마을 지도"));
+        if(auto* T=Cast<UTextBlock>(GetWidgetFromName(TEXT("TXT_MapHelp"))))T->SetText(FText::Format(NSLOCTEXT("ICMap","VillageDragHelp","휠: 확대·축소 · 좌클릭 드래그: 이동 · N / Esc: 닫기 · M: 워프  |  {0}배"),FText::AsNumber(VillageZoom)));
+        return;
+    }
     auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
     const auto* Player=PC?Cast<AICPlayerCharacter>(PC->GetPawn()):nullptr;
     const int32 PlayerGold=PC&&PC->GetWorldState()?PC->GetWorldState()->ExportState().Gold:0;
@@ -270,7 +351,7 @@ FVector2D UICMapWidget::MinimapDisplayUV(FVector2D MapUV,FVector2D CenterUV,floa
 FVector2D UICMapWidget::DisplayUV(FVector P) const
 {
     const FVector2D MapUV=WorldToMapUV(P);
-    return bMinimap?MinimapDisplayUV(MapUV,MinimapCenterUV,FMath::Clamp(double(MinimapZoom),MapMinimumZoom,MapMaximumZoom)):MapUV;
+    return bMinimap?MinimapDisplayUV(MapUV,MinimapCenterUV,FMath::Clamp(double(MinimapZoom),MapMinimumZoom,MapMaximumZoom)):bVillageMap?MinimapDisplayUV(MapUV,VillageCenterUV,VillageZoom):MapUV;
 }
 FSlateRect UICMapWidget::ImageRect(const FGeometry& G) const
 {
@@ -292,21 +373,24 @@ float UICMapWidget::MinimapOpacity(FVector2D UV)
 }
 void UICMapWidget::RefreshVisuals(const FGeometry& G)
 {
-    if(!bMinimap)return;
+    if(!bMinimap&&!bVillageMap)return;
     auto* Canvas=Cast<UCanvasPanel>(GetWidgetFromName(TEXT("MapContent")));
     auto* Image=Cast<UICMapTextureImage>(GetWidgetFromName(TEXT("IMG_Map")));if(!Canvas||!Image)return;
     auto* PC=Cast<AICPlayerController>(GetOwningPlayer());auto* Player=PC?Cast<AICPlayerCharacter>(PC->GetPawn()):nullptr;
-    const double Zoom=bMinimap?FMath::Clamp(double(MinimapZoom),MapMinimumZoom,MapMaximumZoom):1.;
+    const double Zoom=bMinimap?FMath::Clamp(double(MinimapZoom),MapMinimumZoom,MapMaximumZoom):bVillageMap?VillageZoom:1.;
     if(bMinimap&&Player)
     {
-        // Radar-style minimap: the player stays centred and nearby markers move.
+        // The image and every marker use the same player-centred UV window.
         MinimapCenterUV=WorldToMapUV(Player->GetActorLocation());
     }
     const auto Rect=ImageRect(G);const FVector2D Size(Rect.Right-Rect.Left,Rect.Bottom-Rect.Top);
+    // Saved minimap blueprints may still contain the old edge-fade setting.
+    if(Image->bFadeEdges){Image->bFadeEdges=false;Image->SynchronizeProperties();}
     Image->SetTexture(MapTexture);
-    Image->SetVisibility(bMinimap?ESlateVisibility::Collapsed:ESlateVisibility::HitTestInvisible);
+    Image->SetVisibility(ESlateVisibility::HitTestInvisible);
     const FVector2D HalfUV(.5/Zoom,.5/Zoom);
-    Image->SetUVRegion(bMinimap?MinimapCenterUV-HalfUV:FVector2D::ZeroVector,bMinimap?MinimapCenterUV+HalfUV:FVector2D(1,1));
+    const FVector2D Center=bMinimap?MinimapCenterUV:VillageCenterUV;
+    Image->SetUVRegion(Center-HalfUV,Center+HalfUV);
     if(auto* S=Cast<UCanvasPanelSlot>(Image->Slot)){S->SetPosition({Rect.Left,Rect.Top});S->SetSize(Size);}
     TSet<FName> Active;
     for(int32 I=0;I<Portals.Num();++I)if(auto* Portal=Portals[I].Get())
@@ -321,7 +405,7 @@ void UICMapWidget::RefreshVisuals(const FGeometry& G)
         const auto UV=DisplayUV(Portal->GetActorLocation());
         Marker->SetVisibility(UV.X>=0&&UV.X<=1&&UV.Y>=0&&UV.Y<=1?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
         const bool Unlocked=Player&&Player->PartyWarp&&Player->PartyWarp->IsWarpUnlocked(Portal->WarpID);
-        const bool Selected=!bMinimap&&I==SelectedPortal;
+        const bool Selected=!bMinimap&&!bVillageMap&&I==SelectedPortal;
         for(const auto* Name:{TEXT("PortalUnlocked"),TEXT("PortalLocked"),TEXT("PortalSelected")})
         {
             const bool Show=FString(Name)==TEXT("PortalSelected")?Selected:FString(Name)==TEXT("PortalUnlocked")?Unlocked&&!Selected:!Unlocked&&!Selected;
@@ -352,7 +436,7 @@ void UICMapWidget::RefreshVisuals(const FGeometry& G)
             CastChecked<UCanvasPanelSlot>(Marker->Slot)->SetPosition(MarkerPosition(Rect,Actor->GetActorLocation()));
         }
     };
-    if(bMinimap)
+    if(bMinimap||bVillageMap)
     {
         AddWorldMarkers(Buildings,TEXT("■"),FLinearColor(1.f,.7f,.18f),1,NSLOCTEXT("ICMap","BuildingMarker","건물"));
         AddWorldMarkers(NPCs,TEXT("●"),FLinearColor(.2f,.85f,1.f),2,NSLOCTEXT("ICMap","NPCMarker","NPC"));
@@ -390,7 +474,7 @@ void UICMapWidget::Portal3(){ChoosePortal(3);}
 bool UICMapWidget::RequestTravel(FName ID)
 {
     auto* PC=Cast<AICPlayerController>(GetOwningPlayer());auto* Player=PC?Cast<AICPlayerCharacter>(PC->GetPawn()):nullptr;
-    if(bMinimap||bConfirming||bTraveling||(!GetParent()&&!IsInViewport())||!PC||!Player||!Player->PartyWarp||!PC->bCreated||PC->IsDead()||PC->bInCombat||PC->bInDialogue||PC->bInEvent||PC->Menu!=TEXT("Map")||(Player->LifeActions&&(Player->LifeActions->IsWorking()||Player->LifeActions->IsSleeping())))return false;
+    if(bMinimap||bVillageMap||bConfirming||bTraveling||(!GetParent()&&!IsInViewport())||!PC||!Player||!Player->PartyWarp||!PC->bCreated||PC->IsDead()||PC->bInCombat||PC->bInDialogue||PC->bInEvent||PC->Menu!=TEXT("Map")||(Player->LifeActions&&(Player->LifeActions->IsWorking()||Player->LifeActions->IsSleeping())))return false;
     const int32 Index=Portals.IndexOfByPredicate([ID](const auto& P){return P.IsValid()&&P->WarpID==ID;});
     if(Index==INDEX_NONE||!Player->PartyWarp->IsWarpUnlocked(ID))return false;
     PendingWarp=ID;SelectedPortal=Index;bConfirming=true;bConfirmSelected=true;Status=FText::GetEmpty();
@@ -419,7 +503,7 @@ void UICMapWidget::ConfirmTravel()
 bool UICMapWidget::BeginTravel(FName ID)
 {
     auto* PC=Cast<AICPlayerController>(GetOwningPlayer());auto* Player=PC?Cast<AICPlayerCharacter>(PC->GetPawn()):nullptr;
-    if(bMinimap||bTraveling||(!GetParent()&&!IsInViewport())||!PC||!Player||!Player->PartyWarp||!PC->bCreated||PC->IsDead()||PC->bInCombat||PC->bInDialogue||PC->bInEvent||PC->Menu!=TEXT("Map")||(Player->LifeActions&&(Player->LifeActions->IsWorking()||Player->LifeActions->IsSleeping())))return false;
+    if(bMinimap||bVillageMap||bTraveling||(!GetParent()&&!IsInViewport())||!PC||!Player||!Player->PartyWarp||!PC->bCreated||PC->IsDead()||PC->bInCombat||PC->bInDialogue||PC->bInEvent||PC->Menu!=TEXT("Map")||(Player->LifeActions&&(Player->LifeActions->IsWorking()||Player->LifeActions->IsSleeping())))return false;
     if(!Portals.ContainsByPredicate([ID](const auto& P){return P.IsValid()&&P->WarpID==ID;}))return false;
     FString Reason;if(!Player->PartyWarp->CanWarp(ID,Rules.TravelCostGold,Reason)){Status=Local(FText::FromString(Reason));RefreshLabels();return false;}
     PendingWarp=ID;bTraveling=true;bMoved=false;TravelElapsed=0;PC->bInEvent=true;Player->GetCharacterMovement()->StopMovementImmediately();
@@ -446,16 +530,116 @@ void UICMapWidget::NativeTick(const FGeometry& G,float Delta)
     if(bMoved&&TravelElapsed>=Duration)
     {bTraveling=false;PC->bInEvent=false;PC->SetMenu(TEXT(""));PC->AutoSavePlayer();}
 }
-void UICMapWidget::CloseMap(){if(bConfirming){CancelTravelConfirmation();return;}if(!bTraveling)if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->SetMenu(TEXT(""));}
+void UICMapWidget::CloseMap(){if(bVillageMap){EndVillageDrag();if(auto* PC=GetOwningPlayer())if(auto* LocalPlayer=PC->GetLocalPlayer())LocalPlayer->GetSubsystem<UICUIManagerSubsystem>()->ToggleVillageMap();return;}if(bConfirming){CancelTravelConfirmation();return;}if(!bTraveling)if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->SetMenu(TEXT(""));}
+bool UICMapWidget::HandleVillageMapShortcut(const FKeyEvent& Event)
+{
+    if(Event.GetKey()!=EKeys::N||Event.IsAltDown()||Event.IsControlDown()||Event.IsCommandDown()||!bMinimap||!IsVisible()||!GetIsEnabled())return false;
+    auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
+    if(!PC||!PC->IsLocalController()||!PC->GetLocalPlayer()||!PC->Menu.IsEmpty()||!PC->bCreated||!PC->GetPawn()||PC->IsDead()||PC->bInEvent||PC->bInDialogue)return false;
+    if(Event.IsRepeat())return true;
+    return PC->GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>()->ToggleVillageMap();
+}
+void UICMapWidget::ClampVillageCenter()
+{
+    const double Half=.5/FMath::Max(1.,VillageZoom);
+    VillageCenterUV.X=FMath::Clamp(VillageCenterUV.X,Half,1.-Half);
+    VillageCenterUV.Y=FMath::Clamp(VillageCenterUV.Y,Half,1.-Half);
+}
+void UICMapWidget::EndVillageDrag()
+{
+    bDraggingVillageMap=false;
+    if(HasMouseCaptureByUser(VillageDragUser)&&FSlateApplication::IsInitialized())
+        FSlateApplication::Get().ReleaseAllPointerCapture(VillageDragUser);
+}
+FReply UICMapWidget::NativeOnMouseMove(const FGeometry& G,const FPointerEvent& Event)
+{
+    if(!bVillageMap||!bDraggingVillageMap)return Super::NativeOnMouseMove(G,Event);
+    if(!Event.IsMouseButtonDown(EKeys::LeftMouseButton))
+    {bDraggingVillageMap=false;return FReply::Handled().ReleaseMouseCapture();}
+    const auto Rect=ImageRect(G);const FVector2D Size(Rect.Right-Rect.Left,Rect.Bottom-Rect.Top);
+    const FVector2D Current=Event.GetScreenSpacePosition();
+    if(Size.X>0&&Size.Y>0)
+    {
+        // Convert screen motion through geometry for DPI scaling. The paper follows the hand.
+        const FVector2D Delta=G.AbsoluteToLocal(Current)-G.AbsoluteToLocal(VillageDragLastScreen);
+        VillageCenterUV-=Delta/(Size*VillageZoom);
+        ClampVillageCenter();RefreshVisuals(G);
+    }
+    VillageDragLastScreen=Current;
+    return FReply::Handled();
+}
+FReply UICMapWidget::NativeOnMouseButtonUp(const FGeometry& G,const FPointerEvent& Event)
+{
+    if(bVillageMap&&bDraggingVillageMap&&Event.GetEffectingButton()==EKeys::LeftMouseButton)
+    {bDraggingVillageMap=false;return FReply::Handled().ReleaseMouseCapture();}
+    return Super::NativeOnMouseButtonUp(G,Event);
+}
+void UICMapWidget::NativeOnMouseCaptureLost(const FCaptureLostEvent& Event)
+{
+    bDraggingVillageMap=false;
+    Super::NativeOnMouseCaptureLost(Event);
+}
+FReply UICMapWidget::NativeOnMouseWheel(const FGeometry& G,const FPointerEvent& Event)
+{
+    if(!bVillageMap)return Super::NativeOnMouseWheel(G,Event);
+    const float Delta=Event.GetWheelDelta();
+    const auto Rect=ImageRect(G);const FVector2D Size(Rect.Right-Rect.Left,Rect.Bottom-Rect.Top);
+    const FVector2D Mouse=G.AbsoluteToLocal(Event.GetScreenSpacePosition());
+    if(FMath::IsFinite(Delta)&&Size.X>0&&Size.Y>0&&Rect.ContainsPoint(Mouse))
+    {
+        const double Next=FMath::Clamp(VillageZoom*FMath::Pow(1.25,FMath::Clamp(double(Delta),-32.,32.)),1.,FMath::Max(1.,MapMaximumZoom));
+        const FVector2D LocalUV=(Mouse-FVector2D(Rect.Left,Rect.Top))/Size;
+        VillageCenterUV+=(LocalUV-FVector2D(.5,.5))*(1./VillageZoom-1./Next);
+        VillageZoom=Next;ClampVillageCenter();
+        if(VillageZoom<=1.)EndVillageDrag();
+        RefreshVisuals(G);RefreshLabels();
+    }
+    return FReply::Handled();
+}
+
+bool UICMapWidget::HandleMinimapWheel(const FPointerEvent& Event)
+{
+    auto* PC=Cast<AICPlayerController>(GetOwningPlayer());
+    const float Delta=Event.GetWheelDelta();
+    if(!Event.IsAltDown()||Event.IsControlDown()||Event.IsCommandDown()||!FMath::IsFinite(Delta)||FMath::IsNearlyZero(Delta)||
+        !bMinimap||!IsVisible()||!GetIsEnabled()||!PC||!PC->IsLocalController()||!PC->bCreated||!PC->GetPawn()||
+        PC->IsDead()||PC->IsPaused()||!PC->Menu.IsEmpty()||PC->bInEvent||PC->bInDialogue||bTraveling||bConfirming)return false;
+    const double Current=FMath::Clamp(double(MinimapZoom),MapMinimumZoom,MapMaximumZoom);
+    MinimapZoom=static_cast<float>(FMath::Clamp(Current*FMath::Pow(1.25,FMath::Clamp(double(Delta),-32.,32.)),MapMinimumZoom,MapMaximumZoom));
+    RefreshVisuals(GetPaintSpaceGeometry());
+    // Consume even at the limit, so an extra wheel notch cannot move the camera.
+    return true;
+}
+
 FReply UICMapWidget::NativeOnMouseButtonDown(const FGeometry& G,const FPointerEvent& Event)
 {
     if(Event.GetEffectingButton()!=EKeys::LeftMouseButton)return Super::NativeOnMouseButtonDown(G,Event);
+    if(bVillageMap)
+    {
+        const auto Rect=ImageRect(G);
+        if(VillageZoom>1.&&Rect.Right>Rect.Left&&Rect.Bottom>Rect.Top&&Rect.ContainsPoint(G.AbsoluteToLocal(Event.GetScreenSpacePosition())))
+        {
+            bDraggingVillageMap=true;VillageDragUser=Event.GetUserIndex();VillageDragLastScreen=Event.GetScreenSpacePosition();
+            return FReply::Handled().CaptureMouse(TakeWidget()).SetUserFocus(TakeWidget(),EFocusCause::Mouse);
+        }
+        return FReply::Handled();
+    }
+
     if(bTraveling||bConfirming)return FReply::Handled();
     if(bMinimap){if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer());PC&&PC->bCreated&&!PC->bInEvent)PC->SetMenu(TEXT("Map"));return FReply::Handled();}
     return Super::NativeOnMouseButtonDown(G,Event);
 }
 FReply UICMapWidget::NativeOnPreviewKeyDown(const FGeometry& G,const FKeyEvent& Event)
 {
+    if(bVillageMap)
+    {
+        if(Event.GetKey()==EKeys::N||Event.GetKey()==EKeys::Escape||Event.GetKey()==EKeys::M)
+        {
+            if(!Event.IsRepeat()){CloseMap();if(Event.GetKey()==EKeys::M)if(auto* PC=Cast<AICPlayerController>(GetOwningPlayer()))PC->SetMenu(TEXT("Map"));}
+            return FReply::Handled();
+        }
+        return Super::NativeOnPreviewKeyDown(G,Event);
+    }
     if(bMinimap)return Super::NativeOnPreviewKeyDown(G,Event);
     if(bTraveling)return FReply::Handled();
     const FKey Key=UICGameUserSettings::MenuKey(Event.GetKey());

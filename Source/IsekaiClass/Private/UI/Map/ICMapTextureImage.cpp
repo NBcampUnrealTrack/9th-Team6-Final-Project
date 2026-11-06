@@ -19,12 +19,14 @@ public:
     virtual int32 OnPaint(const FPaintArgs&,const FGeometry& G,const FSlateRect&,FSlateWindowElementList& E,int32 L,const FWidgetStyle& Style,bool) const override
     {
         if(!Brush.GetResourceObject())return L;
+        FVector2D LocalMin,LocalMax;
+        if(!UICMapTextureImage::ClipUVRegion(UVMin,UVMax,LocalMin,LocalMax))return L;
         const int32 Columns=bFade?32:1,Rows=bFade?16:1;
         TArray<FSlateVertex> Vertices;TArray<SlateIndex> Indices;
         const auto Transform=G.GetAccumulatedRenderTransform();const FVector2D Size=G.GetLocalSize();
         for(int32 Y=0;Y<=Rows;++Y)for(int32 X=0;X<=Columns;++X)
         {
-            const FVector2D LocalUV(double(X)/Columns,double(Y)/Rows);
+            const FVector2D LocalUV(FMath::Lerp(LocalMin.X,LocalMax.X,double(X)/Columns),FMath::Lerp(LocalMin.Y,LocalMax.Y,double(Y)/Rows));
             const FVector2D TextureUV(
                 FMath::Lerp(UVMin.X,UVMax.X,LocalUV.X),
                 FMath::Lerp(UVMin.Y,UVMax.Y,LocalUV.Y));
@@ -42,8 +44,14 @@ void UICMapTextureImage::SynchronizeProperties()
 void UICMapTextureImage::SetTexture(UTexture2D* Value){if(Texture!=Value){Texture=Value;SynchronizeProperties();}}
 void UICMapTextureImage::SetUVRegion(FVector2D Min,FVector2D Max)
 {
-    Min.X=FMath::Clamp(Min.X,0.,1.);Min.Y=FMath::Clamp(Min.Y,0.,1.);
-    Max.X=FMath::Clamp(Max.X,Min.X,1.);Max.Y=FMath::Clamp(Max.Y,Min.Y,1.);
     if(!UVMin.Equals(Min)||!UVMax.Equals(Max)){UVMin=Min;UVMax=Max;SynchronizeProperties();}
+}
+bool UICMapTextureImage::ClipUVRegion(FVector2D Min,FVector2D Max,FVector2D& LocalMin,FVector2D& LocalMax)
+{
+    const FVector2D Span=Max-Min;
+    if(Span.X<=UE_SMALL_NUMBER||Span.Y<=UE_SMALL_NUMBER)return false;
+    LocalMin={FMath::Clamp(-Min.X/Span.X,0.,1.),FMath::Clamp(-Min.Y/Span.Y,0.,1.)};
+    LocalMax={FMath::Clamp((1.-Min.X)/Span.X,0.,1.),FMath::Clamp((1.-Min.Y)/Span.Y,0.,1.)};
+    return LocalMax.X>LocalMin.X&&LocalMax.Y>LocalMin.Y;
 }
 void UICMapTextureImage::ReleaseSlateResources(bool Children){Super::ReleaseSlateResources(Children);Image.Reset();}
