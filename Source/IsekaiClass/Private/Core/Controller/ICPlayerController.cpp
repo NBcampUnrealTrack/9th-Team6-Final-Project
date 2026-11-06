@@ -200,8 +200,14 @@ void AICPlayerController::TryInitializeGameplay()
     }
     else if (State->ExportState().bPlayerCreated)
     {
+        const bool bLoadingSession = Flow->Phase == EICGameFlowPhase::Loading || Flow->Phase == EICGameFlowPhase::Initializing;
+        if (bLoadingSession)
+        {
+            Flow->BeginInitialization();
+            SetMenu(TEXT("Loading"));
+        }
         RestoreFromWorldState_Implementation(State->ExportState());
-        Flow->CompleteNewGame();
+        if (!bLoadingSession) Flow->CompleteNewGame();
         if (auto* Quests = GetGameInstance()->GetSubsystem<UICQuestSubsystem>())
         {
             Quests->RefreshAvailableQuests();
@@ -575,7 +581,9 @@ void AICPlayerController::RestoreFromWorldState_Implementation(const FICWorldSta
     if(auto* PlayerPawn=Cast<AICPlayerCharacter>(GetPawn()))
     {PlayerPawn->InitializeState(UICWorldStateSubsystem::PlayerId());PlayerPawn->RestoreFromWorldState_Implementation(Candidate);PlayerPawn->ApplyPreset(Preset);PlayerPawn->SetActorLocation(Candidate.PlayerPosition);PlayerPawn->GetCharacterMovement()->StopMovementImmediately();}
     SynchronizeDrops();
-    SetControlRotation(Candidate.PlayerRotation);SetMenu(bCreated?TEXT(""):GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->bPendingNewGame?TEXT("Loading"):TEXT("Create"));
+    SetControlRotation(Candidate.PlayerRotation);
+    if (Menu != TEXT("Loading"))
+        SetMenu(bCreated?TEXT(""):GetGameInstance()->GetSubsystem<UICGameFlowSubsystem>()->bPendingNewGame?TEXT("Loading"):TEXT("Create"));
     const FName Jobs[]={TEXT("Warrior"),TEXT("Archer"),TEXT("Mage"),TEXT("Healer")};
     if(Candidate.bPlayerCreated&&!bInitialSavePending)OnPlayerInitialized.Broadcast(Jobs[Job],FirstSkill);
 }

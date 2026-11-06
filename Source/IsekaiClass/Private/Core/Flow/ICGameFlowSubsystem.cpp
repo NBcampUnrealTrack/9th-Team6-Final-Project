@@ -111,35 +111,42 @@ bool UICGameFlowSubsystem::BeginNewGame(AICPlayerController* Controller)
     Saves->SetAutoSaveSuspended(true);
     Time->ResetClock();
     bPendingNewGame = true;
-    Phase = EICGameFlowPhase::Loading;
-    LastError.Empty();
-    OnChanged.Broadcast();
     if (Controller->GetLocalPlayer())
         if (auto* UI = Controller->GetLocalPlayer()->GetSubsystem<UICUIManagerSubsystem>())
             UI->CloseAllScreens();
-    Controller->SetMenu(TEXT("Loading"));
-    // Let the newly mounted loading screen paint before OpenLevel blocks the
-    // game thread. PIE does not run MoviePlayer, and fast initial saves used to
-    // replace this screen before it could appear on even a single frame.
-    CancelPendingTravel();
-    const TWeakObjectPtr<AICPlayerController> WeakController(Controller);
-    PendingTravel=FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,[this,WeakController,Map](float)
+    ShowLoadingThen(Controller, FSimpleDelegate::CreateWeakLambda(Controller, [this, Controller, Map]
     {
-        PendingTravel.Reset();
-        auto* PC=WeakController.Get();
-        if(!PC||!bPendingNewGame||Phase!=EICGameFlowPhase::Loading)return false;
         GetGameInstance()->GetSubsystem<UICTimeSubsystem>()->PrepareForTravel();
         GetGameInstance()->GetSubsystem<UICLoadingScreenSubsystem>()->Arm();
-        UGameplayStatics::SetGamePaused(PC,false);
-        UGameplayStatics::OpenLevel(PC,FName(*Map));
-        return false;
+        UGameplayStatics::SetGamePaused(Controller, false);
+        UGameplayStatics::OpenLevel(Controller, FName(*Map));
     }),1.2f);
     return true;
 }
 
+void UICGameFlowSubsystem::ShowLoadingThen(AICPlayerController* Controller, FSimpleDelegate Work, float Delay)
+{
+    CancelPendingTravel();
+    LastError.Empty();
+    Phase = EICGameFlowPhase::Loading;
+    OnChanged.Broadcast();
+    Controller->SetMenu(TEXT("Loading"));
+
+    // A synchronous save read or map load must start after Slate can paint the cover.
+    const uint64 ShownFrame = GFrameCounter;
+    PendingTravel = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
+        [this, Work = MoveTemp(Work), ShownFrame](float)
+        {
+            if (GFrameCounter - ShownFrame < 2) return true;
+            PendingTravel.Reset();
+            if (Phase == EICGameFlowPhase::Loading) Work.ExecuteIfBound();
+            return false;
+        }), Delay);
+}
+
 void UICGameFlowSubsystem::BeginInitialization(bool bRetry)
 {
-    if (!bPendingNewGame || (Phase == EICGameFlowPhase::Failed && !bRetry))
+    if (Phase != EICGameFlowPhase::Loading && Phase != EICGameFlowPhase::Initializing && !(bRetry && bPendingNewGame))
         return;
     LastError.Empty();
     Phase = EICGameFlowPhase::Initializing;

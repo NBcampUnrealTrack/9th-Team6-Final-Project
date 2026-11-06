@@ -252,7 +252,7 @@ void UBTService_ICMonsterState::TickNode(UBehaviorTreeComponent& OwnerComp, uint
     const bool bReturning = Enemy->IsReturning();
     if (bReturning) bInvestigating = false;
     const bool bInAttackRange = !bReturning && Target
-        && FVector::DistSquared(Enemy->GetActorLocation(), Target->GetActorLocation()) <= FMath::Square(Definition.AttackRangeCm);
+        && FVector::DistSquared(Enemy->GetActorLocation(), Target->GetActorLocation()) <= FMath::Square(Enemy->GetAttackRangeCm());
 
     WriteObject(Blackboard, TargetActorKey, bReturning ? nullptr : Target);
     WriteBool(Blackboard, IsReturningKey, bReturning);
@@ -391,7 +391,7 @@ EBTNodeResult::Type UBTTask_ICMonsterAttack::PerformAttack(UBehaviorTreeComponen
 
     const FICMonsterRow& Definition = Enemy->GetMonsterDefinition();
     const double DistanceSquared = FVector::DistSquared(Enemy->GetActorLocation(), Target->GetActorLocation());
-    if (DistanceSquared > FMath::Square(Definition.AttackRangeCm)) return EBTNodeResult::Failed;
+    if (DistanceSquared > FMath::Square(Enemy->GetAttackRangeCm())) return EBTNodeResult::Failed;
 
     Controller->StopMovement();
     Enemy->GetCharacterMovement()->StopMovementImmediately();
@@ -439,3 +439,4 @@ EBTNodeResult::Type UBTTask_ICMonsterAttack::PerformAttack(UBehaviorTreeComponen
     Controller->SetMonsterActionReadyAt(ASC->PlaySecond() + FMath::Max(0.25, Definition.AttackIntervalPlaySeconds));
     return EBTNodeResult::Succeeded;
 }
+

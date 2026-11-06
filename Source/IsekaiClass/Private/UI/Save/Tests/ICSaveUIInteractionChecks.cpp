@@ -212,14 +212,19 @@ public:
             Test->TestTrue(TEXT("Visible close action is pointer-clickable"),Click(Client,View,TEXT("IC_SaveLoad_Close")));Next(18);return false;
         }
         if(Stage==20){Press(EKeys::F);Next(21);return false;}
-        if(Stage==21){if(!Popup)return false;Click(Client,Popup,TEXT("IC_LoadConfirm_Confirm"));Next(23);return false;}
+        if(Stage==21)
+        {
+            if(!Popup||!Click(Client,Popup,TEXT("IC_LoadConfirm_Confirm")))return false;
+            Test->TestEqual(TEXT("Confirmed in-game load shows the cover before restoring"),PC->Menu,FString(TEXT("Loading")));
+            Next(23);return false;
+        }
         return false;
     }
     bool FinishIfReady()
     {
         if(Stage!=23||FPlatformTime::Seconds()-StageAt<.3)return false;
         UWorld* World=GEditor->PlayWorld;auto* PC=World?Cast<AICPlayerController>(World->GetFirstPlayerController()):nullptr;
-        if(!PC)return false;
+        if(!PC||PC->Menu==TEXT("Loading"))return false;
         Test->TestFalse(TEXT("Closing save UI releases its pause requests"),World->IsPaused());
         Test->TestFalse(TEXT("Gameplay cursor restored"),PC->bShowMouseCursor);
         Test->TestEqual(TEXT("Load confirmation restores the saved player state"),PC->Gold,SavedGold);

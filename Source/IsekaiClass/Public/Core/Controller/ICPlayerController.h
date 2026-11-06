@@ -235,7 +235,7 @@ private:
     friend class UICGatheringSubsystem;
     TSoftObjectPtr<UWorld> SessionGameplayMap;
     UPROPERTY(Transient) TObjectPtr<UICSaveLoadWidget> SessionSaveLoadScreen;
-    bool LoadSelectedSessionSlot();
+    bool LoadSelectedSessionSlot(bool bContinue = false);
     void ExecuteCombatInput(FName Action,int32 Slot);
     void SelectCombatTarget(bool Next);
     void BeginSkillTarget(class AICCharacterBase* Caster, FName SkillID);
