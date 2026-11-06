@@ -70,6 +70,9 @@ USTRUCT(BlueprintType)
 struct ISEKAICLASS_API FICCombatPresentation
 {
     GENERATED_BODY()
+    /** Zero preserves the Niagara system's authored lifetime. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation", meta=(ClampMin="0")) float MaxVFXLifetimeSeconds = 0.f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Presentation") bool bSuppressDefaultVFX = false;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UTexture2D> Icon;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Presentation") TSoftObjectPtr<UNiagaraSystem> CastVFX;

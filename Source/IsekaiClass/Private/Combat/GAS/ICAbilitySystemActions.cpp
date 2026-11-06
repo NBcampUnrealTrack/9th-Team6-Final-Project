@@ -616,7 +616,7 @@ bool UICAbilitySystemComponent::EmitHit(int32 Index,bool ContinueTrace)
         if(!Target||!Target->GetICAbilitySystem()||Previous+Applied>=Hit->MaximumTargets)continue;
         // A bite is validated again when it lands: leaving its reach must evade it.
         if(RequestedAction==TEXT("Attack"))if(const auto* Enemy=Cast<AICEnemyBase>(C))
-            if(!C->IsHostileTo(Target)||FVector::DistSquared(C->GetActorLocation(),Target->GetActorLocation())>FMath::Square(Enemy->GetMonsterDefinition().AttackRangeCm))continue;
+            if(!C->IsHostileTo(Target)||FVector::DistSquared(C->GetActorLocation(),Target->GetActorLocation())>FMath::Square(Enemy->GetAttackRangeCm()))continue;
         const FString Receipt=FString::Printf(TEXT("%d:%u"),Index,Target->GetUniqueID());if(HitReceipts.Contains(Receipt))continue;
         FHitResult Wall;FCollisionQueryParams Q;Q.AddIgnoredActor(C);Q.AddIgnoredActor(Target);
         if(Hit->bStopAtWorldCollision&&GetWorld()->LineTraceSingleByChannel(Wall,C->GetActorLocation(),Target->GetActorLocation(),ECC_Visibility,Q))continue;
@@ -666,3 +666,4 @@ FICCombatResult UICAbilitySystemComponent::RequestSkillByID(FName SkillID,FName 
 
 void UICAbilitySystemComponent::NotifyEquipmentChanged()
 { IC_TRACE_FUNCTION();if(CurrentID.IsValid()&&(RequestedAction==TEXT("Attack")||Skill.CancelRules.bCancelOnSuccessfulEquipmentChange))CancelAction(); }
+

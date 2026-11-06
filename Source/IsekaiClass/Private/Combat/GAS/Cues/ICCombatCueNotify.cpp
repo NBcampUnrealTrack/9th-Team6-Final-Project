@@ -4,6 +4,9 @@
 #include "Sound/SoundBase.h"
 #include "Combat/VFX/ICCombatVFX.h"
 #include "Audio/ICBGMSubsystem.h"
+#include "NiagaraComponent.h"
+#include "TimerManager.h"
+#include "Engine/World.h"
 
 bool UICCombatCueNotify::OnExecute_Implementation(AActor* MyTarget, const FGameplayCueParameters& Parameters) const
 {
@@ -12,7 +15,7 @@ bool UICCombatCueNotify::OnExecute_Implementation(AActor* MyTarget, const FGamep
     const FVector Location = Parameters.Location.IsNearlyZero() ? MyTarget->GetActorLocation() : FVector(Parameters.Location);
     const auto& ChosenVisual = Payload->bImpact ? Payload->Presentation.ImpactVFX : Payload->Presentation.CastVFX;
     const auto& ChosenSound = Payload->bImpact ? Payload->Presentation.ImpactSound : Payload->Presentation.CastSound;
-    const auto& Visual = ChosenVisual.IsNull() ? DefaultVFX : ChosenVisual;
+    const auto Visual = ChosenVisual.IsNull() && !Payload->Presentation.bSuppressDefaultVFX ? DefaultVFX : ChosenVisual;
     const auto& Sound = ChosenSound.IsNull() ? DefaultSound : ChosenSound;
     if(const auto* Config=ICCombatVFX::Resolve(Payload->Presentation))
     {
@@ -22,7 +25,21 @@ bool UICCombatCueNotify::OnExecute_Implementation(AActor* MyTarget, const FGamep
         const auto& Layers=Payload->bImpact?Config->ImpactLayers:Config->CastLayers;
         for(const auto& Layer:Layers)ICCombatVFX::Spawn(MyTarget->GetWorld(),Transform,Layer,.5f,Follow);
     }
-    else if (auto* System = Visual.LoadSynchronous()) UNiagaraFunctionLibrary::SpawnSystemAtLocation(MyTarget, System, Location);
+    else if (auto* System = Visual.LoadSynchronous())
+    {
+        auto* Component=UNiagaraFunctionLibrary::SpawnSystemAtLocation(MyTarget,System,Location);
+        if (Component && Payload->Presentation.MaxVFXLifetimeSeconds>0)
+        {
+            TWeakObjectPtr<UNiagaraComponent> WeakComponent=Component;
+            FTimerHandle Handle;
+            MyTarget->GetWorld()->GetTimerManager().SetTimer(Handle,FTimerDelegate::CreateLambda([WeakComponent]()
+            {
+                // DeactivateImmediate may auto-destroy and invalidate a weak pointer.
+                // Destroy once using a single validated lookup instead.
+                if (UNiagaraComponent* LiveComponent=WeakComponent.Get()) LiveComponent->DestroyComponent();
+            }),Payload->Presentation.MaxVFXLifetimeSeconds,false);
+        }
+    }
     if (auto* Audio = Sound.LoadSynchronous()) UGameplayStatics::PlaySoundAtLocation(MyTarget, Audio, Location);
     return true;
 }

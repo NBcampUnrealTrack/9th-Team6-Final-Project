@@ -1,0 +1,2 @@
+﻿---,Patterns
+Elite,"((PatternID=""WeakWeakStrong"",bEnabled=True,Priority=0,MinHPRatio=0.000000,MaxHPRatio=1.000000,MinDistanceCm=0.000000,MaxDistanceCm=250.000000,CooldownSeconds=1.000000,StepIntervalSeconds=0.350000,bRequireLineOfSight=True,Conditions=(Policy=All,Conditions=),SkillSequence=("""","""",""SKL_MON_R01_009_HEAVY"")))"
